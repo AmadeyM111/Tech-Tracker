@@ -195,7 +195,7 @@
 - **Попытки:** 3
 
 ## T10 — Первый запуск: секретный ключ, пространство, первый ТА; каркас CLI
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-23 (in-process: ровно один ТА, файл пароля 0600, пароля нет в логах и stdout, ключ стабилен и не `change-me`, повтор не создаёт второго ТА и не меняет файл), AC-114 (часть: после первого запуска в `domain_event` нет строк), FR-6, FR-41 (OI-110), D-9, D-19, D-20, D-29
 - **Файлы:** `backend/app/core/secrets.py`, `backend/app/domain/system/bootstrap.py`,
   `backend/app/cli/main.py`, `backend/app/cli/commands/bootstrap.py`;
@@ -208,10 +208,10 @@
   не пишет (D-9). В stdout — только путь к файлу.
 - **Готово, когда:** `pytest -q backend/tests/cli/test_bootstrap.py` зелёный, линтер чистый.
 - **Заметка ревью T03:** пустой `SECRET_KEY=""` считать отсутствием ключа (в `ensure_secret_key` или приведением `""` → `None` в Settings).
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T11 — Домен аутентификации: провайдер, защита от перебора, сессии
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-30, AC-37, AC-20 (вход заблокированного), AC-32, AC-33 (уровень сервиса), FR-3, FR-56, FR-59, FR-61, D-10, D-13
 - **Файлы:** `backend/app/domain/auth/provider.py`, `backend/app/domain/auth/sessions.py`,
   `backend/app/domain/auth/service.py`; тесты: `backend/tests/domain/test_auth_service.py`
@@ -365,6 +365,7 @@
 - **Готово, когда:** `docker build -t gostracker-api:test backend` успешен;
   `pytest -q -m infra_static backend/tests/infra/test_api_image.py` зелёный (Python 3.12, uid 10001, `gostracker --help`).
 - **Заметка ревью T02:** при `depends_on: db: condition: service_healthy` добавить `start_period` к healthcheck db.
+- **Заметки ревью T10 (желательные, не блокировали):** (1) `alembic upgrade head` выполнять под тем же advisory lock (параллельный запуск на чистой БД падает на `alembic_version`); (2) при ошибке COMMIT перед удалением файла пароля проверить отдельной сессией, не зафиксировано ли пространство (обрыв после фиксации оставляет ТА с неизвестным паролем); (3) минимальная длина `SECRET_KEY` из env (≥ 32 байт) и сравнение заглушки `strip().lower()` — требование в FR-6/D-20 через plan; (4) удалять остатки `.<name>.*.tmp` под блокировкой; `ensure_private_dir` — `lstat`/`S_ISDIR`, чинить права 0755 → 0700; (5) advisory lock на AUTOCOMMIT-соединении; `_known_secrets` из `settings`; `path_separator = os` в `alembic.ini`; plan §4.7 — stdout только путь, текст в stderr.
 - **Попытки:** 0
 
 ## T21 — Каркас фронтенда
