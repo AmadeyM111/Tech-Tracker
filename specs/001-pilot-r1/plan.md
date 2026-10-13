@@ -127,7 +127,7 @@ backend/
     ops/restore_crm.py                   [3]
     ops/demo.py, ops/export.py, ops/importer.py, ops/loadgen.py   [4]
   app/api/
-    deps.py                              [0] get_db, get_actor, гейты, require_capability
+    deps.py                              [0] get_actor (DbSession из core/db.py), гейты, require_capability
     v1/__init__.py                       [0] сборка роутеров
     v1/health.py, v1/auth.py, v1/me.py, v1/admin_users.py, v1/audit.py      [0]
     v1/schemas/{common,auth,admin,audit}.py                               [0]
@@ -178,7 +178,7 @@ AGENTS.md                                изм. [0] только блок «К�
 - `domain/*` — сервисы и запросы; каждая выборка фильтруется `workspace_id = actor.workspace_id`.
   Сервис получает `Actor` и `AsyncSession` аргументами.
 - `core/*` — инфраструктура без бизнес-правил.
-- Транзакция = запрос: `get_db` открывает `session.begin()`; исключение → откат.
+- Транзакция = запрос: `get_db` открывает `session.begin()`; исключение → откат. Подключать только как `DbSession` (scope="function", см. §4.2).
   Сервисы **не** вызывают `commit()`. Событие (§4.4) пишется в той же сессии.
 
 ### 4.2. Ядро
@@ -272,6 +272,10 @@ def create_engine(settings: Settings) -> AsyncEngine: ...   # hide_parameters=Tr
 async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
     # async with request.app.state.sessionmaker() as s, s.begin(): yield s
     ...
+DbSession = Annotated[AsyncSession, Depends(get_db, scope="function")]
+# Единственная точка подключения сессии (ревью T05): scope="function" — COMMIT выполняется ДО
+# отправки ответа, сбой commit даёт 500, а не 200. Прямой Depends(get_db) вне core/db.py запрещён
+# (иначе две сессии и две транзакции на запрос: scope входит в ключ кэша зависимостей).
 
 # app/core/models.py
 class Base(DeclarativeBase): ...                  # MetaData(naming_convention=...)
@@ -583,7 +587,7 @@ async def change_own_password(db, actor: Actor, hasher, sessions, settings, *, c
 ```python
 # app/api/deps.py
 BACKGROUND_HEADER: Final = "X-GT-Background"
-async def get_actor(request: Request, db: AsyncSession = Depends(get_db)) -> Actor          # 401; читает роль из БД каждый раз (FR-67)
+async def get_actor(request: Request, db: DbSession) -> Actor          # 401; читает роль из БД каждый раз (FR-67)
 async def get_active_actor(actor: Actor = Depends(get_actor)) -> Actor                    # 403 password_change_required / no_role
 def require_capability(*caps: Capability) -> Callable[..., Coroutine[Any, Any, Actor]]    # 403 forbidden (любая из caps)
 ```
@@ -1072,6 +1076,7 @@ HSTS не включается (самоподписанный сертифик�
 | `python-multipart` | `>=0.0.20,<0.1` | Apache-2.0 | R1.1 | `UploadFile` в FastAPI (FR-24) | свой разбор multipart | ~25 КБ |
 | `pyyaml` (dev) | `>=6.0,<7` | MIT | R1.0 | статический разбор compose-файлов в тестах `infra_static` (T02, AC-105, AC-95) | `docker compose config` (нужен Docker в CI и на машине разработчика), ruamel.yaml (тяжелее, нужен только чтение) | ~800 КБ (колесо с C-ускорением) |
 | `types-PyYAML` (dev) | `>=6.0,<7` | Apache-2.0 | R1.0 | типы PyYAML для mypy strict | `# type: ignore` в тестах | ~20 КБ |
+| `greenlet` | `>=3.0,<4` | MIT | R1.0 | требуется `sqlalchemy.ext.asyncio` (asyncpg); без него импорт async-слоя падает (находка T05) | `sqlalchemy[asyncio]` extra (тянет тот же greenlet) | ~250 КБ |
 
 Существующие и остающиеся: fastapi (MIT; тянет `opentelemetry-api` Apache-2.0 — no-op без SDK),
 uvicorn[standard] (BSD-3), sqlalchemy (MIT), alembic (MIT), asyncpg (Apache-2.0),

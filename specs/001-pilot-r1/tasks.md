@@ -21,6 +21,7 @@
 - «Линтер чистый» во всех задачах backend = `ruff check backend && ruff format --check backend && mypy --config-file backend/pyproject.toml backend/app` (из корня; без `--config-file` mypy не видит конфиг — ревью T01-1).
 - В тестах: фиксированные часы `FixedClock` (plan §4.2) и фиксированный seed; Argon2 с
   дешёвыми параметрами (`time_cost=1, memory_cost_kib=1024, parallelism=1`).
+- Сессия БД в API подключается только как `DbSession` (core/db.py, scope="function"); прямой `Depends(get_db)` запрещён (ревью T05-1).
 - Каждая выборка из БД фильтруется по `workspace_id` текущего пользователя (AGENTS.md).
 
 ---
@@ -98,11 +99,11 @@
 - **Попытки:** 1
 
 ## T05 — Слой БД, базовые миксины, Alembic и тестовая БД
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** FR-13 (каркас `WorkspaceMixin`), FR-46, D-2…D-4, D-26
 - **Файлы:** `backend/app/core/db.py`, `backend/app/core/models.py`, `backend/app/domain/registry.py`,
   `backend/alembic.ini`, `backend/migrations/env.py`, `backend/migrations/script.py.mako`,
-  `backend/app/main.py` (lifespan: движок и sessionmaker в `app.state`);
+  `backend/app/main.py` (lifespan: движок и sessionmaker в `app.state`), `backend/pyproject.toml`;
   тесты: `backend/tests/conftest.py` (фикстуры БД по plan §5), `backend/tests/db/test_migrations.py`
 - **Зависит от:** T02, T04
 - **Описание:** `create_engine()` (`hide_parameters=True`, `pool_pre_ping=True`), `get_db()`
@@ -114,10 +115,22 @@
 - **Готово, когда:** `pytest -q backend/tests/db/test_migrations.py` зелёный (upgrade → downgrade → upgrade на
   тестовой БД, `alembic check` без расхождений), линтер чистый.
 - **Заметка ревью T01:** решить, нужен ли `asyncio_default_test_loop_scope = "session"` при session-фикстурах движка БД (иначе «attached to a different loop»).
-- **Попытки:** 0
+- **Уточнения (оркестратор, по отчёту test-writer):** добавить `greenlet>=3.0,<4` в зависимости
+  `backend/pyproject.toml` (plan §7.1) и `asyncio_default_test_loop_scope = "session"` в pytest;
+  naming convention: `ix_%(column_0_label)s`, `uq_%(table_name)s_%(column_0_name)s`,
+  `ck_%(table_name)s_%(constraint_name)s`, `fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s`,
+  `pk_%(table_name)s`; `WorkspaceMixin`/`AuthoredMixin` через `declared_attr`; `engine.dispose()`
+  в lifespan после `yield`; `migrations/versions/.gitkeep`. Файлы задачи дополнены: `backend/pyproject.toml`.
+- **Ревью T05-1 (CHANGES_REQUESTED):** `core/db.py` — `DbSession = Annotated[AsyncSession, Depends(get_db, scope="function")]`
+  как единственная точка подключения (иначе сбой COMMIT после отправки ответа → клиент получает 200; прямой
+  `Depends(get_db)` рядом с `scope="function"` даёт две транзакции на запрос); docstring исправить. Новые тесты:
+  сбой на COMMIT (`SET CONSTRAINTS ALL DEFERRED` + нарушение FK) → 500 и откат; AST-запрет `Depends(get_db` вне
+  `core/db.py`. Прочее: `env.py` — `hide_parameters=True`, `NullPool`; `alembic.ini` — `prepend_sys_path = %(here)s`;
+  защита имени `_test` не должна обходиться query-параметром `?database=` (db_support.py).
+- **Попытки:** 2
 
 ## T06 — Модель идентичности: пространство, пользователь, членство, сессия (миграция 0001)
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-116 (уровень БД: логин уникален и соответствует шаблону), FR-73, FR-66 (не больше одной роли), FR-58 (серверная сессия), FR-13, D-5, D-39
 - **Файлы:** `backend/app/domain/workspaces/models.py`, `backend/app/domain/users/models.py`,
   `backend/app/domain/auth/models.py`, `backend/migrations/versions/0001_identity.py`,
@@ -228,6 +241,7 @@
   `password_change_required`, затем 403 `no_role`), `require_capability(*caps)` (403
   `forbidden`), `check_origin` (D-16, 403 `origin_mismatch`). Порядок проверок — plan §4.5.
 - **Готово, когда:** `pytest -q backend/tests/unit/test_role_matrix.py backend/tests/api/test_deps_gates.py` зелёный, линтер чистый.
+- **Заметка ревью T05:** зависимость с `yield` поверх `DbSession` должна объявляться со `scope="function"` (иначе `DependencyScopeError`); AST-тест «нет get_db вне core/db.py» усилить — запретить любое упоминание имени (Name/Attribute/alias, Security).
 - **Попытки:** 0
 
 ## T13 — API входа, выхода и профиля; поведение сессии
