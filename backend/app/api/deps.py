@@ -12,9 +12,9 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Coroutine
 from typing import Annotated, Any, Final
-from urllib.parse import urlsplit
 
 from fastapi import Depends, Request
 from sqlalchemy import select
@@ -111,24 +111,39 @@ def require_capability(*caps: Capability) -> Callable[..., Coroutine[Any, Any, A
     return dependency
 
 
-def _host_port(netloc: str, default_port: int | None) -> tuple[str, int | None] | None:
+# ``host[:port]``: имя из ASCII (punycode для IDN), ``[IPv6]``; без userinfo и пути.
+_HOST_PORT_RE: Final = re.compile(
+    r"(?P<host>[A-Za-z0-9._-]+|\[[0-9A-Fa-f:.]+\])(?::(?P<port>[0-9]{1,5}))?", re.ASCII
+)
+# Origin = ``scheme://host[:port]`` целиком: без userinfo, пути (в т.ч. ``/``), query, fragment.
+_ORIGIN_RE: Final = re.compile(r"(?P<scheme>https?)://(?P<authority>[^/?#@\s]+)", re.ASCII)
+_MAX_PORT: Final = 65535
+
+
+def _host_port(authority: str, default_port: int | None) -> tuple[str, int | None] | None:
     """(host, port) из ``host[:port]``; порт по умолчанию подставляется; ``None`` — не разобрать."""
-    try:
-        parsed = urlsplit("//" + netloc)
-        host, port = parsed.hostname, parsed.port
-    except ValueError:
+    match = _HOST_PORT_RE.fullmatch(authority)
+    if match is None:
         return None
-    if host is None:
-        return None
-    return host, port if port is not None else default_port
+    port_text = match.group("port")
+    if port_text is None:
+        port = default_port
+    else:
+        port = int(port_text)
+        if port > _MAX_PORT:
+            return None
+    return match.group("host").lower(), port
 
 
 async def check_origin(request: Request) -> None:
-    """D-16: для POST/PUT/PATCH/DELETE ``Origin`` с чужим хостом:портом → 403.
+    """D-16: для POST/PUT/PATCH/DELETE ``Origin`` с чужой схемой, хостом или портом → 403.
 
     ``Origin`` нет — проверка не применяется (защита — ``SameSite=Lax``); безопасные методы
-    не проверяются; ``Referer`` не используется. Отсутствующий порт равен порту по умолчанию
-    схемы ``Origin`` (80 для http, 443 для https).
+    не проверяются; ``Referer`` не используется. Заголовок разбирается строго:
+    ``scheme://host[:port]`` без userinfo, пути, query и fragment; ``null``, пустое значение и
+    мусор → 403. Схема Origin должна совпадать со схемой запроса (``request.url.scheme``;
+    за прокси — из ``X-Forwarded-Proto`` при ``--proxy-headers``), порт по умолчанию
+    (80 для http, 443 для https) определяется по схеме запроса.
     """
     if request.method not in _UNSAFE_METHODS:
         return
@@ -136,15 +151,14 @@ async def check_origin(request: Request) -> None:
     if origin is None:
         return
     host_header = request.headers.get("host")
-    try:
-        parsed = urlsplit(origin)
-    except ValueError:
-        raise OriginMismatch() from None
-    # Origin: ``scheme://host[:port]``; ``null`` и мусор не имеют ни схемы, ни хоста
-    if not parsed.scheme or not parsed.netloc or host_header is None:
+    match = _ORIGIN_RE.fullmatch(origin)
+    if match is None or host_header is None:
         raise OriginMismatch()
-    default_port = _DEFAULT_PORTS.get(parsed.scheme)
-    origin_hp = _host_port(parsed.netloc, default_port)
+    request_scheme = request.url.scheme
+    if match.group("scheme") != request_scheme:
+        raise OriginMismatch()
+    default_port = _DEFAULT_PORTS.get(request_scheme)
+    origin_hp = _host_port(match.group("authority"), default_port)
     own_hp = _host_port(host_header, default_port)
     if origin_hp is None or own_hp is None or origin_hp != own_hp:
         raise OriginMismatch()

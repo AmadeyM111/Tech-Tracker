@@ -17,7 +17,7 @@ import asyncio
 import inspect
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import pytest_asyncio
@@ -39,6 +39,8 @@ if TYPE_CHECKING:
         AsyncSession,
         async_sessionmaker,
     )
+
+    from tests.factories import UserRow
 
 FIXED_NOW = datetime(2026, 10, 13, 9, 0, 0, tzinfo=UTC)
 SESSION_LOOP = pytest.mark.asyncio(loop_scope="session")
@@ -216,3 +218,216 @@ async def client(
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as c:
         yield c
+
+
+# --- T13: HTTP-окружение входа (хелперы «войти») ------------------------------------------
+
+
+class ApiEnv:
+    """Приложение с запущенным lifespan, httpx-клиент и хелперы входа.
+
+    ``sessionmaker`` — та же фабрика, что подставлена в ``app.state.sessionmaker``: в обычном
+    режиме сессии внешней транзакции теста (откат), в режиме ``committed`` — реальные
+    фиксации. Тестовые данные создаются в отдельной сессии с ``commit()``: в обоих режимах
+    они видны запросам приложения.
+
+    Cookie-jar клиента отключён: cookie передаёт тест явно (``auth``), чтобы не зависеть от
+    правил ``Secure``/домена httpx.
+    """
+
+    def __init__(
+        self,
+        *,
+        app: FastAPI,
+        client: httpx.AsyncClient,
+        settings: Settings,
+        clock: FixedClock,
+        sessionmaker: async_sessionmaker[AsyncSession],
+        base_url: str,
+    ) -> None:
+        self.app = app
+        self.client = client
+        self.settings = settings
+        self.clock = clock
+        self.sessionmaker = sessionmaker
+        self.base_url = base_url
+
+    # --- данные ---
+
+    async def new_user(self, **kwargs: Any) -> UserRow:
+        """``tests.factories.make_user`` в отдельной сессии с фиксацией (по умолчанию без роли)."""
+        from tests.factories import make_user
+
+        async with self.sessionmaker() as session:
+            user = await make_user(session, **kwargs)
+            await session.commit()
+        return user
+
+    async def execute(self, statement: Any) -> list[Any] | None:
+        """Выполняет Core-выражение в отдельной сессии с фиксацией; возвращает результат."""
+        async with self.sessionmaker() as session:
+            result = await session.execute(statement)
+            rows = result.all() if result.returns_rows else None
+            await session.commit()
+        return rows
+
+    async def user_row(self, user_id: Any) -> Any:
+        """Строка ``app_user`` (failed_login_count, login_locked_until, …) свежей сессией."""
+        from sqlalchemy import select
+
+        from tests.factories import get_table
+
+        table = get_table("app_user")
+        async with self.sessionmaker() as session:
+            row = (await session.execute(select(table).where(table.c.id == user_id))).one()
+        return row
+
+    async def session_ids(self, user_id: Any) -> list[bytes]:
+        from sqlalchemy import select
+
+        from tests.factories import get_table
+
+        table = get_table("user_session")
+        async with self.sessionmaker() as session:
+            rows = (
+                await session.execute(select(table.c.id).where(table.c.user_id == user_id))
+            ).all()
+        return [bytes(r[0]) for r in rows]
+
+    def token_id(self, token: str) -> bytes:
+        from app.core.secrets import ensure_secret_key
+        from app.domain.auth.sessions import SessionStore
+
+        store = SessionStore(
+            ensure_secret_key(self.settings),
+            idle_timeout=self.settings.session_idle_timeout,
+            absolute_timeout=self.settings.session_absolute_timeout,
+        )
+        return store.token_id(token)
+
+    # --- HTTP ---
+
+    @property
+    def cookie_name(self) -> str:
+        return self.settings.cookie_name
+
+    def auth(self, token: str, **extra: str) -> dict[str, str]:
+        """Заголовки с cookie сессии (+ дополнительные заголовки)."""
+        return {"Cookie": f"{self.cookie_name}={token}", **extra}
+
+    async def login(
+        self,
+        login: str,
+        password: str,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        return await self.client.post(
+            "/api/v1/auth/login",
+            json={"login": login, "password": password},
+            headers=headers,
+        )
+
+    def token_from(self, response: httpx.Response) -> str | None:
+        """Значение cookie сессии из ``Set-Cookie`` ответа; ``None`` — cookie не ставится."""
+        for raw in response.headers.get_list("set-cookie"):
+            name, _, rest = raw.partition("=")
+            if name.strip() == self.cookie_name:
+                return rest.split(";", 1)[0].strip().strip('"')
+        return None
+
+    async def login_ok(self, user: UserRow) -> str:
+        """Вход пользователя из ``new_user`` по HTTP; возвращает сырой токен."""
+        response = await self.login(user.login, user.password)
+        assert response.status_code == 200, response.text
+        token = self.token_from(response)
+        assert token, "вход не поставил cookie сессии"
+        return token
+
+    async def me(self, token: str, **extra: str) -> httpx.Response:
+        return await self.client.get("/api/v1/me", headers=self.auth(token, **extra))
+
+
+def _block_cookie_jar(client: httpx.AsyncClient) -> None:
+    from http.cookiejar import DefaultCookiePolicy
+
+    client.cookies.jar.set_policy(DefaultCookiePolicy(allowed_domains=[]))
+
+
+async def _open_api_env(
+    app: FastAPI,
+    settings: Settings,
+    clock: FixedClock,
+    sessionmaker: async_sessionmaker[AsyncSession],
+    base_url: str,
+) -> AsyncIterator[ApiEnv]:
+    import httpx
+
+    async with app.router.lifespan_context(app):
+        app.state.sessionmaker = sessionmaker
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url=base_url) as c:
+            _block_cookie_jar(c)
+            yield ApiEnv(
+                app=app,
+                client=c,
+                settings=settings,
+                clock=clock,
+                sessionmaker=sessionmaker,
+                base_url=base_url,
+            )
+
+
+@pytest_asyncio.fixture
+async def api_env(
+    app: FastAPI,
+    settings: Settings,
+    fixed_clock: FixedClock,
+    db_sessionmaker: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[ApiEnv]:
+    """``cookie_secure=False``, http; запросы в транзакции теста (откат в конце)."""
+    async for env in _open_api_env(
+        app, settings, fixed_clock, db_sessionmaker, "http://testserver"
+    ):
+        yield env
+
+
+@pytest_asyncio.fixture
+async def api_env_secure(
+    settings: Settings,
+    fixed_clock: FixedClock,
+    db_sessionmaker: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[ApiEnv]:
+    """``cookie_secure=True`` (поставляемая конфигурация), запросы по https."""
+    from app.main import create_app
+
+    secure = settings.model_copy(update={"cookie_secure": True})
+    application = create_app(secure, clock=fixed_clock)
+    async for env in _open_api_env(
+        application, secure, fixed_clock, db_sessionmaker, "https://testserver"
+    ):
+        yield env
+
+
+@pytest_asyncio.fixture
+async def committed_api_env(
+    app: FastAPI,
+    settings: Settings,
+    fixed_clock: FixedClock,
+    committed: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[ApiEnv]:
+    """Реальные фиксации и отдельные соединения на запрос (параллельность, FR-61)."""
+    async for env in _open_api_env(app, settings, fixed_clock, committed, "http://testserver"):
+        yield env
+
+
+def parse_set_cookie(response: httpx.Response, name: str) -> Any:
+    """``http.cookies.Morsel`` для cookie ``name`` из ``Set-Cookie`` ответа или ``None``."""
+    from http.cookies import SimpleCookie
+
+    for raw in response.headers.get_list("set-cookie"):
+        jar: SimpleCookie = SimpleCookie()
+        jar.load(raw)
+        if name in jar:
+            return jar[name]
+    return None

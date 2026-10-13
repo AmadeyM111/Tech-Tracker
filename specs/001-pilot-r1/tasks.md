@@ -260,7 +260,7 @@
 - **Попытки:** 1
 
 ## T13 — API входа, выхода и профиля; поведение сессии
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-4, AC-20 (код и тело при входе заблокированного), AC-30, AC-32, AC-33, AC-34, AC-36, AC-37, AC-79, AC-116 (вход с логином в верхнем регистре), FR-7, FR-60, FR-73
 - **Файлы:** `backend/app/api/v1/auth.py`, `backend/app/api/v1/me.py`, `backend/app/api/v1/schemas/auth.py`
   (+ подключение в `app/api/v1/__init__.py`);
@@ -276,10 +276,16 @@
   зелёный, линтер чистый.
 - **Заметка ревью T11:** роут входа не должен писать в сессию БД до `service.login` (иначе `checkpoint`/`commit_durably` зафиксирует эти записи досрочно).
 - **Заметки ревью T12:** (a) тест порядка проверок для битого JSON (422 раньше 401, plan §4.5 п.5) или свой `APIRoute`; (b) `check_origin`: сверять схему Origin с `request.url.scheme` (X-Forwarded-Proto при `--proxy-headers`), строго разбирать Origin (без userinfo/path); (c) имя cookie с префиксом `__Host-` — только при `cookie_secure` (в dev по http префикс недопустим); (d) `require_capability()` без аргументов — `assert caps`.
-- **Попытки:** 0
+- **Уточнения (оркестратор, по отчёту test-writer):** `/me` — только для активного актора (403 `no_role` / `password_change_required`
+  по plan §4.6; фронтенд строит экраны по коду ошибки); тело входа — ровно `{"user": {id, login, role, must_change_password}}`;
+  logout → 204 (повтор 204 или 401, не 5xx); повторный вход создаёт новую сессию, старый токен действует до logout/истечения;
+  имя cookie — `settings.cookie_name` (префикс `__Host-` по умолчанию не вводится; T28 — рекомендация оператору);
+  `deps.check_origin` ужесточается в рамках T13 (схема Origin против `request.url.scheme`; без userinfo/path/query/fragment; `null`/мусор → 403);
+  файлы задачи дополнены: `backend/app/api/deps.py`.
+- **Попытки:** 1
 
 ## T14 — Смена своего пароля, одноразовый пароль, пользователь без роли
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-29, AC-31, AC-35, AC-27, AC-28 и AC-115 (через API), AC-75 (вход, смена пароля, выход; 403 на прочее), AC-113 (часть: при одноразовом пароле выход выполняется и старая сессия получает 401, прочие запросы отклоняются), AC-23 (файл пароля удаляется после смены), FR-55, FR-56, FR-66
 - **Файлы:** `backend/app/api/v1/auth.py` (`POST /api/v1/auth/password`), `backend/app/api/v1/schemas/auth.py`;
   тесты: `backend/tests/api/test_password_change.py`, `backend/tests/api/test_password_leaks.py`,
@@ -294,6 +300,7 @@
   зелёный, линтер чистый.
 - **Заметка ревью T08:** пароль с одиночным суррогатом проходит `SecretStr` и `validate_new_password`, но `hash`/`verify` падают с `UnicodeEncodeError` (500) — отклонять на уровне схемы (422) или ловить; тест порядка «короткий и частый → password_too_short».
 - **Заметки ревью T11:** (5) перебор `current` в `change_own_password` не ограничен — после N подряд `invalid_current_password` завершать сессию (открытый вопрос к spec, FR-61 говорит только о входе); (6) удалять файл пароля первого ТА ПОСЛЕ успешного COMMIT (хук `after_commit` или в роутере) + тест сбоя COMMIT (тест T11 `test_fr6_change_removes_initial_admin_file_for_this_login` потребует правки через test-writer).
+- **Заметки ревью T13:** `Max-Age` cookie брать из `settings.session_absolute_timeout` (а не константа 604800); `max_length` у полей пароля/логина в схемах (пароль на 20 МБ доходит до проверки; предел ≈ 1024); `assert caps` в `require_capability`; явная проверка вместо `assert actor.role is not None` в `me.py`; отклонять запрос с повторным заголовком `Origin`.
 - **Попытки:** 0
 
 ## T15 — Постраничный вывод
@@ -417,6 +424,7 @@
   словарь `ru` и `t()`; тест i18n ищет кириллицу в `src/**/*.tsx` вне `src/shared/i18n/`.
 - **Готово, когда:** `bash scripts/gen-api.sh && git diff --exit-code frontend/src/shared/api/schema.d.ts docs/api/openapi.json`;
   `cd frontend && npm run lint && npm run typecheck && npm test` — успешно.
+- **Заметка ревью T13:** dev-прокси Vite — `changeOrigin: false` (иначе `Host` не совпадёт с `Origin: http://localhost:5173`).
 - **Попытки:** 0
 
 ## T23 — Экраны входа, смены пароля и «нет роли»
@@ -466,6 +474,7 @@
   сертификат создан и стабилен, TLS 1.2 принимается, TLS 1.1 отклоняется, `nginx -T` содержит
   `ssl_protocols TLSv1.2 TLSv1.3`, http → 308).
 - **Заметка ревью T12:** `proxy_set_header Host $http_host` (не `$host`), иначе при нестандартном порте HTTPS ложный 403 `origin_mismatch`; `X-Forwarded-Proto` передавать.
+- **Заметка ревью T13:** uvicorn за nginx — `--proxy-headers --forwarded-allow-ips`; без этого `check_origin` даёт 403 на каждый POST по https; `client_max_body_size` (вложения 10 МБ, прочее — небольшой предел).
 - **Попытки:** 0
 
 ## T26 — Поставляемый docker-compose и инфраструктурные тесты стека
