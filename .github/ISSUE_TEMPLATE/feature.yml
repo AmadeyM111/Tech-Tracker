@@ -1,0 +1,12 @@
+name: Доработка
+description: Предложение по функциональности
+labels: [enhancement]
+body:
+  - type: textarea
+    attributes: {label: Задача пользователя, description: "Как <роль>, я хочу <действие>, чтобы <ценность>"}
+    validations: {required: true}
+  - type: textarea
+    attributes: {label: Критерии приёмки, description: Given / When / Then}
+    validations: {required: true}
+  - type: textarea
+    attributes: {label: Как это решают аналоги}

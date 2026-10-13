@@ -1,0 +1,30 @@
+[project]
+name = "tracker-backend"
+version = "0.0.1"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "asyncpg>=0.30",
+    "pydantic-settings>=2.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "httpx>=0.28", "ruff>=0.7", "mypy>=1.13"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
