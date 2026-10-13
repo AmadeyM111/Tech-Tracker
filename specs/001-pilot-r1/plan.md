@@ -310,7 +310,7 @@ class PasswordHasher:
     def verify(self, password_hash: str, password: str) -> bool: ...
     def dummy_verify(self, password: str) -> None: ...            # выравнивание времени для несуществующего логина
     def needs_rehash(self, password_hash: str) -> bool: ...
-async def hash_in_thread(hasher: PasswordHasher, password: str) -> str: ...      # anyio.to_thread
+async def hash_in_thread(hasher: PasswordHasher, password: str) -> str: ...      # asyncio.to_thread
 async def verify_in_thread(hasher: PasswordHasher, h: str, password: str) -> bool: ...
 
 # app/core/security/common_passwords.py
@@ -1114,7 +1114,8 @@ ruff (MIT), mypy (MIT). `psycopg` (LGPL) **не** добавляется. Все
   `fa1ea0cf2f673458b58be3a7171d2b7fc6f2e704b4691e69c13a9a8511f5cf31`; тест сверяет число
   строк и хеш. Включается в пакет (`package-data`).
 - **Сравнение:** точное совпадение строки (FR-53 «совпадающий»). Записей длиной ≥ 12 в
-  поставляемой части — 9 (например, `unbelievable`) — этого достаточно для AC-28.
+  поставляемой части — 10 (например, `unbelievable`, `films+pic+galeries`; пересчитано при T08 —
+  исходное «9» было ошибкой подсчёта) — этого достаточно для AC-28.
 - **Отвергнуто:** NCSC PwnedPasswordsTop100k (100 000 записей, иные условия лицензии);
   частотные списки zxcvbn (MIT, но 30 000 записей с другой выборкой); HIBP k-anonymity API
   (внешний вызов, нарушает NFR-4).

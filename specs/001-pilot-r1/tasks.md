@@ -162,7 +162,7 @@
 - **Попытки:** 1
 
 ## T08 — Пароли: политика, Argon2id, список частых паролей
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-27, AC-28, AC-115 (юнит-уровень: совпадение точное, с учётом регистра), AC-3 (формат хеша `$argon2id$`), FR-2, FR-52, FR-53, FR-57
 - **Файлы:** `backend/app/core/security/passwords.py`, `backend/app/core/security/common_passwords.py`,
   данные `backend/app/core/security/data/common-passwords-10k.txt`, `backend/app/core/security/data/NOTICE.md`;
@@ -176,10 +176,10 @@
   из аргументов), `dummy_verify`, `needs_rehash`, `hash_in_thread`/`verify_in_thread`,
   `validate_new_password` (сообщение без значения пароля), `generate_password`.
 - **Готово, когда:** `pytest -q backend/tests/unit/test_passwords.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T09 — Логирование без секретов
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** FR-57 (часть AC-35), FR-51 (логи в stdout для драйвера Docker), D-31
 - **Файлы:** `backend/app/core/logging.py`, `backend/app/main.py` (подключение);
   тесты: `backend/tests/unit/test_logging.py`
@@ -191,6 +191,7 @@
   отключён.
 - **Готово, когда:** `pytest -q backend/tests/unit/test_logging.py` зелёный, линтер чистый.
 - **Заметка ревью T04:** фильтр секретов должен применяться и к `exc_info` и тексту исключения (RuntimeError("password=…") сейчас попадает в лог как есть); трассировка 500 дублируется логгерами `app.errors` и `uvicorn.error` — подавить дубль.
+- **Заметка ревью T08:** не логировать `exc.args`/`repr` у `UnicodeError` (при суррогате в пароле `args[1]` содержит пароль) и не выводить `f_locals` в трассировках (show_locals).
 - **Попытки:** 0
 
 ## T10 — Первый запуск: секретный ключ, пространство, первый ТА; каркас CLI
@@ -276,6 +277,7 @@
   ни в телах ответов, ни в 422.
 - **Готово, когда:** `pytest -q backend/tests/api/test_password_change.py backend/tests/api/test_password_leaks.py backend/tests/api/test_route_guards.py`
   зелёный, линтер чистый.
+- **Заметка ревью T08:** пароль с одиночным суррогатом проходит `SecretStr` и `validate_new_password`, но `hash`/`verify` падают с `UnicodeEncodeError` (500) — отклонять на уровне схемы (422) или ловить; тест порядка «короткий и частый → password_too_short».
 - **Попытки:** 0
 
 ## T15 — Постраничный вывод
@@ -496,6 +498,7 @@
   команды из plan D-18/§4.12; ссылки на файлы существуют.
 - **Заметка ревью T02:** вписать в AGENTS.md и README команду dev-конфигурации (`-f deploy/compose.dev.yml`) и способ загрузки `deploy/dev.env.example` (`set -a; . …; set +a`).
 - **Заметка ревью T07:** `downgrade 0002` молча удаляет непустой журнал — описать в документации оператора (или добавить отказ при непустой таблице); в бэклог — отдельная роль БД без SUPERUSER и `REVOKE UPDATE, DELETE, TRUNCATE` (plan D-8).
+- **Заметка ревью T08:** в документации оператора — лимит параллельных хешей (m=128 МиБ, пул `min(32, cpu+4)` → ~900 МиБ пик на стенде C-2).
 - **Попытки:** 0
 
 ---
