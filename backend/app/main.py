@@ -15,6 +15,7 @@ from app.core.clock import Clock, SystemClock, use_clock
 from app.core.config import Settings, get_settings
 from app.core.db import create_engine
 from app.core.errors import install_error_handlers
+from app.core.logging import AccessLogMiddleware, configure_logging
 
 
 class ClockMiddleware:
@@ -51,6 +52,7 @@ async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
 def create_app(settings: Settings | None = None, *, clock: Clock | None = None) -> FastAPI:
     """Собирает приложение. Подключений к БД и сети не открывает."""
     settings = settings if settings is not None else get_settings()
+    configure_logging(settings.log_level)
     docs = settings.expose_api_docs
     application = FastAPI(
         title="Tracker API",
@@ -65,6 +67,8 @@ def create_app(settings: Settings | None = None, *, clock: Clock | None = None) 
     application.state.settings = settings
     application.state.clock = clock if clock is not None else SystemClock()
     application.add_middleware(ClockMiddleware)
+    # добавлен последним — внешний слой: длительность включает остальные middleware
+    application.add_middleware(AccessLogMiddleware)
     install_error_handlers(application)
     application.include_router(api_v1_router)
     return application
