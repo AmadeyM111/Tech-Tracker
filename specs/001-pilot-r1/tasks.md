@@ -62,7 +62,7 @@
 - **Попытки:** 1
 
 ## T03 — Настройки и часы
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-68 (расчёт «сегодня» по Europe/Moscow — юнит-часть), NFR-5, FR-46 (UTC), BR-12
 - **Файлы:** `backend/app/core/config.py`, `backend/app/core/clock.py`;
   тесты: `backend/tests/unit/test_config.py`, `backend/tests/unit/test_clock.py`
@@ -73,7 +73,10 @@
   `use_clock()`, `today_msk()`; `MOSCOW_TZ = ZoneInfo("Europe/Moscow")`.
   Пример для теста: `today_msk(2026-10-13T21:30:00Z) == date(2026, 10, 14)`.
 - **Готово, когда:** `pytest -q backend/tests/unit/test_config.py backend/tests/unit/test_clock.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Уточнения к plan §4.2 (оркестратор, по вопросам test-writer):** `FixedClock` на naive datetime
+  (в `__init__` и `set`) — `ValueError`; `now()` нормализует aware не-UTC в UTC; `today_msk(naive)` —
+  `ValueError`; имена env-переменных = имена полей `Settings`, регистр не важен, без префикса.
+- **Попытки:** 1
 
 ## T04 — Единый формат ошибок и фабрика приложения
 - **Статус:** TODO
@@ -91,6 +94,7 @@
   `generate_unique_id_function=lambda route: route.name`. `debug=False`.
 - **Готово, когда:** `pytest -q backend/tests/api/test_errors.py backend/tests/test_health.py` зелёный, линтер чистый.
 - **Заметка ревью T01:** подпакетам `app/api`, `app/core`, `app/domain` нужен `__init__.py`, иначе `packages.find` не включит их в установку (Docker, T20).
+- **Заметка ревью T03:** `Settings` сейчас с `extra="ignore"` (опечатки в аргументах проглатываются); при создании `create_app(settings)` рассмотреть `extra="forbid"`; нет теста `today_msk(naive)` → `ValueError` и таймауты без проверки `gt=0` — добавить при ближайшем касании config/clock.
 - **Попытки:** 0
 
 ## T05 — Слой БД, базовые миксины, Alembic и тестовая БД
@@ -188,6 +192,7 @@
   через `ALEMBIC_CONFIG`, `run_bootstrap`). Первый запуск под `pg_advisory_lock`; событий аудита
   не пишет (D-9). В stdout — только путь к файлу.
 - **Готово, когда:** `pytest -q backend/tests/cli/test_bootstrap.py` зелёный, линтер чистый.
+- **Заметка ревью T03:** пустой `SECRET_KEY=""` считать отсутствием ключа (в `ensure_secret_key` или приведением `""` → `None` в Settings).
 - **Попытки:** 0
 
 ## T11 — Домен аутентификации: провайдер, защита от перебора, сессии
