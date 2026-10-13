@@ -1142,14 +1142,25 @@ async def test_t08_note_current_password_with_lone_surrogate_is_invalid_current(
     )
 
 
-async def test_fr6_change_removes_initial_admin_file_for_this_login(
+async def test_fr6_change_does_not_remove_initial_admin_file_for_this_login_before_commit(
     db: AsyncSession, auth: SimpleNamespace, mods: SimpleNamespace
 ) -> None:
+    """Порядок T14 (tasks.md, «Уточнения» п.2): файл удаляется ПОСЛЕ COMMIT, а не внутри сервиса.
+
+    Сервис не фиксирует транзакцию, поэтому в момент возврата из ``change_own_password`` смена
+    ещё может быть откачена, и файл с прежним паролем обязан остаться на месте. Удаление после
+    фиксации (на уровне роута или хука ``after_commit``) проверяется через HTTP:
+    ``tests/api/test_password_change.py`` (``test_ac23_*``: после 204 файла нет; при сбое COMMIT
+    файл на месте; в момент ``before_commit`` файл ещё существует).
+    """
     ctx = await _prepare_change(db, auth, must_change=True, login="admin")
     path = write_initial_file(auth.settings, "admin")
     assert path.exists()
     await change(db, auth, mods, ctx)
-    assert not path.exists()
+    assert path.exists()
+    # смена применена в транзакции, но не зафиксирована: откат вернул бы старый пароль
+    state = await user_state(db, ctx.user.id)
+    assert auth.hasher.verify(state.password_hash, NEW_PASSWORD)
 
 
 async def test_fr6_change_keeps_initial_admin_file_of_other_login(

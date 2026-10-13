@@ -12,21 +12,26 @@ JSON даёт 422 раньше 401/403/``origin_mismatch``; валидация �
 plan не описывает — здесь проверяется только, что имя берётся из настроек (test_auth_login).
 """
 
+import ast
 import re
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
+from datetime import timedelta
 from typing import Annotated, Any
 
 import httpx
 import pytest
+import pytest_asyncio
 from fastapi import Depends
 from pydantic import BaseModel, Field
 
-from tests.conftest import ApiEnv
+from tests.conftest import ApiEnv, parse_set_cookie
+from tests.db_support import BACKEND_DIR
 
 PW = "Sup3r-secret-Pa55phrase-xyz"
 LOGIN_URL = "/api/v1/auth/login"
 LOGOUT_URL = "/api/v1/auth/logout"
+PASSWORD_URL = "/api/v1/auth/password"
 PUBLIC: frozenset[tuple[str, str]] = frozenset(
     {("POST", "/api/v1/auth/login"), ("GET", "/api/v1/health")}
 )
@@ -340,6 +345,192 @@ async def test_t12_review_b_malformed_origin_is_403(api_env: ApiEnv, origin: str
     )
     assert (response.status_code, _code(response)) == (403, "origin_mismatch")
     assert api_env.token_from(response) is None
+
+
+# --- T14: FR-55, FR-66 - обход маршрутов при одноразовом пароле и без роли ----------------------
+
+
+def _body_kwargs(method: str) -> dict[str, Any]:
+    return {"json": {}} if method in {"POST", "PUT", "PATCH"} else {}
+
+
+async def test_fr55_fr66_every_guarded_route_gives_403_for_one_time_password_and_no_role(
+    api_env: ApiEnv,
+) -> None:
+    """Все маршруты, кроме входа, выхода, смены пароля и health, закрыты гейтами 2-3."""
+    env = api_env
+    operations = _api_operations(env)
+    assert ("POST", PASSWORD_URL) in operations
+    exempt = PUBLIC | {("POST", LOGOUT_URL), ("POST", PASSWORD_URL)}
+    guarded = sorted(operations - exempt)
+    assert ("GET", "/api/v1/me") in guarded
+
+    once = await env.new_user(role="user", password=PW, must_change_password=True)
+    once_token = await env.login_ok(once)
+    norole = await env.new_user(role=None, password=PW)
+    norole_token = await env.login_ok(norole)
+    both = await env.new_user(role=None, password=PW, must_change_password=True)
+    both_token = await env.login_ok(both)
+
+    failures: list[str] = []
+    for method, path in guarded:
+        for label, token, expected in (
+            ("одноразовый пароль", once_token, "password_change_required"),
+            ("без роли", norole_token, "no_role"),
+            ("оба признака", both_token, "password_change_required"),
+        ):
+            response = await env.client.request(
+                method, _concrete(path), headers=env.auth(token), **_body_kwargs(method)
+            )
+            if response.status_code != 403 or _code(response) != expected:
+                failures.append(
+                    f"{method} {path} ({label}): {response.status_code} {response.text}"
+                )
+    assert failures == []
+
+
+async def test_fr55_fr66_password_and_logout_are_not_gated_by_one_time_password_or_no_role(
+    api_env: ApiEnv,
+) -> None:
+    env = api_env
+    for role, must_change in ((None, False), ("user", True), (None, True)):
+        user = await env.new_user(role=role, password=PW, must_change_password=must_change)
+        token = await env.login_ok(user)
+        # гейт не срабатывает: пустое тело даёт 422 валидации, а не 403
+        empty = await env.client.post(PASSWORD_URL, json={}, headers=env.auth(token))
+        assert (empty.status_code, _code(empty)) == (422, "validation_error"), (role, must_change)
+        wrong = await env.client.post(
+            PASSWORD_URL,
+            json={"current_password": "Wr0ng-Pa55phrase-unique-qq", "new_password": "x" * 20},
+            headers=env.auth(token),
+        )
+        assert (wrong.status_code, _code(wrong)) == (422, "invalid_current_password")
+        out = await env.client.post(LOGOUT_URL, headers=env.auth(token))
+        assert out.status_code == 204, (role, must_change)
+        after = await env.client.post(LOGOUT_URL, headers=env.auth(token))
+        assert after.status_code == 401
+
+
+async def test_fr7_password_route_without_session_is_401_even_with_invalid_body(
+    api_env: ApiEnv,
+) -> None:
+    response = await api_env.client.post(PASSWORD_URL, json={"unexpected": 1})
+    assert (response.status_code, _code(response)) == (401, "not_authenticated")
+
+
+# --- заметки ревью T13 (tasks.md T14) -------------------------------------------------------
+
+
+@pytest_asyncio.fixture
+async def env_custom_absolute(
+    settings: Any, fixed_clock: Any, db_sessionmaker: Any
+) -> AsyncIterator[ApiEnv]:
+    """Приложение с нестандартным абсолютным сроком сессии (2 суток и 30 секунд)."""
+    from app.main import create_app
+    from tests.conftest import _open_api_env
+
+    custom = settings.model_copy(update={"session_absolute_timeout": timedelta(days=2, seconds=30)})
+    application = create_app(custom, clock=fixed_clock)
+    async for env in _open_api_env(
+        application, custom, fixed_clock, db_sessionmaker, "http://testserver"
+    ):
+        yield env
+
+
+async def test_t13_review_login_cookie_max_age_follows_session_absolute_timeout(
+    env_custom_absolute: ApiEnv,
+) -> None:
+    env = env_custom_absolute
+    user = await env.new_user(role="user", password=PW)
+    response = await env.login(user.login, PW)
+    assert response.status_code == 200, response.text
+    morsel = parse_set_cookie(response, "gt_session")
+    assert morsel is not None
+    expected = int(env.settings.session_absolute_timeout.total_seconds())
+    assert expected == 2 * 24 * 3600 + 30
+    assert int(morsel["max-age"]) == expected
+    assert int(morsel["max-age"]) != 604800
+
+
+def test_t13_review_require_capability_without_arguments_is_rejected() -> None:
+    from app.api.deps import require_capability
+
+    with pytest.raises((AssertionError, ValueError)):
+        require_capability()
+
+
+@pytest.mark.parametrize(
+    "origins",
+    [
+        ("http://testserver", "http://testserver"),
+        ("http://testserver", "http://evil.example"),
+        ("http://evil.example", "http://testserver"),
+    ],
+)
+async def test_t13_review_duplicate_origin_header_is_403(
+    api_env: ApiEnv, origins: tuple[str, str]
+) -> None:
+    env = api_env
+    user = await env.new_user(role="user", password=PW)
+    headers = [("Origin", origins[0]), ("Origin", origins[1])]
+    response = await env.client.post(
+        LOGIN_URL, json={"login": user.login, "password": PW}, headers=headers
+    )
+    assert response.status_code == 403, response.text
+    assert _code(response) == "origin_mismatch"
+    assert api_env.token_from(response) is None
+    assert await env.session_ids(user.id) == []
+
+
+async def test_t13_review_duplicate_origin_header_on_password_change_is_403(
+    api_env: ApiEnv,
+) -> None:
+    env = api_env
+    user = await env.new_user(role="user", password=PW)
+    token = await env.login_ok(user)
+    headers = [
+        ("Cookie", f"{env.cookie_name}={token}"),
+        ("Origin", "http://testserver"),
+        ("Origin", "http://testserver"),
+    ]
+    response = await env.client.post(
+        PASSWORD_URL,
+        json={"current_password": PW, "new_password": "Br4nd-new-Pa55phrase-uvw"},
+        headers=headers,
+    )
+    assert response.status_code == 403, response.text
+    assert _code(response) == "origin_mismatch"
+    assert (await env.login(user.login, PW)).status_code == 200  # пароль не сменён
+
+
+def test_t13_review_me_handler_has_no_assert_statement() -> None:
+    tree = ast.parse((BACKEND_DIR / "app" / "api" / "v1" / "me.py").read_text(encoding="utf-8"))
+    asserts = [node.lineno for node in ast.walk(tree) if isinstance(node, ast.Assert)]
+    assert asserts == [], f"assert в me.py (строки {asserts}): под -O проверка исчезнет"
+
+
+async def test_t13_review_me_handler_rejects_actor_without_role_explicitly(
+    api_env: ApiEnv,
+) -> None:
+    """Прямой вызов обработчика с актором без роли: 403 ``no_role``, а не AssertionError."""
+    from app.core.errors import AppError
+    from app.domain.access.roles import Actor
+
+    endpoint = next(
+        route.endpoint for route in _iter_routes(api_env.app.routes) if route.path == "/api/v1/me"
+    )
+    actor = Actor(
+        user_id=uuid.uuid4(),
+        workspace_id=uuid.uuid4(),
+        login="user.norole",
+        role=None,
+        must_change_password=False,
+        session_id=b"\x00" * 32,
+    )
+    with pytest.raises(AppError) as info:
+        await endpoint(actor)
+    assert info.value.status_code == 403
+    assert str(info.value.code) == "no_role"
 
 
 # --- sanity: uuid в обходе -----------------------------------------------------------------------

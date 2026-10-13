@@ -6,12 +6,17 @@
 отказа входа перед ``InvalidCredentials`` (счётчик неудач и блокировка должны пережить откат
 запроса).
 
+Смена пароля (tasks.md T14): неверный текущий пароль занимает тот же слот попытки, что вход
+(``reserve_attempt``, FR-61), поэтому перебор ``current_password`` ограничен тем же порогом.
+Файл пароля первого ТА удаляется хуком ``after_commit``: до COMMIT он остаётся на месте.
+
 Событий в ``domain_event`` вход, выход и смена пароля не пишут (FR-41). Пароли, хеши и
 токены не попадают в исключения и логи (FR-57).
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -19,7 +24,7 @@ from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from pydantic import SecretStr
-from sqlalchemy import select, update
+from sqlalchemy import event, select, update
 
 from app.core.db import commit_durably
 from app.core.errors import ErrorCode, InvalidCredentials, NotAuthenticated, Unprocessable
@@ -30,7 +35,14 @@ from app.core.security.passwords import (
     validate_new_password,
     verify_in_thread,
 )
-from app.domain.auth.provider import AuthProvider, PasswordCredentials, normalize_login
+from app.domain.auth.provider import (
+    AttemptReservation,
+    AuthProvider,
+    PasswordCredentials,
+    normalize_login,
+    reserve_attempt,
+    series_not_locked_by_others,
+)
 from app.domain.auth.sessions import SessionStore
 from app.domain.system.bootstrap import remove_initial_admin_file_if_for
 from app.domain.users.models import AppUser
@@ -142,55 +154,129 @@ async def change_own_password(
     new: SecretStr,
     now: datetime,
 ) -> None:
-    """Смена своего пароля (FR-56, FR-52, FR-53).
+    """Смена своего пароля (FR-56, FR-52, FR-53, FR-61).
 
     Порядок проверок: текущий пароль (``invalid_current_password``) -> новый совпадает с
     текущим (``password_reused``) -> недопустимые символы (``validation_error``) -> политика
     (``password_too_short`` / ``password_too_common``). При успехе: новый хеш,
-    ``must_change_password = false``, ``password_changed_at = now``, все остальные сессии
-    пользователя удалены, файл пароля первого ТА (если он выдан этому логину) удалён.
+    ``must_change_password = false``, ``password_changed_at = now``, счётчик неудач сброшен, все
+    остальные сессии пользователя удалены; файл пароля первого ТА (если он выдан этому логину)
+    удаляется после COMMIT транзакции запроса, а не здесь.
+
+    Неверный текущий пароль занимает слот попытки как неудачный вход (общий счётчик, порог и
+    срок блокировки): пятая подряд ставит ``login_locked_until`` и завершает текущую сессию
+    (фиксируется до ответа). Наружу во всех этих случаях уходит один и тот же
+    ``invalid_current_password``. Блокировка входа, поставленная ранее, ответ не меняет: попытка
+    не засчитывается, пароль не проверяется.
     """
     current_value = current.get_secret_value()
     new_value = new.get_secret_value()
 
-    stored_hash = (
-        await db.execute(
-            select(AppUser.password_hash).where(AppUser.id == actor.user_id).with_for_update()
-        )
-    ).scalar_one_or_none()
-    if stored_hash is None:
-        raise NotAuthenticated()
-
-    if not await _current_password_matches(hasher, stored_hash, current_value):
+    reservation = await reserve_attempt(
+        db,
+        where=AppUser.id == actor.user_id,
+        now=now,
+        max_failures=settings.login_max_failures,
+        lock_duration=settings.login_lock_duration,
+    )
+    if reservation is None:
+        exists = (
+            await db.execute(select(AppUser.id).where(AppUser.id == actor.user_id))
+        ).scalar_one_or_none()
+        if exists is None:
+            raise NotAuthenticated()
+        # вход заблокирован: время ответа как у настоящей проверки, пароль не сверяется
+        await asyncio.to_thread(hasher.dummy_verify, "")
         raise Unprocessable(code=ErrorCode.invalid_current_password)
-    if new_value == current_value:
+
+    # слот попытки виден параллельным запросам до медленной проверки пароля (FR-61)
+    await commit_durably(db)
+
+    if not await _current_password_matches(hasher, reservation.password_hash, current_value):
+        if reservation.own_lock is not None:
+            # порог достигнут: блокировка уже зафиксирована, текущая сессия завершается
+            await sessions.delete_by_id(db, actor.session_id)
+            await commit_durably(db)
+        raise Unprocessable(code=ErrorCode.invalid_current_password)
+
+    try:
+        _check_new_password(current_value, new_value)
+    except Unprocessable:
+        # текущий пароль верен: серия неудач прерывается, даже если новый пароль не принят
+        await _reset_series(db, reservation, now)
+        await commit_durably(db)
+        raise
+
+    new_hash = await hash_in_thread(hasher, new_value)
+    changed = await db.execute(
+        update(AppUser)
+        .where(
+            AppUser.id == actor.user_id,
+            # параллельная смена или блокировка, поставленная пока проверялся пароль
+            AppUser.password_hash == reservation.password_hash,
+            series_not_locked_by_others(reservation, now),
+        )
+        .values(
+            password_hash=new_hash,
+            must_change_password=False,
+            password_changed_at=now,
+            failed_login_count=0,
+            login_locked_until=None,
+        )
+        .returning(AppUser.id)
+        .execution_options(synchronize_session=False)
+    )
+    if changed.scalar_one_or_none() is None:
+        raise Unprocessable(code=ErrorCode.invalid_current_password)
+    await sessions.delete_all_for_user(db, actor.user_id, keep_id=actor.session_id)
+
+    # ПОСЛЕДНИМ действием: после этой точки фиксаций до COMMIT запроса быть не должно
+    _remove_initial_admin_file_after_commit(db, settings, actor.login)
+
+
+def _check_new_password(current: str, new: str) -> None:
+    """``password_reused`` -> недопустимые символы -> политика FR-52/FR-53 (422)."""
+    if new == current:
         raise Unprocessable(code=ErrorCode.password_reused)
     try:
-        new_value.encode("utf-8")
+        new.encode("utf-8")
     except UnicodeEncodeError:
         # исключение не пробрасываем: его args содержат пароль (ревью T08)
         raise Unprocessable(code=ErrorCode.validation_error) from None
     try:
-        validate_new_password(new_value)
+        validate_new_password(new)
     except PasswordPolicyError as exc:
         raise Unprocessable(str(exc), code=exc.code) from None
 
-    new_hash = await hash_in_thread(hasher, new_value)
+
+async def _reset_series(db: AsyncSession, reservation: AttemptReservation, now: datetime) -> None:
     await db.execute(
         update(AppUser)
-        .where(AppUser.id == actor.user_id)
-        .values(password_hash=new_hash, must_change_password=False, password_changed_at=now)
+        .where(AppUser.id == reservation.user_id, series_not_locked_by_others(reservation, now))
+        .values(failed_login_count=0, login_locked_until=None)
+        .execution_options(synchronize_session=False)
     )
-    await sessions.delete_all_for_user(db, actor.user_id, keep_id=actor.session_id)
 
-    try:
-        remove_initial_admin_file_if_for(settings, actor.login)
-    except Exception as exc:
-        # Пароль уже сменён, файл содержит недействительный пароль: сбой удаления не
-        # откатывает смену. В лог — только тип ошибки (без текста и трассировки).
-        logger.warning(
-            "Не удалось удалить файл пароля первого администратора: %s", type(exc).__name__
-        )
+
+def _remove_initial_admin_file_after_commit(
+    db: AsyncSession, settings: Settings, login: str
+) -> None:
+    """Удаляет файл пароля первого ТА (FR-6) после успешного COMMIT текущей транзакции.
+
+    Откат или сбой COMMIT оставляют файл на месте: пароль не сменён, файл ещё действителен.
+    Сбой удаления смену не отменяет и наружу не выходит (в лог — только тип ошибки): пароль
+    уже сменён, файл содержит недействительный пароль.
+    """
+
+    def remove(_session: object) -> None:
+        try:
+            remove_initial_admin_file_if_for(settings, login)
+        except Exception as exc:
+            logger.warning(
+                "Не удалось удалить файл пароля первого администратора: %s", type(exc).__name__
+            )
+
+    event.listen(db.sync_session, "after_commit", remove, once=True)
 
 
 async def _current_password_matches(

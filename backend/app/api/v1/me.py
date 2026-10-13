@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import get_active_actor
 from app.api.v1.schemas.auth import MeResponse
+from app.core.errors import NoRole
 from app.domain.access.roles import Actor, Capability
 
 router = APIRouter(tags=["me"])
@@ -20,7 +21,8 @@ async def me(actor: Annotated[Actor, Depends(get_active_actor)]) -> MeResponse:
     Роль и флаги читаются из БД на каждый запрос (FR-67). ``get_active_actor`` гарантирует
     назначенную роль и ``must_change_password = false``.
     """
-    assert actor.role is not None  # гейт «без роли» уже отработал
+    if actor.role is None:  # гейт «без роли» уже отработал; защита от прямого вызова
+        raise NoRole()
     capabilities = sorted((cap for cap in Capability if actor.can(cap)), key=lambda c: c.value)
     return MeResponse(
         id=actor.user_id,

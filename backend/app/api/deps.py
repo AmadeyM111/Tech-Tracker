@@ -100,8 +100,12 @@ async def get_active_actor(actor: Annotated[Actor, Depends(get_actor)]) -> Actor
 def require_capability(*caps: Capability) -> Callable[..., Coroutine[Any, Any, Actor]]:
     """Гейт раздела: достаточно любой из ``caps``; иначе 403 ``forbidden``.
 
-    Включает ``get_active_actor``, поэтому 401 и гейты 2-3 срабатывают раньше.
+    Включает ``get_active_actor``, поэтому 401 и гейты 2-3 срабатывают раньше. Без аргументов
+    гейт закрыл бы раздел для всех: это ошибка программиста, она проявляется при создании
+    зависимости (не ``assert``: он исчезает под ``-O``).
     """
+    if not caps:
+        raise ValueError("require_capability() требует хотя бы одну возможность")
 
     async def dependency(actor: Annotated[Actor, Depends(get_active_actor)]) -> Actor:
         if not any(actor.can(cap) for cap in caps):
@@ -141,15 +145,19 @@ async def check_origin(request: Request) -> None:
     ``Origin`` нет — проверка не применяется (защита — ``SameSite=Lax``); безопасные методы
     не проверяются; ``Referer`` не используется. Заголовок разбирается строго:
     ``scheme://host[:port]`` без userinfo, пути, query и fragment; ``null``, пустое значение и
-    мусор → 403. Схема Origin должна совпадать со схемой запроса (``request.url.scheme``;
-    за прокси — из ``X-Forwarded-Proto`` при ``--proxy-headers``), порт по умолчанию
-    (80 для http, 443 для https) определяется по схеме запроса.
+    мусор, повторный заголовок ``Origin`` → 403. Схема Origin должна совпадать со схемой
+    запроса (``request.url.scheme``; за прокси — из ``X-Forwarded-Proto`` при
+    ``--proxy-headers``), порт по умолчанию (80 для http, 443 для https) определяется по
+    схеме запроса.
     """
     if request.method not in _UNSAFE_METHODS:
         return
-    origin = request.headers.get("origin")
-    if origin is None:
+    origins = request.headers.getlist("origin")
+    if not origins:
         return
+    if len(origins) > 1:
+        raise OriginMismatch()  # повторный заголовок: какое значение увидит браузер, неясно
+    origin = origins[0]
     host_header = request.headers.get("host")
     match = _ORIGIN_RE.fullmatch(origin)
     if match is None or host_header is None:

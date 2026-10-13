@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Final, Protocol
 from uuid import UUID
 
 from pydantic import SecretStr
-from sqlalchemy import case, or_, update
+from sqlalchemy import ColumnElement, case, or_, update
 
 from app.core.security.passwords import PasswordHasher, hash_in_thread, verify_in_thread
 from app.domain.users.models import AppUser
@@ -99,6 +99,74 @@ def _encodable(password: str) -> str | None:
     return password
 
 
+@dataclass(frozen=True)
+class AttemptReservation:
+    """Занятый слот попытки: строка пользователя после ``reserve_attempt``."""
+
+    user_id: UUID
+    password_hash: str
+    # срок блокировки, поставленной ЭТОЙ попыткой (пятой в серии); иначе ``None``
+    own_lock: datetime | None
+
+
+async def reserve_attempt(
+    db: AsyncSession,
+    *,
+    where: ColumnElement[bool],
+    now: datetime,
+    max_failures: int,
+    lock_duration: timedelta,
+) -> AttemptReservation | None:
+    """Резервирует попытку проверки пароля одним атомарным ``UPDATE ... RETURNING`` (FR-61).
+
+    Общая для входа и смены своего пароля (tasks.md T14): неудачи обоих видов идут в один
+    счётчик. ``None`` — подходящей строки нет либо вход заблокирован. Пятая попытка в серии
+    сразу ставит ``login_locked_until`` и обнуляет счётчик (``own_lock``).
+    """
+    next_count = AppUser.failed_login_count + 1
+    reached = next_count >= max_failures
+    row = (
+        await db.execute(
+            update(AppUser)
+            .where(
+                where,
+                or_(AppUser.login_locked_until.is_(None), AppUser.login_locked_until <= now),
+            )
+            .values(
+                failed_login_count=case((reached, 0), else_=next_count),
+                login_locked_until=case(
+                    (reached, now + lock_duration), else_=AppUser.login_locked_until
+                ),
+            )
+            .returning(
+                AppUser.id,
+                AppUser.password_hash,
+                AppUser.failed_login_count,
+                AppUser.login_locked_until,
+            )
+            .execution_options(synchronize_session=False)
+        )
+    ).one_or_none()
+    if row is None:
+        return None
+    # RETURNING отдаёт новые значения: счётчик 0 после резервирования означает, что эта
+    # попытка — пятая в серии и сама поставила блокировку.
+    own_lock: datetime | None = row.login_locked_until if row.failed_login_count == 0 else None
+    return AttemptReservation(user_id=row.id, password_hash=row.password_hash, own_lock=own_lock)
+
+
+def series_not_locked_by_others(
+    reservation: AttemptReservation, now: datetime
+) -> ColumnElement[bool]:
+    """Условие сброса серии: блокировка не поставлена параллельным запросом.
+
+    Исключение — блокировка самой попытки (``own_lock``): верный пароль её снимает.
+    """
+    if reservation.own_lock is not None:
+        return AppUser.login_locked_until == reservation.own_lock
+    return or_(AppUser.login_locked_until.is_(None), AppUser.login_locked_until <= now)
+
+
 class LocalPasswordProvider:
     """Пароль в БД (Argon2id) + защита от перебора (FR-61)."""
 
@@ -135,38 +203,18 @@ class LocalPasswordProvider:
 
         # Резервирование попытки до проверки пароля: один атомарный UPDATE. Нет строки —
         # логина нет либо вход заблокирован: ответ и затраты времени одинаковы (FR-61).
-        next_count = AppUser.failed_login_count + 1
-        reached = next_count >= self._max_failures
-        row = (
-            await db.execute(
-                update(AppUser)
-                .where(
-                    AppUser.login == login,
-                    or_(AppUser.login_locked_until.is_(None), AppUser.login_locked_until <= now),
-                )
-                .values(
-                    failed_login_count=case((reached, 0), else_=next_count),
-                    login_locked_until=case(
-                        (reached, now + self._lock_duration), else_=AppUser.login_locked_until
-                    ),
-                )
-                .returning(
-                    AppUser.id,
-                    AppUser.password_hash,
-                    AppUser.failed_login_count,
-                    AppUser.login_locked_until,
-                )
-                .execution_options(synchronize_session=False)
-            )
-        ).one_or_none()
-        if row is None:
+        reservation = await reserve_attempt(
+            db,
+            where=AppUser.login == login,
+            now=now,
+            max_failures=self._max_failures,
+            lock_duration=self._lock_duration,
+        )
+        if reservation is None:
             await self._equalize_time(password)
             return None
 
-        user_id: UUID = row.id
-        # RETURNING отдаёт новые значения: счётчик 0 после резервирования означает, что эта
-        # попытка — пятая в серии и сама поставила блокировку (``own_lock``).
-        own_lock: datetime | None = row.login_locked_until if row.failed_login_count == 0 else None
+        user_id = reservation.user_id
         if checkpoint is not None:
             await checkpoint()
 
@@ -175,19 +223,14 @@ class LocalPasswordProvider:
             # Одиночный суррогат не совпадёт ни с одним хешем: обычная неудача.
             await self._equalize_time(password)
             return None
-        if not await verify_in_thread(self._hasher, row.password_hash, safe_password):
+        if not await verify_in_thread(self._hasher, reservation.password_hash, safe_password):
             return None  # неудача уже учтена резервированием
 
         # Успех: условный сброс серии (и перехеширование устаревшего хеша). Блокировка,
         # зафиксированная параллельными неудачами, пока проверялся пароль, вход отклоняет.
-        if own_lock is not None:
-            still_ours = AppUser.login_locked_until == own_lock
-        else:
-            still_ours = or_(
-                AppUser.login_locked_until.is_(None), AppUser.login_locked_until <= now
-            )
+        still_ours = series_not_locked_by_others(reservation, now)
         values: dict[str, object] = {"failed_login_count": 0, "login_locked_until": None}
-        if self._hasher.needs_rehash(row.password_hash):
+        if self._hasher.needs_rehash(reservation.password_hash):
             values["password_hash"] = await hash_in_thread(self._hasher, safe_password)
         reset = await db.execute(
             update(AppUser)

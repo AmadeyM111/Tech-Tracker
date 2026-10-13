@@ -1,25 +1,28 @@
-"""Вход и выход (plan §4.6, FR-1, FR-5, FR-58, FR-60, FR-61, D-13)."""
+"""Вход, выход и смена своего пароля (plan §4.6, FR-1, FR-5, FR-56, FR-58, FR-60, FR-61, D-13)."""
 
 from __future__ import annotations
 
-from typing import Annotated, Final
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response
 
 from app.api.deps import get_actor
-from app.api.v1.schemas.auth import LoginRequest, LoginResponse, SessionUser
+from app.api.v1.schemas.auth import (
+    ChangePasswordRequest,
+    LoginRequest,
+    LoginResponse,
+    SessionUser,
+)
 from app.core.clock import utcnow
 from app.core.config import Settings
 from app.core.db import DbSession
+from app.core.security.passwords import PasswordHasher
 from app.domain.access.roles import Actor, Role
 from app.domain.auth import service
 from app.domain.auth.provider import AuthProvider
 from app.domain.auth.sessions import SessionStore
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-# plan §4.6: Max-Age = 7 суток (абсолютный срок сессии по умолчанию)
-SESSION_COOKIE_MAX_AGE: Final = 7 * 24 * 60 * 60
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -48,7 +51,7 @@ async def login(
     response.set_cookie(
         key=settings.cookie_name,
         value=result.token,
-        max_age=SESSION_COOKIE_MAX_AGE,
+        max_age=int(settings.session_absolute_timeout.total_seconds()),
         path="/",
         secure=settings.cookie_secure,
         httponly=True,
@@ -92,3 +95,35 @@ async def logout(
         samesite="lax",
     )
     return response
+
+
+@router.post("/password", status_code=204, response_class=Response)
+async def change_password(
+    body: ChangePasswordRequest,
+    request: Request,
+    db: DbSession,
+    actor: Annotated[Actor, Depends(get_actor)],
+) -> Response:
+    """Смена своего пароля (FR-56): 204 без тела.
+
+    Доступна при одноразовом пароле и без роли: ``get_actor``, а не ``get_active_actor``
+    (plan §4.5, п.2–3). Origin проверяется app-level зависимостью ``check_origin`` до
+    обработчика, поэтому чужой Origin не засчитывается как неверный пароль. Файл пароля
+    первого ТА сервис удаляет после COMMIT (``get_db`` фиксирует транзакцию до ответа).
+    """
+    state = request.app.state
+    settings: Settings = state.settings
+    hasher: PasswordHasher = state.password_hasher
+    sessions: SessionStore = state.session_store
+
+    await service.change_own_password(
+        db,
+        actor,
+        hasher,
+        sessions,
+        settings,
+        current=body.current_password,
+        new=body.new_password,
+        now=utcnow(),
+    )
+    return Response(status_code=204)

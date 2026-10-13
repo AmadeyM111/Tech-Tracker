@@ -117,6 +117,10 @@ class SessionStore:
         """Удаляет сессию по токену; неизвестный токен — не ошибка (идемпотентно)."""
         await db.execute(delete(UserSession).where(UserSession.id == self.token_id(token)))
 
+    async def delete_by_id(self, db: AsyncSession, session_id: bytes) -> None:
+        """Удаляет сессию по её идентификатору (HMAC токена); отсутствующая — не ошибка."""
+        await db.execute(delete(UserSession).where(UserSession.id == session_id))
+
     async def delete_all_for_user(
         self, db: AsyncSession, user_id: UUID, *, keep_id: bytes | None = None
     ) -> int:

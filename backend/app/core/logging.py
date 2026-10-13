@@ -483,7 +483,9 @@ def configure_logging(level: str | int = "INFO") -> None:
     handler = _StdoutHandler()
     handler.setFormatter(JsonFormatter())
     handler.addFilter(SecretsFilter())
-    root.addHandler(handler)
+    # Первым в списке: фильтр очищает запись на месте, и остальные обработчики корня
+    # (добавленные раньше — например, caplog, или позже) получают уже очищенную запись.
+    root.handlers.insert(0, handler)
     root.setLevel(numeric)
 
     # uvicorn: свои записи идут через корневой обработчик (JSON), дефолтные handlers убираем
