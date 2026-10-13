@@ -130,7 +130,7 @@
 - **Попытки:** 2
 
 ## T06 — Модель идентичности: пространство, пользователь, членство, сессия (миграция 0001)
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-116 (уровень БД: логин уникален и соответствует шаблону), FR-73, FR-66 (не больше одной роли), FR-58 (серверная сессия), FR-13, D-5, D-39
 - **Файлы:** `backend/app/domain/workspaces/models.py`, `backend/app/domain/users/models.py`,
   `backend/app/domain/auth/models.py`, `backend/migrations/versions/0001_identity.py`,
@@ -142,10 +142,10 @@
   `PK(workspace_id, user_id)`, `user_session.id bytea` (HMAC), индексы. Логин: `UNIQUE(login)` и
   `CHECK (login ~ '^[a-z0-9][a-z0-9._-]{2,63}$')` (FR-73, хранится в нижнем регистре). Миграция с `downgrade`.
 - **Готово, когда:** `pytest -q backend/tests/db/test_identity_models.py backend/tests/db/test_migrations.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T07 — Журнал событий: append-only таблица, каталог, запись (миграция 0002)
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-66 (неизменяемость на уровне БД), FR-41 (основа), FR-35/FR-38 (основа таблицы), FR-57 (`details` без паролей по типу), D-7, D-8
 - **Файлы:** `backend/app/domain/events/models.py`, `backend/app/domain/events/catalog.py`,
   `backend/app/domain/events/writer.py`, `backend/migrations/versions/0002_domain_event.py`;
@@ -224,6 +224,7 @@
   `InvalidCredentials` одинаков для всех причин отказа. Логин при входе приводится к нижнему
   регистру (FR-73); логин, не подходящий под шаблон, — обычный `InvalidCredentials`.
 - **Готово, когда:** `pytest -q backend/tests/domain/test_auth_service.py` зелёный, линтер чистый.
+- **Заметка ревью T06:** добавить `CHECK (octet_length(id) = 32)` на `user_session.id` (новой миграцией 000x) и тест; рассмотреть `server_default="0"` для `app_user.failed_login_count`.
 - **Попытки:** 0
 
 ## T12 — Модуль прав: роли, возможности, гейты запроса
