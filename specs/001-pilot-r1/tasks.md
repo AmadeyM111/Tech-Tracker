@@ -238,7 +238,7 @@
 - **Попытки:** 2
 
 ## T12 — Модуль прав: роли, возможности, гейты запроса
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** FR-8, FR-9, FR-10, FR-45a (403 по разделу до 404), FR-55 (гейт), FR-66 (гейт), FR-67, BR-1 (системные строки), D-16
 - **Файлы:** `backend/app/domain/access/roles.py`, `backend/app/api/deps.py`,
   `backend/app/main.py` (lifespan: `PasswordHasher`, `SessionStore`, `LocalPasswordProvider`
@@ -254,10 +254,13 @@
 - **Готово, когда:** `pytest -q backend/tests/unit/test_role_matrix.py backend/tests/api/test_deps_gates.py` зелёный, линтер чистый.
 - **Заметка ревью T05:** зависимость с `yield` поверх `DbSession` должна объявляться со `scope="function"` (иначе `DependencyScopeError`); AST-тест «нет get_db вне core/db.py» усилить — запретить любое упоминание имени (Name/Attribute/alias, Security).
 - **Заметки ревью T11:** `SessionStore` — ключ только из `ensure_secret_key`; истёкшие сессии остаются после отката при 401 — очищать в `gostracker maintenance` (T19) или при входе пользователя.
-- **Попытки:** 0
+- **Уточнения (оркестратор, по отчёту test-writer):** `check_origin` проверяет только `Origin` (D-16; `Referer` не проверяется);
+  `app.state.session_store`, `app.state.password_hasher`, `app.state.auth_provider`; значения `Capability` — имя члена в нижнем регистре
+  (`manage_accounts`); короткий `SECRET_KEY` (< 32 байт) роняет запуск; lifespan не обращается к БД.
+- **Попытки:** 1
 
 ## T13 — API входа, выхода и профиля; поведение сессии
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-4, AC-20 (код и тело при входе заблокированного), AC-30, AC-32, AC-33, AC-34, AC-36, AC-37, AC-79, AC-116 (вход с логином в верхнем регистре), FR-7, FR-60, FR-73
 - **Файлы:** `backend/app/api/v1/auth.py`, `backend/app/api/v1/me.py`, `backend/app/api/v1/schemas/auth.py`
   (+ подключение в `app/api/v1/__init__.py`);
@@ -272,6 +275,7 @@
 - **Готово, когда:** `pytest -q backend/tests/api/test_auth_login.py backend/tests/api/test_login_lockout.py backend/tests/api/test_sessions.py backend/tests/api/test_route_guards.py`
   зелёный, линтер чистый.
 - **Заметка ревью T11:** роут входа не должен писать в сессию БД до `service.login` (иначе `checkpoint`/`commit_durably` зафиксирует эти записи досрочно).
+- **Заметки ревью T12:** (a) тест порядка проверок для битого JSON (422 раньше 401, plan §4.5 п.5) или свой `APIRoute`; (b) `check_origin`: сверять схему Origin с `request.url.scheme` (X-Forwarded-Proto при `--proxy-headers`), строго разбирать Origin (без userinfo/path); (c) имя cookie с префиксом `__Host-` — только при `cookie_secure` (в dev по http префикс недопустим); (d) `require_capability()` без аргументов — `assert caps`.
 - **Попытки:** 0
 
 ## T14 — Смена своего пароля, одноразовый пароль, пользователь без роли
@@ -461,6 +465,7 @@
   `pytest -q -m infra_static backend/tests/infra/test_web_image.py` зелёный (самоподписанный
   сертификат создан и стабилен, TLS 1.2 принимается, TLS 1.1 отклоняется, `nginx -T` содержит
   `ssl_protocols TLSv1.2 TLSv1.3`, http → 308).
+- **Заметка ревью T12:** `proxy_set_header Host $http_host` (не `$host`), иначе при нестандартном порте HTTPS ложный 403 `origin_mismatch`; `X-Forwarded-Proto` передавать.
 - **Попытки:** 0
 
 ## T26 — Поставляемый docker-compose и инфраструктурные тесты стека
@@ -479,6 +484,7 @@
   `HTTP_PORT=18080 HTTPS_PORT=18443 docker compose -p gostracker-infratest up -d --build --wait`,
   затем `GT_INFRA_STACK=1 GT_INFRA_PROJECT=gostracker-infratest HTTP_PORT=18080 HTTPS_PORT=18443 pytest -q -m infra_stack backend/tests/infra`
   зелёный, затем `docker compose -p gostracker-infratest down -v` (удаляются только тома тестового проекта).
+- **Заметка ревью T12:** infra_stack-тест входа и POST при `HTTPS_PORT=8443` (Origin с портом) — без ложного `origin_mismatch`.
 - **Попытки:** 0
 
 ## T27 — CI
