@@ -574,3 +574,32 @@ async def test_lifespan_puts_engine_and_sessionmaker_into_app_state(
         async with sessionmaker() as session:
             assert isinstance(session, AsyncSession)
             assert (await session.execute(text("SELECT 1"))).scalar_one() == 1
+
+
+def test_commit_durably_used_only_by_auth_service() -> None:
+    """T11 (ревью): единственное санкционированное исключение из «сервисы не фиксируют» —
+    ``commit_durably``; определён в core/db.py, вызывается только из domain/auth/service.py."""
+    allowed_users = {"domain/auth/service.py"}
+    definition = "core/db.py"
+    users: set[str] = set()
+    defined_in: set[str] = set()
+    for path in APP_DIR.rglob("*.py"):
+        rel = path.relative_to(APP_DIR).as_posix()
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef):
+                if node.name == "commit_durably":
+                    defined_in.add(rel)
+                continue
+            hit = (
+                (isinstance(node, ast.Name) and node.id == "commit_durably")
+                or (isinstance(node, ast.Attribute) and node.attr == "commit_durably")
+                or (
+                    isinstance(node, ast.ImportFrom)
+                    and any(a.name == "commit_durably" for a in node.names)
+                )
+            )
+            if hit and rel != definition:
+                users.add(rel)
+    assert defined_in == {definition}, f"commit_durably определён в {sorted(defined_in)}"
+    assert users == allowed_users, f"commit_durably используется в {sorted(users)}"

@@ -87,9 +87,10 @@ backend/
   migrations/versions/
     0001_identity.py                     [0] workspace, app_user, workspace_member, user_session
     0002_domain_event.py                 [0] domain_event + append-only триггеры
-    0003_projects_tasks.py               [1] pg_trgm, project, project_member, task, label, task_label,
+    0003_user_session_id_length.py       [0] CHECK octet_length(id)=32 на user_session.id (ревью T06/T11)
+    0004_projects_tasks.py               [1] pg_trgm, project, project_member, task, label, task_label,
                                              comment, mention, attachment
-    0004_crm.py                          [3] pipeline, stage, account, contact, deal, deal_contact
+    0005_crm.py                          [3] pipeline, stage, account, contact, deal, deal_contact
   app/__init__.py                        нов. [0]
   app/main.py                            изм. [0] create_app(), middleware, обработчики ошибок, роутеры
   app/core/
@@ -167,7 +168,7 @@ docs/api/openapi.json                    нов. [0] (генерируется)
 docs/data-model.md                       нов. [0], дополняется [1][3]
 docs/acceptance/r1-manual.md             нов. [4] чек-листы ручных AC
 README.md                                изм. [0] ru/en, [4] финал
-AGENTS.md                                изм. [0] только блок «Команды» (dev-БД, тесты) — правила не меняются
+AGENTS.md                                изм. [0] блок «Команды» (dev-БД, тесты); правила «Время», «Удаление», «Аудит» уже приведены к ADR-0006, ADR-0007, ADR-0010 — других изменений правил нет
 ```
 
 ## 4. Интерфейсы
@@ -178,7 +179,7 @@ AGENTS.md                                изм. [0] только блок «К�
 - `domain/*` — сервисы и запросы; каждая выборка фильтруется `workspace_id = actor.workspace_id`.
   Сервис получает `Actor` и `AsyncSession` аргументами.
 - `core/*` — инфраструктура без бизнес-правил.
-- Транзакция = запрос: `get_db` открывает `session.begin()`; исключение → откат. Подключать только как `DbSession` (scope="function", см. §4.2).
+- Транзакция = запрос: `get_db` открывает `session.begin()`; исключение → откат. Подключать только как `DbSession` (scope="function", см. §4.2). **Исключение (ревью T11, PLAN_ISSUE):** состояние, которое должно пережить откат запроса (счётчик неудачных входов и `login_locked_until`, FR-61), закрепляется до броска `InvalidCredentials` единственным санкционированным помощником `core/db.py::commit_durably(session)`; прямой `.commit()` в сервисах по-прежнему запрещён (AST-тест), без помощника блокировка через API не работала бы — `get_db` откатывает транзакцию на исключении.
   Сервисы **не** вызывают `commit()`. Событие (§4.4) пишется в той же сессии.
 
 ### 4.2. Ядро
@@ -340,7 +341,7 @@ COMMON_PASSWORDS_SHA256: Final = "fa1ea0cf2f673458b58be3a7171d2b7fc6f2e704b4691e
 идентичность (D-5), принадлежность пространству — `workspace_member`. В R1 у пользователя
 ровно одна строка `workspace_member`, текущее пространство берётся из неё.
 
-**R1.1 (миграция 0003)** — `CREATE EXTENSION IF NOT EXISTS pg_trgm`.
+**R1.1 (миграция 0004; 0003 занята CHECK-ом длины id сессии, T11)** — `CREATE EXTENSION IF NOT EXISTS pg_trgm`.
 
 | Таблица | Столбцы | Ограничения и индексы |
 |---|---|---|
@@ -357,7 +358,7 @@ COMMON_PASSWORDS_SHA256: Final = "fa1ea0cf2f673458b58be3a7171d2b7fc6f2e704b4691e
 упомянутый может читать задачу — удаление и восстановление комментария (FR-71, OI-98)
 работают без изменения `mention`.
 
-**R1.3 (миграция 0004)**
+**R1.3 (миграция 0005)**
 
 | Таблица | Столбцы | Ограничения и индексы |
 |---|---|---|
@@ -541,17 +542,29 @@ class PasswordCredentials:
     password: SecretStr
 class AuthProvider(Protocol):
     name: str
-    async def authenticate(self, db: AsyncSession, credentials: PasswordCredentials, *, now: datetime) -> UUID | None: ...
+    async def authenticate(self, db: AsyncSession, credentials: PasswordCredentials, *, now: datetime,
+                           checkpoint: Callable[[], Awaitable[None]] | None = None) -> UUID | None: ...
+    # checkpoint: фиксирует резервирование попытки ДО verify (service передаёт commit_durably); OIDC-провайдер (FR-3) тоже принимает аргумент
 class LocalPasswordProvider:   # Argon2id + защита от перебора (FR-61)
     def __init__(self, hasher: PasswordHasher, *, max_failures: int, lock_duration: timedelta) -> None: ...
 ```
-Логика `LocalPasswordProvider.authenticate`:
-- логина нет → `dummy_verify`, `None`;
-- `login_locked_until > now` → `dummy_verify`, `None` (счётчик не трогается);
-- пароль неверен → `failed_login_count += 1` (атомарный `UPDATE … RETURNING`); при достижении
-  5 → `login_locked_until = now + 15 мин`, счётчик = 0; `None`;
-- пароль верен → `failed_login_count = 0`, `login_locked_until = NULL`, при `needs_rehash` —
-  перехеширование; вернуть `user_id`.
+Логика `LocalPasswordProvider.authenticate` (ревью T11, гонка FR-61/AC-37):
+- попытка резервируется ДО verify одним атомарным `UPDATE app_user SET failed_login_count =
+  CASE WHEN count+1 >= 5 THEN 0 ELSE count+1 END, login_locked_until = CASE WHEN count+1 >= 5
+  THEN now+15 мин ELSE login_locked_until END WHERE login = :l AND (login_locked_until IS NULL OR
+  login_locked_until <= now) RETURNING …`; строки нет (логина нет или он заблокирован) →
+  `dummy_verify`, `None`; ответ одинаков;
+- затем `checkpoint()` фиксирует резервирование, чтобы параллельные запросы видели занятый слот
+  (блокировка строки на время Argon2 НЕ используется — иначе пачка запросов исчерпывает пул);
+- пароль верен → условный сброс `SET failed_login_count = 0, login_locked_until = NULL WHERE id = :id
+  AND (login_locked_until IS NULL OR login_locked_until <= now) RETURNING id` (при `needs_rehash` —
+  перехеширование); строки нет → `None`; исключение: пятая попытка, сама поставившая блокировку,
+  при верном пароле снимает её по `login_locked_until = <свой срок>`;
+- пароль неверен → `None` (счётчик уже увеличен).
+Свойства: не более 5 реальных проверок пароля между фиксациями блокировки при любом
+параллелизме; **известное поведение:** верная попытка, зарезервированная до порога, отклоняется,
+если параллельная неудача успела поставить блокировку (консервативный отказ, не обход);
+прерванная отменой попытка остаётся засчитанной.
 
 ```python
 # app/domain/auth/sessions.py

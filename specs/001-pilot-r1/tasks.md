@@ -211,7 +211,7 @@
 - **Попытки:** 1
 
 ## T11 — Домен аутентификации: провайдер, защита от перебора, сессии
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-30, AC-37, AC-20 (вход заблокированного), AC-32, AC-33 (уровень сервиса), FR-3, FR-56, FR-59, FR-61, D-10, D-13
 - **Файлы:** `backend/app/domain/auth/provider.py`, `backend/app/domain/auth/sessions.py`,
   `backend/app/domain/auth/service.py`; тесты: `backend/tests/domain/test_auth_service.py`
@@ -226,10 +226,19 @@
   регистру (FR-73); логин, не подходящий под шаблон, — обычный `InvalidCredentials`.
 - **Готово, когда:** `pytest -q backend/tests/domain/test_auth_service.py` зелёный, линтер чистый.
 - **Заметка ревью T06:** добавить `CHECK (octet_length(id) = 32)` на `user_session.id` (новой миграцией 000x) и тест; рассмотреть `server_default="0"` для `app_user.failed_login_count`.
-- **Попытки:** 0
+- **Уточнения (оркестратор, по отчёту test-writer):** (1) PLAN_ISSUE решён: в `core/db.py` добавить
+  `commit_durably(session)`; `login` вызывает его на ветках отказа ДО `raise InvalidCredentials`
+  (счётчик и `login_locked_until` переживают откат запроса); `get_db` должен оставаться корректным
+  после такого commit (тесты T05 — 38 — зелёные); AST-тест «нет `.commit()` вне core/db.py и cli» остаётся.
+  (2) Ошибка удаления файла пароля первого ТА после смены пароля не выходит наружу (пароль сменён, warning без
+  секретов). (3) Суррогат в новом пароле → `Unprocessable(code=ErrorCode.validation_error)` (новых кодов не вводить).
+  (4) События для login/logout/change_own_password не пишутся (0 строк `domain_event`).
+  (5) Без строки `workspace_member` → `InvalidCredentials`; роль NULL → вход разрешён.
+  (6) Миграция `0003` — CHECK `octet_length(id) = 32` на `user_session.id`, downgrade снимает constraint.
+- **Попытки:** 2
 
 ## T12 — Модуль прав: роли, возможности, гейты запроса
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** FR-8, FR-9, FR-10, FR-45a (403 по разделу до 404), FR-55 (гейт), FR-66 (гейт), FR-67, BR-1 (системные строки), D-16
 - **Файлы:** `backend/app/domain/access/roles.py`, `backend/app/api/deps.py`,
   `backend/app/main.py` (lifespan: `PasswordHasher`, `SessionStore`, `LocalPasswordProvider`
@@ -244,6 +253,7 @@
   `forbidden`), `check_origin` (D-16, 403 `origin_mismatch`). Порядок проверок — plan §4.5.
 - **Готово, когда:** `pytest -q backend/tests/unit/test_role_matrix.py backend/tests/api/test_deps_gates.py` зелёный, линтер чистый.
 - **Заметка ревью T05:** зависимость с `yield` поверх `DbSession` должна объявляться со `scope="function"` (иначе `DependencyScopeError`); AST-тест «нет get_db вне core/db.py» усилить — запретить любое упоминание имени (Name/Attribute/alias, Security).
+- **Заметки ревью T11:** `SessionStore` — ключ только из `ensure_secret_key`; истёкшие сессии остаются после отката при 401 — очищать в `gostracker maintenance` (T19) или при входе пользователя.
 - **Попытки:** 0
 
 ## T13 — API входа, выхода и профиля; поведение сессии
@@ -261,6 +271,7 @@
   нормализуется в нижний регистр; `/me` отдаёт отсортированный список capabilities.
 - **Готово, когда:** `pytest -q backend/tests/api/test_auth_login.py backend/tests/api/test_login_lockout.py backend/tests/api/test_sessions.py backend/tests/api/test_route_guards.py`
   зелёный, линтер чистый.
+- **Заметка ревью T11:** роут входа не должен писать в сессию БД до `service.login` (иначе `checkpoint`/`commit_durably` зафиксирует эти записи досрочно).
 - **Попытки:** 0
 
 ## T14 — Смена своего пароля, одноразовый пароль, пользователь без роли
@@ -278,6 +289,7 @@
 - **Готово, когда:** `pytest -q backend/tests/api/test_password_change.py backend/tests/api/test_password_leaks.py backend/tests/api/test_route_guards.py`
   зелёный, линтер чистый.
 - **Заметка ревью T08:** пароль с одиночным суррогатом проходит `SecretStr` и `validate_new_password`, но `hash`/`verify` падают с `UnicodeEncodeError` (500) — отклонять на уровне схемы (422) или ловить; тест порядка «короткий и частый → password_too_short».
+- **Заметки ревью T11:** (5) перебор `current` в `change_own_password` не ограничен — после N подряд `invalid_current_password` завершать сессию (открытый вопрос к spec, FR-61 говорит только о входе); (6) удалять файл пароля первого ТА ПОСЛЕ успешного COMMIT (хук `after_commit` или в роутере) + тест сбоя COMMIT (тест T11 `test_fr6_change_removes_initial_admin_file_for_this_login` потребует правки через test-writer).
 - **Попытки:** 0
 
 ## T15 — Постраничный вывод
@@ -303,6 +315,7 @@
   ровно одно событие `record_event` в той же транзакции; одноразовые пароли нигде не
   сохраняются, кроме хеша. Все выборки — в пространстве актора (404 для чужого).
 - **Готово, когда:** `pytest -q backend/tests/domain/test_user_admin_service.py` зелёный, линтер чистый.
+- **Заметка ревью T11:** единый шаблон логина (сейчас `provider.LOGIN_RE` и `bootstrap._LOGIN_RE`), правило «только ASCII перед lower()» одинаково при создании и при входе.
 - **Попытки:** 0
 
 ## T17 — API системных настроек: учётные записи и роли
@@ -509,7 +522,7 @@
 
 Модули и интерфейсы — plan §3, §4.3–§4.14; трассировка — plan §6.
 
-### R1.1 «Проекты и задачи» (миграция 0003)
+### R1.1 «Проекты и задачи» (миграция 0004; 0003 занята в T11)
 - **B1.1-A Справочник пользователей, проекты, участники, владение, архив.** `domain/projects`,
   `domain/access/{policy,recipients}`, `api/v1/{users,projects}`; события `project.*`, `member.*`.
   AC-51, AC-52, AC-53, AC-54, AC-55, AC-70 (кроме перемещения на доске), AC-71 (кроме сделки),
@@ -538,7 +551,7 @@
 - **B1.2-C Фронтенд доски:** перетаскивание (`@dnd-kit`) с клавиатурной заменой, опрос доски.
   AC-5 *ручной*, AC-97 (доска) *ручной*.
 
-### R1.3 «CRM» (миграция 0004)
+### R1.3 «CRM» (миграция 0005)
 - **B1.3-A Воронка и стадии; стадии по умолчанию при первом запуске.** `domain/crm/pipeline`,
   `domain/system/bootstrap`. AC-85, AC-65 (стадии).
 - **B1.3-B Клиенты и контакты.** `domain/crm/{accounts,contacts}`. AC-82, AC-83, AC-89.

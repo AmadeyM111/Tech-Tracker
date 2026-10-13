@@ -26,9 +26,11 @@ def create_engine(settings: Settings) -> AsyncEngine:
 async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
     """Сессия на запрос: одна транзакция, откат при исключении, COMMIT в конце запроса.
 
-    Единственное место фиксации транзакции в ``app/**`` (сервисы ``commit()`` не вызывают).
-    Транзакцию открывает и закрывает ``session.begin()``: при выходе без исключения — COMMIT,
-    с исключением — ROLLBACK.
+    Фиксация транзакции запроса выполняется здесь (сервисы ``commit()`` не вызывают; единственное
+    исключение — ``commit_durably`` ниже). Выход без исключения — COMMIT, с исключением —
+    ROLLBACK. Транзакция открывается явно в начале запроса; если сервис зафиксировал её раньше
+    через ``commit_durably``, следующая операция автоматически начнёт новую, а откат на
+    исключении и итоговый COMMIT по-прежнему относятся к текущей транзакции.
 
     Подключать только через ``DbSession`` (ниже); ``Depends(get_db)`` вне этого модуля
     запрещён. Причины: при ``scope="request"`` (умолчание ``Depends``) COMMIT выполняется
@@ -36,8 +38,28 @@ async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
     ``DbSession`` в одном запросе даёт две сессии и две транзакции.
     """
     sessionmaker = request.app.state.sessionmaker
-    async with sessionmaker() as session, session.begin():
-        yield session
+    async with sessionmaker() as session:
+        await session.begin()
+        try:
+            yield session
+            await session.commit()
+        except BaseException:
+            await session.rollback()
+            raise
+
+
+async def commit_durably(session: AsyncSession) -> None:
+    """Фиксирует транзакцию запроса до броска исключения (plan §4.1, исключение T11).
+
+    Единственный санкционированный способ зафиксировать транзакцию внутри запроса (``app/**``).
+    Причина: ``get_db`` откатывает транзакцию на любом исключении, а отказ входа — это
+    исключение (``InvalidCredentials``), поэтому счётчик неудачных попыток и
+    ``login_locked_until`` (FR-61) без явной фиксации терялись бы вместе с откатом, и блокировка
+    через API не срабатывала бы. Вызывать только на ветках отказа непосредственно перед
+    ``raise``, когда в транзакции нет ничего, что нельзя зафиксировать. Прямой ``commit()``
+    в сервисах запрещён (AST-тест).
+    """
+    await session.commit()
 
 
 # Единственная точка подключения сессии: COMMIT выполняется до отправки ответа клиенту.
