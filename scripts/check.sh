@@ -7,7 +7,7 @@ run() { echo; echo "=== $* ==="; "$@" || status=1; }
 
 run ruff check backend
 run ruff format --check backend
-run mypy backend/app
+run mypy --config-file backend/pyproject.toml backend/app
 run pytest -q backend/tests
 
 if [ -f frontend/package.json ]; then

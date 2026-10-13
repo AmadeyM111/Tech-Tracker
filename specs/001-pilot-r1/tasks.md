@@ -18,7 +18,7 @@
   (по умолчанию `postgresql+asyncpg://tracker:tracker@localhost:5432/tracker_test`, plan §5).
 - Тесты и фикстуры (`backend/tests/**`, `frontend/tests/**`, в т.ч. `conftest.py`,
   `factories.py`) пишет test-writer; исполнитель их не меняет.
-- «Линтер чистый» во всех задачах backend = `ruff check backend && ruff format --check backend && mypy backend/app`.
+- «Линтер чистый» во всех задачах backend = `ruff check backend && ruff format --check backend && mypy --config-file backend/pyproject.toml backend/app` (из корня; без `--config-file` mypy не видит конфиг — ревью T01-1).
 - В тестах: фиксированные часы `FixedClock` (plan §4.2) и фиксированный seed; Argon2 с
   дешёвыми параметрами (`time_cost=1, memory_cost_kib=1024, parallelism=1`).
 - Каждая выборка из БД фильтруется по `workspace_id` текущего пользователя (AGENTS.md).
@@ -26,7 +26,7 @@
 ---
 
 ## T01 — Окружение Python 3.12 и конфигурация инструментов
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** NFR-10 (часть), N-6 / OI-69 (эталон Python 3.12)
 - **Файлы:** `backend/pyproject.toml`, `backend/app/__init__.py`, `scripts/check.sh`;
   тесты: `backend/tests/test_toolchain.py`
@@ -41,7 +41,7 @@
   `scripts/check.sh` вызывает инструменты из активного окружения, как сейчас.
 - **Готово, когда:** `python --version` → 3.12.x; `pytest -q backend/tests/test_toolchain.py backend/tests/test_health.py`
   зелёный; `bash scripts/check.sh` зелёный.
-- **Попытки:** 0
+- **Попытки:** 2
 
 ## T02 — Закрыть порт БД в поставке; dev-конфигурация БД
 - **Статус:** TODO
@@ -89,6 +89,7 @@
   `use_clock`. `/docs`, `/redoc`, `/openapi.json` выключены, если `expose_api_docs` ложно.
   `generate_unique_id_function=lambda route: route.name`. `debug=False`.
 - **Готово, когда:** `pytest -q backend/tests/api/test_errors.py backend/tests/test_health.py` зелёный, линтер чистый.
+- **Заметка ревью T01:** подпакетам `app/api`, `app/core`, `app/domain` нужен `__init__.py`, иначе `packages.find` не включит их в установку (Docker, T20).
 - **Попытки:** 0
 
 ## T05 — Слой БД, базовые миксины, Alembic и тестовая БД
@@ -107,6 +108,7 @@
   или `-x dburl=…`. Миграций в этой задаче нет.
 - **Готово, когда:** `pytest -q backend/tests/db/test_migrations.py` зелёный (upgrade → downgrade → upgrade на
   тестовой БД, `alembic check` без расхождений), линтер чистый.
+- **Заметка ревью T01:** решить, нужен ли `asyncio_default_test_loop_scope = "session"` при session-фикстурах движка БД (иначе «attached to a different loop»).
 - **Попытки:** 0
 
 ## T06 — Модель идентичности: пространство, пользователь, членство, сессия (миграция 0001)
