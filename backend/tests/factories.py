@@ -146,3 +146,45 @@ async def make_user(
         is_blocked=blocked,
         must_change_password=must_change_password,
     )
+
+
+async def make_domain_event(
+    db: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    actor_id: uuid.UUID | None = None,
+    entity_type: str = "user",
+    entity_id: uuid.UUID | None = None,
+    action: str = "user.created",
+    changed_fields: list[str] | None = None,
+    project_id: uuid.UUID | None = None,
+    deal_id: uuid.UUID | None = None,
+    in_audit: bool = True,
+    changes: list[dict[str, object]] | None = None,
+    details: dict[str, object] | None = None,
+    occurred_at: datetime | None = None,
+) -> int:
+    """Строка ``domain_event`` напрямую (в обход ``record_event``); возвращает ``id`` (T07).
+
+    Для тестов представлений (лента, история, аудит) и проверок триггеров append-only.
+    """
+    result = await db.execute(
+        get_table("domain_event")
+        .insert()
+        .values(
+            workspace_id=workspace_id,
+            occurred_at=occurred_at or utcnow(),
+            actor_id=actor_id,
+            entity_type=entity_type,
+            entity_id=entity_id or uuid.uuid4(),
+            action=action,
+            changed_fields=changed_fields or [],
+            project_id=project_id,
+            deal_id=deal_id,
+            in_audit=in_audit,
+            changes=changes,
+            details=details,
+        )
+        .returning(get_table("domain_event").c.id)
+    )
+    return int(result.scalar_one())

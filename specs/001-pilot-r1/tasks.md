@@ -145,7 +145,7 @@
 - **Попытки:** 1
 
 ## T07 — Журнал событий: append-only таблица, каталог, запись (миграция 0002)
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-66 (неизменяемость на уровне БД), FR-41 (основа), FR-35/FR-38 (основа таблицы), FR-57 (`details` без паролей по типу), D-7, D-8
 - **Файлы:** `backend/app/domain/events/models.py`, `backend/app/domain/events/catalog.py`,
   `backend/app/domain/events/writer.py`, `backend/migrations/versions/0002_domain_event.py`;
@@ -159,10 +159,10 @@
   — `ValueError`; `details` допустим только для `entity_type = user`.
 - **Готово, когда:** `pytest -q backend/tests/db/test_event_log.py` зелёный (UPDATE/DELETE/TRUNCATE падают,
   событие откатывается вместе с транзакцией), линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T08 — Пароли: политика, Argon2id, список частых паролей
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-27, AC-28, AC-115 (юнит-уровень: совпадение точное, с учётом регистра), AC-3 (формат хеша `$argon2id$`), FR-2, FR-52, FR-53, FR-57
 - **Файлы:** `backend/app/core/security/passwords.py`, `backend/app/core/security/common_passwords.py`,
   данные `backend/app/core/security/data/common-passwords-10k.txt`, `backend/app/core/security/data/NOTICE.md`;
@@ -329,6 +329,7 @@
   `details` только для `entity_type = user`; `actor.kind = system` при `actor_id IS NULL`;
   `entity_deleted` — существует ли объект. Гейт `VIEW_AUDIT`. Сортировка `id DESC`.
 - **Готово, когда:** `pytest -q backend/tests/api/test_audit.py backend/tests/cli/test_bootstrap_audit.py` зелёный, линтер чистый.
+- **Заметка ревью T07:** триггер журнала даёт `restrict_violation` (класс 23) — глобальный обработчик не должен превращать его в 409 с текстом SQL.
 - **Попытки:** 0
 
 ## T19 — Служебные команды: OpenAPI и замер хеширования; отсутствие телеметрии
@@ -494,6 +495,7 @@
 - **Готово, когда:** ревьюер подтверждает соответствие plan; в README есть обе языковые части и
   команды из plan D-18/§4.12; ссылки на файлы существуют.
 - **Заметка ревью T02:** вписать в AGENTS.md и README команду dev-конфигурации (`-f deploy/compose.dev.yml`) и способ загрузки `deploy/dev.env.example` (`set -a; . …; set +a`).
+- **Заметка ревью T07:** `downgrade 0002` молча удаляет непустой журнал — описать в документации оператора (или добавить отказ при непустой таблице); в бэклог — отдельная роль БД без SUPERUSER и `REVOKE UPDATE, DELETE, TRUNCATE` (plan D-8).
 - **Попытки:** 0
 
 ---
