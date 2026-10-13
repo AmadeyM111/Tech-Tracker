@@ -44,9 +44,10 @@
 - **Попытки:** 2
 
 ## T02 — Закрыть порт БД в поставке; dev-конфигурация БД
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-105 (статическая часть: порт 5432 не опубликован, нет override-файлов), FR-6a, AC-95 (для `db`)
-- **Файлы:** `docker-compose.yml`, `deploy/compose.dev.yml`, `deploy/dev.env.example`, `.env.example`;
+- **Файлы:** `docker-compose.yml`, `deploy/compose.dev.yml`, `deploy/dev.env.example`, `.env.example`,
+  `backend/pyproject.toml` (dev-зависимости `pyyaml`, `types-PyYAML`, plan §7.1);
   тесты: `backend/tests/infra/conftest.py`, `backend/tests/infra/test_compose_static.py`
 - **Зависит от:** T01
 - **Описание:** По plan D-18, §4.12: убрать `ports` у `db`; переменные `POSTGRES_*` — из
@@ -58,7 +59,7 @@
 - **Готово, когда:** `pytest -q -m infra_static backend/tests/infra/test_compose_static.py` зелёный;
   `docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db`
   поднимает БД, `pg_isready -h 127.0.0.1 -p 5432` (или `docker compose … exec db pg_isready`) — ок.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T03 — Настройки и часы
 - **Статус:** TODO
@@ -339,6 +340,7 @@
   `/api/v1/health` средствами Python (без curl).
 - **Готово, когда:** `docker build -t gostracker-api:test backend` успешен;
   `pytest -q -m infra_static backend/tests/infra/test_api_image.py` зелёный (Python 3.12, uid 10001, `gostracker --help`).
+- **Заметка ревью T02:** при `depends_on: db: condition: service_healthy` добавить `start_period` к healthcheck db.
 - **Попытки:** 0
 
 ## T21 — Каркас фронтенда
@@ -470,6 +472,7 @@
   добавить `TEST_DATABASE_URL`; правила не менять. `docs/STATE.md` — состояние после R1.0.
 - **Готово, когда:** ревьюер подтверждает соответствие plan; в README есть обе языковые части и
   команды из plan D-18/§4.12; ссылки на файлы существуют.
+- **Заметка ревью T02:** вписать в AGENTS.md и README команду dev-конфигурации (`-f deploy/compose.dev.yml`) и способ загрузки `deploy/dev.env.example` (`set -a; . …; set +a`).
 - **Попытки:** 0
 
 ---

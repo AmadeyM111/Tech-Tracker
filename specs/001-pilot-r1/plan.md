@@ -884,8 +884,8 @@ HSTS не включается (самоподписанный сертифик�
   на стенде.
 - **Ручное/вне цикла:** AC-1, AC-5, AC-12, AC-97, AC-98 — чек-листы `docs/acceptance/r1-manual.md`
   (R1.4); AC-19, AC-38 — замеры на стенде C-2; AC-107 — Playwright в Chromium, вне CI.
-- **Маркеры pytest:** `committed`, `infra_static` (нужен `docker` CLI, без запущенного стека;
-  пропуск, если docker недоступен), `infra_stack` (нужен поднятый поставляемый стек;
+- **Маркеры pytest:** `committed`, `infra_static` (статический разбор файлов репозитория через
+  PyYAML; Docker не нужен, выполняются в CI всегда — правка по T02), `infra_stack` (нужен поднятый поставляемый стек;
   выполняются только при `GT_INFRA_STACK=1`).
 
 ### 5.1. Методика NFR-2 (OI-37)
@@ -1070,6 +1070,8 @@ HSTS не включается (самоподписанный сертифик�
 | `argon2-cffi` | `>=25.1,<26` | MIT (+ `argon2-cffi-bindings` MIT, `cffi` MIT, `pycparser` BSD-3) | R1.0 | Argon2id (FR-2, ADR-0004) | passlib (не развивается), hashlib (нет Argon2) | ~100 КБ + колёса |
 | `tzdata` | `>=2025.2` | Apache-2.0 | R1.0 | Europe/Moscow в `zoneinfo` независимо от системного tzdata slim-образа (FR-27a, NFR-5) | системный пакет `tzdata` в образе | ~350 КБ |
 | `python-multipart` | `>=0.0.20,<0.1` | Apache-2.0 | R1.1 | `UploadFile` в FastAPI (FR-24) | свой разбор multipart | ~25 КБ |
+| `pyyaml` (dev) | `>=6.0,<7` | MIT | R1.0 | статический разбор compose-файлов в тестах `infra_static` (T02, AC-105, AC-95) | `docker compose config` (нужен Docker в CI и на машине разработчика), ruamel.yaml (тяжелее, нужен только чтение) | ~800 КБ (колесо с C-ускорением) |
+| `types-PyYAML` (dev) | `>=6.0,<7` | Apache-2.0 | R1.0 | типы PyYAML для mypy strict | `# type: ignore` в тестах | ~20 КБ |
 
 Существующие и остающиеся: fastapi (MIT; тянет `opentelemetry-api` Apache-2.0 — no-op без SDK),
 uvicorn[standard] (BSD-3), sqlalchemy (MIT), alembic (MIT), asyncpg (Apache-2.0),
