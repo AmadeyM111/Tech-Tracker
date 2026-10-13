@@ -79,7 +79,7 @@
 - **Попытки:** 1
 
 ## T04 — Единый формат ошибок и фабрика приложения
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** FR-45 (формат `{"detail","code"}`), FR-57 (ответ 422 не содержит введённых значений), FR-7 (health публичный), D-32
 - **Файлы:** `backend/app/core/errors.py`, `backend/app/main.py`, `backend/app/api/v1/health.py`
   (+ пустые `app/api/__init__.py`, `app/api/v1/__init__.py` со сборкой роутеров);
@@ -95,10 +95,10 @@
 - **Готово, когда:** `pytest -q backend/tests/api/test_errors.py backend/tests/test_health.py` зелёный, линтер чистый.
 - **Заметка ревью T01:** подпакетам `app/api`, `app/core`, `app/domain` нужен `__init__.py`, иначе `packages.find` не включит их в установку (Docker, T20).
 - **Заметка ревью T03:** `Settings` сейчас с `extra="ignore"` (опечатки в аргументах проглатываются); при создании `create_app(settings)` рассмотреть `extra="forbid"`; нет теста `today_msk(naive)` → `ValueError` и таймауты без проверки `gt=0` — добавить при ближайшем касании config/clock.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T05 — Слой БД, базовые миксины, Alembic и тестовая БД
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** FR-13 (каркас `WorkspaceMixin`), FR-46, D-2…D-4, D-26
 - **Файлы:** `backend/app/core/db.py`, `backend/app/core/models.py`, `backend/app/domain/registry.py`,
   `backend/alembic.ini`, `backend/migrations/env.py`, `backend/migrations/script.py.mako`,
@@ -177,6 +177,7 @@
   `request.state.user_id` (если есть). Заголовки и тела не логируются. Логгер `uvicorn.access`
   отключён.
 - **Готово, когда:** `pytest -q backend/tests/unit/test_logging.py` зелёный, линтер чистый.
+- **Заметка ревью T04:** фильтр секретов должен применяться и к `exc_info` и тексту исключения (RuntimeError("password=…") сейчас попадает в лог как есть); трассировка 500 дублируется логгерами `app.errors` и `uvicorn.error` — подавить дубль.
 - **Попытки:** 0
 
 ## T10 — Первый запуск: секретный ключ, пространство, первый ТА; каркас CLI
