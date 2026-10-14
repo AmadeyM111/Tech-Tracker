@@ -311,17 +311,17 @@
 - **Попытки:** 1
 
 ## T15 — Постраничный вывод
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** FR-47 (каркас), AC-22 (формат: 50 элементов и `has_next`), D-34
 - **Файлы:** `backend/app/core/pagination.py`; тесты: `backend/tests/db/test_pagination.py`
 - **Зависит от:** T05
 - **Описание:** `PageParams`, `Page[T]`, `paginate()` по plan §4.2: `page ≥ 1`,
   `1 ≤ page_size ≤ 100`, по умолчанию 50; `LIMIT page_size + 1 OFFSET …`; без COUNT.
 - **Готово, когда:** `pytest -q backend/tests/db/test_pagination.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 2
 
 ## T16 — Сервис учётных записей и ролей
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-78, AC-121 (уровень сервиса: создание без роли — одно событие, назначение роли — второе), AC-113 и AC-116 (уровень сервиса), FR-4, FR-5 (блокировка завершает сессии), FR-5a, FR-12, FR-55, FR-62, FR-65, FR-66, FR-69, FR-73; события `user.*` (основа AC-64)
 - **Файлы:** `backend/app/domain/users/service.py`; тесты: `backend/tests/domain/test_user_admin_service.py`
 - **Зависит от:** T07, T12, T15
@@ -335,6 +335,7 @@
 - **Готово, когда:** `pytest -q backend/tests/domain/test_user_admin_service.py` зелёный, линтер чистый.
 - **Заметка ревью T11:** единый шаблон логина (сейчас `provider.LOGIN_RE` и `bootstrap._LOGIN_RE`), правило «только ASCII перед lower()» одинаково при создании и при входе.
 - **Заметка ревью T14:** добавить тесты на ветки «блокировка входа уже стоит → 422 без засчитывания» и «сброс серии при верном `current` и отказе по политике»; обновить docstring `commit_durably` («только на ветках отказа» устарел: вызывается и до verify) и комментарий в `core/logging.py` про дубль `uvicorn.error`.
+- **Заметка ревью T15:** `paginate(db, stmt: Select[R], params)` — всегда `order_by(..., Entity.id)` (тай-брейкер); типизированный вызов обязан проходить mypy strict; без ORDER BY — `ValueError`; добавить тест на этот `ValueError`; рассмотреть верхнюю границу `sqlalchemy<2.2` в `pyproject.toml`.
 - **Попытки:** 0
 
 ## T17 — API системных настроек: учётные записи и роли
@@ -349,6 +350,7 @@
   Одноразовый пароль приходит в запросе (`SecretStr`), в ответах паролей нет (D-15).
 - **Готово, когда:** `pytest -q backend/tests/api/test_admin_users.py backend/tests/api/test_admin_roles.py backend/tests/api/test_workspace_isolation.py`
   зелёный, линтер чистый.
+- **Заметка ревью T15:** `paginate(db, stmt: Select[R], params)` — всегда `order_by(..., Entity.id)` (тай-брейкер); типизированный вызов обязан проходить mypy strict; без ORDER BY — `ValueError`; добавить тест на этот `ValueError`; рассмотреть верхнюю границу `sqlalchemy<2.2` в `pyproject.toml`.
 - **Попытки:** 0
 
 ## T18 — API журнала аудита
@@ -364,6 +366,7 @@
   `entity_deleted` — существует ли объект. Гейт `VIEW_AUDIT`. Сортировка `id DESC`.
 - **Готово, когда:** `pytest -q backend/tests/api/test_audit.py backend/tests/cli/test_bootstrap_audit.py` зелёный, линтер чистый.
 - **Заметка ревью T07:** триггер журнала даёт `restrict_violation` (класс 23) — глобальный обработчик не должен превращать его в 409 с текстом SQL.
+- **Заметка ревью T15:** `paginate(db, stmt: Select[R], params)` — всегда `order_by(..., Entity.id)` (тай-брейкер); типизированный вызов обязан проходить mypy strict; без ORDER BY — `ValueError`; добавить тест на этот `ValueError`; рассмотреть верхнюю границу `sqlalchemy<2.2` в `pyproject.toml`.
 - **Попытки:** 0
 
 ## T19 — Служебные команды: OpenAPI и замер хеширования; отсутствие телеметрии

@@ -293,7 +293,11 @@ class PageParams(BaseModel):
     page_size: int = Field(50, ge=1, le=100)
 class Page(BaseModel, Generic[T]):
     items: list[T]; page: int; page_size: int; has_next: bool
-async def paginate(db: AsyncSession, stmt: Select[tuple[R]], params: PageParams) -> tuple[list[R], bool]: ...
+async def paginate(db: AsyncSession, stmt: Select[R], params: PageParams) -> tuple[list[R], bool]: ...  # SQLAlchemy 2.1: select(Entity) is Select[Entity]
+# Ревью T15: page ≤ 10**15 (при page_size ≤ 100 OFFSET помещается в bigint; больше → 422, не 500); LIMIT/OFFSET — привязанные параметры,
+# OFFSET приводится к bigint (asyncpg иначе INTEGER); порядок сортировки — ответственность вызывающего (stmt обязан содержать
+# order_by по уникальному ключу, тай-брейкер `Entity.id`; paginate без order_by → ValueError); paginate возвращает ORM-сущности
+# (scalars) для select(Entity); коллекции — только selectinload, связи «один-ко-многим» для фильтра — через EXISTS, не join (иначе дубли).
 
 # app/core/secrets.py
 def write_private_file(path: Path, content: str) -> None: ...   # атомарно, O_CREAT|O_EXCL→rename, режим 0600
