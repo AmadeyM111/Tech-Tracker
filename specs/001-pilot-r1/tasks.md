@@ -399,7 +399,7 @@
 - **Попытки:** 2
 
 ## T19 — Служебные команды: OpenAPI и замер хеширования; отсутствие телеметрии
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** FR-43 (все маршруты под `/api/v1`), FR-44, AC-38 (инструмент замера), NFR-4, D-32, D-33
 - **Файлы:** `backend/app/cli/commands/openapi.py`, `backend/app/cli/commands/hash_bench.py`,
   `scripts/gen-api.sh`, `docs/api/openapi.json` (генерируется); тесты: `backend/tests/cli/test_openapi.py`,
@@ -417,7 +417,7 @@
 - **Заметки ревью T17:** (1) битый JSON даёт 422 `json_invalid` раньше 401/403 на всех эндпоинтах — сквозное решение (обработчик ошибок/middleware) либо принять; (2) OpenAPI: описать ответы 401/403/404 и реальное тело ошибки `{detail, code}` (D-33, генерация типов).
 - **Заметки ревью T18:** OpenAPI — описать 401/403/404 для /admin/audit* (D-33); `list_accounts` читает `password_hash` (`users/service.py`) — сузить проекцией (`load_only`); при появлении deal/stage-событий — белый список имён `changed_fields` по действию; пропуск (с логированием) строк журнала с неизвестным `entity_type`, вместо 500 всей страницы.
 - **Заметка ревью T18:** строка журнала с неизвестным `entity_type` (откат кода после R1.1+) даёт 500 всей страницы аудита — CHECK-ограничение на `entity_type` в миграции либо отдача «неизвестный тип» без `details`; решить при первой задаче, расширяющей `EntityType`.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T20 — Образ API
 - **Статус:** TODO
@@ -559,6 +559,7 @@
 - **Заметка ревью T16a:** AST-тест `commit_durably` — требовать равенство `{auth/service.py, api/deps.py}`; тест числа COMMIT на запрос — `== 2`; mypy на `backend/tests` (≈13 ошибок типов в conftest и др.) — решить, проверять ли тесты.
 - **Заметка ревью T17:** `test_admin_roles.py::note_b` — ужесточить до `== 401` для параллельно заблокированного в смене пароля.
 - **Наблюдение (оркестратор, T18):** фильтр журнала по `actor_id` без совпадений уходит в `Seq Scan` (1,6 мс на 30 000 строк); при росте журнала (R1.1+, десятки тысяч событий на проект) рассмотреть частичный индекс `(workspace_id, actor_id, id DESC) WHERE in_audit`; замер объёма — в нагрузочном прогоне NFR-2 (R1.4).
+- **Заметки ревью T19:** вынести `_safe_description`/`wait_for_database`/`BootstrapError` из `bootstrap` в общий модуль CLI; в OpenAPI уточнить 403 у login/logout/password до `origin_mismatch` и объявить 500/default с `ErrorResponse`; `hash-bench` при неверных `ARGON2_*` печатать причину; R1.1 — единый `gostracker maintenance` с `--dry-run` и unit-тест `purge_expired_sessions` на точных границах (8 ч, ±1 мкс, `absolute == now`).
 - **Попытки:** 0
 
 ## T28 — Документация R1.0

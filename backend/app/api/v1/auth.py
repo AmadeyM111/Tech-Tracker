@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request, Response
 
 from app.api.deps import get_actor
+from app.api.openapi import error_response, error_responses
 from app.api.v1.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
@@ -25,7 +26,14 @@ from app.domain.auth.sessions import SessionStore
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post(
+    "/login",
+    response_model=LoginResponse,
+    responses={
+        **error_response(401, "Неверный логин или пароль (code: invalid_credentials)"),
+        **error_responses(403, 422),
+    },
+)
 async def login(
     body: LoginRequest, request: Request, response: Response, db: DbSession
 ) -> LoginResponse:
@@ -67,7 +75,9 @@ async def login(
     )
 
 
-@router.post("/logout", status_code=204, response_class=Response)
+@router.post(
+    "/logout", status_code=204, response_class=Response, responses=error_responses(401, 403)
+)
 async def logout(
     request: Request,
     db: DbSession,
@@ -97,7 +107,12 @@ async def logout(
     return response
 
 
-@router.post("/password", status_code=204, response_class=Response)
+@router.post(
+    "/password",
+    status_code=204,
+    response_class=Response,
+    responses=error_responses(401, 403, 422),
+)
 async def change_password(
     body: ChangePasswordRequest,
     request: Request,

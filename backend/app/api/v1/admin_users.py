@@ -16,6 +16,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.api.deps import get_active_actor, require_capability
+from app.api.openapi import error_responses
 from app.api.v1.schemas.admin import (
     AdminUser,
     CreateUserRequest,
@@ -33,13 +34,14 @@ router = APIRouter(
     prefix="/admin/users",
     tags=["admin-users"],
     dependencies=[Depends(require_capability(Capability.MANAGE_ACCOUNTS))],
+    responses=error_responses(401, 403),
 )
 
 # ``get_active_actor`` общий с гейтом раздела (кэш зависимостей запроса): ``get_actor`` один.
 CurrentActor = Annotated[Actor, Depends(get_active_actor)]
 
 
-@router.get("", response_model=Page[AdminUser])
+@router.get("", response_model=Page[AdminUser], responses=error_responses(422))
 async def list_users(
     db: DbSession, actor: CurrentActor, params: Annotated[PageParams, Query()]
 ) -> Page[AdminUser]:
@@ -53,7 +55,7 @@ async def list_users(
     )
 
 
-@router.post("", status_code=201, response_model=AdminUser)
+@router.post("", status_code=201, response_model=AdminUser, responses=error_responses(422))
 async def create_user(
     body: CreateUserRequest, request: Request, db: DbSession, actor: CurrentActor
 ) -> AdminUser:
@@ -65,13 +67,18 @@ async def create_user(
     return AdminUser.model_validate(account)
 
 
-@router.get("/{user_id}", response_model=AdminUser)
+@router.get("/{user_id}", response_model=AdminUser, responses=error_responses(404, 422))
 async def get_user(user_id: UUID, db: DbSession, actor: CurrentActor) -> AdminUser:
     """Учётная запись; чужое пространство и неизвестный id — 404 (FR-13)."""
     return AdminUser.model_validate(await service.get_account(db, actor, user_id))
 
 
-@router.post("/{user_id}/block", status_code=204, response_class=Response)
+@router.post(
+    "/{user_id}/block",
+    status_code=204,
+    response_class=Response,
+    responses=error_responses(404, 422),
+)
 async def block_user(
     user_id: UUID, request: Request, db: DbSession, actor: CurrentActor
 ) -> Response:
@@ -81,14 +88,24 @@ async def block_user(
     return Response(status_code=204)
 
 
-@router.post("/{user_id}/unblock", status_code=204, response_class=Response)
+@router.post(
+    "/{user_id}/unblock",
+    status_code=204,
+    response_class=Response,
+    responses=error_responses(404, 422),
+)
 async def unblock_user(user_id: UUID, db: DbSession, actor: CurrentActor) -> Response:
     """Снимает блокировку (FR-5a); прежние сессии не восстанавливаются."""
     await service.unblock_user(db, actor, user_id)
     return Response(status_code=204)
 
 
-@router.post("/{user_id}/reset-password", status_code=204, response_class=Response)
+@router.post(
+    "/{user_id}/reset-password",
+    status_code=204,
+    response_class=Response,
+    responses=error_responses(404, 422),
+)
 async def reset_password(
     user_id: UUID,
     body: ResetPasswordRequest,
@@ -105,7 +122,12 @@ async def reset_password(
     return Response(status_code=204)
 
 
-@router.post("/{user_id}/revoke-sessions", status_code=204, response_class=Response)
+@router.post(
+    "/{user_id}/revoke-sessions",
+    status_code=204,
+    response_class=Response,
+    responses=error_responses(404, 422),
+)
 async def revoke_sessions(
     user_id: UUID, request: Request, db: DbSession, actor: CurrentActor
 ) -> Response:
@@ -119,6 +141,7 @@ async def revoke_sessions(
     "/{user_id}/role",
     response_model=AdminUser,
     dependencies=[Depends(require_capability(Capability.ASSIGN_ROLES))],
+    responses=error_responses(404, 422),
 )
 async def set_role(
     user_id: UUID, body: SetRoleRequest, db: DbSession, actor: CurrentActor

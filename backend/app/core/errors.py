@@ -13,11 +13,27 @@ from typing import Any, ClassVar, cast
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger("app.errors")
 
 INTERNAL_ERROR_DETAIL = "Внутренняя ошибка"
+
+
+class ErrorDetail(BaseModel):
+    """Одна ошибка валидации в ``detail`` 422: без введённого значения (FR-57)."""
+
+    loc: list[str | int]
+    msg: str
+    type: str
+
+
+class ErrorResponse(BaseModel):
+    """Тело любой ошибки API: ``detail`` — текст или ошибки валидации, ``code`` — машинный код."""
+
+    detail: str | list[ErrorDetail]
+    code: str
 
 
 class ErrorCode(StrEnum):

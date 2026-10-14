@@ -38,6 +38,7 @@ from uuid import UUID, uuid4
 from pydantic import SecretStr
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import load_only
 
 from app.core.clock import utcnow
 from app.core.errors import ErrorCode, Forbidden, NotFound, Unprocessable
@@ -517,6 +518,16 @@ async def list_accounts(
     _require(actor, Capability.MANAGE_ACCOUNTS)
     stmt = (
         select(AppUser)
+        # ревью T17/T18: password_hash и счётчики входа в выборку не попадают
+        .options(
+            load_only(
+                AppUser.id,
+                AppUser.login,
+                AppUser.is_blocked,
+                AppUser.must_change_password,
+                AppUser.created_at,
+            )
+        )
         .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
         .where(WorkspaceMember.workspace_id == actor.workspace_id)
         .order_by(AppUser.login, AppUser.id)

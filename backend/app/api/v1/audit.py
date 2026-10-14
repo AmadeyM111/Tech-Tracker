@@ -14,6 +14,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import get_active_actor, require_capability
+from app.api.openapi import error_responses
 from app.api.v1.schemas.audit import AuditActor, AuditEntry, AuditListQuery
 from app.core.db import DbSession
 from app.core.pagination import Page
@@ -26,6 +27,7 @@ router = APIRouter(
     prefix="/admin/audit",
     tags=["admin-audit"],
     dependencies=[Depends(require_capability(Capability.VIEW_AUDIT))],
+    responses=error_responses(401, 403),
 )
 
 # ``get_active_actor`` общий с гейтом раздела (кэш зависимостей запроса): ``get_actor`` один.
@@ -50,7 +52,7 @@ def _to_entry(record: AuditRecord) -> AuditEntry:
     )
 
 
-@router.get("", response_model=Page[AuditEntry])
+@router.get("", response_model=Page[AuditEntry], responses=error_responses(422))
 async def list_audit(
     db: DbSession, actor: CurrentActor, params: Annotated[AuditListQuery, Query()]
 ) -> Page[AuditEntry]:
@@ -66,7 +68,7 @@ async def list_audit(
     )
 
 
-@router.get("/{entry_id}", response_model=AuditEntry)
+@router.get("/{entry_id}", response_model=AuditEntry, responses=error_responses(404, 422))
 async def get_audit_entry(entry_id: int, db: DbSession, actor: CurrentActor) -> AuditEntry:
     """Запись журнала; чужое пространство, неизвестный и не аудитный ``id`` — 404."""
     return _to_entry(await queries.get_audit_entry(db, actor, entry_id))

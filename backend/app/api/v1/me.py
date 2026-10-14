@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.api.deps import get_active_actor
+from app.api.openapi import error_responses
 from app.api.v1.schemas.auth import MeResponse
 from app.core.errors import NoRole
 from app.domain.access.roles import Actor, Capability
@@ -14,7 +15,7 @@ from app.domain.access.roles import Actor, Capability
 router = APIRouter(tags=["me"])
 
 
-@router.get("/me", response_model=MeResponse)
+@router.get("/me", response_model=MeResponse, responses=error_responses(401, 403))
 async def me(actor: Annotated[Actor, Depends(get_active_actor)]) -> MeResponse:
     """Профиль и отсортированный список возможностей активного пользователя.
 

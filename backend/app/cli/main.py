@@ -6,7 +6,7 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 
-from app.cli.commands import bootstrap
+from app.cli.commands import bootstrap, hash_bench, maintenance, openapi
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -16,6 +16,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", metavar="КОМАНДА", required=True)
     bootstrap.add_parser(subparsers)
+    openapi.add_parser(subparsers)
+    hash_bench.add_parser(subparsers)
+    maintenance.add_parser(subparsers)
     return parser
 
 

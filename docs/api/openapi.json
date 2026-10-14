@@ -1,0 +1,1516 @@
+{
+  "components": {
+    "schemas": {
+      "AdminUser": {
+        "description": "Учётная запись в разделе администрирования (``GET``, ``POST``, ``PUT …/role``).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_blocked": {
+            "title": "Is Blocked",
+            "type": "boolean"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "login",
+          "role",
+          "is_blocked",
+          "must_change_password",
+          "created_at"
+        ],
+        "title": "AdminUser",
+        "type": "object"
+      },
+      "AuditActor": {
+        "description": "Автор действия; ``kind = system`` при ``actor_id IS NULL`` (id и login — ``null``).",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "kind": {
+            "enum": [
+              "user",
+              "system"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "login"
+        ],
+        "title": "AuditActor",
+        "type": "object"
+      },
+      "AuditEntry": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/AuditActor"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "entity_deleted": {
+            "title": "Entity Deleted",
+            "type": "boolean"
+          },
+          "entity_id": {
+            "format": "uuid",
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "occurred_at",
+          "actor",
+          "action",
+          "entity_type",
+          "entity_id",
+          "entity_deleted",
+          "changed_fields",
+          "details"
+        ],
+        "title": "AuditEntry",
+        "type": "object"
+      },
+      "Capability": {
+        "description": "Возможность; значение — имя члена в нижнем регистре (``auto()`` у ``StrEnum``).",
+        "enum": [
+          "manage_accounts",
+          "assign_roles",
+          "view_audit",
+          "business_access",
+          "project_create",
+          "project_manage_any",
+          "task_assign_others",
+          "labels_manage",
+          "crm_read",
+          "crm_write",
+          "pipeline_manage"
+        ],
+        "title": "Capability",
+        "type": "string"
+      },
+      "ChangePasswordRequest": {
+        "additionalProperties": false,
+        "description": "``POST /auth/password`` (FR-56): ответ 204 без тела.",
+        "properties": {
+          "current_password": {
+            "format": "password",
+            "maxLength": 1024,
+            "title": "Current Password",
+            "type": "string",
+            "writeOnly": true
+          },
+          "new_password": {
+            "format": "password",
+            "maxLength": 1024,
+            "title": "New Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordRequest",
+        "type": "object"
+      },
+      "CreateUserRequest": {
+        "additionalProperties": false,
+        "description": "``POST /admin/users``: роль не передаётся, назначается отдельным действием (FR-4).",
+        "properties": {
+          "login": {
+            "maxLength": 1024,
+            "title": "Login",
+            "type": "string"
+          },
+          "one_time_password": {
+            "format": "password",
+            "maxLength": 1024,
+            "title": "One Time Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "login",
+          "one_time_password"
+        ],
+        "title": "CreateUserRequest",
+        "type": "object"
+      },
+      "EntityType": {
+        "enum": [
+          "user",
+          "project",
+          "task",
+          "comment",
+          "attachment",
+          "stage",
+          "deal"
+        ],
+        "title": "EntityType",
+        "type": "string"
+      },
+      "ErrorDetail": {
+        "description": "Одна ошибка валидации в ``detail`` 422: без введённого значения (FR-57).",
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "description": "Тело любой ошибки API: ``detail`` — текст или ошибки валидации, ``code`` — машинный код.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "required": [
+          "detail",
+          "code"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "LoginRequest": {
+        "additionalProperties": false,
+        "description": "``POST /auth/login``: логин нормализуется и проверяется сервисом (FR-73).",
+        "properties": {
+          "login": {
+            "maxLength": 1024,
+            "title": "Login",
+            "type": "string"
+          },
+          "password": {
+            "format": "password",
+            "maxLength": 1024,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "login",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "LoginResponse": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/SessionUser"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "title": "LoginResponse",
+        "type": "object"
+      },
+      "MeResponse": {
+        "description": "``GET /me``: активный пользователь (роль назначена, пароль не одноразовый).",
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          }
+        },
+        "required": [
+          "id",
+          "login",
+          "role",
+          "must_change_password",
+          "capabilities"
+        ],
+        "title": "MeResponse",
+        "type": "object"
+      },
+      "Page_AdminUser_": {
+        "properties": {
+          "has_next": {
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "has_next"
+        ],
+        "title": "Page[AdminUser]",
+        "type": "object"
+      },
+      "Page_AuditEntry_": {
+        "properties": {
+          "has_next": {
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "has_next"
+        ],
+        "title": "Page[AuditEntry]",
+        "type": "object"
+      },
+      "ResetPasswordRequest": {
+        "additionalProperties": false,
+        "description": "``POST /admin/users/{user_id}/reset-password`` (FR-65).",
+        "properties": {
+          "one_time_password": {
+            "format": "password",
+            "maxLength": 1024,
+            "title": "One Time Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "one_time_password"
+        ],
+        "title": "ResetPasswordRequest",
+        "type": "object"
+      },
+      "Role": {
+        "description": "Роль в пространстве; значения совпадают с ``workspace_member.role`` (CHECK role_valid).",
+        "enum": [
+          "tech_admin",
+          "business_admin",
+          "mixed",
+          "user"
+        ],
+        "title": "Role",
+        "type": "string"
+      },
+      "SessionUser": {
+        "description": "Профиль в ответе на вход: ровно эти четыре поля.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "login",
+          "role",
+          "must_change_password"
+        ],
+        "title": "SessionUser",
+        "type": "object"
+      },
+      "SetRoleRequest": {
+        "additionalProperties": false,
+        "description": "``PUT /admin/users/{user_id}/role``: ``null`` снимает роль (FR-12, FR-66).",
+        "properties": {
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "SetRoleRequest",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Tracker API",
+    "version": "0.0.1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/admin/audit": {
+      "get": {
+        "description": "Страница журнала пространства: ``id DESC``, фильтры ``entity_type`` и ``actor_id``.",
+        "operationId": "list_audit",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 1000000000000000,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entity_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EntityType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AuditEntry_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "List Audit",
+        "tags": [
+          "admin-audit"
+        ]
+      }
+    },
+    "/api/v1/admin/audit/{entry_id}": {
+      "get": {
+        "description": "Запись журнала; чужое пространство, неизвестный и не аудитный ``id`` — 404.",
+        "operationId": "get_audit_entry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Get Audit Entry",
+        "tags": [
+          "admin-audit"
+        ]
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "description": "Страница учётных записей пространства: ``login ASC, id ASC`` (D-34).",
+        "operationId": "list_users",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 1000000000000000,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AdminUser_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "List Users",
+        "tags": [
+          "admin-users"
+        ]
+      },
+      "post": {
+        "description": "Создаёт пользователя без роли с одноразовым паролем из запроса (FR-4, D-15).",
+        "operationId": "create_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Create User",
+        "tags": [
+          "admin-users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}": {
+      "get": {
+        "description": "Учётная запись; чужое пространство и неизвестный id — 404 (FR-13).",
+        "operationId": "get_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Get User",
+        "tags": [
+          "admin-users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/block": {
+      "post": {
+        "description": "Блокирует пользователя и завершает его сессии (FR-5); повтор — без ошибки.",
+        "operationId": "block_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Block User",
+        "tags": [
+          "admin-users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/reset-password": {
+      "post": {
+        "description": "Задаёт новый одноразовый пароль из запроса, завершает сессии (FR-65, D-15).",
+        "operationId": "reset_password",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Reset Password",
+        "tags": [
+          "admin-users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/revoke-sessions": {
+      "post": {
+        "description": "Завершает все сессии пользователя; вход остаётся возможным (FR-62).",
+        "operationId": "revoke_sessions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Revoke Sessions",
+        "tags": [
+          "admin-users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/role": {
+      "put": {
+        "description": "Назначает, меняет или снимает роль (FR-12); сессии и пароль не затрагиваются.",
+        "operationId": "set_role",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Set Role",
+        "tags": [
+          "admin-users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/unblock": {
+      "post": {
+        "description": "Снимает блокировку (FR-5a); прежние сессии не восстанавливаются.",
+        "operationId": "unblock_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Unblock User",
+        "tags": [
+          "admin-users"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "description": "Вход по логину и паролю; любая причина отказа — один и тот же 401.\n\nДо ``service.login`` обработчик не обращается к БД (ревью T11): иначе ``commit_durably``\nвнутри сервиса зафиксировал бы эти записи досрочно. Cookie клиента не читается: токен\nвсегда выдаёт сервер (защита от фиксации сессии).",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Неверный логин или пароль (code: invalid_credentials)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "Завершает сессию на сервере и стирает cookie (FR-60).\n\nДоступен при одноразовом пароле и без роли: используется ``get_actor``, а не\n``get_active_actor`` (plan §4.5, п.2–3). Повторный выход той же cookie — 401: сессии нет.",
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password": {
+      "post": {
+        "description": "Смена своего пароля (FR-56): 204 без тела.\n\nДоступна при одноразовом пароле и без роли: ``get_actor``, а не ``get_active_actor``\n(plan §4.5, п.2–3). Origin проверяется app-level зависимостью ``check_origin`` до\nобработчика, поэтому чужой Origin не засчитывается как неверный пароль. Файл пароля\nпервого ТА сервис удаляет после COMMIT (``get_db`` фиксирует транзакцию до ответа).",
+        "operationId": "change_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Change Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "Проверка живости сервиса.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "description": "Профиль и отсортированный список возможностей активного пользователя.\n\nРоль и флаги читаются из БД на каждый запрос (FR-67). ``get_active_actor`` гарантирует\nназначенную роль и ``must_change_password = false``.",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          }
+        },
+        "summary": "Me",
+        "tags": [
+          "me"
+        ]
+      }
+    }
+  }
+}
