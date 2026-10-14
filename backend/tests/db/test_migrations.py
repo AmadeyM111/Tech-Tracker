@@ -604,7 +604,7 @@ def test_commit_durably_used_only_by_auth_service() -> None:
             if hit and rel != definition:
                 users.add(rel)
     assert defined_in == {definition}, f"commit_durably определён в {sorted(defined_in)}"
-    assert required_users <= users, (
-        f"commit_durably не вызывается из {sorted(required_users - users)}"
+    # T27 (заметка ревью T16a): набор вызывающих РАВЕН санкционированному
+    assert users == allowed_users, (
+        f"commit_durably: ожидалось {sorted(allowed_users)}, найдено {sorted(users)}"
     )
-    assert users <= allowed_users, f"commit_durably используется в {sorted(users - allowed_users)}"

@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 
 from alembic import context
+from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
@@ -38,6 +39,9 @@ def run_migrations_offline() -> None:
 
 
 def _do_run_migrations(connection: Connection) -> None:
+    # Серверный lock_timeout (plan §4.12) рассчитан на запросы приложения; миграция ждёт блокировку.
+    connection.execute(text("SET lock_timeout = 0"))
+    connection.commit()  # SET - сессионный; транзакцию закрываем, чтобы alembic вёл свою
     context.configure(
         connection=connection,
         target_metadata=target_metadata,

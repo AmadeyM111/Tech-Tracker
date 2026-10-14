@@ -208,6 +208,9 @@ async def bootstrap_lock(
         connection = await lock_session.connection(
             execution_options={"isolation_level": "AUTOCOMMIT"}
         )
+        # Серверный lock_timeout (plan §4.12, решения T26) не должен обрывать ожидание: второй
+        # экземпляр bootstrap ждёт освобождения блокировки (plan §4.7).
+        await connection.execute(text("SET lock_timeout = 0"))
         await connection.execute(
             text("SELECT pg_advisory_lock(:key)"), {"key": _BOOTSTRAP_LOCK_KEY}
         )

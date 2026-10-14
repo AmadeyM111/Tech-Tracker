@@ -209,8 +209,11 @@ describe("error middleware (FR-45)", () => {
         () => new Response(bytes, { status: 200, headers: { "Content-Type": type } }),
       );
       const res = await client.GET("/api/v1/me", { parseAs: "blob" });
-      expect(res.data).toBeInstanceOf(Blob);
-      expect((res.data as Blob).size).toBe(bytes.length);
+      // Не instanceof: в jsdom глобальный Blob отличается от Blob из Response.blob() (Node 22).
+      expect(Object.prototype.toString.call(res.data)).toBe("[object Blob]");
+      const blob = res.data as Blob;
+      expect(blob.size).toBe(bytes.length);
+      expect(Array.from(new Uint8Array(await blob.arrayBuffer()))).toEqual(Array.from(bytes));
     },
   );
 

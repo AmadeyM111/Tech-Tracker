@@ -139,6 +139,45 @@ def _key_from_settings(settings: Settings) -> bytes | None:
     return key
 
 
+_TMP_PREFIX: Final = f".{SECRET_KEY_FILE}."
+_TMP_SUFFIX: Final = ".tmp"
+_PUBLISH_ATTEMPTS: Final = 5
+
+
+def _remove_stale_tmp_files(directory: Path) -> None:
+    """Удаляет ``.secret_key.*.tmp`` от прерванных запусков (в них лежит ключ в hex).
+
+    Удаляются только обычные файлы и символьные ссылки (сама ссылка, не цель); каталоги и
+    файлы с другими именами не трогаются. Если ``directory`` - не каталог (в том числе
+    символьная ссылка на чужой каталог), чистки нет: такой путь отвергает ``ensure_private_dir``.
+    Остаток, уже удалённый параллельным запуском (ENOENT), - не ошибка; прочие сбои дают
+    WARNING с кодом ошибки ОС и не мешают запуску.
+    """
+    try:
+        if not stat.S_ISDIR(os.lstat(directory).st_mode):
+            return
+        with os.scandir(directory) as entries:
+            names = [e.name for e in entries]
+    except OSError:  # каталога нет (первый запуск) или он нечитаем
+        return
+    for name in names:
+        if not (
+            name.startswith(_TMP_PREFIX)
+            and name.endswith(_TMP_SUFFIX)
+            and len(name) >= len(_TMP_PREFIX) + len(_TMP_SUFFIX)
+        ):
+            continue
+        candidate = directory / name
+        try:
+            mode = os.lstat(candidate).st_mode
+            if stat.S_ISREG(mode) or stat.S_ISLNK(mode):
+                os.unlink(candidate)
+        except FileNotFoundError:
+            continue  # удалён параллельным запуском
+        except OSError as exc:
+            _log.warning("не удалось удалить остаток временного файла ключа: %s", exc.errno)
+
+
 def ensure_secret_key(settings: Settings) -> bytes:
     """Возвращает секретный ключ приложения (D-20, FR-6).
 
@@ -154,16 +193,26 @@ def ensure_secret_key(settings: Settings) -> bytes:
         return from_settings
 
     path = settings.secrets_dir / SECRET_KEY_FILE
+    _remove_stale_tmp_files(settings.secrets_dir)
     try:
         return _read_key_file(path)
     except FileNotFoundError:
         pass
 
     ensure_private_dir(settings.secrets_dir)
-    key = secrets.token_bytes(GENERATED_KEY_BYTES)
-    try:
-        write_private_file(path, key.hex() + "\n")
-    except FileExistsError:
-        # проиграли гонку: файл опубликован целиком (link), читаем чужой ключ
-        return _read_key_file(path)
-    return key
+    for _ in range(_PUBLISH_ATTEMPTS):
+        key = secrets.token_bytes(GENERATED_KEY_BYTES)
+        try:
+            write_private_file(path, key.hex() + "\n")
+        except FileExistsError:
+            # проиграли гонку: файл опубликован целиком (link), читаем чужой ключ
+            return _read_key_file(path)
+        except FileNotFoundError:
+            # параллельный запуск удалил наш временный файл как «остаток»: читаем чужой
+            # результат либо повторяем публикацию
+            try:
+                return _read_key_file(path)
+            except FileNotFoundError:
+                continue
+        return key
+    raise RuntimeError(f"Не удалось создать файл секретного ключа: {path}")

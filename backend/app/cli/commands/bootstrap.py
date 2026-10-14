@@ -201,7 +201,7 @@ def run(args: argparse.Namespace) -> int:
 
     if result.admin_created:
         path = settings.secrets_dir / INITIAL_ADMIN_FILE
-        _warn(f"Создан первый техадминистратор, пароль в файле: {path}")
+        _warn("Создан первый техадминистратор; путь к файлу с паролем выведен в stdout")
         print(path, flush=True)
     else:
         _warn("Первый запуск уже выполнен: изменений нет")

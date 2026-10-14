@@ -557,11 +557,11 @@ async def _measure(env: ApiEnv, token: str, **extra: str) -> tuple[httpx.Respons
     return response, counter
 
 
-async def test_fr59_ordinary_request_has_at_most_one_extra_commit(
+async def test_fr59_ordinary_request_has_exactly_one_extra_commit(
     committed_api_env: ApiEnv,
 ) -> None:
-    """Обычный запрос: ровно одно ``UPDATE user_session`` и не более 2 COMMIT (1 итоговый +
-    не более одного дополнительного на ``get_actor``)."""
+    """Обычный запрос: ровно одно ``UPDATE user_session`` и ровно 2 COMMIT (1 итоговый +
+    один дополнительный на ``get_actor``)."""
     env = committed_api_env
     user = await env.new_user(role="user")
     token = await env.login_ok(user)
@@ -571,7 +571,7 @@ async def test_fr59_ordinary_request_has_at_most_one_extra_commit(
 
     assert response.status_code == 200
     assert counter.session_updates == 1
-    assert 1 <= counter.commits <= 2, counter
+    assert counter.commits == 2, counter  # T27: ровно итоговый + один на get_actor
 
 
 async def test_ac79_background_request_has_no_extra_commit_and_no_update(

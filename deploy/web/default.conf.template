@@ -44,6 +44,13 @@ server {
     # Без пользовательской сети Docker резолвер молчит: отвечаем 502 за 5 с, а не за 30 с.
     resolver_timeout 5s;
 
+    # Проверка живости для HEALTHCHECK образа: отвечает сам nginx (без api и SPA) и не пишется
+    # в access-лог (запрос раз в 10 с засорял бы его).
+    location = /healthz {
+        access_log off;
+        return 200 "ok";
+    }
+
     location @payload_too_large {
         default_type application/json;
         charset utf-8;

@@ -553,7 +553,7 @@
 - **Попытки:** 1
 
 ## T27 — CI
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** NFR-10, N-6
 - **Файлы:** `.github/workflows/ci.yml`, `scripts/check.sh`
 - **Зависит от:** T22, T26
@@ -572,10 +572,11 @@
 - **Заметки ревью T19:** вынести `_safe_description`/`wait_for_database`/`BootstrapError` из `bootstrap` в общий модуль CLI; в OpenAPI уточнить 403 у login/logout/password до `origin_mismatch` и объявить 500/default с `ErrorResponse`; `hash-bench` при неверных `ARGON2_*` печатать причину; R1.1 — единый `gostracker maintenance` с `--dry-run` и unit-тест `purge_expired_sessions` на точных границах (8 ч, ±1 мкс, `absolute == now`).
 - **Открытый вопрос (оркестратор, T20):** `ruff check backend` обнаружил I001 в `backend/tests/cli/test_bootstrap.py` (:430, :532) и `backend/tests/api/test_deps_gates.py` (:147), существовавшие с T10/T12, хотя `bash scripts/check.sh` на тех задачах был зелёным; воспроизводится и с `--no-cache`, причина молчания прежних запусков не установлена. В CI запускать линтер на чистой выгрузке без кэша (`--no-cache`), версию ruff закрепить в `pyproject.toml`.
 - **Перенесено из ревью T26:** (1) CI infra-задание строго в порядке `up` → `pytest -m infra_stack` → `down -v` на свежем проекте (тесты first_run зависят от порядка/состояния), при ошибке — `docker compose logs`; только infra_stack ловит удаление `lock_timeout`; (2) `test_stack_first_run.py`: проверка свежести стека в начале модуля (`pytest.fail("нужен свежий стек: down -v")` вместо 9 каскадных KeyError) и статическая проверка `lock_timeout`/`idle_in_transaction_session_timeout` в `test_compose_static.py`; (3) `lock_timeout=30s` задан на весь сервер: в соединении блокировки bootstrap и в alembic — `SET lock_timeout = 0` (второй bootstrap по plan §4.7 ждёт); ответ на `LockNotAvailableError` сейчас 500 `internal_error` — код ошибки нужен в spec/plan (R1.1); (4) `deploy/web/10-gostracker-tls.sh`: удалять остатки `.tls.*.??????` (с закрытым ключом) под flock; `ensure_secret_key`: чистить `.secret_key.*.tmp`; (5) HEALTHCHECK web пишет `GET /` в access-лог nginx каждые 10 с — отдельный location с `access_log off`; (6) `restart: unless-stopped` — решить через plan (сейчас нет restart policy; иначе описать в T28); (7) `.gitignore`: строки `deploy/tls/*.crt|*.key` лишние (покрыты `deploy/tls/*`); bootstrap печатает путь к файлу пароля дважды.
-- **Попытки:** 0
+- **Заметки ревью T27 (R1.1+/T28):** (1) код ошибки для `LockNotAvailableError` (сейчас 500 `internal_error`, нужен пункт в spec/plan); (2) mypy на `backend/tests` (с `--explicit-package-bases` ≈64 ошибки в 15 файлах; без флага не стартует — конфликт имён `conftest`); (3) заметки T19, не сделанные в T27: вынос `_safe_description`/`wait_for_database`/`BootstrapError`, уточнение 403/500 в OpenAPI, причина в `hash-bench`, `gostracker maintenance --dry-run`, unit-тест границ `purge_expired_sessions`; (4) частичный индекс журнала по `actor_id` — по замеру NFR-2 (R1.4); (5) пины `actions/*` (v4/v5/v4) работают на рантайме Node 20 — поднять мажоры при первом прогоне CI; (6) `.gitignore`: лишние строки `deploy/tls/*.crt|*.key` (тест T25 их требует — убрать вместе с тестом); (7) T28 (документация): семантика `restart: unless-stopped` (после `docker stop`/`kill` не поднимается; unhealthy не перезапускается); bootstrap и миграции ждут блокировки бессрочно (`lock_timeout=0`), зависшая блокировка → api не healthy и `up --wait` висит; `/healthz` доступен снаружи (200 «ok»); infra_stack требует свежий стек (`down -v`); требования к Node; Content-Type `/healthz` — косметика.
+- **Попытки:** 2
 
 ## T28 — Документация R1.0
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** NFR-11 (часть), NFR-3 (инструкция), FR-63 (самоподписанный сертификат в README), OI-70 (dev-команды)
 - **Файлы:** `README.md` (ru + en), `docs/data-model.md`, `AGENTS.md` (только блок «Команды»), `docs/STATE.md`
 - **Зависит от:** T26

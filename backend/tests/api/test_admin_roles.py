@@ -620,7 +620,7 @@ async def test_t16a_note_b_change_own_password_of_blocked_user_is_not_204(
         problems: list[str] = []
         if block.status_code != 204:
             problems.append(f"блокировка: {block.status_code}")
-        if result[0] != "status" or not (400 <= int(result[1]) < 500):
+        if result[0] != "status" or int(result[1]) != 401:  # T27: ровно 401
             problems.append(f"смена пароля заблокированным: {result}")
         if row.password_hash != y.password_hash:
             problems.append("пароль заблокированного изменён")

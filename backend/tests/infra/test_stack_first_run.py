@@ -17,6 +17,8 @@ import stat
 from datetime import UTC, datetime
 from typing import Any
 
+import pytest
+
 from tests.infra import stack_support as ss
 
 pytestmark = ss.stack_marks()
@@ -26,6 +28,21 @@ SECRET_FILE = "/data/secrets/secret_key"
 NEW_PASSWORD = "Gt" + secrets.token_hex(10) + "Ab"  # 22 символа, не из списка частых
 
 STATE: dict[str, Any] = {}
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _fresh_stack_guard() -> None:
+    """T27 (ревью T26): сценарий рассчитан на свежий стек; на «использованном» стеке вместо
+    каскада KeyError - одно понятное сообщение."""
+    reasons: list[str] = []
+    if not _exists("api", PASSWORD_FILE):
+        reasons.append("нет файла пароля первого администратора (пароль уже сменён)")
+    if int(ss.psql("SELECT count(*) FROM app_user;")) != 1:
+        reasons.append("в app_user не одна строка")
+    if int(ss.psql("SELECT count(*) FROM user_session;")) > 0:
+        reasons.append("уже есть сессии (user_session не пуста)")
+    if reasons:
+        pytest.fail("нужен свежий стек: down -v (" + "; ".join(reasons) + ")")
 
 
 def _stat(service: str, path: str) -> tuple[int, int]:

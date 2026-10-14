@@ -96,6 +96,16 @@ tmp_key=
 tmp_crt=
 trap 'rm -f "${tmp_key:-}" "${tmp_crt:-}"' EXIT
 
+# Остатки прерванных генераций (mktemp: .tls.key.XXXXXX, .tls.crt.XXXXXX; в них закрытый ключ).
+# Под блокировкой чужих «живых» временных файлов нет. Удаляются только обычные файлы и
+# символьные ссылки (сама ссылка); каталоги с такими именами не трогаются и не роняют запуск.
+# tls.crt/tls.key и файлы с другими именами шаблон не затрагивает.
+for leftover in "$GENERATED_DIR"/.tls.key.?????? "$GENERATED_DIR"/.tls.crt.??????; do
+    if [ -L "$leftover" ] || [ -f "$leftover" ]; then
+        rm -f -- "$leftover"
+    fi
+done
+
 gen_crt="$GENERATED_DIR/tls.crt"
 gen_key="$GENERATED_DIR/tls.key"
 need_generate=1

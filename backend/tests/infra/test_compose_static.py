@@ -437,3 +437,29 @@ def test_t25_gitignore_tls_dir_and_env(repo_root: Path) -> None:
     assert ignored("deploy/tls/tls.key")
     assert ignored("deploy/tls/server.pem")
     assert not ignored("deploy/tls/README.md")
+
+
+# --- T27 (перенесено из ревью T26): таймауты сервера и restart policy ---------------------
+
+
+def _db_command_text(compose: dict[str, Any]) -> str:
+    command = _db(compose).get("command")
+    assert command, "у db нет command: серверные таймауты не заданы (plan §4.12, решения T26)"
+    return " ".join(command) if isinstance(command, list) else str(command)
+
+
+@pytest.mark.parametrize("param", ["lock_timeout", "idle_in_transaction_session_timeout"])
+def test_t27_db_command_sets_positive_server_timeout(compose: dict[str, Any], param: str) -> None:
+    """T26 п.2: параметр задан в command сервиса db с положительным значением (0 = выключен)."""
+    import re
+
+    text = _db_command_text(compose)
+    m = re.search(rf"(?<![\w]){param}[= ]\s*'?(\d+)\s*(ms|s|min|h)?'?(?!\w)", text)
+    assert m, f"в command db нет {param}=<значение>: {text!r}"
+    assert int(m.group(1)) > 0, f"{param} должен быть > 0"
+
+
+@pytest.mark.parametrize("service", ["db", "api", "web"])
+def test_t27_service_restart_unless_stopped(compose: dict[str, Any], service: str) -> None:
+    """T26 п.6, plan §4.12 (а): после перезагрузки хоста стек поднимается сам."""
+    assert compose["services"][service].get("restart") == "unless-stopped"

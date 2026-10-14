@@ -10,6 +10,7 @@ x-logging: &logging
 services:
   db:
     image: postgres:16
+    restart: unless-stopped
     # Таймауты уровня сервера (ревью T16): зависшая транзакция администратора не блокирует
     # остальные админ-действия пространства бессрочно.
     command:
@@ -35,6 +36,7 @@ services:
   api:
     build:
       context: ./backend
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tracker}:${POSTGRES_PASSWORD:-tracker}@db:5432/${POSTGRES_DB:-tracker}
       # Литерал: значение из .env не читается (FR-58, AC-105).
@@ -67,6 +69,7 @@ services:
     build:
       context: .
       dockerfile: deploy/web/Dockerfile
+    restart: unless-stopped
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
