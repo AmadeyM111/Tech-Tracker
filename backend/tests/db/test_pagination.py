@@ -425,3 +425,18 @@ async def test_sanity_seed_count(db: AsyncSession) -> None:
         )
     ).scalar()
     assert n == 12
+
+
+async def test_t18_paginate_without_order_by_raises_value_error(db: AsyncSession) -> None:
+    """Заметка ревью T15/T17: порядок страниц без ORDER BY не определён -> ``ValueError``.
+
+    Исключение обязано возникнуть до обращения к БД (ни одного запроса не выполняется).
+    """
+    from app.core.pagination import PageParams, paginate
+    from app.domain.users.models import AppUser
+
+    stmt = select(AppUser).where(AppUser.login.like("any%"))
+    conn = await db.connection()
+    with _capture_sql(conn.sync_connection) as seen, pytest.raises(ValueError, match="ORDER BY"):
+        await paginate(db, stmt, PageParams())
+    assert seen == []
