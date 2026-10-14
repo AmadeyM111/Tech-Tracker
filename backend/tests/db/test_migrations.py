@@ -578,8 +578,10 @@ async def test_lifespan_puts_engine_and_sessionmaker_into_app_state(
 
 def test_commit_durably_used_only_by_auth_service() -> None:
     """T11 (ревью): единственное санкционированное исключение из «сервисы не фиксируют» —
-    ``commit_durably``; определён в core/db.py, вызывается только из domain/auth/service.py."""
-    allowed_users = {"domain/auth/service.py"}
+    ``commit_durably``; определён в core/db.py, вызывается только из domain/auth/service.py
+    и (T16a) api/deps.py (``get_actor`` фиксирует активность сессии до обработчика)."""
+    required_users = {"domain/auth/service.py"}
+    allowed_users = required_users | {"api/deps.py"}
     definition = "core/db.py"
     users: set[str] = set()
     defined_in: set[str] = set()
@@ -602,4 +604,7 @@ def test_commit_durably_used_only_by_auth_service() -> None:
             if hit and rel != definition:
                 users.add(rel)
     assert defined_in == {definition}, f"commit_durably определён в {sorted(defined_in)}"
-    assert users == allowed_users, f"commit_durably используется в {sorted(users)}"
+    assert required_users <= users, (
+        f"commit_durably не вызывается из {sorted(required_users - users)}"
+    )
+    assert users <= allowed_users, f"commit_durably используется в {sorted(users - allowed_users)}"

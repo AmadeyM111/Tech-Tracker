@@ -346,7 +346,7 @@
 - **Попытки:** 3
 
 ## T16a — get_actor: не держать блокировку строки сессии до конца запроса (дефект на стыке T12/T16)
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** FR-5, FR-62, FR-67 (корректность без deadlock при действиях над сессией работающего пользователя), AC-79 (фон), AC-32/AC-33 (границы), D-14
 - **Файлы:** `backend/app/api/deps.py` (`get_actor`), `backend/app/domain/auth/sessions.py` (при необходимости),
   `backend/app/core/db.py`; тесты: `backend/tests/api/test_session_row_lock.py`, правки `backend/tests/api/test_deps_gates.py` и AST-теста
@@ -362,10 +362,10 @@
   (AST-тест T11/T05) осознанно: `deps.py`.
 - **Готово, когда:** новые API-тесты (параллельные админ-действия над работающим админом через HTTP, 100+ итераций) зелёные без 500;
   тесты T12/T13/T14 не ослаблены (границы AC-32/AC-33/AC-79 прежние); `pytest -q backend/tests`, `bash scripts/check.sh` зелёные.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T17 — API системных настроек: учётные записи и роли
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-2, AC-3, AC-20 (сессия заблокированного получает 401), AC-26, AC-39, AC-44, AC-45, AC-75 (назначение и снятие роли), AC-78, AC-113 (создание и сброс: пароль в запросе, в ответе его нет, 422 для 11 символов и частого), AC-116 (создание: `ivan.petrov`, `Ivan.Petrov` занят, `ab`, `.ivan`, `ivan petrov`, `иван`, 65 символов → 422), AC-121 (после создания роли нет), AC-21 (пользователи другого пространства — 404), FR-4, FR-42, FR-45a (БА/П на `/admin/*` с любым id — 403), FR-55, FR-65, FR-67, FR-73
 - **Файлы:** `backend/app/api/v1/admin_users.py`, `backend/app/api/v1/schemas/admin.py`;
   тесты: `backend/tests/api/test_admin_users.py`, `backend/tests/api/test_admin_roles.py`,
@@ -378,6 +378,7 @@
   зелёный, линтер чистый.
 - **Заметка ревью T15:** `paginate(db, stmt: Select[R], params)` — всегда `order_by(..., Entity.id)` (тай-брейкер); типизированный вызов обязан проходить mypy strict; без ORDER BY — `ValueError`; добавить тест на этот `ValueError`; рассмотреть верхнюю границу `sqlalchemy<2.2` в `pyproject.toml`.
 - **Заметка ревью T16:** порядок проверок в `create_user`: `login_invalid` → `login_taken` → политика пароля; сериализация действий над одним пользователем — `FOR NO KEY UPDATE` (иначе deadlock с вставками, ссылающимися на `app_user` по FK).
+- **Заметка ревью T16a:** окно устаревшего актора — в `_lock_for_account_change` проверять, что актор входит в заблокированное множество активных админов (иначе 401/403); в `change_own_password` добавить `is_blocked = false` в условие UPDATE; реальные админ-эндпоинты добавить в дедлок-сценарии T16a (тот же стресс на HTTP).
 - **Попытки:** 0
 
 ## T18 — API журнала аудита
@@ -411,6 +412,7 @@
   Тест «нет телеметрии»: пакет `opentelemetry.sdk` не установлен, приложение не обращается к сети при старте.
 - **Готово, когда:** `pytest -q backend/tests/cli/test_openapi.py backend/tests/unit/test_no_telemetry.py` зелёный
   (включая проверку, что `docs/api/openapi.json` совпадает с генерацией), линтер чистый.
+- **Заметка ревью T16a:** `gostracker maintenance` удаляет истёкшие сессии (фоновый GET с истёкшей сессией не фиксирует удаление при 401).
 - **Попытки:** 0
 
 ## T20 — Образ API
@@ -550,6 +552,7 @@
   Секретов в workflow нет; `git push` агенты не выполняют.
 - **Готово, когда:** `python -c "import yaml,sys; yaml.safe_load(open('.github/workflows/ci.yml'))"` без ошибок;
   `bash scripts/check.sh` зелёный локально; первый прогон CI на ветке зелёный (проверяет человек после push).
+- **Заметка ревью T16a:** AST-тест `commit_durably` — требовать равенство `{auth/service.py, api/deps.py}`; тест числа COMMIT на запрос — `== 2`; mypy на `backend/tests` (≈13 ошибок типов в conftest и др.) — решить, проверять ли тесты.
 - **Попытки:** 0
 
 ## T28 — Документация R1.0

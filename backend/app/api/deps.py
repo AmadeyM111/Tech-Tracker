@@ -21,7 +21,7 @@ from sqlalchemy import select
 
 from app.core.clock import utcnow
 from app.core.config import Settings
-from app.core.db import DbSession
+from app.core.db import DbSession, commit_durably
 from app.core.errors import (
     Forbidden,
     NoRole,
@@ -46,7 +46,19 @@ def _is_background(request: Request) -> bool:
 
 
 async def get_actor(request: Request, db: DbSession) -> Actor:
-    """Субъект запроса по cookie сессии; нет, истекла, заблокирован, нет членства → 401."""
+    """Субъект запроса по cookie сессии; нет, истекла, заблокирован, нет членства → 401.
+
+    Обычный запрос: ``resolve`` обновляет ``last_activity_at`` (или удаляет истёкшую строку), и
+    сразу после него ``commit_durably`` фиксирует это. Причины (T16a, D-14): (1) строка
+    ``user_session`` освобождается до обработчика; иначе администратор A держал бы её до конца
+    запроса, ожидая advisory-блокировку, а администратор C, держа блокировку, ждал бы строку A
+    (block/reset/revoke над работающим пользователем, ``POST /auth/password``) -> deadlock, 500;
+    (2) активность и удаление истёкшей сессии не откатываются ``get_db`` при 4xx/401/5xx.
+    Фоновый запрос (``GET`` с ``X-GT-Background: 1``) сессию не обновляет и ничего не
+    фиксирует: итоговый COMMIT остаётся единственным. Дальнейшая работа запроса идёт в новой
+    транзакции той же сессии БД (autobegin) и откатывается целиком при исключении (D-3);
+    к строке сессии после фиксации запрос не обращается.
+    """
     settings: Settings = request.app.state.settings
     store: SessionStore = request.app.state.session_store
 
@@ -54,7 +66,11 @@ async def get_actor(request: Request, db: DbSession) -> Actor:
     if not token:
         raise NotAuthenticated()
 
-    record = await store.resolve(db, token, now=utcnow(), background=_is_background(request))
+    background = _is_background(request)
+    record = await store.resolve(db, token, now=utcnow(), background=background)
+    if not background:
+        # до возможного 401: удаление истёкшей строки не должно откатиться
+        await commit_durably(db)
     if record is None:
         raise NotAuthenticated()
 
