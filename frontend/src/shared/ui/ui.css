@@ -1,0 +1,27 @@
+/* Visible keyboard focus (NFR-7). #0b3d91 on white: contrast about 10:1 (>= 4.5:1). */
+:focus-visible {
+  outline: 3px solid #0b3d91;
+  outline-offset: 2px;
+}
+
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.ui-hint {
+  color: #3d3d3d;
+  font-size: 0.875rem;
+}
+
+.ui-error {
+  color: #9b1c1c;
+  margin: 0 0 12px;
+}
+
+.ui-form {
+  max-width: 24rem;
+  margin: 2rem auto;
+}

@@ -154,3 +154,30 @@ export function createApiClient(options: ApiClientOptions = {}): Client<paths> {
   client.use(middleware);
   return client;
 }
+
+// One client for the whole application (plan §4.14): navigation callbacks are
+// registered once at the app level (AppRoutes) and shared by every request.
+let appHandlers: NavigationHandlers = {};
+
+/** Registers the app-level callbacks; returns a function that removes them. */
+export function setNavigationHandlers(handlers: NavigationHandlers): () => void {
+  appHandlers = handlers;
+  return () => {
+    if (appHandlers === handlers) appHandlers = {};
+  };
+}
+
+let appClient: Client<paths> | undefined;
+
+/** The shared client. fetch is looked up per request, so a replaced global works. */
+export function getAppClient(): Client<paths> {
+  appClient ??= createApiClient({
+    // Request needs an absolute URL outside a browser page (jsdom, Node).
+    baseUrl: globalThis.location.origin,
+    fetch: (input, init) => globalThis.fetch(input, init),
+    onUnauthenticated: () => appHandlers.onUnauthenticated?.(),
+    onPasswordChangeRequired: () => appHandlers.onPasswordChangeRequired?.(),
+    onNoRole: () => appHandlers.onNoRole?.(),
+  });
+  return appClient;
+}

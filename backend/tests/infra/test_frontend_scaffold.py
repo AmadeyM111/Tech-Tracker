@@ -242,6 +242,11 @@ def test_t21_src_files_only_expected() -> None:
         # T22
         "shared/api/client.ts", "shared/api/polling.ts", "shared/api/schema.d.ts",
         "shared/i18n/ru.ts", "shared/i18n/index.ts",
+        # T23
+        "app/router.tsx", "features/auth/api.ts", "features/auth/LoginPage.tsx",
+        "features/auth/ChangePasswordPage.tsx", "features/auth/NoRolePage.tsx",
+        "features/auth/useLogout.ts", "shared/ui/TextField.tsx",
+        "shared/ui/ErrorAlert.tsx", "shared/ui/ui.css",
     }  # fmt: skip
     assert {"main.tsx", "app/App.tsx", "app/providers.tsx"} <= found
     assert found <= allowed, f"лишние файлы: {sorted(found - allowed)}"
