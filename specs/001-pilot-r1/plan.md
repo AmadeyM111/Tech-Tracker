@@ -811,6 +811,12 @@ volumes: pgdata, appdata, tls-generated
 Запрещённые имена в репозитории: `docker-compose.override.yml|yaml`, `compose.override.yml|yaml`
 (тест AC-105).
 
+**Решения после ревью T26:** (а) у `db`, `api`, `web` — `restart: unless-stopped` (после перезагрузки
+хоста/демона стек поднимается сам); (б) серверные `idle_in_transaction_session_timeout=60s` и
+`lock_timeout=30s` задаются `command:` сервиса `db`; соединение блокировки bootstrap и миграции alembic
+выполняют `SET lock_timeout = 0` (второй экземпляр bootstrap ждёт, а не падает); (в) HEALTHCHECK web
+не пишется в access-лог nginx (отдельный location с `access_log off`).
+
 `deploy/web/Dockerfile`: stage 1 `node:22-alpine` — `npm ci && npm run build` в `frontend/`;
 stage 2 `nginx:<stable>-alpine` + `apk add --no-cache openssl`; статика →
 `/usr/share/nginx/html`; `default.conf.template` → `/etc/nginx/templates/`;
