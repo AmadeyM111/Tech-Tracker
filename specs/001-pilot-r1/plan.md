@@ -1122,11 +1122,14 @@ ruff (MIT), mypy (MIT). `psycopg` (LGPL) **не** добавляется. Все
 | dev: eslint, typescript-eslint, eslint-plugin-react-hooks | — | MIT | R1.0 | линтер (NFR-10) |
 | dev: vitest, jsdom, @testing-library/react | — | MIT | R1.0 | тесты |
 | dev: openapi-typescript `^7` | — | MIT | R1.0 | генерация типов |
+| dev: @testing-library/dom `^10.4`, @types/react `^18.3`, @types/react-dom `^18.3`, @types/node `^22` | — | MIT | R1.0 | peer-зависимость @testing-library/react 16 и типы (ревью T21; @types/node ^22 = node:22-alpine, §7.4) |
 | react-markdown `^10` | — | MIT | R1.1 | рендер комментариев без HTML |
 | @dnd-kit/core, @dnd-kit/sortable | — | MIT | R1.2 | перетаскивание с клавиатурной заменой (NFR-7) |
 | dev: @playwright/test | — | Apache-2.0 | R1.4 | e2e AC-107 (Chromium) |
 
 `package-lock.json` коммитится; образ собирается `npm ci` (интернет нужен только при сборке, C-2).
+
+**Фактические версии T21 (npm ls):** react 18.3.1, @tanstack/react-query 5.104.2, react-router-dom 7.18.4, openapi-fetch 0.17.0, vite 8.3.4, @vitejs/plugin-react 6.1.2, typescript 5.9.3, openapi-typescript 7.13.0, eslint 10.12.0, typescript-eslint 8.71.2, vitest 5.0.4, jsdom 30.1.2, @testing-library/react 16.3.3. Требования к Node: `^22.12 || ^24 || >=26` (vitest 5, jsdom 30). Единственный пакет с `hasInstallScript` — `fsevents` (optional, macOS); решение — `frontend/.npmrc` `ignore-scripts=true` (T22).
 
 ### 7.3. Список 10 000 частых паролей (ADR-0004)
 

@@ -437,7 +437,7 @@
 - **Попытки:** 2
 
 ## T21 — Каркас фронтенда
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** NFR-10 (линтер, типы, тесты фронтенда), C-1, NFR-8
 - **Файлы:** `frontend/package.json`, `frontend/package-lock.json`, `frontend/tsconfig.json`,
   `frontend/vite.config.ts`, `frontend/eslint.config.js`, `frontend/index.html`,
@@ -451,10 +451,10 @@
   `typecheck` (`tsc --noEmit`), `test` (`vitest run`, `include: ["tests/**/*.test.{ts,tsx}"]`,
   jsdom), `gen:api` (`openapi-typescript ../docs/api/openapi.json -o src/shared/api/schema.d.ts`).
 - **Готово, когда:** `cd frontend && npm ci && npm run lint && npm run typecheck && npm test && npm run build` — всё успешно.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T22 — API-клиент, сгенерированные типы, словарь строк, фоновый опрос
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** FR-29 и FR-59 (заголовок `X-GT-Background: 1` только на повторных загрузках опроса), FR-44 (типы из OpenAPI), NFR-6, AC-98 (автопроверка: строк интерфейса вне словаря нет)
 - **Файлы:** `frontend/src/shared/api/client.ts`, `frontend/src/shared/api/polling.ts`,
   `frontend/src/shared/i18n/ru.ts`, `frontend/src/shared/i18n/index.ts`,
@@ -469,6 +469,7 @@
 - **Готово, когда:** `bash scripts/gen-api.sh && git diff --exit-code frontend/src/shared/api/schema.d.ts docs/api/openapi.json`;
   `cd frontend && npm run lint && npm run typecheck && npm test` — успешно.
 - **Заметка ревью T13:** dev-прокси Vite — `changeOrigin: false` (иначе `Host` не совпадёт с `Origin: http://localhost:5173`).
+- **Заметки ревью T21:** (1) eslint для `src/**` кроме `src/shared/api/**`: `no-restricted-globals` на `fetch`, `no-restricted-properties` на `window.fetch`/`globalThis.fetch`, `no-restricted-imports` на `axios`; (2) README и `engines` в package.json: Node `^22.12 || ^24 || >=26`; (3) `frontend/.npmrc` с `ignore-scripts=true` (fsevents) и проверка `npm ci`+сборки; (4) `server.strictPort: true` в vite.config.ts; (5) `scripts/check.sh`: понятное сообщение «выполните `cd frontend && npm ci`» при отсутствии `node_modules`; (6) `backend/tests/infra/test_frontend_scaffold.py::test_t21_src_files_only_expected` расширить списком файлов T22; (7) `src/shared/api/schema.d.ts` — генерируемый, в ignores eslint; сгенерировать `npm run gen:api` из `docs/api/openapi.json` и закоммитить (тест на совпадение с генерацией).
 - **Попытки:** 0
 
 ## T23 — Экраны входа, смены пароля и «нет роли»
