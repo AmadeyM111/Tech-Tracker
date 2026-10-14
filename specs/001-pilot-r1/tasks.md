@@ -420,10 +420,10 @@
 - **Попытки:** 1
 
 ## T20 — Образ API
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** FR-48 (api), FR-6 (bootstrap при старте), NFR-4, N-6, D-19, D-21
 - **Файлы:** `backend/Dockerfile`, `backend/docker-entrypoint.sh`, `backend/.dockerignore`;
-  тесты: `backend/tests/infra/test_api_image.py` (`infra_static`)
+  тесты: `backend/tests/infra/test_api_image_static.py` (`infra_static`), `backend/tests/infra/test_api_image_build.py` (`infra_stack`, `GT_INFRA_STACK=1`)
 - **Зависит от:** T10, T19
 - **Описание:** По plan §4.12: `python:3.12-slim-bookworm`, исходники в `/app`,
   `pip install --no-cache-dir /app`, `ALEMBIC_CONFIG=/app/alembic.ini`, пользователь uid 10001,
@@ -431,13 +431,13 @@
   `exec uvicorn … --proxy-headers --forwarded-allow-ips='*' --no-access-log`; `HEALTHCHECK` на
   `/api/v1/health` средствами Python (без curl).
 - **Готово, когда:** `docker build -t gostracker-api:test backend` успешен;
-  `pytest -q -m infra_static backend/tests/infra/test_api_image.py` зелёный (Python 3.12, uid 10001, `gostracker --help`).
+  `pytest -q -m infra_static backend/tests/infra/test_api_image_static.py` и `GT_INFRA_STACK=1 pytest -q -m infra_stack backend/tests/infra/test_api_image_build.py` зелёные (Python 3.12, uid 10001, `gostracker --help`).
 - **Заметка ревью T02:** при `depends_on: db: condition: service_healthy` добавить `start_period` к healthcheck db.
 - **Заметки ревью T10 (желательные, не блокировали):** (1) `alembic upgrade head` выполнять под тем же advisory lock (параллельный запуск на чистой БД падает на `alembic_version`); (2) при ошибке COMMIT перед удалением файла пароля проверить отдельной сессией, не зафиксировано ли пространство (обрыв после фиксации оставляет ТА с неизвестным паролем); (3) минимальная длина `SECRET_KEY` из env (≥ 32 байт) и сравнение заглушки `strip().lower()` — требование в FR-6/D-20 через plan; (4) удалять остатки `.<name>.*.tmp` под блокировкой; `ensure_private_dir` — `lstat`/`S_ISDIR`, чинить права 0755 → 0700; (5) advisory lock на AUTOCOMMIT-соединении; `_known_secrets` из `settings`; `path_separator = os` в `alembic.ini`; plan §4.7 — stdout только путь, текст в stderr.
-- **Попытки:** 0
+- **Попытки:** 2
 
 ## T21 — Каркас фронтенда
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** NFR-10 (линтер, типы, тесты фронтенда), C-1, NFR-8
 - **Файлы:** `frontend/package.json`, `frontend/package-lock.json`, `frontend/tsconfig.json`,
   `frontend/vite.config.ts`, `frontend/eslint.config.js`, `frontend/index.html`,
@@ -519,6 +519,7 @@
   `ssl_protocols TLSv1.2 TLSv1.3`, http → 308).
 - **Заметка ревью T12:** `proxy_set_header Host $http_host` (не `$host`), иначе при нестандартном порте HTTPS ложный 403 `origin_mismatch`; `X-Forwarded-Proto` передавать.
 - **Заметка ревью T13:** uvicorn за nginx — `--proxy-headers --forwarded-allow-ips`; без этого `check_origin` даёт 403 на каждый POST по https; `client_max_body_size` (вложения 10 МБ, прочее — небольшой предел).
+- **Заметка ревью T20:** nginx перезаписывает `X-Forwarded-Proto` (`proxy_set_header`), не пропуская клиентский.
 - **Попытки:** 0
 
 ## T26 — Поставляемый docker-compose и инфраструктурные тесты стека
@@ -540,6 +541,7 @@
 - **Заметка ревью T12:** infra_stack-тест входа и POST при `HTTPS_PORT=8443` (Origin с портом) — без ложного `origin_mismatch`.
 - **Заметка ревью T16:** документация оператора — `INITIAL_ADMIN_LOGIN` читается без `.strip()`: значение с пробелами/переводом строки по краям даёт ошибку запуска (без значения в тексте).
 - **Заметка ревью T16:** `idle_in_transaction_session_timeout` на уровне БД и `lock_timeout` для админ-действий (зависшая транзакция админа блокирует остальные админ-действия пространства).
+- **Перенесено из ревью T10/T20 (не терять):** (2) при ошибке COMMIT перед удалением файла пароля проверять отдельной сессией, не зафиксировано ли пространство; (4) удалять остатки `.<name>.*.tmp` под блокировкой, `ensure_private_dir` — `lstat`/`S_ISDIR` и 0755 → 0700; (5) advisory lock на AUTOCOMMIT-соединении, `_known_secrets` из `settings`, `path_separator = os` в `alembic.ini` (предупреждение alembic в логах); `run_bootstrap(locked: bool)` → токен-маркер от `bootstrap_lock`; не логировать `/api/v1/health` в INFO (≈8,6 тыс. строк/сутки от HEALTHCHECK) — правка теста T09; Dockerfile: слой зависимостей до исходников и очистка `/app/build`, `*.egg-info`.
 - **Попытки:** 0
 
 ## T27 — CI
@@ -560,6 +562,7 @@
 - **Заметка ревью T17:** `test_admin_roles.py::note_b` — ужесточить до `== 401` для параллельно заблокированного в смене пароля.
 - **Наблюдение (оркестратор, T18):** фильтр журнала по `actor_id` без совпадений уходит в `Seq Scan` (1,6 мс на 30 000 строк); при росте журнала (R1.1+, десятки тысяч событий на проект) рассмотреть частичный индекс `(workspace_id, actor_id, id DESC) WHERE in_audit`; замер объёма — в нагрузочном прогоне NFR-2 (R1.4).
 - **Заметки ревью T19:** вынести `_safe_description`/`wait_for_database`/`BootstrapError` из `bootstrap` в общий модуль CLI; в OpenAPI уточнить 403 у login/logout/password до `origin_mismatch` и объявить 500/default с `ErrorResponse`; `hash-bench` при неверных `ARGON2_*` печатать причину; R1.1 — единый `gostracker maintenance` с `--dry-run` и unit-тест `purge_expired_sessions` на точных границах (8 ч, ±1 мкс, `absolute == now`).
+- **Открытый вопрос (оркестратор, T20):** `ruff check backend` обнаружил I001 в `backend/tests/cli/test_bootstrap.py` (:430, :532) и `backend/tests/api/test_deps_gates.py` (:147), существовавшие с T10/T12, хотя `bash scripts/check.sh` на тех задачах был зелёным; воспроизводится и с `--no-cache`, причина молчания прежних запусков не установлена. В CI запускать линтер на чистой выгрузке без кэша (`--no-cache`), версию ruff закрепить в `pyproject.toml`.
 - **Попытки:** 0
 
 ## T28 — Документация R1.0
@@ -579,6 +582,7 @@
 - **Заметка ревью T07:** `downgrade 0002` молча удаляет непустой журнал — описать в документации оператора (или добавить отказ при непустой таблице); в бэклог — отдельная роль БД без SUPERUSER и `REVOKE UPDATE, DELETE, TRUNCATE` (plan D-8).
 - **Заметка ревью T08:** в документации оператора — лимит параллельных хешей (m=128 МиБ, пул `min(32, cpu+4)` → ~900 МиБ пик на стенде C-2).
 - **Заметка ревью T09:** в README/документации оператора — запускать API через `uvicorn app.main:app` (или CLI), не программным `uvicorn.run(app)` (dictConfig вернёт обработчики без фильтра секретов); правило «не печатать секреты в `__repr__`/`__str__`» — в docstring модуля логирования.
+- **Перенесено из ревью T20:** документация оператора — `--forwarded-allow-ips='*'` допустим пока порт api не публикуется; при публикации 8000 сузить до адреса прокси; plan D-20 — правило «`SECRET_KEY` короче 32 байт отклоняется, заглушка по `strip().lower()`».
 - **Попытки:** 0
 
 ---

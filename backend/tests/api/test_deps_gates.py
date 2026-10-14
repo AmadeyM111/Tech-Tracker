@@ -145,10 +145,9 @@ class Env:
 def _add_routes(app: FastAPI, calls: list[str]) -> None:
     """Временные роуты поверх публичного интерфейса ``app.api.deps`` (plan §4.6)."""
     from app.api.deps import get_active_actor, get_actor, require_capability
-    from app.domain.access.roles import Actor, Capability
-
     from app.core.db import DbSession
     from app.core.errors import NotFound
+    from app.domain.access.roles import Actor, Capability
 
     def describe(actor: Actor, request: Request) -> dict[str, Any]:
         return {

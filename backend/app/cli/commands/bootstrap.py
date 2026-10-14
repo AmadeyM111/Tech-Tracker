@@ -1,9 +1,9 @@
 """Подкоманда ``gostracker bootstrap`` (plan §4.7, §4.13, D-21, D-29, FR-6).
 
-Последовательность: ожидание БД (до 60 с) → ``ensure_secret_key`` → ``alembic upgrade head``
-(``ALEMBIC_CONFIG``) → ``run_bootstrap``. В stdout — только путь к файлу пароля первого ТА
-(и только когда он создан); сообщения — в stderr. Пароли, ключ и DSN в вывод не попадают:
-ошибки печатаются как имя типа исключения и очищенный текст.
+Последовательность: ожидание БД (до 60 с) → ``ensure_secret_key`` → под одной
+advisory-блокировкой ``alembic upgrade head`` (``ALEMBIC_CONFIG``) → ``run_bootstrap``.
+В stdout — только путь к файлу пароля первого ТА (и только когда он создан); сообщения — в stderr.
+Пароли, ключ и DSN в вывод не попадают: ошибки печатаются как имя типа исключения и очищенный текст.
 """
 
 from __future__ import annotations
@@ -30,7 +30,12 @@ from app.core.config import Settings, get_settings
 from app.core.db import create_engine
 from app.core.logging import redact_text
 from app.core.secrets import ensure_secret_key
-from app.domain.system.bootstrap import INITIAL_ADMIN_FILE, BootstrapResult, run_bootstrap
+from app.domain.system.bootstrap import (
+    INITIAL_ADMIN_FILE,
+    BootstrapResult,
+    bootstrap_lock,
+    run_bootstrap,
+)
 
 DB_WAIT_TIMEOUT_SECONDS: Final = 60.0
 DB_WAIT_INTERVAL_SECONDS: Final = 1.0
@@ -113,11 +118,22 @@ def _alembic_upgrade_head() -> None:
     command.upgrade(Config(str(path)), "head")
 
 
-async def _run_first_start(settings: Settings) -> BootstrapResult:
+async def _migrate_and_first_start(settings: Settings, stage: list[str]) -> BootstrapResult:
+    """Миграции и первый запуск под одной advisory-блокировкой (ревью T10 (1), AC-23).
+
+    Параллельные запуски на чистой БД выстраиваются в очередь: второй видит уже применённые
+    миграции и созданного ТА. Alembic работает в потоке (``env.py`` вызывает ``asyncio.run``).
+    ``stage`` — изменяемая ссылка на название текущего шага для сообщения об ошибке.
+    """
     engine = create_engine(settings)
     try:
         sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
-        return await run_bootstrap(sessionmaker, settings, clock=SystemClock())
+        stage[0] = "блокировка первого запуска"
+        async with bootstrap_lock(sessionmaker):
+            stage[0] = "миграции"
+            await asyncio.to_thread(_alembic_upgrade_head)
+            stage[0] = "первый запуск"
+            return await run_bootstrap(sessionmaker, settings, clock=SystemClock(), locked=True)
     finally:
         await engine.dispose()
 
@@ -160,10 +176,11 @@ def run(args: argparse.Namespace) -> int:
         asyncio.run(wait_for_database(settings.database_url))
         step = "секретный ключ"
         ensure_secret_key(settings)  # значение не используется и не печатается
-        step = "миграции"
-        _alembic_upgrade_head()
-        step = "первый запуск"
-        result = asyncio.run(_run_first_start(settings))
+        stage = ["блокировка первого запуска"]
+        try:
+            result = asyncio.run(_migrate_and_first_start(settings, stage))
+        finally:
+            step = stage[0]
     except BootstrapError as exc:
         _warn(f"Ошибка ({step}): {exc}")
         return 1

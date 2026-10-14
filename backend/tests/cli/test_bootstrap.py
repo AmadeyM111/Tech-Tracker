@@ -16,6 +16,8 @@ import json
 import logging
 import os
 import stat
+import subprocess
+import sys
 import threading
 import time
 from collections.abc import Iterator
@@ -425,9 +427,8 @@ async def test_bootstrap_default_generator_password_is_valid(
     committed: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
     """FR-6: без ``generate`` пароль генерируется generate_password (политика FR-52/53)."""
-    from app.domain.system.bootstrap import run_bootstrap
-
     from app.core.security.passwords import PasswordHasher, validate_new_password
+    from app.domain.system.bootstrap import run_bootstrap
 
     _prepare_secrets_dir(settings)
     await run_bootstrap(committed, settings, clock=FixedClock(FIXED_NOW))
@@ -527,9 +528,8 @@ async def test_bootstrap_concurrent_runs_create_single_admin(
     committed: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
     """AC-23, D-29 (pg_advisory_lock): конкурентные запуски → один ТА, один файл, согласованный."""
-    from app.domain.system.bootstrap import run_bootstrap
-
     from app.core.security.passwords import PasswordHasher
+    from app.domain.system.bootstrap import run_bootstrap
 
     _prepare_secrets_dir(settings)
     passwords = [f"Cc{i}RaceBootstrapPassword{i}" for i in range(4)]
@@ -762,3 +762,155 @@ async def test_cli_bootstrap_full_flow_and_rerun(
     out2, err2 = capfd.readouterr()
     assert creds["password"] not in out2
     assert creds["password"] not in err2
+
+
+# --- T20 / заметки ревью T10 -----------------------------------------------------------------
+
+
+@pytest.mark.committed
+async def test_cli_bootstrap_two_parallel_runs_on_clean_db(
+    committed: async_sessionmaker[AsyncSession],
+    cli_env: Path,
+    test_database_url: str,
+) -> None:
+    """Ревью T10 (1), AC-23: два ``bootstrap`` одновременно на ЧИСТУЮ БД (без alembic_version).
+
+    Оба rc=0, один ТА, один файл пароля, ни одной ошибки UniqueViolation/alembic_version.
+    """
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    # чистая БД: схема пуста, миграций ещё нет (фикстура committed сама вернёт схему в конце)
+    engine = create_async_engine(test_database_url, hide_parameters=True)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+            await conn.execute(text("CREATE SCHEMA public"))
+    finally:
+        await engine.dispose()
+
+    # отдельные процессы с жёстким таймаутом: взаимная блокировка не должна вешать прогон
+    code_src = "import sys; from app.cli.main import main; sys.exit(main(['bootstrap']))"
+    procs = [
+        subprocess.Popen(
+            [sys.executable, "-c", code_src],
+            env=dict(os.environ),
+            cwd=str(Path(__file__).resolve().parents[2]),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for _ in range(2)
+    ]
+
+    def _collect() -> tuple[list[int], str]:
+        codes_: list[int] = []
+        texts: list[str] = []
+        for proc in procs:
+            try:
+                o, e = proc.communicate(timeout=90)
+            except subprocess.TimeoutExpired:
+                for other in procs:
+                    other.kill()
+                raise AssertionError("bootstrap завис: параллельные миграции (>90 с)") from None
+            codes_.append(proc.returncode)
+            texts.append(o + e)
+        return codes_, "\n".join(texts)
+
+    codes, combined = await asyncio.to_thread(_collect)
+
+    assert codes == [0, 0], combined[-3000:]
+    for marker in ("UniqueViolation", "alembic_version", "DuplicateTable", "already exists"):
+        assert marker not in combined, f"{marker!r} в выводе:\n{combined[-3000:]}"
+
+    assert await _scalar(committed, "SELECT count(*) FROM alembic_version") == 1
+    assert await _scalar(committed, "SELECT count(*) FROM workspace") == 1
+    rows = await _admin_rows(committed)
+    assert len(rows) == 1
+    assert rows[0]["role"] == "tech_admin"
+    pw_path = cli_env / "secrets" / INITIAL_FILE
+    assert pw_path.is_file()
+    assert _mode(pw_path) == 0o600
+    assert sorted(p.name for p in (cli_env / "secrets").glob("initial-admin-*")) == [INITIAL_FILE]
+    assert not list((cli_env / "secrets").glob(".*.tmp"))
+    # пароль в файле — от того ТА, который в БД
+    from app.core.security.passwords import PasswordHasher
+
+    hasher = PasswordHasher(time_cost=1, memory_cost_kib=1024, parallelism=1)
+    assert hasher.verify(rows[0]["password_hash"], _parse_credentials(pw_path)["password"])
+
+
+def _key_outcome(tmp_path: Path, value: str) -> bytes | None:
+    """Ключ из env как есть: ``None`` — отказ (ValueError/RuntimeError без значения в тексте)."""
+    from app.core.secrets import ensure_secret_key
+
+    try:
+        settings = _settings(tmp_path, secret_key=SecretStr(value))
+        return ensure_secret_key(settings)
+    except (ValueError, RuntimeError) as exc:
+        text_ = f"{exc!s} {exc!r}"
+        assert value not in text_, "значение SECRET_KEY попало в сообщение об ошибке"
+        if value.strip():
+            assert value.strip() not in text_
+        return None
+
+
+@pytest.mark.parametrize("length", [1, 8, 31])
+def test_ensure_secret_key_from_env_shorter_than_32_bytes_is_rejected(
+    tmp_path: Path, length: int
+) -> None:
+    """Ревью T10 (3), D-20: SECRET_KEY из env короче 32 байт → отказ, значение не в тексте."""
+    value = "kQ7vXz2Lm9" * 4
+    value = value[:length]
+    assert _key_outcome(tmp_path, value) is None
+    assert not (tmp_path / "data" / "secrets" / "secret_key").exists()
+
+
+def test_ensure_secret_key_from_env_32_bytes_is_accepted(tmp_path: Path) -> None:
+    """Ревью T10 (3): ровно 32 байта допустимы и используются как есть."""
+    value = "Zq7Lm2Vx9Tk4Hw8Rt6Nc3Pb5Yd1Fg0Ab"
+    assert len(value.encode()) == 32
+    assert _key_outcome(tmp_path, value) == value.encode()
+
+
+def test_ensure_secret_key_length_is_counted_in_bytes(tmp_path: Path) -> None:
+    """Ревью T10 (3): 16 символов кириллицы = 32 байта (принят), 15 = 30 байт (отказ)."""
+    assert _key_outcome(tmp_path, "я" * 16) == ("я" * 16).encode()
+    assert _key_outcome(tmp_path / "b", "я" * 15) is None
+
+
+@pytest.mark.parametrize("value", ["CHANGE-ME", " change-me ", "Change-Me", "\tCHANGE-me\n"])
+def test_ensure_secret_key_placeholder_variants_are_not_used(tmp_path: Path, value: str) -> None:
+    """Ревью T10 (3), AC-23: заглушка в любом регистре и с пробелами — как ``change-me``.
+
+    Допустимо: отказ либо генерация файла (ключ ≥ 32 байт и не равен заглушке).
+    """
+    key = _key_outcome(tmp_path, value)
+    if key is None:
+        return
+    assert key.strip().lower() != b"change-me"
+    assert len(key) >= 32
+    assert (tmp_path / "data" / "secrets" / "secret_key").is_file()
+
+
+@pytest.mark.parametrize("value", ["", "   ", "\t\n"])
+def test_ensure_secret_key_blank_env_value_is_absence_of_key(tmp_path: Path, value: str) -> None:
+    """Ревью T10 (3): пустой/пробельный SECRET_KEY = ключа нет → генерация файла."""
+    from app.core.secrets import ensure_secret_key
+
+    settings = _settings(tmp_path, secret_key=SecretStr(value))
+    key = ensure_secret_key(settings)
+    path = settings.secrets_dir / "secret_key"
+    assert len(key) >= 32
+    assert path.is_file()
+    assert _mode(path) == 0o600
+    assert bytes.fromhex(path.read_text(encoding="utf-8").strip()) == key
+
+
+def test_ensure_secret_key_short_env_does_not_fall_back_to_existing_file(tmp_path: Path) -> None:
+    """Ревью T10 (3): короткий ключ из env — отказ, а не тихий переход на файл."""
+    from app.core.secrets import ensure_secret_key
+
+    settings = _settings(tmp_path)
+    ensure_secret_key(settings)  # файл уже есть
+    assert _key_outcome(tmp_path, "short-key") is None
+    assert ensure_secret_key(settings)  # файл не повреждён

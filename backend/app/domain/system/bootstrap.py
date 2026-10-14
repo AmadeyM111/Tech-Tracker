@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -127,26 +127,22 @@ async def _create_first_admin(
     return BootstrapResult(workspace_id=workspace_id, admin_created=True)
 
 
-async def run_bootstrap(
+@contextlib.asynccontextmanager
+async def bootstrap_lock(
     sessionmaker: async_sessionmaker[AsyncSession],
-    settings: Settings,
-    *,
-    clock: Clock,
-    generate: Callable[[], str] = generate_password,
-) -> BootstrapResult:
-    """Идемпотентная инициализация чистой установки (plan §4.7).
+) -> AsyncIterator[None]:
+    """Сессионная ``pg_advisory_lock`` первого запуска на отдельном соединении.
 
-    Блокировка сессионная (``pg_advisory_lock``) на отдельном соединении: она удерживается
-    до удаления файла при неудачной фиксации, поэтому параллельный запуск не увидит
-    полузавершённое состояние.
+    Блокировка удерживается до выхода из контекста: ею накрывается вся последовательность
+    «миграции + первый запуск» (ревью T10), а не только создание ТА. Не реентерабельна между
+    соединениями: внутри контекста ``run_bootstrap`` нужно вызывать с ``locked=True``.
     """
     async with sessionmaker() as lock_session:
         await lock_session.execute(
             text("SELECT pg_advisory_lock(:key)"), {"key": _BOOTSTRAP_LOCK_KEY}
         )
         try:
-            with use_clock(clock):
-                return await _create_first_admin(sessionmaker, settings, generate)
+            yield
         finally:
             try:
                 await lock_session.execute(
@@ -156,6 +152,29 @@ async def run_bootstrap(
                 # соединение закрывается: блокировка снимается сервером, в пул не вернётся
                 await lock_session.invalidate()
                 raise
+
+
+async def run_bootstrap(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    *,
+    clock: Clock,
+    generate: Callable[[], str] = generate_password,
+    locked: bool = False,
+) -> BootstrapResult:
+    """Идемпотентная инициализация чистой установки (plan §4.7).
+
+    Блокировка сессионная (``pg_advisory_lock``) на отдельном соединении: она удерживается
+    до удаления файла при неудачной фиксации, поэтому параллельный запуск не увидит
+    полузавершённое состояние. ``locked=True`` — вызывающий уже держит ``bootstrap_lock``
+    (повторное взятие на другом соединении заблокировало бы процесс самим собой).
+    """
+    if locked:
+        with use_clock(clock):
+            return await _create_first_admin(sessionmaker, settings, generate)
+    async with bootstrap_lock(sessionmaker):
+        with use_clock(clock):
+            return await _create_first_admin(sessionmaker, settings, generate)
 
 
 def remove_initial_admin_file_if_for(settings: Settings, login: str) -> None:

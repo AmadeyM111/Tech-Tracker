@@ -21,6 +21,7 @@ from app.core.config import Settings
 SECRET_KEY_FILE: Final = "secret_key"
 PLACEHOLDER_SECRET_KEY: Final = "change-me"  # значение из старого .env.example: ключом не считается
 GENERATED_KEY_BYTES: Final = 32  # 256 бит
+MIN_ENV_KEY_BYTES: Final = 32  # минимальная длина SECRET_KEY из окружения (в байтах UTF-8)
 
 _PRIVATE_FILE_MODE: Final = 0o600
 _PRIVATE_DIR_MODE: Final = 0o700
@@ -99,7 +100,7 @@ def ensure_private_dir(path: Path) -> None:
 def _read_key_file(path: Path) -> bytes:
     """Читает ключ из файла: hex (как пишет ``ensure_secret_key``) или произвольные байты."""
     raw = path.read_bytes().strip()
-    if not raw or raw == PLACEHOLDER_SECRET_KEY.encode():
+    if not raw or raw.lower() == PLACEHOLDER_SECRET_KEY.encode():
         raise RuntimeError(f"Файл секретного ключа пуст или содержит заглушку: {path}")
     try:
         return bytes.fromhex(raw.decode("ascii"))
@@ -113,19 +114,28 @@ def _key_from_settings(settings: Settings) -> bytes | None:
     value = settings.secret_key.get_secret_value()
     if not value.strip():
         return None  # SECRET_KEY="" == ключа нет (ревью T03)
-    if value == PLACEHOLDER_SECRET_KEY:
+    if value.strip().lower() == PLACEHOLDER_SECRET_KEY:
         _log.warning("SECRET_KEY содержит значение-заглушку и игнорируется")
         return None
     try:
-        return value.encode("utf-8")
+        key = value.encode("utf-8")
     except UnicodeEncodeError:
         raise ValueError("SECRET_KEY не кодируется в UTF-8") from None
+    if len(key) < MIN_ENV_KEY_BYTES:
+        # без отката на файл: короткий ключ из окружения — ошибка конфигурации; значение не в тексте
+        raise ValueError(
+            f"SECRET_KEY короче {MIN_ENV_KEY_BYTES} байт: задайте длинный случайный ключ "
+            "или оставьте переменную пустой (ключ будет создан в каталоге секретов)"
+        )
+    return key
 
 
 def ensure_secret_key(settings: Settings) -> bytes:
     """Возвращает секретный ключ приложения (D-20, FR-6).
 
-    1. Непустой ``settings.secret_key`` (не ``change-me``) — приоритетнее файла.
+    1. Непустой ``settings.secret_key`` (не ``change-me`` без учёта регистра и пробелов) —
+       приоритетнее файла; короче 32 байт — ``ValueError`` (значение в сообщение не попадает,
+       на файл не откатываемся).
     2. Иначе файл ``secrets_dir/secret_key``; при отсутствии создаётся один раз: 32 случайных
        байта в hex, режим 0600, каталог 0700. Повторные и конкурентные вызовы возвращают
        один и тот же ключ; существующий файл никогда не пересоздаётся.
