@@ -491,7 +491,7 @@
 - **Попытки:** 3
 
 ## T24 — Экраны администрирования: учётные записи, роли, сессии, журнал
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** UF-2, FR-42 (интерфейс системных настроек), FR-55 и FR-65 (OI-108: одноразовый пароль генерирует клиент и показывает администратору), FR-73 (подсказка формата логина), FR-4 (создание без роли, роль — отдельным действием)
 - **Файлы:** `frontend/src/features/admin/api.ts`, `frontend/src/features/admin/UsersPage.tsx`,
   `frontend/src/features/admin/AuditPage.tsx` (+ маршруты в `frontend/src/app/router.tsx`);
@@ -503,10 +503,11 @@
   роли; журнал аудита с фильтрами. Экраны видны только при соответствующих capabilities из
   `/me` (сервер проверяет сам).
 - **Готово, когда:** `cd frontend && npm run lint && npm run typecheck && npm test` — успешно.
-- **Попытки:** 0
+- **Заметки ревью T24:** (1) правки вне списка T24: `router.tsx` (главная, SessionGate), `shared/ui/{ConfirmDialog,Pagination,TextField,ui.css}`, `eslint.config.js` (запрет `Math.random` в `src/**`), `ru.ts`; (2) главная содержит «Выйти» (FR-60) и ссылку на `/change-password` (FR-56) — решение замечания T23 №3; (3) журнал фильтруется по `entity_type` и `actor_id` (API R1.0 других фильтров не даёт; период/действие — вне спецификации FR-47); (4) для ввода `actor_id` — свободное поле UUID, выбор из списка пользователей — UX на R1.1; (5) опрос на admin-экранах не подключён (FR-29 их не перечисляет).
+- **Попытки:** 2
 
 ## T25 — Образ web: TLS-прокси nginx и статика
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** FR-63 (конфигурация; проверка в стеке — T26), AC-40 (проверка образа отдельно), NFR-4, D-17
 - **Файлы:** `deploy/web/Dockerfile`, `deploy/web/default.conf.template`, `deploy/web/10-gostracker-tls.sh`,
   `deploy/tls/README.md`, `.gitignore` (`deploy/tls/*.crt`, `deploy/tls/*.key`, `backups/`, `frontend/dist`);

@@ -247,6 +247,9 @@ def test_t21_src_files_only_expected() -> None:
         "features/auth/ChangePasswordPage.tsx", "features/auth/NoRolePage.tsx",
         "features/auth/useLogout.ts", "shared/ui/TextField.tsx",
         "shared/ui/ErrorAlert.tsx", "shared/ui/ui.css",
+        # T24
+        "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
+        "features/admin/password.ts", "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
     }  # fmt: skip
     assert {"main.tsx", "app/App.tsx", "app/providers.tsx"} <= found
     assert found <= allowed, f"лишние файлы: {sorted(found - allowed)}"

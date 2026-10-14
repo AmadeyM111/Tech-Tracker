@@ -1,14 +1,17 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, type ReactNode } from "react";
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
+import { AuditPage } from "../features/admin/AuditPage";
+import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
-import { me } from "../features/auth/api";
+import { me, type MeResponse } from "../features/auth/api";
+import { useLogout } from "../features/auth/useLogout";
 import { ApiError, setNavigationHandlers } from "../shared/api/client";
 import { errorMessage, t } from "../shared/i18n";
-import { ErrorAlert } from "../shared/ui/ErrorAlert";
+import { ErrorAlert, useAlertState } from "../shared/ui/ErrorAlert";
 
 // Session check shared by the guards (not a polled query: key is its own).
 const SESSION_KEY = ["auth", "me"] as const;
@@ -33,13 +36,22 @@ function redirectFor(error: unknown): string | null {
   return null;
 }
 
-// "/" has no section screens until T24+: a landmark with a heading is the stub.
 // Inside the App shell the <main> already exists, so a plain wrapper is used.
 function Landmark({ insideMain, children }: { insideMain: boolean; children: ReactNode }) {
   return insideMain ? <div>{children}</div> : <main>{children}</main>;
 }
 
-function Root({ insideMain }: { insideMain: boolean }) {
+/**
+ * Session guard of the application screens: decides by the result of the `me`
+ * request (not only by the client callbacks, which fire once per series).
+ */
+function SessionGate({
+  insideMain,
+  children,
+}: {
+  insideMain: boolean;
+  children: (profile: MeResponse) => ReactNode;
+}) {
   const session = useSession();
   if (session.isPending) {
     // Not a landmark: the page content has not arrived yet.
@@ -58,10 +70,84 @@ function Root({ insideMain }: { insideMain: boolean }) {
       </Landmark>
     );
   }
+  return <>{children(session.data)}</>;
+}
+
+function Home({ profile }: { profile: MeResponse }) {
+  const alert = useAlertState();
+  const logout = useLogout(alert);
   return (
-    <Landmark insideMain={insideMain}>
+    <>
       <h1>{t("app.home_title")}</h1>
-    </Landmark>
+      <ErrorAlert message={alert.message} seq={alert.seq} />
+      <nav>
+        {profile.capabilities.includes("manage_accounts") ? (
+          <p>
+            <Link to="/admin/users">{t("admin.home_users_link")}</Link>
+          </p>
+        ) : null}
+        {profile.capabilities.includes("view_audit") ? (
+          <p>
+            <Link to="/admin/audit">{t("admin.home_audit_link")}</Link>
+          </p>
+        ) : null}
+        <p>
+          <Link to="/change-password">{t("app.change_password_link")}</Link>
+        </p>
+      </nav>
+      <button type="button" disabled={logout.pending} onClick={() => void logout.run()}>
+        {t("auth.logout")}
+      </button>
+    </>
+  );
+}
+
+function Root({ insideMain }: { insideMain: boolean }) {
+  return (
+    <SessionGate insideMain={insideMain}>
+      {(profile) => (
+        <Landmark insideMain={insideMain}>
+          <Home profile={profile} />
+        </Landmark>
+      )}
+    </SessionGate>
+  );
+}
+
+/** Admin screen: the session guard plus a capability; without it no request is made. */
+function HomeLink() {
+  return (
+    <p>
+      <Link to="/">{t("app.home_link")}</Link>
+    </p>
+  );
+}
+
+function AdminScreen({
+  insideMain,
+  capability,
+  children,
+}: {
+  insideMain: boolean;
+  capability: MeResponse["capabilities"][number];
+  children: (profile: MeResponse) => ReactNode;
+}) {
+  return (
+    <SessionGate insideMain={insideMain}>
+      {(profile) =>
+        profile.capabilities.includes(capability) ? (
+          <Landmark insideMain={insideMain}>
+            <HomeLink />
+            {children(profile)}
+          </Landmark>
+        ) : (
+          <Landmark insideMain={insideMain}>
+            <HomeLink />
+            <ErrorAlert message={errorMessage("forbidden")} />
+          </Landmark>
+        )
+      }
+    </SessionGate>
   );
 }
 
@@ -143,6 +229,22 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         }
       />
       <Route path="/" element={<Root insideMain={insideMain} />} />
+      <Route
+        path="/admin/users"
+        element={
+          <AdminScreen insideMain={insideMain} capability="manage_accounts">
+            {(profile) => <UsersPage canAssignRoles={profile.capabilities.includes("assign_roles")} />}
+          </AdminScreen>
+        }
+      />
+      <Route
+        path="/admin/audit"
+        element={
+          <AdminScreen insideMain={insideMain} capability="view_audit">
+            {() => <AuditPage />}
+          </AdminScreen>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

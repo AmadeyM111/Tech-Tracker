@@ -10,10 +10,11 @@ export interface TextFieldProps {
   invalid?: boolean;
   disabled?: boolean;
   hint?: string;
+  name?: string;
 }
 
 export function TextField(props: TextFieldProps) {
-  const { label, value, onChange, type = "text", autoComplete, inputRef, invalid, disabled, hint } = props;
+  const { label, value, onChange, type = "text", autoComplete, inputRef, invalid, disabled, hint, name } = props;
   const id = useId();
   const hintId = `${id}-hint`;
   return (
@@ -21,6 +22,7 @@ export function TextField(props: TextFieldProps) {
       <label htmlFor={id}>{label}</label>
       <input
         id={id}
+        name={name}
         ref={inputRef}
         type={type}
         value={value}

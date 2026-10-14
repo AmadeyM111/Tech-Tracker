@@ -2,6 +2,11 @@ import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 const USE_API_CLIENT = "Use the API client from src/shared/api.";
+const NO_MATH_RANDOM = {
+  object: "Math",
+  property: "random",
+  message: "Math.random is not a secure source: use crypto.getRandomValues.",
+};
 
 export default tseslint.config(
   { ignores: ["dist", "node_modules", "src/shared/api/schema.d.ts"] },
@@ -42,6 +47,7 @@ export default tseslint.config(
         { object: "navigator", property: "sendBeacon", message: USE_API_CLIENT },
         { object: "window", property: "XMLHttpRequest", message: USE_API_CLIENT },
         { object: "window", property: "EventSource", message: USE_API_CLIENT },
+        NO_MATH_RANDOM,
       ],
       "no-restricted-syntax": [
         "error",
@@ -64,6 +70,11 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  {
+    // The API layer is exempt from the client rules above, not from this one.
+    files: ["src/shared/api/**/*.{ts,tsx}"],
+    rules: { "no-restricted-properties": ["error", NO_MATH_RANDOM] },
   },
   {
     // Tests may assert on values narrowed away by closures (non-null assertions).
