@@ -1,0 +1,9 @@
+# Контекст сборки образа web (deploy/web/Dockerfile): корень репозитория.
+# Белый список: в контекст попадают только исходники фронтенда и файлы deploy/web.
+# Ключи, сертификаты, .env, .git, .venv, backups, specs, docs и backend в контекст не входят.
+# (Образ API собирается с контекстом backend/ и использует backend/.dockerignore.)
+*
+!frontend
+!deploy/web
+**/node_modules
+frontend/dist

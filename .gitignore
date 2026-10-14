@@ -12,3 +12,7 @@ dist/
 .DS_Store
 .claude/settings.local.json
 *.egg-info/
+frontend/dist
+deploy/tls/*.crt
+deploy/tls/*.key
+backups/

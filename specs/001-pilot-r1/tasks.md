@@ -507,7 +507,7 @@
 - **Попытки:** 2
 
 ## T25 — Образ web: TLS-прокси nginx и статика
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** FR-63 (конфигурация; проверка в стеке — T26), AC-40 (проверка образа отдельно), NFR-4, D-17
 - **Файлы:** `deploy/web/Dockerfile`, `deploy/web/default.conf.template`, `deploy/web/10-gostracker-tls.sh`,
   `deploy/tls/README.md`, `.gitignore` (`deploy/tls/*.crt`, `deploy/tls/*.key`, `backups/`, `frontend/dist`);
@@ -525,10 +525,11 @@
 - **Заметка ревью T12:** `proxy_set_header Host $http_host` (не `$host`), иначе при нестандартном порте HTTPS ложный 403 `origin_mismatch`; `X-Forwarded-Proto` передавать.
 - **Заметка ревью T13:** uvicorn за nginx — `--proxy-headers --forwarded-allow-ips`; без этого `check_origin` даёт 403 на каждый POST по https; `client_max_body_size` (вложения 10 МБ, прочее — небольшой предел).
 - **Заметка ревью T20:** nginx перезаписывает `X-Forwarded-Proto` (`proxy_set_header`), не пропуская клиентский.
-- **Попытки:** 0
+- **Заметки ревью T25 (перенесены в T26/T28):** см. блок «Перенесено из ревью T25» в T26 и T28.
+- **Попытки:** 1
 
 ## T26 — Поставляемый docker-compose и инфраструктурные тесты стека
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-23 (в стеке), AC-40, AC-95, AC-105, FR-6a, FR-48, FR-51, FR-58, FR-63, NFR-3 (часть), NFR-9
 - **Файлы:** `docker-compose.yml`, `.env.example`; тесты: `backend/tests/infra/test_compose_static.py`
   (расширение), `backend/tests/infra/test_stack_first_run.py`, `backend/tests/infra/test_stack_tls.py` (`infra_stack`)
@@ -547,6 +548,7 @@
 - **Заметка ревью T16:** документация оператора — `INITIAL_ADMIN_LOGIN` читается без `.strip()`: значение с пробелами/переводом строки по краям даёт ошибку запуска (без значения в тексте).
 - **Заметка ревью T16:** `idle_in_transaction_session_timeout` на уровне БД и `lock_timeout` для админ-действий (зависшая транзакция админа блокирует остальные админ-действия пространства).
 - **Перенесено из ревью T10/T20 (не терять):** (2) при ошибке COMMIT перед удалением файла пароля проверять отдельной сессией, не зафиксировано ли пространство; (4) удалять остатки `.<name>.*.tmp` под блокировкой, `ensure_private_dir` — `lstat`/`S_ISDIR` и 0755 → 0700; (5) advisory lock на AUTOCOMMIT-соединении, `_known_secrets` из `settings`, `path_separator = os` в `alembic.ini` (предупреждение alembic в логах); `run_bootstrap(locked: bool)` → токен-маркер от `bootstrap_lock`; не логировать `/api/v1/health` в INFO (≈8,6 тыс. строк/сутки от HEALTHCHECK) — правка теста T09; Dockerfile: слой зависимостей до исходников и очистка `/app/build`, `*.egg-info`.
+- **Перенесено из ревью T25:** (1) `deploy/web/10-gostracker-tls.sh`: временные файлы через `mktemp` в каталоге генерации (PID одинаков в контейнерах — гонка двух контейнеров на одном томе); перед использованием сгенерированной пары сверять открытые ключи и `-checkend 0`, при несовпадении/просрочке перегенерировать с сообщением в лог (не для сертификата оператора); предупреждение, если оператор положил только один из файлов; не глушить stderr openssl, проверка длины `TLS_SERVER_NAME` (≤ 64); (2) проверять `HTTPS_PORT` — число 1…65535, иначе понятная ошибка; (3) `.gitignore`: `deploy/tls/*` + `!deploy/tls/README.md`; (4) в compose у web: `HTTPS_PORT: ${HTTPS_PORT:-443}`, `TLS_SERVER_NAME: ${TLS_SERVER_NAME:-localhost}`, контекст сборки `.`, `dockerfile: deploy/web/Dockerfile`; api собирать строго с контекстом `./backend` (корневой `.dockerignore` — белый список: только `frontend` и `deploy/web`); одна реплика web на том `tls-generated`; healthcheck api только GET (HEAD `/api/v1/health` → 405); HEALTHCHECK у web; (5) infra_stack: вход и POST при `HTTPS_PORT=8443` с Origin с портом, подставной `X-Forwarded-Proto` ни на что не влияет; (6) тесты: 404 для отсутствующего `/assets/*`, `/api` не отдаёт index, `Cache-Control: no-cache` у index.html, `server_tokens off`, отказ при `TLS_SERVER_NAME` с `;`, `$(...)`; (7) ответы 502/400/405 от nginx на `/api` приходят HTML, не ErrorResponse — клиент T22 переносит (`invalid_response`), принять как известное; 413 с кодом `attachment_too_large` для любого пути.
 - **Попытки:** 0
 
 ## T27 — CI
@@ -589,6 +591,7 @@
 - **Заметка ревью T09:** в README/документации оператора — запускать API через `uvicorn app.main:app` (или CLI), не программным `uvicorn.run(app)` (dictConfig вернёт обработчики без фильтра секретов); правило «не печатать секреты в `__repr__`/`__str__`» — в docstring модуля логирования.
 - **Перенесено из ревью T20:** документация оператора — `--forwarded-allow-ips='*'` допустим пока порт api не публикуется; при публикации 8000 сузить до адреса прокси; plan D-20 — правило «`SECRET_KEY` короче 32 байт отклоняется, заглушка по `strip().lower()`».
 - **Окружение (T22):** `node` в среде разработчика — shim `proto` с единственной Node 18; `engines.node = "^22.12 || ^24 || >=26"` требует ≥ 22.12: запускать с `PATH=/opt/homebrew/bin:$PATH` (Node 26.3) либо `proto install node 24`; README и CI должны требовать/устанавливать подходящий Node.
+- **Перенесено из ревью T25:** документация: после смены `TLS_SERVER_NAME`, при битом/просроченном (825 дней, первый — около января 2029) сгенерированном сертификате удалить том `<project>_tls-generated`; при доступе по IP в SAN будет DNS-запись, а не IP; файлы оператора называются `tls.crt`/`tls.key`; access-log nginx пишет query — секреты в URL не передавать.
 - **Попытки:** 0
 
 ---
