@@ -129,35 +129,44 @@ async def _migrate_and_first_start(settings: Settings, stage: list[str]) -> Boot
     try:
         sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
         stage[0] = "блокировка первого запуска"
-        async with bootstrap_lock(sessionmaker):
+        async with bootstrap_lock(sessionmaker) as lock:
             stage[0] = "миграции"
             await asyncio.to_thread(_alembic_upgrade_head)
             stage[0] = "первый запуск"
-            return await run_bootstrap(sessionmaker, settings, clock=SystemClock(), locked=True)
+            return await run_bootstrap(sessionmaker, settings, clock=SystemClock(), locked=lock)
     finally:
         await engine.dispose()
 
 
-def _known_secrets() -> list[str]:
-    """Значения из окружения, которые нельзя печатать (пароль из DSN, ключ приложения)."""
+def _known_secrets(settings: Settings | None = None) -> list[str]:
+    """Значения, которые нельзя печатать: ключ приложения и пароль из DSN.
+
+    Берутся из ``settings`` (настройки могли прийти не из окружения процесса), плюс из окружения
+    (на случай, когда ``get_settings`` сам упал на проверке).
+    """
     values: list[str] = []
-    key = os.environ.get("SECRET_KEY")
-    if key:
-        values.append(key)
-    dsn = os.environ.get("DATABASE_URL")
-    if dsn:
+    dsns: list[str] = []
+    if settings is not None:
+        if settings.secret_key is not None:
+            values.append(settings.secret_key.get_secret_value())
+        dsns.append(settings.database_url)
+    values.append(os.environ.get("SECRET_KEY", ""))
+    dsns.append(os.environ.get("DATABASE_URL", ""))
+    for dsn in dsns:
+        if not dsn:
+            continue
         try:
             password = make_url(dsn).password
         except Exception:
             password = None
         if password:
             values.append(password)
-    return values
+    return [v for v in dict.fromkeys(values) if v]
 
 
-def _safe_description(exc: BaseException) -> str:
+def _safe_description(exc: BaseException, settings: Settings | None = None) -> str:
     message = redact_text(str(exc))
-    for secret in _known_secrets():
+    for secret in _known_secrets(settings):
         message = message.replace(secret, _MASK)
     name = type(exc).__name__
     return f"{name}: {message}" if message else name
@@ -170,8 +179,10 @@ def _warn(message: str) -> None:
 def run(args: argparse.Namespace) -> int:
     """Выполняет ``gostracker bootstrap``; возвращает код выхода (0 — успех)."""
     step = "настройки"
+    loaded: Settings | None = None  # для маскирования секретов, если сбой случится позже
     try:
         settings = get_settings()
+        loaded = settings
         step = "ожидание БД"
         asyncio.run(wait_for_database(settings.database_url))
         step = "секретный ключ"
@@ -185,7 +196,7 @@ def run(args: argparse.Namespace) -> int:
         _warn(f"Ошибка ({step}): {exc}")
         return 1
     except Exception as exc:
-        _warn(f"Ошибка ({step}): {_safe_description(exc)}")
+        _warn(f"Ошибка ({step}): {_safe_description(exc, loaded)}")
         return 1
 
     if result.admin_created:

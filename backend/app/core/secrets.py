@@ -1,7 +1,7 @@
 """Секретный ключ приложения и безопасная запись приватных файлов (plan §4.2, D-19, D-20, FR-6).
 
 - ``write_private_file``: атомарное исключающее создание файла с режимом ``0600``;
-- ``ensure_private_dir``: каталог секретов с режимом ``0700``;
+- ``ensure_private_dir``: каталог секретов с режимом ``0700`` (``lstat``: не ссылка, не файл);
 - ``ensure_secret_key``: ключ из настроек или файл ``data_dir/secrets/secret_key``.
 
 Содержимое файлов и значение ключа не попадают ни в сообщения исключений, ни в логи (FR-57).
@@ -13,6 +13,7 @@ import contextlib
 import logging
 import os
 import secrets
+import stat
 from pathlib import Path
 from typing import Final
 
@@ -85,15 +86,23 @@ def write_private_file(path: Path, content: str) -> None:
 
 
 def ensure_private_dir(path: Path) -> None:
-    """Создаёт каталог с режимом 0700, если его нет; существующий каталог не меняет."""
+    """Создаёт каталог с режимом 0700; существующий каталог приводит к 0700.
+
+    Тип проверяется через ``lstat``: символьная ссылка (в том числе на каталог) и обычный файл
+    отвергаются (``NotADirectoryError``), чтобы секреты не уехали по ссылке в чужой каталог.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         os.mkdir(path, _PRIVATE_DIR_MODE)
     except FileExistsError:
-        if not path.is_dir():
-            raise NotADirectoryError(f"{path} существует и не является каталогом") from None
-        return
-    # umask мог урезать права при создании
+        info = os.lstat(path)
+        if not stat.S_ISDIR(info.st_mode):
+            raise NotADirectoryError(
+                f"{path} существует и не является каталогом (символьные ссылки не допускаются)"
+            ) from None
+        if stat.S_IMODE(info.st_mode) == _PRIVATE_DIR_MODE:
+            return
+    # umask мог урезать права при создании; у существующего каталога ослабленные права сужаются
     os.chmod(path, _PRIVATE_DIR_MODE)
 
 

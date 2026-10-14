@@ -16,3 +16,5 @@ frontend/dist
 deploy/tls/*.crt
 deploy/tls/*.key
 backups/
+deploy/tls/*
+!deploy/tls/README.md

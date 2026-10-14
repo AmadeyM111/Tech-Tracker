@@ -436,14 +436,15 @@ async def test_access_log_has_method_path_status_duration(
     logs: LogReader, app_client: tuple[FastAPI, httpx.AsyncClient]
 ) -> None:
     _, client = app_client
-    r = await client.get("/api/v1/health")
-    assert r.status_code == 200
+    r = await client.get("/api/v1/no-such-route-for-access-log")
+    assert r.status_code == 404
 
-    recs = [x for x in _access_records(logs.records()) if x["path"] == "/api/v1/health"]
-    assert len(recs) == 1  # health тоже логируется, ровно один раз
+    path = "/api/v1/no-such-route-for-access-log"
+    recs = [x for x in _access_records(logs.records()) if x["path"] == path]
+    assert len(recs) == 1  # не-health запрос логируется ровно один раз
     rec = recs[0]
     assert rec["method"] == "GET"
-    assert _pick(rec, _STATUS_KEYS) == 200
+    assert _pick(rec, _STATUS_KEYS) == 404
     duration_keys = [k for k in rec if k.startswith("duration")]
     assert duration_keys, sorted(rec)
     duration = rec[duration_keys[0]]
@@ -457,10 +458,12 @@ async def test_access_log_strips_query_string(
 ) -> None:
     """FR-57: query (там может быть пароль) не попадает в лог."""
     _, client = app_client
-    await client.get("/api/v1/health?password=QUERYPASSWORDVAL&token=QUERYTOKENVAL")
+    await client.get(
+        "/api/v1/no-such-route-for-access-log?password=QUERYPASSWORDVAL&token=QUERYTOKENVAL"
+    )
 
     recs = _access_records(logs.records())
-    assert [x["path"] for x in recs] == ["/api/v1/health"]
+    assert [x["path"] for x in recs] == ["/api/v1/no-such-route-for-access-log"]
     text = logs.text()
     assert "QUERYPASSWORDVAL" not in text
     assert "QUERYTOKENVAL" not in text

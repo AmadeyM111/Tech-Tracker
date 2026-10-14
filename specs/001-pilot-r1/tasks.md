@@ -529,7 +529,7 @@
 - **Попытки:** 1
 
 ## T26 — Поставляемый docker-compose и инфраструктурные тесты стека
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-23 (в стеке), AC-40, AC-95, AC-105, FR-6a, FR-48, FR-51, FR-58, FR-63, NFR-3 (часть), NFR-9
 - **Файлы:** `docker-compose.yml`, `.env.example`; тесты: `backend/tests/infra/test_compose_static.py`
   (расширение), `backend/tests/infra/test_stack_first_run.py`, `backend/tests/infra/test_stack_tls.py` (`infra_stack`)
@@ -549,10 +549,11 @@
 - **Заметка ревью T16:** `idle_in_transaction_session_timeout` на уровне БД и `lock_timeout` для админ-действий (зависшая транзакция админа блокирует остальные админ-действия пространства).
 - **Перенесено из ревью T10/T20 (не терять):** (2) при ошибке COMMIT перед удалением файла пароля проверять отдельной сессией, не зафиксировано ли пространство; (4) удалять остатки `.<name>.*.tmp` под блокировкой, `ensure_private_dir` — `lstat`/`S_ISDIR` и 0755 → 0700; (5) advisory lock на AUTOCOMMIT-соединении, `_known_secrets` из `settings`, `path_separator = os` в `alembic.ini` (предупреждение alembic в логах); `run_bootstrap(locked: bool)` → токен-маркер от `bootstrap_lock`; не логировать `/api/v1/health` в INFO (≈8,6 тыс. строк/сутки от HEALTHCHECK) — правка теста T09; Dockerfile: слой зависимостей до исходников и очистка `/app/build`, `*.egg-info`.
 - **Перенесено из ревью T25:** (1) `deploy/web/10-gostracker-tls.sh`: временные файлы через `mktemp` в каталоге генерации (PID одинаков в контейнерах — гонка двух контейнеров на одном томе); перед использованием сгенерированной пары сверять открытые ключи и `-checkend 0`, при несовпадении/просрочке перегенерировать с сообщением в лог (не для сертификата оператора); предупреждение, если оператор положил только один из файлов; не глушить stderr openssl, проверка длины `TLS_SERVER_NAME` (≤ 64); (2) проверять `HTTPS_PORT` — число 1…65535, иначе понятная ошибка; (3) `.gitignore`: `deploy/tls/*` + `!deploy/tls/README.md`; (4) в compose у web: `HTTPS_PORT: ${HTTPS_PORT:-443}`, `TLS_SERVER_NAME: ${TLS_SERVER_NAME:-localhost}`, контекст сборки `.`, `dockerfile: deploy/web/Dockerfile`; api собирать строго с контекстом `./backend` (корневой `.dockerignore` — белый список: только `frontend` и `deploy/web`); одна реплика web на том `tls-generated`; healthcheck api только GET (HEAD `/api/v1/health` → 405); HEALTHCHECK у web; (5) infra_stack: вход и POST при `HTTPS_PORT=8443` с Origin с портом, подставной `X-Forwarded-Proto` ни на что не влияет; (6) тесты: 404 для отсутствующего `/assets/*`, `/api` не отдаёт index, `Cache-Control: no-cache` у index.html, `server_tokens off`, отказ при `TLS_SERVER_NAME` с `;`, `$(...)`; (7) ответы 502/400/405 от nginx на `/api` приходят HTML, не ErrorResponse — клиент T22 переносит (`invalid_response`), принять как известное; 413 с кодом `attachment_too_large` для любого пути.
-- **Попытки:** 0
+- **Заметки ревью T26:** перенесены в T27/T28 (блоки «Перенесено из ревью T26»).
+- **Попытки:** 1
 
 ## T27 — CI
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** NFR-10, N-6
 - **Файлы:** `.github/workflows/ci.yml`, `scripts/check.sh`
 - **Зависит от:** T22, T26
@@ -570,6 +571,7 @@
 - **Наблюдение (оркестратор, T18):** фильтр журнала по `actor_id` без совпадений уходит в `Seq Scan` (1,6 мс на 30 000 строк); при росте журнала (R1.1+, десятки тысяч событий на проект) рассмотреть частичный индекс `(workspace_id, actor_id, id DESC) WHERE in_audit`; замер объёма — в нагрузочном прогоне NFR-2 (R1.4).
 - **Заметки ревью T19:** вынести `_safe_description`/`wait_for_database`/`BootstrapError` из `bootstrap` в общий модуль CLI; в OpenAPI уточнить 403 у login/logout/password до `origin_mismatch` и объявить 500/default с `ErrorResponse`; `hash-bench` при неверных `ARGON2_*` печатать причину; R1.1 — единый `gostracker maintenance` с `--dry-run` и unit-тест `purge_expired_sessions` на точных границах (8 ч, ±1 мкс, `absolute == now`).
 - **Открытый вопрос (оркестратор, T20):** `ruff check backend` обнаружил I001 в `backend/tests/cli/test_bootstrap.py` (:430, :532) и `backend/tests/api/test_deps_gates.py` (:147), существовавшие с T10/T12, хотя `bash scripts/check.sh` на тех задачах был зелёным; воспроизводится и с `--no-cache`, причина молчания прежних запусков не установлена. В CI запускать линтер на чистой выгрузке без кэша (`--no-cache`), версию ruff закрепить в `pyproject.toml`.
+- **Перенесено из ревью T26:** (1) CI infra-задание строго в порядке `up` → `pytest -m infra_stack` → `down -v` на свежем проекте (тесты first_run зависят от порядка/состояния), при ошибке — `docker compose logs`; только infra_stack ловит удаление `lock_timeout`; (2) `test_stack_first_run.py`: проверка свежести стека в начале модуля (`pytest.fail("нужен свежий стек: down -v")` вместо 9 каскадных KeyError) и статическая проверка `lock_timeout`/`idle_in_transaction_session_timeout` в `test_compose_static.py`; (3) `lock_timeout=30s` задан на весь сервер: в соединении блокировки bootstrap и в alembic — `SET lock_timeout = 0` (второй bootstrap по plan §4.7 ждёт); ответ на `LockNotAvailableError` сейчас 500 `internal_error` — код ошибки нужен в spec/plan (R1.1); (4) `deploy/web/10-gostracker-tls.sh`: удалять остатки `.tls.*.??????` (с закрытым ключом) под flock; `ensure_secret_key`: чистить `.secret_key.*.tmp`; (5) HEALTHCHECK web пишет `GET /` в access-лог nginx каждые 10 с — отдельный location с `access_log off`; (6) `restart: unless-stopped` — решить через plan (сейчас нет restart policy; иначе описать в T28); (7) `.gitignore`: строки `deploy/tls/*.crt|*.key` лишние (покрыты `deploy/tls/*`); bootstrap печатает путь к файлу пароля дважды.
 - **Попытки:** 0
 
 ## T28 — Документация R1.0
@@ -592,6 +594,7 @@
 - **Перенесено из ревью T20:** документация оператора — `--forwarded-allow-ips='*'` допустим пока порт api не публикуется; при публикации 8000 сузить до адреса прокси; plan D-20 — правило «`SECRET_KEY` короче 32 байт отклоняется, заглушка по `strip().lower()`».
 - **Окружение (T22):** `node` в среде разработчика — shim `proto` с единственной Node 18; `engines.node = "^22.12 || ^24 || >=26"` требует ≥ 22.12: запускать с `PATH=/opt/homebrew/bin:$PATH` (Node 26.3) либо `proto install node 24`; README и CI должны требовать/устанавливать подходящий Node.
 - **Перенесено из ревью T25:** документация: после смены `TLS_SERVER_NAME`, при битом/просроченном (825 дней, первый — около января 2029) сгенерированном сертификате удалить том `<project>_tls-generated`; при доступе по IP в SAN будет DNS-запись, а не IP; файлы оператора называются `tls.crt`/`tls.key`; access-log nginx пишет query — секреты в URL не передавать.
+- **Перенесено из ревью T26:** документация: `SECRET_KEY` в api из `.env` не пробрасывается — ключ в `/data/secrets/secret_key`; `POSTGRES_PASSWORD` подставляется в `DATABASE_URL` без URL-кодирования (`@ : / %` ломают подключение), смена пароля после первой инициализации БД не меняет пароль в БД; `INITIAL_ADMIN_LOGIN` без пробелов по краям; таймауты 30 с / 60 с: админ-действие при занятой блокировке получает 500 через 30 с, стек не обновлять во время бэкапа; без restart policy после перезагрузки хоста нужен `docker compose up -d`; web остаётся healthy при упавшем api (на `/api` HTML 502), health api не проверяет БД; `TLS_SERVER_NAME` пропускает синтаксически неверные имена (`a..b`, `a-`).
 - **Попытки:** 0
 
 ---

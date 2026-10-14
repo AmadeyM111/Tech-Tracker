@@ -1,3 +1,6 @@
+# Поставляемая конфигурация GOSTracker (plan §4.12, D-17..D-20).
+# Порты публикует только web; db и api доступны лишь внутри сети проекта.
+# Режим разработки: deploy/compose.dev.yml подключается только явно (см. README).
 x-logging: &logging
   driver: json-file
   options:
@@ -7,6 +10,14 @@ x-logging: &logging
 services:
   db:
     image: postgres:16
+    # Таймауты уровня сервера (ревью T16): зависшая транзакция администратора не блокирует
+    # остальные админ-действия пространства бессрочно.
+    command:
+      - postgres
+      - -c
+      - idle_in_transaction_session_timeout=60s
+      - -c
+      - lock_timeout=30s
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tracker}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tracker}
@@ -21,5 +32,56 @@ services:
       start_period: 10s
     logging: *logging
 
+  api:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tracker}:${POSTGRES_PASSWORD:-tracker}@db:5432/${POSTGRES_DB:-tracker}
+      # Литерал: значение из .env не читается (FR-58, AC-105).
+      COOKIE_SECURE: "true"
+      DATA_DIR: /data
+      # SECRET_KEY не передаётся: при пустом значении ключ создаётся в /data/secrets/secret_key (D-20).
+      INITIAL_ADMIN_LOGIN: ${INITIAL_ADMIN_LOGIN:-admin}
+      ARGON2_TIME_COST: ${ARGON2_TIME_COST:-3}
+      ARGON2_MEMORY_COST_KIB: ${ARGON2_MEMORY_COST_KIB:-131072}
+      ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-2}
+    volumes:
+      - appdata:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    # GET: HEAD на /api/v1/health даёт 405. start_period покрывает ожидание БД bootstrap (до 60 с).
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4)"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 75s
+    logging: *logging
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web/Dockerfile
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      HTTPS_PORT: ${HTTPS_PORT:-443}
+      TLS_SERVER_NAME: ${TLS_SERVER_NAME:-localhost}
+    volumes:
+      - ./deploy/tls:/etc/gostracker/tls:ro
+      - tls-generated:/var/lib/gostracker/tls
+    depends_on:
+      api:
+        condition: service_healthy
+    logging: *logging
+
 volumes:
   pgdata:
+  appdata:
+  tls-generated:

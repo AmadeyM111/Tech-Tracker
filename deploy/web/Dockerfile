@@ -31,3 +31,8 @@ COPY deploy/web/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --chmod=0755 deploy/web/10-gostracker-tls.sh /docker-entrypoint.d/10-gostracker-tls.sh
 
 EXPOSE 80 443
+
+# Проверка TLS-порта изнутри контейнера: самоподписанный сертификат не проверяется (-k),
+# ответ 2xx/3xx от nginx достаточен (SPA отдаётся без api).
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -fsk -o /dev/null https://127.0.0.1:443/ || exit 1

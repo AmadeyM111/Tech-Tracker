@@ -79,6 +79,7 @@ _UVICORN_DUPLICATE_MESSAGE = "Exception in ASGI application"
 _RESERVED_FIELDS = frozenset({"timestamp", "level", "logger", "message", "exception", "stack"})
 
 _ACCESS_LOGGER = logging.getLogger("app.access")
+_HEALTH_PATH = "/api/v1/health"
 
 
 # --------------------------------------------------------------------------- очистка значений
@@ -546,5 +547,8 @@ class AccessLogMiddleware:
             user_id = state.get("user_id") if isinstance(state, dict) else None
             if user_id is not None:
                 extra["user_id"] = str(user_id)
+            # HEALTHCHECK контейнера бьёт сюда каждые 10 с (~8,6 тыс. записей в сутки): успешные
+            # ответы health идут на DEBUG, отказы (статус >= 400) остаются на INFO.
+            level = logging.DEBUG if path == _HEALTH_PATH and status < 400 else logging.INFO
             # путь только в extra: он очищается один раз, дублировать его в тексте незачем
-            _ACCESS_LOGGER.info("http request", extra=extra)
+            _ACCESS_LOGGER.log(level, "http request", extra=extra)
