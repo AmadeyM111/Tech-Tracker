@@ -454,7 +454,7 @@
 - **Попытки:** 1
 
 ## T22 — API-клиент, сгенерированные типы, словарь строк, фоновый опрос
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** FR-29 и FR-59 (заголовок `X-GT-Background: 1` только на повторных загрузках опроса), FR-44 (типы из OpenAPI), NFR-6, AC-98 (автопроверка: строк интерфейса вне словаря нет)
 - **Файлы:** `frontend/src/shared/api/client.ts`, `frontend/src/shared/api/polling.ts`,
   `frontend/src/shared/i18n/ru.ts`, `frontend/src/shared/i18n/index.ts`,
@@ -470,7 +470,8 @@
   `cd frontend && npm run lint && npm run typecheck && npm test` — успешно.
 - **Заметка ревью T13:** dev-прокси Vite — `changeOrigin: false` (иначе `Host` не совпадёт с `Origin: http://localhost:5173`).
 - **Заметки ревью T21:** (1) eslint для `src/**` кроме `src/shared/api/**`: `no-restricted-globals` на `fetch`, `no-restricted-properties` на `window.fetch`/`globalThis.fetch`, `no-restricted-imports` на `axios`; (2) README и `engines` в package.json: Node `^22.12 || ^24 || >=26`; (3) `frontend/.npmrc` с `ignore-scripts=true` (fsevents) и проверка `npm ci`+сборки; (4) `server.strictPort: true` в vite.config.ts; (5) `scripts/check.sh`: понятное сообщение «выполните `cd frontend && npm ci`» при отсутствии `node_modules`; (6) `backend/tests/infra/test_frontend_scaffold.py::test_t21_src_files_only_expected` расширить списком файлов T22; (7) `src/shared/api/schema.d.ts` — генерируемый, в ignores eslint; сгенерировать `npm run gen:api` из `docs/api/openapi.json` и закоммитить (тест на совпадение с генерацией).
-- **Попытки:** 0
+- **Заметки ревью T22 (в T23+/T26/T27):** (1) polling.ts: ограничить задержку тика сверху `POLL_INTERVAL_MS` (перевод часов назад замораживает опрос); (2) фоновые тики без retry (серия 5xx даёт пачку из 4 запросов каждые ~22 с); (3) pytest-сверка `PASSWORD_MIN_LENGTH` с `MIN_PASSWORD_LENGTH` и списка кодов бэкенда со словарём (коды R1.1+ не должны молча уходить в `error.unknown`); (4) известный краевой случай: `refetch()` во время летящего фонового тика без данных присоединяется к нему и уходит с заголовком (plan §4.14).
+- **Попытки:** 3
 
 ## T23 — Экраны входа, смены пароля и «нет роли»
 - **Статус:** TODO
@@ -584,6 +585,7 @@
 - **Заметка ревью T08:** в документации оператора — лимит параллельных хешей (m=128 МиБ, пул `min(32, cpu+4)` → ~900 МиБ пик на стенде C-2).
 - **Заметка ревью T09:** в README/документации оператора — запускать API через `uvicorn app.main:app` (или CLI), не программным `uvicorn.run(app)` (dictConfig вернёт обработчики без фильтра секретов); правило «не печатать секреты в `__repr__`/`__str__`» — в docstring модуля логирования.
 - **Перенесено из ревью T20:** документация оператора — `--forwarded-allow-ips='*'` допустим пока порт api не публикуется; при публикации 8000 сузить до адреса прокси; plan D-20 — правило «`SECRET_KEY` короче 32 байт отклоняется, заглушка по `strip().lower()`».
+- **Окружение (T22):** `node` в среде разработчика — shim `proto` с единственной Node 18; `engines.node = "^22.12 || ^24 || >=26"` требует ≥ 22.12: запускать с `PATH=/opt/homebrew/bin:$PATH` (Node 26.3) либо `proto install node 24`; README и CI должны требовать/устанавливать подходящий Node.
 - **Попытки:** 0
 
 ---

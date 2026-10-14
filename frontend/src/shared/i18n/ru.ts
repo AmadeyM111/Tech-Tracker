@@ -1,0 +1,32 @@
+// UI string dictionary (NFR-6, AC-98): the only place with user-facing text.
+// Keys are flat dotted identifiers; `{name}` marks a placeholder for t().
+// Error keys follow `error.<code>`, where <code> is a backend error code
+// (backend/app/core/errors.py) or a client-side code from shared/api/client.ts.
+export const ru = {
+  "error.not_authenticated": "Требуется вход в систему",
+  "error.invalid_credentials": "Неверный логин или пароль",
+  "error.password_change_required": "Необходимо сменить пароль",
+  "error.no_role": "Вам не назначена роль. Обратитесь к администратору",
+  "error.forbidden": "Недостаточно прав для этого действия",
+  "error.origin_mismatch": "Запрос отклонён: недопустимый источник",
+  "error.not_found": "Не найдено",
+  "error.validation_error": "Проверьте правильность заполнения полей",
+  "error.last_account_admin": "Нельзя лишить роли или заблокировать последнего администратора учётных записей",
+  "error.login_taken": "Пользователь с таким логином уже существует",
+  "error.login_invalid": "Недопустимый логин",
+  "error.password_too_short": "Пароль слишком короткий",
+  "error.password_too_common": "Этот пароль слишком распространён, выберите другой",
+  "error.invalid_current_password": "Текущий пароль указан неверно",
+  "error.password_reused": "Новый пароль должен отличаться от прежнего",
+  "error.internal_error": "Внутренняя ошибка сервера. Попробуйте позже",
+  "error.network_error": "Нет связи с сервером. Проверьте подключение и повторите попытку",
+  "error.invalid_response": "Получен некорректный ответ сервера",
+  "error.bad_request": "Некорректный запрос",
+  "error.method_not_allowed": "Это действие не поддерживается",
+  "error.payload_too_large": "Слишком большой объём данных в запросе",
+  "error.unsupported_media_type": "Неподдерживаемый тип данных",
+  "error.too_many_requests": "Слишком много запросов. Подождите немного и повторите",
+  "error.http_error": "Сервер отклонил запрос",
+  "error.unknown": "Не удалось выполнить действие. Попробуйте ещё раз",
+  "auth.password_min_length_hint": "Не менее {min} символов",
+} as const;

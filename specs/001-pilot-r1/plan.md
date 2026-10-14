@@ -868,10 +868,19 @@ HSTS не включается (самоподписанный сертифик�
 - `src/shared/api/client.ts`: `createClient<paths>({ baseUrl: "/", credentials: "same-origin" })`
   + middleware: ошибки → `ApiError {status, code, detail}`; 401 → сброс кэша и переход на `/login`;
   403 `password_change_required` → `/change-password`; 403 `no_role` → экран «нет роли».
-- `src/shared/api/polling.ts`: `usePolledQuery(options)` = `useQuery` с `refetchInterval: 15_000`;
-  `queryFn` ставит `X-GT-Background: 1`, если у запроса уже есть данные
-  (`queryClient.getQueryState(key)?.dataUpdatedAt > 0`) — первая загрузка экрана считается
-  действием пользователя, повторы по таймеру — фоном (FR-29, FR-59, D-14).
+- `src/shared/api/polling.ts`: `usePolledQuery(options)` = `useQuery` со своей цепочкой `setTimeout` (не `refetchInterval`: нужна пометка источника запроса); один таймер на ключ; якорь — `max(dataUpdatedAt, errorUpdatedAt)`: если данные моложе `POLL_INTERVAL_MS`, тик не шлёт запрос, а взводит дотик на остаток, поэтому между обновлениями не больше 15 с + время ответа (FR-29, AC-107); известный краевой случай: `refetch()` во время летящего фонового тика без данных присоединяется к нему и уходит с `X-GT-Background`;
+  `queryFn` ставит `X-GT-Background: 1` для КАЖДОГО запроса, инициированного таймером опроса
+  (независимо от того, есть ли у запроса данные: тик по определению повторяет запрос); первая
+  загрузка, ручной `refetch()` и перезагрузка после мутации (`invalidateQueries`) — обычные
+  запросы без заголовка, продлевают сессию (FR-29, FR-59, D-14).
+  **Ревью T22:** прежняя формулировка `dataUpdatedAt > 0` помечала бы фоновым и действие
+  пользователя; условие «есть данные» вредно в обратную сторону: после неудачной первой загрузки
+  (5xx) тики шли бы без заголовка и неограниченно продлевали сессию открытого сломанного экрана. Опрос приостанавливается при `document.hidden`; 401,
+  403 `password_change_required` и 403 `no_role` останавливают опрос (меняется состояние
+  сессии), ошибки 5xx и сети — нет (транзиентные). Клиент: `baseUrl` — `"/"` (пути OpenAPI уже
+  содержат `/api/v1`), на небезопасные методы всегда `Content-Type: application/json`;
+  коды клиента `network_error` (status 0) и `invalid_response`; колбэк 401 снова
+  взводится после любого успешного ответа.
 - `src/shared/i18n/ru.ts` — словарь `as const`; `t(key: keyof typeof ru)`; строк интерфейса
   вне словаря нет (NFR-6); vitest-проверка ищет кириллицу в `src/**/*.tsx` вне `i18n/`.
 - UI-кит `src/shared/ui`: видимый фокус (`:focus-visible` outline 2px), контраст AA (NFR-7).

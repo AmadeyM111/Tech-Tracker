@@ -237,7 +237,12 @@ def test_t21_src_files_only_expected() -> None:
     src = FE / "src"
     assert src.is_dir()
     found = {p.relative_to(src).as_posix() for p in src.rglob("*") if p.is_file()}
-    allowed = {"main.tsx", "app/App.tsx", "app/providers.tsx", "vite-env.d.ts"}
+    allowed = {
+        "main.tsx", "app/App.tsx", "app/providers.tsx", "vite-env.d.ts",
+        # T22
+        "shared/api/client.ts", "shared/api/polling.ts", "shared/api/schema.d.ts",
+        "shared/i18n/ru.ts", "shared/i18n/index.ts",
+    }  # fmt: skip
     assert {"main.tsx", "app/App.tsx", "app/providers.tsx"} <= found
     assert found <= allowed, f"лишние файлы: {sorted(found - allowed)}"
 
@@ -261,3 +266,79 @@ def test_t21_readme_documents_commands() -> None:
     for cmd in ("npm ci", "npm run dev", "npm run lint", "npm run typecheck", "npm test",
                 "npm run build", "npm run gen:api"):  # fmt: skip
         assert cmd in txt, cmd
+
+
+# --- T22: заметки ревью T21 -------------------------------------------------------------
+
+
+def test_t22_src_has_api_and_i18n_files() -> None:
+    for rel in ("shared/api/client.ts", "shared/api/polling.ts", "shared/api/schema.d.ts",
+                "shared/i18n/ru.ts", "shared/i18n/index.ts"):  # fmt: skip
+        assert (FE / "src" / rel).is_file(), f"нет frontend/src/{rel}"
+
+
+def test_t22_eslint_forbids_direct_fetch_and_axios_outside_api() -> None:
+    cfg = _text("eslint.config.js")
+    assert re.search(r"no-restricted-globals", cfg)
+    assert re.search(r"no-restricted-properties", cfg)
+    assert re.search(r"no-restricted-imports", cfg)
+    # правила нацелены на fetch, window.fetch, globalThis.fetch и axios
+    assert re.search(r"""no-restricted-globals[\s\S]{0,400}?['"]fetch['"]""", cfg)
+    props = re.search(r"no-restricted-properties[\s\S]{0,800}", cfg)
+    assert props is not None
+    assert "window" in props.group(0)
+    assert "globalThis" in props.group(0)
+    assert re.search(r"""['"]fetch['"]""", props.group(0))
+    assert re.search(r"""no-restricted-imports[\s\S]{0,400}?['"]axios['"]""", cfg)
+    # исключение: сам API-слой
+    assert re.search(r"""ignores\s*:\s*\[[^\]]*['"]src/shared/api/\*\*['"]""", cfg)
+    # генерируемый файл по-прежнему не линтуется
+    assert "src/shared/api/schema.d.ts" in cfg
+
+
+def test_t22_engines_and_readme_node_range() -> None:
+    expected = "^22.12 || ^24 || >=26"
+    engines = _json("package.json").get("engines", {})
+    assert engines.get("node") == expected
+    readme = _text("README.md")
+    assert expected in readme
+    assert "^20.19" not in readme
+
+
+def test_t22_npmrc_ignore_scripts() -> None:
+    lines = [ln.strip() for ln in _text(".npmrc").splitlines()]
+    assert "ignore-scripts=true" in lines
+
+
+def test_t22_vite_strict_port() -> None:
+    assert re.search(r"strictPort\s*:\s*true", _text("vite.config.ts"))
+
+
+def test_t22_check_sh_explains_npm_ci_when_node_modules_missing() -> None:
+    txt = (REPO / "scripts" / "check.sh").read_text(encoding="utf-8")
+    assert "node_modules" in txt
+    assert "cd frontend && npm ci" in txt
+
+
+def test_t22_eslint_restricts_all_network_apis() -> None:
+    cfg = _text("eslint.config.js")
+    globals_block = re.search(r"no-restricted-globals[\s\S]{0,900}?\],", cfg)
+    assert globals_block is not None
+    for name in ("fetch", "XMLHttpRequest", "EventSource"):
+        assert re.search(rf"""name\s*:\s*['"]{name}['"]""", globals_block.group(0)), name
+    props = re.search(r"no-restricted-properties[\s\S]{0,1800}?\],", cfg)
+    assert props is not None
+    for obj, prop in (("self", "fetch"), ("window", "fetch"), ("globalThis", "fetch"),
+                      ("navigator", "sendBeacon")):  # fmt: skip
+        pat = rf"""object\s*:\s*['"]{obj}['"][\s\S]{{0,80}}?property\s*:\s*['"]{prop}['"]"""
+        assert re.search(pat, props.group(0)), f"{obj}.{prop}"
+
+
+def test_t22_node_version_enforced_by_npmrc_or_check_script() -> None:
+    npmrc = [ln.strip() for ln in _text(".npmrc").splitlines()]
+    check = (REPO / "scripts" / "check.sh").read_text(encoding="utf-8")
+    by_npmrc = "engine-strict=true" in npmrc
+    by_check = bool(re.search(r"node\s+(-v|--version|-p|-e)", check)) and bool(
+        re.search(r"(?i)node[^\n]*(верси|version|22|24)", check)
+    )
+    assert by_npmrc or by_check, "нужен engine-strict=true или проверка версии Node в check.sh"

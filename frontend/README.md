@@ -2,7 +2,7 @@
 
 Vite + React 18 + TypeScript (strict) + TanStack Query v5 + react-router-dom v7.
 Версии зависимостей зафиксированы в `package-lock.json` (план §7.2). Требуется
-Node.js `^20.19.0 || >=22.12.0` (образ сборки — `node:22-alpine`).
+Node.js `^22.12 || ^24 || >=26` (образ сборки — `node:22-alpine`).
 
 Команды (из каталога `frontend/`):
 
