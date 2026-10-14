@@ -17,7 +17,10 @@ FR-65, FR-66, FR-69, FR-73).
 1. ``pg_advisory_xact_lock(_ACCOUNT_LOCK_NAMESPACE, hashtext(workspace_id))`` — действия
    администрирования учётных записей одного пространства выполняются строго по очереди;
 2. одним запросом ``FOR NO KEY UPDATE ... ORDER BY user_id`` блокируются строки
-   ``workspace_member`` и ``app_user`` объединения «активные администраторы пространства ∪ цель»;
+   ``workspace_member`` и ``app_user`` объединения «активные администраторы пространства ∪
+   цель»; затем проверяется, что актор входит в заблокированное множество активных
+   администраторов (окно устаревшего актора, ревью T16a: между ``get_actor`` и блокировками
+   актора могли заблокировать или лишить роли) — иначе 403 без изменений и без событий;
 3. цель читается заново (``_load_target`` без блокировки — данные уже свежие и защищены), затем
    только изменения строк, удаление сессий цели и запись события.
 
@@ -38,6 +41,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.clock import utcnow
 from app.core.errors import ErrorCode, Forbidden, NotFound, Unprocessable
+from app.core.pagination import PageParams, paginate
 from app.core.security.passwords import (
     PasswordHasher,
     PasswordPolicyError,
@@ -162,7 +166,9 @@ def _is_active_account_admin() -> ColumnElement[bool]:
     return and_(WorkspaceMember.role.in_(_ADMIN_ROLE_VALUES), AppUser.is_blocked.is_(False))
 
 
-async def _lock_for_account_change(db: AsyncSession, workspace_id: UUID, target_id: UUID) -> None:
+async def _lock_for_account_change(
+    db: AsyncSession, workspace_id: UUID, target_id: UUID, actor_id: UUID
+) -> None:
     """Единый протокол блокировок перед изменением учётной записи (см. docstring модуля).
 
     1. ``pg_advisory_xact_lock`` по пространству: все действия администрирования учётных
@@ -175,10 +181,17 @@ async def _lock_for_account_change(db: AsyncSession, workspace_id: UUID, target_
        им не ждут.
     2. Одним запросом ``FOR NO KEY UPDATE ... ORDER BY user_id`` (строки ``workspace_member``,
        затем ``app_user`` каждого пользователя) блокируется объединение «активные
-       администраторы пространства ∪ цель»: состояние, на котором проверяется FR-69, не
-       изменится до конца транзакции, а порядок по ``user_id`` единый для любого изменяющего
+       администраторы пространства ∪ цель»: состояние, на котором проверяется FR-69,
+       не изменится до конца транзакции, а порядок по ``user_id`` единый для любого изменяющего
        кода. Отдельной блокировки цели после множества админов нет (она нарушала порядок и
        давала deadlock, ревью T16).
+    3. Окно устаревшего актора (ревью T16a): права актора проверены в ``get_actor`` до этих
+       блокировок, а он мог быть заблокирован или лишён роли параллельным действием, уже
+       зафиксированным к моменту получения advisory-блокировки. Поэтому после блокировок актор
+       должен входить в множество заблокированных активных администраторов (роль из
+       ``ACCOUNT_ADMIN_ROLES``, не заблокирован); иначе ``Forbidden`` (403: актор был
+       аутентифицирован на момент запроса, права он потерял в окне). Исключение откатывает
+       транзакцию: изменений и событий нет.
 
     Почему не мешает FK и входу: вставки ``domain_event`` (``actor_id``), ``user_session``
     (``user_id``) и ``created_by`` проверяют ссылку на ``app_user`` блокировкой
@@ -194,16 +207,24 @@ async def _lock_for_account_change(db: AsyncSession, workspace_id: UUID, target_
             func.pg_advisory_xact_lock(_ACCOUNT_LOCK_NAMESPACE, func.hashtext(str(workspace_id)))
         )
     )
-    await db.execute(
-        select(WorkspaceMember.user_id)
-        .join(AppUser, AppUser.id == WorkspaceMember.user_id)
-        .where(
-            WorkspaceMember.workspace_id == workspace_id,
-            or_(_is_active_account_admin(), WorkspaceMember.user_id == target_id),
+    locked = (
+        await db.execute(
+            select(WorkspaceMember.user_id, WorkspaceMember.role, AppUser.is_blocked)
+            .join(AppUser, AppUser.id == WorkspaceMember.user_id)
+            .where(
+                WorkspaceMember.workspace_id == workspace_id,
+                or_(_is_active_account_admin(), WorkspaceMember.user_id == target_id),
+            )
+            .order_by(WorkspaceMember.user_id)
+            .with_for_update(key_share=True)
         )
-        .order_by(WorkspaceMember.user_id)
-        .with_for_update(key_share=True)
-    )
+    ).all()
+    active_admin_ids = {
+        row.user_id for row in locked if row.role in _ADMIN_ROLE_VALUES and not row.is_blocked
+    }
+    if actor_id in active_admin_ids:
+        return
+    raise Forbidden()
 
 
 async def ensure_account_admin_remains(db: AsyncSession, workspace_id: UUID) -> None:
@@ -258,7 +279,7 @@ async def create_user(
     password = one_time_password.get_secret_value()
     _check_one_time_password(password)
     password_hash = await hash_in_thread(hasher, password)
-    await _lock_for_account_change(db, actor.workspace_id, actor.user_id)
+    await _lock_for_account_change(db, actor.workspace_id, actor.user_id, actor.user_id)
 
     user_id = uuid4()
     now = utcnow()
@@ -319,7 +340,7 @@ async def block_user(
     срок блокировки входа не трогаются.
     """
     _require(actor, Capability.MANAGE_ACCOUNTS)
-    await _lock_for_account_change(db, actor.workspace_id, user_id)
+    await _lock_for_account_change(db, actor.workspace_id, user_id, actor.user_id)
     target = await _load_target(db, actor.workspace_id, user_id)
     if target.is_blocked:
         return
@@ -348,7 +369,7 @@ async def unblock_user(db: AsyncSession, actor: Actor, user_id: UUID, /) -> None
     без ошибки и без события.
     """
     _require(actor, Capability.MANAGE_ACCOUNTS)
-    await _lock_for_account_change(db, actor.workspace_id, user_id)
+    await _lock_for_account_change(db, actor.workspace_id, user_id, actor.user_id)
     target = await _load_target(db, actor.workspace_id, user_id)
     if not target.is_blocked:
         return
@@ -393,7 +414,7 @@ async def reset_password(
     _check_one_time_password(password)
     # медленный Argon2 — до протокола блокировок: ничего не удерживается на время хеширования
     password_hash = await hash_in_thread(hasher, password)
-    await _lock_for_account_change(db, actor.workspace_id, user_id)
+    await _lock_for_account_change(db, actor.workspace_id, user_id, actor.user_id)
     target = await _load_target(db, actor.workspace_id, user_id)
     await db.execute(
         update(AppUser)
@@ -422,7 +443,7 @@ async def revoke_sessions(
 ) -> int:
     """Завершает все сессии пользователя (FR-62, AC-39); событие пишется и при 0 сессий."""
     _require(actor, Capability.MANAGE_ACCOUNTS)
-    await _lock_for_account_change(db, actor.workspace_id, user_id)
+    await _lock_for_account_change(db, actor.workspace_id, user_id, actor.user_id)
     target = await _load_target(db, actor.workspace_id, user_id)
     removed = await sessions.delete_all_for_user(db, target.id)
     await record_event(
@@ -446,7 +467,7 @@ async def set_role(
     """
     _require(actor, Capability.ASSIGN_ROLES)
     new_role = _parse_role(role)
-    await _lock_for_account_change(db, actor.workspace_id, user_id)
+    await _lock_for_account_change(db, actor.workspace_id, user_id, actor.user_id)
     target = await _load_target(db, actor.workspace_id, user_id)
     if target.role == new_role:
         return target.to_account(role=new_role)
@@ -482,3 +503,50 @@ async def set_role(
         details=details,
     )
     return target.to_account(role=new_role)
+
+
+async def list_accounts(
+    db: AsyncSession, actor: Actor, params: PageParams
+) -> tuple[list[UserAccount], bool]:
+    """Страница учётных записей пространства актора (FR-4, AC-2, D-34).
+
+    Сортировка ``login ASC, id ASC`` (``id`` — тай-брейкер, страницы не пересекаются). Роль
+    читается вторым запросом по идентификаторам страницы: ``paginate`` работает с одной
+    сущностью. Второй элемент — признак следующей страницы.
+    """
+    _require(actor, Capability.MANAGE_ACCOUNTS)
+    stmt = (
+        select(AppUser)
+        .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
+        .where(WorkspaceMember.workspace_id == actor.workspace_id)
+        .order_by(AppUser.login, AppUser.id)
+    )
+    users, has_next = await paginate(db, stmt, params)
+    if not users:
+        return [], has_next
+    role_rows = await db.execute(
+        select(WorkspaceMember.user_id, WorkspaceMember.role).where(
+            WorkspaceMember.workspace_id == actor.workspace_id,
+            WorkspaceMember.user_id.in_([user.id for user in users]),
+        )
+    )
+    roles = {row.user_id: row.role for row in role_rows}
+    items = [
+        UserAccount(
+            id=user.id,
+            login=user.login,
+            role=None if roles[user.id] is None else Role(roles[user.id]),
+            is_blocked=user.is_blocked,
+            must_change_password=user.must_change_password,
+            created_at=user.created_at,
+        )
+        for user in users
+    ]
+    return items, has_next
+
+
+async def get_account(db: AsyncSession, actor: Actor, user_id: UUID, /) -> UserAccount:
+    """Учётная запись в пространстве актора; чужая и несуществующая — ``NotFound`` (FR-13)."""
+    _require(actor, Capability.MANAGE_ACCOUNTS)
+    target = await _load_target(db, actor.workspace_id, user_id)
+    return target.to_account(role=target.role)

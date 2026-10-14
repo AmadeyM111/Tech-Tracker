@@ -689,7 +689,13 @@ async def test_ac78_concurrent_mutual_demotion_leaves_one_admin(
     """Два админа одновременно лишают друг друга права: ровно один успех, админ остаётся.
 
     Заодно требует отсутствия взаимной блокировки (DBAPIError/deadlock): гонка обязана
-    завершаться кодом ``last_account_admin``, а не необработанным исключением БД.
+    завершаться отказом приложения, а не необработанным исключением БД.
+
+    Проигравший получает ``forbidden`` (403) ИЛИ ``last_account_admin`` (422). После T16a
+    протокол блокировок проверяет, что актор остался среди активных администраторов: если
+    победитель уже зафиксировал лишение роли/блокировку проигравшего, тот отклоняется как
+    актор без права (403); если проигравший успел пройти эту проверку, его действие упирается в
+    инвариант FR-69 (422). Какой путь — зависит от порядка захвата advisory-блокировки.
     """
     from app.core.errors import AppError
 
@@ -709,13 +715,16 @@ async def test_ac78_concurrent_mutual_demotion_leaves_one_admin(
                 await s.commit()
             except AppError as exc:
                 await s.rollback()
-                assert exc.status_code == 422
+                assert exc.status_code in (403, 422)
                 return str(exc.code)
             return "ok"
 
     for _ in range(6):
         outcomes = await asyncio.gather(attempt(a, b), attempt(b, a))
-        assert sorted(outcomes) == ["last_account_admin", "ok"], outcomes
+        assert outcomes.count("ok") == 1, outcomes
+        assert [o for o in outcomes if o != "ok"][0] in ("forbidden", "last_account_admin"), (
+            outcomes
+        )
         async with committed() as s:
             res = await s.execute(
                 text(
@@ -726,6 +735,13 @@ async def test_ac78_concurrent_mutual_demotion_leaves_one_admin(
                 {"w": ws.id},
             )
             assert res.scalar_one() == 1
+            # события сходятся с результатами: одно успешное действие - одно событие
+            action = "user.role_changed" if mode == "role" else "user.blocked"
+            count = await s.execute(
+                text("SELECT count(*) FROM domain_event WHERE workspace_id = :w AND action = :a"),
+                {"w": ws.id, "a": action},
+            )
+            assert count.scalar_one() == _ + 1
             await s.execute(
                 text("UPDATE workspace_member SET role = 'tech_admin' WHERE workspace_id = :w"),
                 {"w": ws.id},

@@ -538,3 +538,71 @@ async def test_t13_review_me_handler_rejects_actor_without_role_explicitly(
 
 def test_helper_concrete_replaces_all_path_params() -> None:
     assert uuid.UUID(_concrete("/api/v1/x/{item_id}").rsplit("/", 1)[1])
+
+
+# --- T17: каждый маршрут /api/v1/admin/* защищён (FR-42, FR-45a, FR-55, FR-66) ----------------
+
+
+def _admin_operations(env: ApiEnv) -> set[tuple[str, str]]:
+    return {op for op in _api_operations(env) if op[1].startswith("/api/v1/admin/")}
+
+
+async def test_t17_admin_routes_exist_in_route_walk(api_env: ApiEnv) -> None:
+    operations = _admin_operations(api_env)
+    assert ("GET", "/api/v1/admin/users") in operations
+    assert ("POST", "/api/v1/admin/users") in operations
+    assert any(m == "PUT" and p.endswith("/role") for m, p in operations)
+    assert len(operations) >= 8
+
+
+@pytest.mark.parametrize(
+    ("role", "extra", "expected"),
+    [
+        ("business_admin", {}, (403, "forbidden")),
+        ("user", {}, (403, "forbidden")),
+        (None, {}, (403, "no_role")),
+        ("tech_admin", {"must_change_password": True}, (403, "password_change_required")),
+        ("mixed", {"must_change_password": True}, (403, "password_change_required")),
+    ],
+    ids=["business_admin", "user", "no_role", "ta_one_time_password", "mixed_one_time_password"],
+)
+async def test_t17_every_admin_route_rejects_non_admin_actors(
+    api_env: ApiEnv, role: str | None, extra: dict[str, Any], expected: tuple[int, str]
+) -> None:
+    env = api_env
+    # администратор пространства есть, чтобы отказ не объяснялся «пустым» пространством
+    await env.new_user(role="tech_admin")
+    actor = await env.new_user(role=role, password=PW, **extra)
+    login = await env.login(actor.login, PW)
+    assert login.status_code == 200, login.text
+    token = env.token_from(login)
+    assert token
+
+    failures: list[str] = []
+    for method, path in sorted(_admin_operations(env)):
+        kwargs: dict[str, Any] = {"json": {}} if method in {"POST", "PUT", "PATCH"} else {}
+        response = await env.client.request(
+            method, _concrete(path), headers=env.auth(token), **kwargs
+        )
+        if (response.status_code, _code(response)) != expected:
+            failures.append(f"{method} {path}: {response.status_code} {response.text}")
+    assert failures == []
+
+
+async def test_t17_every_admin_unsafe_route_rejects_foreign_origin(api_env: ApiEnv) -> None:
+    env = api_env
+    admin = await env.new_user(role="tech_admin", password=PW)
+    token = await env.login_ok(admin)
+    failures: list[str] = []
+    for method, path in sorted(_admin_operations(env)):
+        if method == "GET":
+            continue
+        response = await env.client.request(
+            method,
+            _concrete(path),
+            headers={**env.auth(token), "Origin": "http://evil.example"},
+            json={},
+        )
+        if (response.status_code, _code(response)) != (403, "origin_mismatch"):
+            failures.append(f"{method} {path}: {response.status_code} {response.text}")
+    assert failures == []

@@ -160,7 +160,8 @@ async def change_own_password(
     текущим (``password_reused``) -> недопустимые символы (``validation_error``) -> политика
     (``password_too_short`` / ``password_too_common``). При успехе: новый хеш,
     ``must_change_password = false``, ``password_changed_at = now``, счётчик неудач сброшен, все
-    остальные сессии пользователя удалены; файл пароля первого ТА (если он выдан этому логину)
+    остальные сессии пользователя удалены (заблокированный параллельно пользователь пароль не
+    меняет: 401, T17/ревью T16a); файл пароля первого ТА (если он выдан этому логину)
     удаляется после COMMIT транзакции запроса, а не здесь.
 
     Неверный текущий пароль занимает слот попытки как неудачный вход (общий счётчик, порог и
@@ -212,7 +213,9 @@ async def change_own_password(
         update(AppUser)
         .where(
             AppUser.id == actor.user_id,
-            # параллельная смена или блокировка, поставленная пока проверялся пароль
+            # заблокированный параллельно (между get_actor и этим UPDATE) пароль не меняет
+            AppUser.is_blocked.is_(False),
+            # параллельная смена или блокировка входа, поставленная пока проверялся пароль
             AppUser.password_hash == reservation.password_hash,
             series_not_locked_by_others(reservation, now),
         )
@@ -227,6 +230,11 @@ async def change_own_password(
         .execution_options(synchronize_session=False)
     )
     if changed.scalar_one_or_none() is None:
+        blocked = (
+            await db.execute(select(AppUser.is_blocked).where(AppUser.id == actor.user_id))
+        ).scalar_one_or_none()
+        if blocked is not False:  # заблокирован (или удалён) параллельно: как у get_actor
+            raise NotAuthenticated()
         raise Unprocessable(code=ErrorCode.invalid_current_password)
     await sessions.delete_all_for_user(db, actor.user_id, keep_id=actor.session_id)
 
