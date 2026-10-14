@@ -1222,3 +1222,299 @@ ruff (MIT), mypy (MIT). `psycopg` (LGPL) **не** добавляется. Все
 на зафиксированной БД после `run_bootstrap`. Обратный случай: AC-120 без пометки (API-автотест),
 но его часть «восстановление командой оператора» проверяется тестом команды в `tests/cli/`,
 как у *инфра*-AC-101.
+
+## 10. Детализация R1.1 «Проекты и задачи» (R1.1, архитектор, 2026-10-15)
+
+Раздел добавлен при детализации задач T29–T66 (`tasks.md`). Решения D-1…D-39 и разделы 1–9 не
+меняются: здесь уточнены интерфейсы R1.1 и приняты новые решения D-40…D-52. Входы: spec v0.15
+с правками рабочего дерева (FR-9 — 413; FR-14c — «владелец-БА в своём проекте, СМ в любом»),
+приёмка R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1.1!»), `decisions-for-customer.md`,
+`docs/open-questions.md` (вопросы 13, 14, 18). Пункты с пометкой «вопрос Q-n» — предложения
+архитектора, которые ждут подтверждения (§10.8): реализация идёт по предложению, другой ответ
+меняет только названное место.
+
+### 10.1. Решения R1.1
+
+| # | Решение | Выбрано | Отвергнутые альтернативы | Почему |
+|---|---|---|---|---|
+| D-40 | Ожидание блокировки БД и взаимоблокировка | Ошибка БД с SQLSTATE `55P03` (`lock_not_available`, превышен `lock_timeout=30s`, §4.12) или `40P01` (`deadlock_detected`) → **503** `{"detail": "Сервер занят, повторите запрос", "code": "service_busy"}` + `Retry-After: 5`; распознаётся в `core/errors.py` по `sqlstate`/`pgcode` у `sqlalchemy.exc.DBAPIError.orig` (и у `orig.__cause__`); лог — warning без текста SQL и параметров; транзакция откатывается `get_db`; в OpenAPI по маршрутам не объявляется (как 500), код добавляется в словарь фронтенда | 409 (FR-45 закрепляет 409 за `project_archived`); 500 `internal_error` (как сейчас: клиент не отличает «повторите» от сбоя); повтор транзакции на сервере (удваивает ожидание 30 с, скрывает зависание) | Состояние временное, клиент может повторить; FR-45 перечисляет коды клиентских ошибок, 5xx — решение плана. **Вопрос Q-1 (заказчику, Д-8)** |
+| D-41 | Каталог событий R1.1 и белые списки | `EventSpec` дополняется `fields: frozenset[str]` (допустимые `changed_fields`) и `value_fields: frozenset[str]` (допустимые `changes[].field`); `record_event` → `ValueError`, если поле вне списка, если `changes` передан событию с пустым `value_fields`, если у события с `feed="project"` нет `project_id`. Миграция 0004 добавляет `CHECK ck_domain_event_entity_type_valid` (7 значений `EntityType`). Чтение журнала: строка с `entity_type` вне `EntityType` пропускается с warning (без значений), страница не падает | только CHECK (не спасает откат кода к версии без нового типа); `entity_type: str` в схеме (меняет контракт) | BR-2: в `changed_fields` только имена из белого списка; ревью T18/T19 |
+| D-42 | Команда обслуживания | `domain/ops/maintenance.py::run_maintenance` — шаги: истёкшие сессии (R1.0), корзина (T54), файлы-сироты (T54); `--dry-run` считает, ничего не меняя; stdout — строки `ключ=число`; регулярный запуск — cron оператора на хосте (`docker compose exec -T api gostracker maintenance`, README) | сервис compose с циклом или запуск из lifespan api | FR-25b и Scope: «фонового планировщика в R1 нет» (OI-12) — сервис с циклом им и был бы |
+| D-43 | Каскад мягкого удаления | Все неудалённые зависимые строки получают те же `deleted_at` и `deleted_batch_id`: проект → его задачи и подзадачи → их комментарии и вложения; задача → подзадачи → комментарии и вложения задачи и подзадач | помечать только корень, зависимые скрывать join-ами | восстановление и автоочистка работают по одному batch (D-25); одинаковое `deleted_at` у пакета |
+| D-44 | Корзина проекта | `GET /trash?project_id=` — корзина пространства с фильтром по проекту | отдельный эндпоинт | FR-25a; вопрос 14 `open-questions.md` — **Q-3 (аналитику)** |
+| D-45 | Видимость проекта | Карточка проекта и состав участников видны тем, кто видит проект в списке (БА, СМ — все неудалённые проекты; П — где участник); содержимое (задачи, комментарии, вложения, лента) — только участникам, иначе 403 | карточка только участникам | СМ-неучастник архивирует, передаёт владение, правит название и состав (FR-14a/b/c, FR-15) — ему нужны данные проекта; FR-17 относит к содержимому только задачи, комментарии, вложения |
+| D-46 | Повтор того же действия | Повторное добавление участника, передача владения текущему владельцу, архивирование архивного (разархивирование активного), то же значение поля задачи и тот же набор меток — 200/204 без изменений и без события; права (403) и 404 проверяются как обычно | 409/422 | как `set_role` (T16): событие пишется только при изменении |
+| D-47 | Исключение участника (FR-15a) | Исполнитель снимается у всех задач проекта, где исключённый — исполнитель, включая подзадачи и мягко удалённые; событие `task.unassigned_member_removed` — на каждую неудалённую, затем `member.removed` | только неудалённые | иначе восстановление задачи вернёт исполнителя-неучастника (нарушение FR-20); **Q-7** |
+| D-48 | Разбор упоминаний | `MENTION_RE = (?<![A-Za-z0-9._@-])@([A-Za-z0-9][A-Za-z0-9._-]{2,63})` (ASCII); кандидат → `lower()`; если такого участника нет, с конца по одному отрезаются `.`, `_`, `-` (пока длина ≥ 3). Уведомление — участнику проекта на момент создания или правки, включая автора (буквально FR-71). Правка добавляет только новых (`UNIQUE(comment_id, user_id)`, `ON CONFLICT DO NOTHING`); упоминание, убранное правкой, не снимается (**Q-4**) | без отрезания хвостовой пунктуации (`@ivan.` не сработает); снятие при правке | FR-71, FR-73, D-39 |
+| D-49 | Файлы вложений и транзакция | Загрузка: поток → `attachments/tmp/<uuid>` → `detect` → `rename` в итоговый путь до COMMIT; хук `after_rollback` удаляет итоговый файл. Окончательное удаление (кнопка и обслуживание): ключи собираются до `DELETE`, файлы удаляются хуком `after_commit` (как файл пароля первого ТА, T14). Сироты и `tmp/` старше 1 ч — обслуживание | удаление файлов до COMMIT | при сбое COMMIT БД и файлы согласованы; остаток добирает обслуживание (§4.10 п.3) |
+| D-50 | Корзина и архивный проект | Восстановление и окончательное удаление **проекта** в архиве разрешены (как удаление проекта, FR-14b); восстановление и окончательное удаление **задач, комментариев, вложений** архивного проекта → 409 `project_archived` (FR-14b перечисляет удаление и восстановление задач, комментарии, вложения среди запрещённого). Восстановленный проект сохраняет статус | всё разрешено; всё запрещено | **Q-2 (аналитику)** |
+| D-51 | Срок задачи (AC-68) | `DueDate`: только строка `^\d{4}-\d{2}-\d{2}$`, затем `date.fromisoformat`; иное (дата-время, число, `2026-02-30`) → 422 `validation_error` | `datetime.date` Pydantic (в lax-режиме принимает `2026-10-20T00:00:00` и числа) | FR-18, ADR-0007 |
+| D-52 | Пустое название | Название проекта, задачи, метки из одних пробельных символов → 422; значение хранится как введено (без обрезки); длина — в символах (`len` = `char_length`) | обрезка по краям при сохранении | FR-14, FR-18, FR-18b: «пустое название — 422» |
+
+### 10.2. Протокол блокировок R1.1
+
+Порядок всегда один и тот же — без обратных зависимостей и, значит, без взаимоблокировок;
+превышение `lock_timeout` — 503 (D-40):
+
+1. **Изменение проекта** (правка полей, архив, владелец, участники, удаление, восстановление,
+   окончательное удаление проекта): строка `project` — `FOR NO KEY UPDATE` сразу после гейтов.
+2. **Изменение содержимого** (задачи, подзадачи, комментарии, вложения, метки задачи,
+   восстановление и окончательное удаление объектов внутри проекта): строка `project` —
+   `FOR SHARE` (сериализует с п.1: архивирование и исключение участника не проходят между
+   проверкой и записью).
+3. **Получатель** (участник, исполнитель, владелец): строки `app_user` и `workspace_member`
+   получателя — `FOR SHARE` (сериализует с блокировкой и сменой роли, которые берут
+   `FOR NO KEY UPDATE`, §4.6).
+4. **Колонки доски**: `positions.lock_columns` — `pg_advisory_xact_lock(hashtext(project_id || ':' || status))`,
+   одноключевая форма (не пересекается с двухключевой `_ACCOUNT_LOCK_NAMESPACE`), статусы в
+   отсортированном порядке.
+5. Строки задач, комментариев, вложений, упоминаний.
+
+### 10.3. API R1.1 (`/api/v1`)
+
+Общие схемы: `UserRef {id, login}`; `ProjectRef {id, name}`; `Label {id, name}`;
+`TaskStatus = "todo" | "in_progress" | "review" | "done"`; `TaskPriority = "base" | "high"`;
+списки — `Page[T]` (D-34), `page_size` по умолчанию 50. Гейт раздела (п.4 §4.5) — router-level
+`require_capability(BUSINESS_ACCESS)`, если не указано иное. Колонка «Ошибки» — помимо 401 и
+403 гейтов; порядок — §4.5.
+
+| Метод и путь | Доступ (объектный) | Тело / параметры → ответ | Ошибки |
+|---|---|---|---|
+| `GET /users` | — | `?q&page&page_size` → `Page[DirectoryUser {id, login, role}]`: незаблокированные с ролью БА/СМ/П, `ORDER BY login, id`; `q` — подстрока логина | 422 |
+| `GET /projects` | БА/СМ — все, П — где участник | `?status=active\|archived\|all` (по умолчанию `active`) → `Page[ProjectListItem {id, name, status, owner: UserRef, task_count}]`, `ORDER BY lower(name), id`; `task_count` — неудалённые задачи верхнего уровня | 422 |
+| `POST /projects` | `PROJECT_CREATE` | `{name, description?}` → 201 `ProjectDetail`; создатель — владелец и участник | 422 |
+| `GET /projects/{id}` | `can_view_project` (D-45) | → `ProjectDetail {id, name, description, status, owner: UserRef, task_count, is_member, created_at, updated_at, permissions {manage, manage_members, create_task, remove_self}}` (R1.3 добавит `deal_link`, §4.15) | 403, 404 |
+| `PATCH /projects/{id}` | `can_manage_project` (FR-14c) | `{name?, description?}` → `ProjectDetail`; событие `project.updated` | 403, 404, 409, 422 |
+| `POST /projects/{id}/archive` · `/unarchive` | `can_manage_project` | → `ProjectDetail`; события `project.archived`/`unarchived` | 403, 404 |
+| `PUT /projects/{id}/owner` | `can_manage_project` | `{user_id}` → `ProjectDetail`; получатель — `PROJECT_OWNER`; разрешено в архиве | 403, 404, 422 |
+| `DELETE /projects/{id}` | `can_manage_project` (FR-16) | 204; мягко, каскад D-43; разрешено в архиве | 403, 404 |
+| `GET /projects/{id}/members` | `can_view_project` | `?page` → `Page[ProjectMember {user: UserRef, role, is_blocked, is_owner}]`, `ORDER BY login, id` | 403, 404 |
+| `POST /projects/{id}/members` | `can_manage_members`; БА не добавляет себя (403) | `{user_id}` → 204; получатель — `PROJECT_MEMBER` | 403, 404, 409, 422 |
+| `DELETE /projects/{id}/members/{user_id}` | `can_manage_members` или `can_remove_self` | 204; владелец → 422 `owner_cannot_be_removed`; не участник → 404; D-47 | 403, 404, 409, 422 |
+| `GET /projects/{id}/tasks` | участник | `?page` → `Page[TaskListItem]`, подзадачи включены, `ORDER BY created_at DESC, id DESC` (фильтры — R1.2) | 403, 404, 422 |
+| `POST /projects/{id}/tasks` | `can_create_task` | `TaskCreate` → 201 `TaskDetail`; позиция — конец колонки `todo` | 403, 404, 409, 422 |
+| `GET /projects/{id}/activity` | участник | `?page` → `Page[ActivityItem]`, `ORDER BY id DESC` | 403, 404, 422 |
+| `GET /me/tasks` | — | `?project_status=active\|archived\|all` (по умолчанию `active`), `?page` → `Page[TaskListItem]`: исполнитель = актор, включая подзадачи, только проекты, где актор участник; `ORDER BY due_date ASC NULLS LAST, id` | 422 |
+| `GET /tasks/{id}` | участник | → `TaskDetail` | 403, 404 |
+| `PATCH /tasks/{id}` | по полям: `status` — `can_change_task_status`; `assignee_id` — `can_change_assignee`; прочие — `can_edit_task_fully`; проверяются только меняющиеся поля (D-46) | `TaskUpdate` → `TaskDetail`; смена статуса задачи верхнего уровня → конец целевой колонки (FR-28a) | 403, 404, 409, 422 |
+| `DELETE /tasks/{id}` | `can_delete_task` | 204; каскад D-43; событие `task.deleted` | 403, 404, 409 |
+| `POST /tasks/{id}/subtasks` | `can_create_subtask` | `TaskCreate` → 201 `TaskDetail`; родитель — подзадача → 422 `subtask_depth_exceeded` | 403, 404, 409, 422 |
+| `GET /labels` | — | `?q&page` → `Page[Label]`, `ORDER BY lower(name), id` | 422 |
+| `POST /labels` · `PATCH /labels/{id}` · `DELETE /labels/{id}` | `LABELS_MANAGE` (гейт маршрута) | `{name}` → 201/200 `Label`; удаление — 204, жёсткое, снимает метку с задач (FR-18b) | 404, 422 `label_name_taken` |
+| `GET /tasks/{id}/comments` | участник | `?page` → `Page[Comment]`, `ORDER BY created_at, id`; удалённые — заглушка | 403, 404, 422 |
+| `POST /tasks/{id}/comments` | участник | `{body}` → 201 `Comment`; упоминания D-48 | 403, 404, 409, 422 |
+| `PATCH /comments/{id}` | автор (`can_edit_comment`) и участник | `{body}` → `Comment`; `edited_at = now` | 403, 404, 409, 422 |
+| `DELETE /comments/{id}` | `can_delete_comment` | 204; мягко; событие `comment.deleted` | 403, 404, 409 |
+| `GET /mentions` | — | `?unread_only=false&page` → `Page[MentionItem]`, `ORDER BY created_at DESC, id DESC` | 422 |
+| `GET /mentions/unread-count` | — | → `{count}` | — |
+| `POST /mentions/{id}/read` | получатель упоминания | 204; повтор — 204 | 404 |
+| `POST /tasks/{id}/attachments` | участник | multipart `file` → 201 `Attachment` (§4.11) | 403, 404, 409, 413, 422 |
+| `GET /attachments/{id}/content` | участник (в архиве — тоже) | файл (§4.11) | 403, 404 |
+| `DELETE /attachments/{id}` | `can_delete_attachment` | 204; мягко; событие `attachment.deleted` | 403, 404, 409 |
+| `GET /trash` | только `get_active_actor` (без гейта раздела: ТА получает пустую страницу, §4.5) | `?project_id&type&page` → `Page[TrashItem]`, `ORDER BY deleted_at DESC, id` | 422 |
+| `POST /trash/{type}/{id}/restore` | право удаления объекта (§10.6) | 204 | 403, 404, 409, 422 `project_deleted` / `parent_task_deleted` |
+| `DELETE /trash/{type}/{id}` | то же (FR-25b, OI-107) | 204; окончательно, файлы — D-49 | 403, 404, 409 |
+| `GET /search` | — | `?q` → `{tasks: [SearchTask ≤ 20], projects: [SearchProject ≤ 20]}` (§4.9) | 422 `search_query_too_short` |
+
+Схемы ответов:
+- `TaskCreate {title, description?, assignee_id?: UUID | null, due_date?: DueDate | null, priority?: TaskPriority, label_ids?: list[UUID]}` —
+  «поле не передано» и «передан null» различаются по `model_fields_set` (FR-20, §4.5);
+  `TaskUpdate` — те же поля и `status`, все необязательны.
+- `TaskDetail {id, project: {id, name, status}, parent_id, title, description, status, priority, due_date, assignee: UserRef | null, author: UserRef, position: int | null, labels: list[Label], subtasks: list[TaskBrief], progress: int | null, attachments: list[Attachment], created_at, updated_at, permissions {edit, change_status, change_assignee, delete, create_subtask}}`;
+  `TaskBrief {id, title, status, priority, due_date, assignee}`; вложенные коллекции карточки
+  (подзадачи, ≤ 10 меток, ≤ 20 вложений) не пагинируются — часть карточки (§5.1).
+- `TaskListItem {id, project: ProjectRef, parent_id, title, status, priority, due_date, assignee: UserRef | null, created_at}`.
+- `Comment {id, task_id, author: UserRef, body: str | null, is_deleted, created_at, edited_at, permissions {edit, delete}}` — у удалённого `body = null`.
+- `MentionItem {id, is_read, created_at, comment_id, task: {id, title}, project: ProjectRef, author: UserRef}` — видимо, пока комментарий, задача и проект не удалены и получатель — участник проекта (§4.3).
+- `Attachment {id, original_name, content_type, size_bytes, created_at, uploaded_by: UserRef, permissions {delete}}`.
+- `ActivityItem {id, occurred_at, actor {kind, id, login}, action, entity {type, id, deleted, title}, changed_fields, changes: list[{field, old, new}] | null}` — `entity.title`: проект — `name`, задача — `title`, вложение — `original_name`, пользователь (`member.*`) — `login`, комментарий — `null`; `deleted = true`, если строки объекта нет (окончательно удалён), тогда `title = null` и `changes = null` (FR-25b). Значения `assignee_id`/`owner_id` в `changes` — `{id, login}` на момент изменения (как стадия и ответственный сделки, §4.4); `title`/`description` в `changes` не попадают (**Q-5**).
+- `TrashItem {type, id, title: str | null, project: ProjectRef, task: {id, title} | null, deleted_at, purge_after, container_deleted}` — `type ∈ project, task, comment, attachment` (R1.3 добавит CRM); `title` у комментария — `null`; `purge_after = deleted_at + trash_retention`; `container_deleted` — удалён проект или родительская задача (восстановление даст 422).
+- `SearchTask {id, title, status, project: ProjectRef}`, `SearchProject {id, name, status}`.
+
+### 10.4. Сервисы и запросы (domain)
+
+Все функции получают `db: AsyncSession` и `actor: Actor`, фильтруют по `actor.workspace_id`,
+не вызывают `commit()`, пишут события через `record_event` в той же транзакции.
+
+```python
+# domain/access/policy.py — функции §4.5 плюс:
+def can_view_project(a: Actor, p: ProjectFacts) -> bool          # D-45: BA/MIXED — да; USER — участник
+# domain/access/recipients.py — §4.5
+@dataclass(frozen=True)
+class RecipientFacts:
+    user_id: UUID; in_workspace: bool; is_blocked: bool; role: Role | None
+
+# domain/users/directory.py
+async def list_directory(db, actor, params: PageParams, *, q: str | None) -> tuple[list[DirectoryUser], bool]
+async def load_recipient(db, workspace_id: UUID, user_id: UUID, *, lock: bool) -> RecipientFacts   # lock → FOR SHARE (§10.2 п.3)
+async def user_refs(db, workspace_id: UUID, ids: Iterable[UUID]) -> dict[UUID, UserRef]           # один запрос
+
+# domain/projects/queries.py
+async def load_project_facts(db, actor, project_id: UUID, *, lock: Literal["update", "share"] | None = None,
+                             include_deleted: bool = False) -> ProjectFacts                        # 404
+async def list_projects(db, actor, params, *, status: ProjectStatusFilter) -> tuple[list[ProjectListRow], bool]
+async def get_project(db, actor, project_id: UUID) -> ProjectView                                  # 403/404
+# domain/projects/service.py
+async def create_project(db, actor, *, name: str, description: str) -> ProjectView
+async def update_project(db, actor, project_id, *, changes: ProjectPatch) -> ProjectView
+async def set_archived(db, actor, project_id, *, archived: bool) -> ProjectView
+async def transfer_ownership(db, actor, project_id, *, new_owner_id: UUID) -> ProjectView
+async def delete_project(db, actor, project_id) -> None                                            # D-43
+# domain/projects/members.py
+async def list_members(db, actor, project_id, params) -> tuple[list[ProjectMemberRow], bool]
+async def add_member(db, actor, project_id, user_id) -> None
+async def remove_member(db, actor, project_id, user_id) -> None                                    # D-47
+
+# domain/tasks/positions.py — §4.8 (R1.1: lock_columns, append_position, renumber_column, place_after)
+async def place_after(db, project_id: UUID, status: TaskStatus, occupied_position: int) -> int     # AC-118
+# domain/tasks/progress.py
+def progress(done: int, total: int) -> int | None                                                  # FR-22: None при total == 0, иначе done*100 // total
+# domain/tasks/context.py
+@dataclass(frozen=True)
+class TaskContext:
+    project: ProjectFacts; task: TaskFacts; task_id: UUID; status: TaskStatus; position: int | None
+async def load_task_context(db, actor, task_id, *, lock_project: Literal["share"] | None = None,
+                            include_deleted: bool = False) -> TaskContext                          # 404
+# domain/tasks/service.py
+async def create_task(db, actor, project_id, data: TaskCreateData) -> UUID
+async def create_subtask(db, actor, parent_id, data: TaskCreateData) -> UUID
+async def update_task(db, actor, task_id, patch: TaskPatch) -> None
+async def delete_task(db, actor, task_id) -> None                                                  # D-43
+# domain/tasks/queries.py
+async def get_task(db, actor, task_id) -> TaskView                                                 # подзадачи, прогресс, метки, вложения
+async def list_project_tasks(db, actor, project_id, params) -> tuple[list[TaskListRow], bool]
+async def list_my_tasks(db, actor, params, *, project_status: ProjectStatusFilter) -> tuple[list[TaskListRow], bool]
+
+# domain/labels/service.py
+async def list_labels(...); async def create_label(...); async def rename_label(...); async def delete_label(...)
+async def resolve_labels(db, workspace_id, label_ids: Sequence[UUID]) -> list[UUID]   # 422 label_not_found / too_many_labels (> 10)
+
+# domain/comments/sanitize.py
+def strip_html(text: str) -> str                                                                    # D-28
+# domain/comments/mentions.py
+def extract_mention_candidates(text: str) -> list[tuple[str, ...]]  # D-48: на каждое упоминание — токен в нижнем регистре и его укорочения
+                                                                    # (без хвостовых . _ -), порядок появления, повторы токенов убраны
+async def sync_mentions(db, *, workspace_id, project_id, comment_id, body: str) -> int             # вставляет новые, возвращает число
+async def list_mentions(...); async def unread_count(db, actor) -> int; async def mark_read(db, actor, mention_id) -> None
+# domain/comments/service.py
+async def list_comments(...); async def create_comment(...); async def edit_comment(...); async def delete_comment(...)
+
+# domain/attachments/storage.py
+class AttachmentStorage:
+    def __init__(self, root: Path) -> None: ...                         # settings.attachments_dir, каталоги 0700
+    async def receive(self, upload: UploadFile, *, max_bytes: int) -> ReceivedFile   # tmp, sha256, size; > max → PayloadTooLarge
+    def final_path(self, workspace_id: UUID, storage_key: UUID) -> Path
+    def promote(self, received: ReceivedFile, workspace_id: UUID, storage_key: UUID) -> Path
+    def remove(self, refs: Iterable[tuple[UUID, UUID]]) -> None            # (workspace_id, storage_key), отсутствие файла — не ошибка
+    def orphans(self, known: Callable[[UUID], bool], *, older_than: datetime) -> list[Path]
+# domain/attachments/service.py
+async def upload(db, actor, storage, settings, task_id, upload: UploadFile) -> AttachmentView
+async def open_content(db, actor, storage, attachment_id) -> AttachmentFile                       # путь, mime, имя
+async def delete_attachment(db, actor, attachment_id) -> None
+
+# domain/trash/purge.py — общий для кнопки и обслуживания (§4.10)
+async def purge(db, *, workspace_id, project_ids=(), task_ids=(), comment_ids=(), attachment_ids=()) -> list[tuple[UUID, UUID]]
+# domain/trash/service.py
+class TrashType(StrEnum): PROJECT = "project"; TASK = "task"; COMMENT = "comment"; ATTACHMENT = "attachment"
+async def list_trash(db, actor, params, *, project_id: UUID | None, type: TrashType | None) -> tuple[list[TrashRow], bool]
+async def restore(db, actor, type: TrashType, object_id: UUID) -> None
+async def purge_one(db, actor, storage, type: TrashType, object_id: UUID) -> None                  # файлы — after_commit
+# domain/ops/maintenance.py
+@dataclass(frozen=True)
+class MaintenanceReport:
+    dry_run: bool; sessions_expired: int; projects_purged: int; tasks_purged: int
+    comments_purged: int; attachments_purged: int; files_removed: int; orphan_files_removed: int
+async def run_maintenance(sessionmaker, settings, *, clock: Clock, dry_run: bool) -> MaintenanceReport
+# domain/activity/service.py
+async def project_feed(db, actor, project_id, params) -> tuple[list[ActivityRow], bool]
+# domain/search/service.py
+async def search(db, actor, q: str) -> SearchResult
+```
+
+### 10.5. Каталог событий R1.1 (D-41, §4.4)
+
+| Действие | `entity_type` | Лента | Аудит | `fields` (`changed_fields`) | `value_fields` (`changes`) |
+|---|---|---|---|---|---|
+| `project.updated` | project | проект | — | `name`, `description` | — |
+| `project.ownership_transferred` | project | проект | да | `owner_id` | `owner_id` |
+| `project.archived`, `project.unarchived` | project | проект | да | `status` | — |
+| `member.added`, `member.removed` | user | проект | — | — | — |
+| `task.created`, `task.deleted`, `task.restored` | task | проект | — | — | — |
+| `task.updated` | task | проект | — | `status`, `assignee_id`, `due_date`, `title`, `description` | `status`, `assignee_id`, `due_date` |
+| `task.unassigned_member_removed` | task | проект | — | `assignee_id` | `assignee_id` |
+| `comment.created`, `comment.deleted` | comment | проект | — | — | — |
+| `attachment.created`, `attachment.deleted` | attachment | проект | — | — | — |
+
+`user.*` — как в R1.0 (`fields`, `value_fields` пусты). `task.updated` пишется одной строкой на
+запрос и только если изменилось хотя бы одно поле из `fields` (приоритет и метки события не дают,
+§4.4). Восстановление комментария и вложения, удаление и восстановление проекта событий не
+пишут (их нет в §4.4 и FR-38/FR-41).
+
+### 10.6. Корзина R1.1 (уточнение §4.10)
+
+| Тип | Право удалить = восстановить = окончательно удалить | 422 при восстановлении | 409 (архив, D-50) |
+|---|---|---|---|
+| project | `can_manage_project` (БА-владелец или СМ) | — | нет |
+| task (и подзадача) | `can_delete_task` | проект удалён → `project_deleted`; родитель удалён → `parent_task_deleted` | да |
+| comment | `can_delete_comment` (и участник) | задача удалена → `parent_task_deleted`; проект удалён → `project_deleted` | да |
+| attachment | `can_delete_attachment` (и участник) | то же | да |
+
+- Права оцениваются по текущим роли и членству (FR-67, FR-68) на фактах удалённого объекта;
+  `actor_has_task` считает только неудалённые задачи (FR-19).
+- Восстановление: строки с тем же `deleted_batch_id` (D-25); задача верхнего уровня —
+  `place_after`, если позиция в колонке занята неудалённой задачей (AC-118); восстановление
+  пишет `task.restored` только для задачи-корня пакета.
+- `GET /trash` строится одним `UNION ALL` по типам с SQL-предикатами прав, эквивалентными
+  функциям `policy` (тест: множество строк корзины = множество объектов, для которых
+  `restore` разрешён, по всем ролям). Объект виден, пока строка существует (и после 30 дней —
+  до запуска обслуживания).
+- Окончательное удаление: `purge` удаляет строки (каскады FK, D-26), возвращает ключи файлов
+  до `DELETE`; `domain_event` не трогается (AC-66). Снятие связи со сделкой при удалении
+  проекта — R1.3 (§4.10 п.1, AC-91).
+
+### 10.7. Трассировка AC R1.1 → задача
+
+Пути тестов — относительно `backend/tests/`. Части AC, относящиеся к другим этапам, указаны.
+
+| AC | Задачи | Тест |
+|---|---|---|
+| AC-6 | T41, T43, T45 | `api/test_personal_tasks.py::test_ac6_*` |
+| AC-7, AC-8 | T39, T41, T43, T44 | `api/test_subtasks.py` |
+| AC-9, AC-11 | T34, T41, T44 | `api/test_task_permissions.py` |
+| AC-16, AC-59, AC-100, AC-117 | T49, T50, T51 | `api/test_attachments.py`, `unit/test_filetype.py`, `infra/test_stack_attachments.py` (413 через nginx) |
+| AC-18 (задача, проект; доска — R1.2) | T36, T42, T52, T53, T56 | `api/test_soft_delete.py` |
+| AC-21 | T35, T38, T44, T45, T48, T51, T53, T55, T56 | `api/test_workspace_isolation.py` |
+| AC-24, AC-49, AC-56, AC-68 (формат), AC-81, AC-106, AC-108 (задача) | T41, T42, T44 | `api/test_tasks.py` |
+| AC-42, AC-43 (задачи; «находится фильтром по исполнителю» — R1.2, `test_task_filters.py`) | T42, T44 | `api/test_reassign_blocked.py` |
+| AC-46, AC-47, AC-48, AC-103 (задачи), AC-109 | T34, T41, T42, T44 | `api/test_task_permissions.py` |
+| AC-50, AC-53, AC-54, AC-73 | T37, T38 | `api/test_project_members.py` |
+| AC-51, AC-52, AC-55, AC-72, AC-108 (проект), AC-110 | T36, T38 | `api/test_projects.py` |
+| AC-57, AC-69 | T40, T42 | `api/test_labels.py` |
+| AC-58, AC-102, AC-103 (комментарии), AC-116 (упоминание) | T46, T47, T48 | `api/test_comments.py`, `api/test_mentions.py`, `unit/test_sanitize.py`, `unit/test_mention_parse.py` |
+| AC-62, AC-99, AC-112, AC-118 | T52, T53 | `api/test_trash.py` |
+| AC-63, AC-66 (обслуживание) *инфра* | T31, T54 | `cli/test_maintenance.py` |
+| AC-65 (владение, архив) | T30, T36, T38 | `api/test_audit.py::test_ac65_*` |
+| AC-66 (окончательное удаление кнопкой) | T53 | `api/test_trash.py::test_ac66_*` |
+| AC-70 (кроме доски), AC-71 (кроме сделки) | T36, T38, T42, T44, T45, T48, T51 | `api/test_project_archive.py` |
+| AC-74 (проект, задача) | T34, T35, T37, T38, T41, T44 | `api/test_recipients.py` |
+| AC-75 (проекты, свои задачи) | T38, T45 | `api/test_route_guards.py` |
+| AC-80 (списки, счётчик; доска — R1.2) | T43, T45 | `api/test_personal_tasks.py::test_ac80_*` |
+| AC-90 (проект) | T55 | `api/test_activity.py` |
+| AC-92 (задачи, проекты) | T56 | `api/test_search.py` |
+| AC-94 (ТА → проект 403; задачи 404) | T38, T44 | `api/test_not_found_vs_forbidden.py`, `api/test_workspace_isolation.py` |
+| AC-2, AC-64 (сквозные), AC-98 (автопроверка) | T32 | `api/test_e2e_accounts.py`, `frontend/tests/shared/i18n.test.ts` |
+| AC-107 *e2e* (экраны R1.1) | T60–T65 (опрос), проверка — R1.4 | `frontend/e2e/polling.spec.ts` (R1.4) |
+
+### 10.8. Вопросы, найденные при детализации R1.1
+
+| # | Кому | Суть | Предложение (действует до ответа) | Что меняется при другом ответе |
+|---|---|---|---|---|
+| Q-1 | заказчик (Д-8) | Код ответа при занятой блокировке БД (сейчас 500 через 30 с) | D-40: 503 `service_busy` + `Retry-After` | только `core/errors.py` и словарь фронтенда |
+| Q-2 | аналитик | FR-14b не говорит, можно ли в архивном проекте восстанавливать и окончательно удалять проект и его объекты из корзины | D-50 | `trash/service.py` (одна проверка) |
+| Q-3 | аналитик + архитектор | «Корзина проекта» FR-25a (вопрос 14 `open-questions.md`) | D-44: фильтр `project_id` у корзины пространства | `GET /trash` |
+| Q-4 | аналитик | Снимается ли уведомление, если правка убрала `@логин` (FR-71 говорит только об удалении комментария) | не снимается (D-48) | `comments/mentions.py::sync_mentions` |
+| Q-5 | аналитик | AC-90 «событие без старого и нового значения»: допустимо ли показывать в ленте текущее название объекта | да: `entity.title` = текущее название, `changes` никогда не содержит `title`/`description` | `activity/service.py` (убрать `title`) |
+| Q-6 | заказчик (вопрос 13 `open-questions.md`) | БА-участник получает права «своего проекта», создав себе задачу | реализуется по spec (FR-19, З-8) | `policy.is_own_project` |
+| Q-7 | аналитик | FR-15a: снимать ли исполнителя у мягко удалённых задач исключённого | D-47: да, без события | `projects/members.py` |
+| Q-8 | заказчик (вопрос 18 `open-questions.md`) | Сокращение объёма R1 (упоминания, корзина, архив, рекурсивная проверка архивов) | объём по spec v0.15 | сужаются T46–T48 (часть «упоминания»), T49 (уровни архивов), T52–T54 (корзина), T59 (архив) |
+| Q-9 | заказчик (Д-7) | Битый JSON без сессии → 422 раньше 401 | наследуется всеми новыми эндпоинтами с телом | `test_route_guards.py`, своё `APIRoute` |
