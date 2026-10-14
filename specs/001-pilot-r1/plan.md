@@ -643,7 +643,14 @@ async def revoke_sessions(db, actor, sessions, user_id) -> int    # event user.s
 async def set_role(db, actor, user_id, role: Role | None) -> UserRow
     # та же роль → без изменений и без события; иначе role_assigned/changed/removed; инвариант FR-69
 async def ensure_account_admin_remains(db, workspace_id) -> None
-    # SELECT … FROM workspace_member JOIN app_user WHERE role IN ('tech_admin','mixed') AND NOT is_blocked FOR UPDATE;
+    # SELECT … FROM workspace_member JOIN app_user WHERE role IN ('tech_admin','mixed') AND NOT is_blocked ORDER BY user_id FOR NO KEY UPDATE;  -- не FOR UPDATE (ревью T16): FOR UPDATE конфликтует с FOR KEY SHARE от FK на app_user → deadlock в парах block/revoke, unblock/set_role
+    # ПРОТОКОЛ БЛОКИРОВОК (ревью T16, попытка 3): все действия над учётными записями (create_user, block, unblock, reset_password,
+    # revoke_sessions, set_role) начинают с `_lock_for_account_change`: (1) `pg_advisory_xact_lock(0x75736572, hashtext(workspace_id))` —
+    # сериализация админ-действий пространства; (2) одним запросом «активные админы ∪ цель» ORDER BY user_id FOR NO KEY UPDATE;
+    # (3) только затем изменения, удаление сессий и record_event. Argon2 считается ДО блокировки. FOR UPDATE запрещён: конфликтует с
+    # FOR KEY SHARE от FK на app_user. Любой будущий код, меняющий роль, is_blocked или сессии других пользователей, берёт advisory
+    # до строк. Корректность «свежего» чтения держится на READ COMMITTED. Известное ограничение: lock_timeout не задан — зависшая
+    # транзакция админа блокирует остальные админ-действия пространства (T16a/T26: lock_timeout, idle_in_transaction_session_timeout).
     # 0 → 422 last_account_admin (вызывается после изменения в той же транзакции)
 ```
 

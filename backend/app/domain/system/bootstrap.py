@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
@@ -27,6 +26,7 @@ from app.core.clock import Clock, use_clock
 from app.core.config import Settings
 from app.core.secrets import ensure_private_dir, write_private_file
 from app.core.security.passwords import PasswordHasher, generate_password, hash_in_thread
+from app.domain.auth.provider import normalize_login
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import Workspace, WorkspaceMember
 
@@ -37,8 +37,6 @@ INITIAL_ADMIN_FILE: Final = "initial-admin-password.txt"
 
 # bigint-константа блокировки первого запуска (ASCII «GOST» + номер)
 _BOOTSTRAP_LOCK_KEY: Final = 0x474F535400000001
-# FR-73 / D-39: тот же шаблон, что в CHECK таблицы app_user
-_LOGIN_RE: Final = re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 
 
 @dataclass(frozen=True)
@@ -48,9 +46,9 @@ class BootstrapResult:
 
 
 def _initial_login(settings: Settings) -> str:
-    """Логин первого ТА: приводится к нижнему регистру и проверяется по FR-73."""
-    login = settings.initial_admin_login.strip().lower()
-    if _LOGIN_RE.fullmatch(login) is None:
+    """Логин первого ТА: тот же разбор, что при входе и создании (FR-73, ``normalize_login``)."""
+    login = normalize_login(settings.initial_admin_login)
+    if login is None:
         # значение не включаем: сообщение должно быть безопасным для логов
         raise ValueError("INITIAL_ADMIN_LOGIN не соответствует шаблону логина (FR-73)")
     return login

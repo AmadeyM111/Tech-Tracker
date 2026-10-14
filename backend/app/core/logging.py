@@ -327,7 +327,12 @@ def _exc_info_of(
 
 
 def _is_uvicorn_duplicate(record: logging.LogRecord) -> bool:
-    """Дубль трассировки необработанной ошибки: её уже записал ``app.errors``."""
+    """Дубль трассировки необработанной ошибки: её уже записал ``app.errors``.
+
+    Внимание: ``SecretsFilter`` висит на обработчике и возвращает ``False`` ДО очистки записи,
+    поэтому подавление действует только для этого обработчика; другие обработчики записи
+    (если они появятся) получат дубль в сыром виде — их нужно защищать отдельно.
+    """
     name = record.name
     if name != "uvicorn.error" and not name.startswith("uvicorn.error."):
         return False

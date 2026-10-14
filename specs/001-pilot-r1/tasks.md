@@ -321,7 +321,7 @@
 - **Попытки:** 2
 
 ## T16 — Сервис учётных записей и ролей
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-78, AC-121 (уровень сервиса: создание без роли — одно событие, назначение роли — второе), AC-113 и AC-116 (уровень сервиса), FR-4, FR-5 (блокировка завершает сессии), FR-5a, FR-12, FR-55, FR-62, FR-65, FR-66, FR-69, FR-73; события `user.*` (основа AC-64)
 - **Файлы:** `backend/app/domain/users/service.py`; тесты: `backend/tests/domain/test_user_admin_service.py`
 - **Зависит от:** T07, T12, T15
@@ -336,6 +336,32 @@
 - **Заметка ревью T11:** единый шаблон логина (сейчас `provider.LOGIN_RE` и `bootstrap._LOGIN_RE`), правило «только ASCII перед lower()» одинаково при создании и при входе.
 - **Заметка ревью T14:** добавить тесты на ветки «блокировка входа уже стоит → 422 без засчитывания» и «сброс серии при верном `current` и отказе по политике»; обновить docstring `commit_durably` («только на ветках отказа» устарел: вызывается и до verify) и комментарий в `core/logging.py` про дубль `uvicorn.error`.
 - **Заметка ревью T15:** `paginate(db, stmt: Select[R], params)` — всегда `order_by(..., Entity.id)` (тай-брейкер); типизированный вызов обязан проходить mypy strict; без ORDER BY — `ValueError`; добавить тест на этот `ValueError`; рассмотреть верхнюю границу `sqlalchemy<2.2` в `pyproject.toml`.
+- **Уточнения (оркестратор, по отчёту test-writer):** (1) повторная блокировка и разблокировка активного — без ошибки и без события;
+  (2) разблокировка сбрасывает `failed_login_count` и `login_locked_until` (FR-5a: «вход проходит»), блокировка их не трогает;
+  (3) `create_user`/`set_role` возвращают frozen dataclass `UserAccount(id, login, role, is_blocked, must_change_password, created_at)`
+  (типа `UserRow` в приложении нет); (4) проверка прав — ДО загрузки цели (БА к чужому пользователю → 403, чужое пространство
+  для ТА/СМ → 404); (5) `ensure_account_admin_remains`: блокировка строк админов `FOR NO KEY UPDATE ORDER BY user_id` + `pg_advisory_xact_lock` по пространству ДО изменения (plan §4.6)
+  (иначе deadlock при взаимной смене ролей); (6) единый шаблон логина: `provider.LOGIN_RE`/`normalize_login` — единственное место,
+  `bootstrap` использует их же (знак Кельвина отклоняется и у первого ТА); (7) в исходнике сервиса нет подстрок `projects`/`tasks` (BR-2).
+- **Попытки:** 3
+
+## T16a — get_actor: не держать блокировку строки сессии до конца запроса (дефект на стыке T12/T16)
+- **Статус:** IN_PROGRESS
+- **AC:** FR-5, FR-62, FR-67 (корректность без deadlock при действиях над сессией работающего пользователя), AC-79 (фон), AC-32/AC-33 (границы), D-14
+- **Файлы:** `backend/app/api/deps.py` (`get_actor`), `backend/app/domain/auth/sessions.py` (при необходимости),
+  `backend/app/core/db.py`; тесты: `backend/tests/api/test_session_row_lock.py`, правки `backend/tests/api/test_deps_gates.py` и AST-теста
+  `commit_durably` (T11) только через test-writer
+- **Зависит от:** T12, T16
+- **Описание:** Найдено исполнителем T16 (попытка 3), воспроизведено 3 из 3: `get_actor` → `SessionStore.resolve` делает
+  `UPDATE user_session SET last_activity_at` в транзакции запроса и держит эту строку до его конца. Администратор C блокирует /
+  сбрасывает пароль / завершает сессии администратора A, пока у A идёт своё действие: A держит свою строку сессии и ждёт
+  advisory-блокировку, C держит её и ждёт сессию A → deadlock, 500. Тот же механизм возможен для `change_own_password` цели Y при
+  параллельном block/reset/revoke над Y. Решение (проверить альтернативы): зафиксировать обновление активности сразу после `resolve`
+  (`commit_durably` в `get_actor`; побочно закрывает заметку T12 «4xx откатывает `last_activity_at`» и «истёкшая сессия остаётся
+  после отката при 401»), либо брать строку сессии без удержания до конца запроса. Расширить разрешённый список для `commit_durably`
+  (AST-тест T11/T05) осознанно: `deps.py`.
+- **Готово, когда:** новые API-тесты (параллельные админ-действия над работающим админом через HTTP, 100+ итераций) зелёные без 500;
+  тесты T12/T13/T14 не ослаблены (границы AC-32/AC-33/AC-79 прежние); `pytest -q backend/tests`, `bash scripts/check.sh` зелёные.
 - **Попытки:** 0
 
 ## T17 — API системных настроек: учётные записи и роли
@@ -344,13 +370,14 @@
 - **Файлы:** `backend/app/api/v1/admin_users.py`, `backend/app/api/v1/schemas/admin.py`;
   тесты: `backend/tests/api/test_admin_users.py`, `backend/tests/api/test_admin_roles.py`,
   `backend/tests/api/test_workspace_isolation.py`
-- **Зависит от:** T14, T16
+- **Зависит от:** T16a (+ T16, T15, T12)
 - **Описание:** Эндпоинты `/api/v1/admin/users*` по таблице plan §4.6 (гейт раздела —
   router-level `require_capability(MANAGE_ACCOUNTS)`, `PUT …/role` — `ASSIGN_ROLES`).
   Одноразовый пароль приходит в запросе (`SecretStr`), в ответах паролей нет (D-15).
 - **Готово, когда:** `pytest -q backend/tests/api/test_admin_users.py backend/tests/api/test_admin_roles.py backend/tests/api/test_workspace_isolation.py`
   зелёный, линтер чистый.
 - **Заметка ревью T15:** `paginate(db, stmt: Select[R], params)` — всегда `order_by(..., Entity.id)` (тай-брейкер); типизированный вызов обязан проходить mypy strict; без ORDER BY — `ValueError`; добавить тест на этот `ValueError`; рассмотреть верхнюю границу `sqlalchemy<2.2` в `pyproject.toml`.
+- **Заметка ревью T16:** порядок проверок в `create_user`: `login_invalid` → `login_taken` → политика пароля; сериализация действий над одним пользователем — `FOR NO KEY UPDATE` (иначе deadlock с вставками, ссылающимися на `app_user` по FK).
 - **Попытки:** 0
 
 ## T18 — API журнала аудита
@@ -505,6 +532,8 @@
   затем `GT_INFRA_STACK=1 GT_INFRA_PROJECT=gostracker-infratest HTTP_PORT=18080 HTTPS_PORT=18443 pytest -q -m infra_stack backend/tests/infra`
   зелёный, затем `docker compose -p gostracker-infratest down -v` (удаляются только тома тестового проекта).
 - **Заметка ревью T12:** infra_stack-тест входа и POST при `HTTPS_PORT=8443` (Origin с портом) — без ложного `origin_mismatch`.
+- **Заметка ревью T16:** документация оператора — `INITIAL_ADMIN_LOGIN` читается без `.strip()`: значение с пробелами/переводом строки по краям даёт ошибку запуска (без значения в тексте).
+- **Заметка ревью T16:** `idle_in_transaction_session_timeout` на уровне БД и `lock_timeout` для админ-действий (зависшая транзакция админа блокирует остальные админ-действия пространства).
 - **Попытки:** 0
 
 ## T27 — CI
