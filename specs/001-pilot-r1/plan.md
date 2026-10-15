@@ -2,6 +2,9 @@
 
 - **Spec:** ./spec.md (v0.15, все OI закрыты, включая OI-103…OI-118 по §9 этого плана; протокол решений — ./consensus-2026-10-13.md)
 - **Статус:** DRAFT (v2, 2026-10-13 — синхронизирован со spec v0.15)
+- **MVP-пересборка (архитектор, 2026-10-15):** объём сокращён решением владельца продукта —
+  см. **§11** (имеет приоритет над §1–§10 при расхождении; заменённые и отложенные решения
+  перечислены в §11.3).
 - **Охват:** архитектура всего R1 (этапы R1.0–R1.4, ТЗ §9). Детальные задачи — только R1.0
   (`tasks.md`); задачи R1.1–R1.4 детализируются позже по этому плану.
 - **Входы:** `spec.md`, `docs/adr/0001…0011`, `docs/glossary.md`, `AGENTS.md`, текущий код
@@ -345,6 +348,9 @@ COMMON_PASSWORDS_SHA256: Final = "fa1ea0cf2f673458b58be3a7171d2b7fc6f2e704b4691e
 идентичность (D-5), принадлежность пространству — `workspace_member`. В R1 у пользователя
 ровно одна строка `workspace_member`, текущее пространство берётся из неё.
 
+> **SUPERSEDED (MVP-пересборка, 2026-10-15):** состав миграции 0004 — §11.6 (D-58); таблица ниже
+> и таблица R1.3 — для следующей версии.
+
 **R1.1 (миграция 0004; 0003 занята CHECK-ом длины id сессии, T11)** — `CREATE EXTENSION IF NOT EXISTS pg_trgm`.
 
 | Таблица | Столбцы | Ограничения и индексы |
@@ -476,6 +482,10 @@ class Actor:
     session_id: bytes
     def can(self, cap: Capability) -> bool: ...
 ```
+
+> **SUPERSEDED (MVP-пересборка, 2026-10-15):** объектные проверки MVP — §11.5 (D-54: «свой
+> проект» БА = владелец; без `actor_has_task`, архива, вложений, `DEAL_RESPONSIBLE`); п.5 порядка
+> проверок ниже (битый JSON) — D-65 (400 `bad_request`), п.8 (409) в MVP не применяется.
 
 Объектные проверки (R1.1, `domain/access/policy.py`) — чистые функции над фактами,
 которые сервис загружает одним запросом:
@@ -1225,6 +1235,9 @@ ruff (MIT), mypy (MIT). `psycopg` (LGPL) **не** добавляется. Все
 
 ## 10. Детализация R1.1 «Проекты и задачи» (R1.1, архитектор, 2026-10-15)
 
+> **Частично SUPERSEDED (MVP-пересборка, 2026-10-15):** для MVP действуют §11.3–§11.7; что из
+> §10 сохраняется, заменено или отложено — §11.3.
+
 Раздел добавлен при детализации задач T29–T66 (`tasks.md`). Решения D-1…D-39 и разделы 1–9 не
 меняются: здесь уточнены интерфейсы R1.1 и приняты новые решения D-40…D-52. Входы: spec v0.15
 с правками рабочего дерева (FR-9 — 413; FR-14c — «владелец-БА в своём проекте, СМ в любом»),
@@ -1509,12 +1522,301 @@ async def search(db, actor, q: str) -> SearchResult
 
 | # | Кому | Суть | Предложение (действует до ответа) | Что меняется при другом ответе |
 |---|---|---|---|---|
-| Q-1 | заказчик (Д-8) | Код ответа при занятой блокировке БД (сейчас 500 через 30 с) | D-40: 503 `service_busy` + `Retry-After` | только `core/errors.py` и словарь фронтенда |
+| Q-1 | заказчик (Д-8) | Код ответа при занятой блокировке БД (сейчас 500 через 30 с) | D-40: 503 `service_busy` + `Retry-After` | только `core/errors.py` и словарь фронтенда **— РЕШЕНО владельцем 2026-10-15: принят D-40 (55P03, 40P01 → 503 `service_busy`, `Retry-After: 5`), задача T29** |
+- **Дефолт:** `503 service_busy` + `Retry-After: 5`
+
 | Q-2 | аналитик | FR-14b не говорит, можно ли в архивном проекте восстанавливать и окончательно удалять проект и его объекты из корзины | D-50 | `trash/service.py` (одна проверка) |
+- **Дефолт:** Можно; его задачи, комментарии и вложения — `409`
+
 | Q-3 | аналитик + архитектор | «Корзина проекта» FR-25a (вопрос 14 `open-questions.md`) | D-44: фильтр `project_id` у корзины пространства | `GET /trash` |
+- **Дефолт:** Фильтр `project_id` в `GET /trash`
+
 | Q-4 | аналитик | Снимается ли уведомление, если правка убрала `@логин` (FR-71 говорит только об удалении комментария) | не снимается (D-48) | `comments/mentions.py::sync_mentions` |
+- **Дефолт:** Не снимать
+
 | Q-5 | аналитик | AC-90 «событие без старого и нового значения»: допустимо ли показывать в ленте текущее название объекта | да: `entity.title` = текущее название, `changes` никогда не содержит `title`/`description` | `activity/service.py` (убрать `title`) |
-| Q-6 | заказчик (вопрос 13 `open-questions.md`) | БА-участник получает права «своего проекта», создав себе задачу | реализуется по spec (FR-19, З-8) | `policy.is_own_project` |
+- **Дефолт:** Да; в changes названий и описаний нет
+
+| Q-6 | заказчик (вопрос 13 `open-questions.md`) | БА-участник получает права «своего проекта», создав себе задачу | реализуется по spec (FR-19, З-8) | `policy.is_own_project` **— РЕШЕНО владельцем 2026-10-15: нет; «свой проект» БА = проект, где он владелец (D-54, §11), SPEC_CHANGES SC-2** |
+- нет, права на проект надо задавать вручную, по умолчанию проект принадлежит его создателю (Владельцу)
+
 | Q-7 | аналитик | FR-15a: снимать ли исполнителя у мягко удалённых задач исключённого | D-47: да, без события | `projects/members.py` |
+- **Дефолт:** Да, без события
+
+
 | Q-8 | заказчик (вопрос 18 `open-questions.md`) | Сокращение объёма R1 (упоминания, корзина, архив, рекурсивная проверка архивов) | объём по spec v0.15 | сужаются T46–T48 (часть «упоминания»), T49 (уровни архивов), T52–T54 (корзина), T59 (архив) |
-| Q-9 | заказчик (Д-7) | Битый JSON без сессии → 422 раньше 401 | наследуется всеми новыми эндпоинтами с телом | `test_route_guards.py`, своё `APIRoute` |
+- Сокращать объем - нужен MVP, а не большой оверинжениринг продукт: сначала разрабатываем Таск-треккер - как основу продукта для MVP заказчику, далее добавляем CRM после одобрения заказчиком.
+
+| Q-9 | заказчик (Д-7) | Битый JSON без сессии → 422 раньше 401 | наследуется всеми новыми эндпоинтами с телом | `test_route_guards.py`, своё `APIRoute` **— РЕШЕНО владельцем 2026-10-15: синтаксически невалидный JSON → 400 `bad_request` у всех эндпоинтов с телом (D-65, §11), задача T68** |
+- Дефолт
+
+Статус вопросов после MVP-пересборки (§11): Q-1, Q-6, Q-9 — решены владельцем (см. строки выше);
+Q-7 — дефолт (исполнитель снимается и у мягко удалённых задач; событий ленты в MVP нет вовсе, D-55);
+Q-8 — решён владельцем, реализован §11; **Q-2, Q-3, Q-4, Q-5 — закрыты переносом** (корзина,
+упоминания и лента отложены в следующую версию; при возврате функций действуют дефолты из
+строк владельца выше).
+
+---
+
+## 11. MVP-пересборка (MVP-пересборка, архитектор, 2026-10-15)
+
+> Этот раздел **имеет приоритет** над разделами 1–10 там, где они расходятся. Разделы 1–10 не
+> переписываются: решения, которые здесь заменены или отложены, перечислены в §11.3 со статусом
+> SUPERSEDED / ОТЛОЖЕНО. Пока аналитик не выпустил spec с правками §11.9 (задача T67), исполнители
+> MVP-задач не начинают (кроме T29).
+
+### 11.1. Цель и рамки
+
+Решение владельца продукта (2026-10-15, строка под Q-8 §10.8): максимально ускорить прототип
+таск-трекера для показа заказчику; CRM (R1.3) — в следующую версию продукта; MVP без
+оверинжиниринга. Цель — **≤ 25 задач до демо** (получилось 25, из них 1 — синхронизация spec,
+1 — приёмка).
+
+**Входит в MVP:** всё R1.0 (готово); проекты (создание, правка названия/описания, участники,
+передача владения, мягкое удаление); задачи (поля: название, описание, исполнитель, срок,
+приоритет, статус), подзадачи одного уровня с прогрессом; комментарии (без упоминаний, без
+markdown-рендеринга); личный список «мои задачи» и список задач проекта с фильтрами по
+исполнителю и статусу; канбан-доска по статусам с переносом и ручным порядком карточек;
+аудит — как есть (учётные записи, роли, передача владения); 503 `service_busy` (T29);
+400 `bad_request` на невалидный JSON (T68); демо-данные одной командой; README и чек-лист демо.
+
+**Отложено (следующая версия):** CRM целиком (клиенты, контакты, сделки, воронка, история и лента
+сделки, связь сделки с проектом, миграция 0005); метки; упоминания и уведомления; вложения
+(+ `python-multipart`); корзина, восстановление, окончательное удаление и автоочистка корзины;
+архив проекта; лента активности проекта; поиск (`pg_trgm`); фильтры по сроку и общий список
+задач с фильтрами (FR-27a); экспорт/импорт JSON; резервная копия; генератор нагрузки и замер
+NFR-2; Playwright-e2e. Реестр с исходными номерами — `tasks.md`, раздел «Отложено (следующая версия)».
+
+### 11.2. Решения MVP
+
+| # | Решение | Выбрано | Отвергнутые альтернативы | Почему |
+|---|---|---|---|---|
+| D-53 | CRM и задел R1.0 | R1.3 не делается. Задел R1.0 **остаётся как есть, без правок**: `Capability.CRM_READ/CRM_WRITE/PIPELINE_MANAGE` и `LABELS_MANAGE` в матрице (их отдаёт `/me.capabilities`, фронтенд MVP их не использует), `EntityType.STAGE/DEAL`, `EventSpec.feed="deal"`/`deal_history`, столбец и индекс `domain_event.deal_id` (миграция 0002), коды `ErrorCode` [3], подписи «Этап»/«Сделка» в фильтре журнала. `RecipientPurpose.DEAL_RESPONSIBLE`, поле `deal_link` проекта (§4.15), воронка в `bootstrap` — не реализуются | Вычистить CRM-задел из R1.0 | Задел покрыт тестами R1.0 и OpenAPI-контрактом; удаление — переделка готового без пользы; применённые миграции менять нельзя (AGENTS.md); при возврате CRM он нужен в том же виде. Код R1.0/R1.1 (готовые T29–T32a) от CRM-таблиц не зависит — проверено поиском по коду |
+| D-54 | «Свой проект» (Q-6, решение владельца) | БА: «свой проект» = проект, где он **владелец**; задача, созданная БА в чужом проекте, прав «своего проекта» не даёт. СМ — по-прежнему проект, где участвует. `ProjectFacts.actor_has_task` удаляется. Права на проект «задаются вручную» = передача владения (FR-14a) и роль СМ | Реализовать по spec v0.15 (FR-19, З-8) | Решение владельца 2026-10-15; упрощает политику и выборки (нет подзапроса по задачам актора). SPEC_CHANGES SC-2 |
+| D-55 | События в MVP | Пишутся **только события аудита**: `user.*` (R1.0) и `project.ownership_transferred`. События ленты (`project.updated`, `member.*`, `task.*`, `comment.*`) **не пишутся** — лента отложена. Каталог T30 не меняется | Писать все события ленты «впрок» | Каждое событие = вызов + тесты состава; без читателя это работа впустую. Цена: лента следующей версии начнётся пустой для данных MVP (риск R-M2) |
+| D-56 | Удаление | Мягкое (BR-7, ТЗ §3): `deleted_at` + `deleted_batch_id` с каскадом D-43 (проект → задачи → подзадачи → комментарии; задача → подзадачи → комментарии; подзадача → её комментарии). Восстановления, корзины, окончательного удаления и автоочистки нет; удалённое — 404 и не видно в списках, на доске и в счётчиках. Комментарий удаляется мягко с заглушкой (FR-23) | Жёсткое удаление; мягкое без `deleted_batch_id` | Мягкое удаление требует ТЗ §3 и стоит столько же, сколько жёсткое; `deleted_batch_id` уже в `SoftDeleteMixin` (R1.0) и позволит корзине следующей версии восстанавливать данные, удалённые в MVP |
+| D-57 | Архив проекта | Не делается: столбца `project.status` в 0004 **нет**, проверок 409 `project_archived` нет. Возврат — аддитивной миграцией `ADD COLUMN status text NOT NULL DEFAULT 'active'` + CHECK | Столбец «впрок» без функции | Архив не нужен для прав (D-54); без него из всех изменяющих операций уходит шаг 409 |
+| D-58 | Миграция 0004 | Только `project`, `project_member`, `task`, `comment` и `CHECK ck_domain_event_entity_type_valid` (7 значений `EntityType`, совпадает с перечислением R1.0, D-41). **Нет:** `pg_trgm` и GIN-индексов, `label`, `task_label`, `mention`, `attachment`, `project.status`. Состав — §11.6 | 0004 по §4.3 целиком | «Только нужное» (решение владельца); отложенные таблицы добавятся отдельными миграциями. CHECK с 7 значениями: модель строит его из `EntityType`, иначе `alembic check` расходится |
+| D-59 | Подзадачи | Оставить: `task.parent_id`, один уровень (FR-21), прогресс (FR-22), `POST /tasks/{id}/subtasks`, правило FR-19b | Отложить | ТЗ §6 п.4 (UF-4, AC-7, AC-8) — пункт приёмки ТЗ; стоимость — один столбец с CHECK, один маршрут, чистая функция и блок в карточке; отдельных задач не требует (≈10–15 % работы по задачам) |
+| D-60 | Комментарии | Сервер вырезает HTML (`strip_html`, D-28) — AC-58 сохраняется; фронтенд показывает текст как простой текст (`white-space: pre-wrap`, React экранирует), **без** `react-markdown`; упоминаний нет; правка с `edited_at` и мягкое удаление с заглушкой — как FR-23 | `react-markdown`; хранить HTML как есть | Без новой зависимости; XSS исключён экранированием React; markdown хранится и будет отрисован позже. SPEC_CHANGES SC-11 |
+| D-61 | Доска | Оставить минимальную доску: `GET /projects/{id}/board` (4 колонки, задачи верхнего уровня, порядок FR-28a, без пагинации — исключение из FR-47, как поиск) и `POST /tasks/{id}/move` по соседям (§4.8, D-22). Фронтенд — `@dnd-kit` с клавиатурной заменой (NFR-7) и опросом (FR-29) | Отложить доску; доска без ручного порядка (сортировка по времени создания) | Доска — визуальный центр таск-трекера и пункт ТЗ §6 п.5; без неё демо не продаётся. Ручной порядок просил владелец; позиции всё равно нужны для FR-28a |
+| D-62 | Фильтры | `GET /projects/{id}/tasks?assignee_id=&status=` (И), пагинация 50. Фильтров по сроку (FR-27a), общего списка `GET /tasks` и фильтра архива нет | Полный B1.2-B | Исполнитель нужен для FR-5/AC-43 (найти задачи заблокированного), статус — для демо; часовые пояса FR-27a — отдельная работа |
+| D-63 | Демо-данные | `gostracker demo-data [--seed 1]` (§11.8): 12 пользователей (1 ТА, 1 СМ, 3 БА, 7 П) + первый ТА = 13; 2 проекта; 30 задач, из них 6 подзадач; ~20 комментариев; без сделок. Прямые вставки ORM в одной транзакции (не через сервисы с `Actor`), события аудита `user.created`/`user.role_assigned` с `actor_id = NULL` (FR-41: создание учётных записей аудируется; автор — «система», D-6) | Через HTTP API; через сервисы | Одна транзакция, детерминизм по seed, без подделки сессий |
+| D-64 | Приёмка MVP | Ручной чек-лист `docs/acceptance/mvp-demo.md` (AC-1, AC-5, AC-97 в объёме MVP, AC-98, сценарий демо UF-2…UF-6, проверка опроса вместо AC-107) + автотесты; без замеров NFR-2, бэкапа, экспорта, Playwright | Полный R1.4 | Прототип; отложенное — в реестре |
+| D-65 | Невалидный JSON (Д-7, Q-9, решение владельца) | Обработчик `RequestValidationError` (`core/errors.py`): если **все** ошибки имеют `type == "json_invalid"` — **400** `{"detail": "Некорректный JSON в теле запроса", "code": "bad_request"}` без эха тела; иначе — прежний 422 `validation_error`. Действует для всех эндпоинтов с телом, с сессией и без: FastAPI разбирает тело до зависимостей, поэтому 400 приходит раньше 401/403 — это принято владельцем («отбрасывается быстро и дёшево, без бизнес-логики»). Валидный JSON с неверными полями — 401/403 гейтов раньше 422 (как сейчас). Размер тела ограничивает nginx (`client_max_body_size 12m`); приложение тело дополнительно не читает. OpenAPI: у маршрутов с телом объявлен 400 (`error_responses(400, …)`) | Своё `APIRoute`/middleware со строгим порядком 401 → 400; оставить 422 | Решение владельца; обработчик — 10 строк в одном месте. **SUPERSEDES** §4.5 п.5 «битый JSON даёт 422». SPEC_CHANGES SC-21 |
+
+### 11.3. Статус прежних решений и разделов
+
+| Решение / раздел | Статус в MVP |
+|---|---|
+| D-1…D-23, D-25, D-26, D-28, D-29…D-39 | действуют; D-23 (связь со сделкой), D-27, D-35, D-36, D-37 — ОТЛОЖЕНО вместе с функциями |
+| D-24 (`pg_trgm`, поиск), §4.9 | ОТЛОЖЕНО |
+| D-40 (503), D-41 (белые списки), D-42 (обслуживание: только сессии), D-43 (каскад), D-45 (видимость проекта), D-46 (повтор без изменений), D-51 (формат срока), D-52 (пустое название) | действуют |
+| D-44, D-50, §4.10, §10.6 (корзина), D-49 и §4.11 (вложения), D-48 (упоминания) | ОТЛОЖЕНО |
+| D-47 (исключение участника) | действует частично: исполнитель снимается у всех задач исключённого, включая мягко удалённые (Q-7); событий нет (D-55) |
+| §4.3 R1.1 (0004) | SUPERSEDED §11.6; §4.3 R1.3 (0005) — ОТЛОЖЕНО |
+| §4.4 лента и история сделки | ОТЛОЖЕНО; аудит — как в R1.0 + `project.ownership_transferred` |
+| §4.5 `ProjectFacts`, `is_own_project`, `can_delete_attachment`, `DEAL_RESPONSIBLE`; п.5 порядка проверок (битый JSON) | SUPERSEDED §11.5 и D-65; п.8 (409 архива) — не применяется |
+| §4.8 позиции | действует; `place_after` (восстановление, AC-118) — ОТЛОЖЕНО |
+| §4.13 команды | действуют `bootstrap`, `openapi`, `hash-bench`, `maintenance` (только сессии), `demo-data` (D-63); `restore-crm`, `export`, `import`, `loadgen`, `backup/restore` — ОТЛОЖЕНО |
+| §4.15, §5.1 | ОТЛОЖЕНО |
+| §6.2, §10.7 трассировка | для MVP SUPERSEDED §11.7 |
+| §7.1 `python-multipart`; §7.2 `react-markdown`, `@playwright/test` | ОТЛОЖЕНО (не добавлять) |
+| §7.2 `@dnd-kit/core`, `@dnd-kit/sortable` | действуют (MVP, T86) + `@dnd-kit/utilities` (§11.10) |
+| §10.2 протокол блокировок | действует без архивной части: п.1 и п.2 сохраняются (сериализация с исключением участника и сменой владельца) |
+| §10.3 API, §10.4 сервисы, §10.5 каталог | SUPERSEDED §11.4–§11.5 для MVP; каталог T30 не меняется, пишется только аудит (D-55) |
+
+### 11.4. API MVP (`/api/v1`)
+
+Общее — §10.3 (схемы `UserRef`, `ProjectRef {id, name}`, `Page[T]`, гейт `BUSINESS_ACCESS` на
+уровне роутера), порядок проверок — §4.5 **без п.8 (409)**; п.5 — по D-65. В колонке «Ошибки» —
+помимо 401/403 гейтов и 400 `bad_request` у маршрутов с телом.
+
+| Метод и путь | Доступ (объектный) | Тело / параметры → ответ | Ошибки |
+|---|---|---|---|
+| `GET /users` | — (T35, §10.3 без изменений) | `?q&page&page_size` → `Page[DirectoryUser]` | 422 |
+| `GET /projects` | БА/СМ — все неудалённые, П — где участник | `?page&page_size` → `Page[ProjectListItem {id, name, owner: UserRef, task_count}]`, `ORDER BY lower(name), id`; `task_count` — неудалённые задачи верхнего уровня | 422 |
+| `POST /projects` | `PROJECT_CREATE` | `{name, description?}` → 201 `ProjectDetail`; создатель — владелец и участник | 422 |
+| `GET /projects/{id}` | `can_view_project` (D-45) | → `ProjectDetail {id, name, description, owner: UserRef, task_count, is_member, created_at, updated_at, permissions {manage, manage_members, create_task, remove_self}}` | 403, 404 |
+| `PATCH /projects/{id}` | `can_manage_project` | `{name?, description?}` → `ProjectDetail`; событий нет | 403, 404, 422 |
+| `PUT /projects/{id}/owner` | `can_manage_project` | `{user_id}` → `ProjectDetail`; получатель `PROJECT_OWNER`; событие аудита `project.ownership_transferred` (`changes owner_id {id, login}`); тот же владелец — без события | 403, 404, 422 |
+| `DELETE /projects/{id}` | `can_manage_project` | 204; мягко, каскад D-56 | 403, 404 |
+| `GET /projects/{id}/members` | `can_view_project` | `?page` → `Page[ProjectMember {user: UserRef, role, is_blocked, is_owner}]`, `ORDER BY login, id` | 403, 404, 422 |
+| `POST /projects/{id}/members` | `can_add_member` | `{user_id}` → 204; получатель `PROJECT_MEMBER`; уже участник — 204 без изменений | 403, 404, 422 |
+| `DELETE /projects/{id}/members/{user_id}` | `can_manage_members` или `can_remove_self` | 204; цель не участник → 404; владелец → 422 `owner_cannot_be_removed`; исполнитель снимается со всех задач проекта (вкл. подзадачи и мягко удалённые) | 403, 404, 422 |
+| `GET /projects/{id}/tasks` | участник | `?assignee_id&status&page&page_size` → `Page[TaskListItem]`, подзадачи включены, фильтры через «И», `ORDER BY created_at DESC, id DESC` | 403, 404, 422 |
+| `POST /projects/{id}/tasks` | `can_create_task` | `TaskCreate` → 201 `TaskDetail`; конец колонки `todo` | 403, 404, 422 |
+| `GET /projects/{id}/board` | участник | → `Board` (ниже) | 403, 404 |
+| `GET /me/tasks` | — | `?page&page_size` → `Page[TaskListItem]`: исполнитель = актор, неудалённые задача и проект, актор — участник; подзадачи включены; `ORDER BY due_date ASC NULLS LAST, id` | 422 |
+| `GET /tasks/{id}` | участник | → `TaskDetail` | 403, 404 |
+| `PATCH /tasks/{id}` | по полям (§10.3): `status` — `can_change_task_status`, `assignee_id` — `can_change_assignee`, прочие — `can_edit_task_fully`; проверяются только меняющиеся поля (D-46) | `TaskUpdate` → `TaskDetail`; смена статуса задачи верхнего уровня → конец целевой колонки | 403, 404, 422 |
+| `DELETE /tasks/{id}` | `can_delete_task` | 204; мягко, каскад D-56 | 403, 404 |
+| `POST /tasks/{id}/subtasks` | `can_create_subtask` | `TaskCreate` → 201 `TaskDetail`; родитель — подзадача → 422 `subtask_depth_exceeded` | 403, 404, 422 |
+| `POST /tasks/{id}/move` | `can_change_task_status` | `{status, before_task_id?, after_task_id?}` → 204 (§4.8); подзадача → 422 `validation_error`; плохие соседи → 422 `invalid_neighbors` | 403, 404, 422 |
+| `GET /tasks/{id}/comments` | участник | `?page` → `Page[Comment]`, `ORDER BY created_at, id`, удалённые — заглушка | 403, 404, 422 |
+| `POST /tasks/{id}/comments` | участник | `{body}` (1–10 000 до очистки) → 201 `Comment` | 403, 404, 422 |
+| `PATCH /comments/{id}` | автор и участник | `{body}` → `Comment`, `edited_at = now` | 403, 404, 422 |
+| `DELETE /comments/{id}` | `can_delete_comment` | 204; мягко | 403, 404 |
+
+Схемы:
+- `TaskCreate {title, description?, assignee_id?: UUID | null, due_date?: DueDate | null, priority?: TaskPriority}` — «не передано» и «null» различаются по `model_fields_set` (FR-20); меток нет. `TaskUpdate` — те же поля и `status`, все необязательны.
+- `TaskDetail {id, project: ProjectRef, parent_id, title, description, status, priority, due_date, assignee: UserRef | null, author: UserRef, position: int | null, subtasks: list[TaskBrief], progress: int | null, created_at, updated_at, permissions {edit, change_status, change_assignee, delete, create_subtask}}`; `TaskBrief {id, title, status, priority, due_date, assignee}`.
+- `TaskListItem {id, project: ProjectRef, parent_id, title, status, priority, due_date, assignee: UserRef | null, created_at}`.
+- `Board {project: ProjectRef, columns: list[BoardColumn]}`, `BoardColumn {status, tasks: list[BoardCard]}` — всегда 4 колонки в порядке FR-18a; `BoardCard {id, title, status, priority, due_date, assignee: UserRef | null, position, subtask_count, progress}`; карточки — неудалённые задачи верхнего уровня, `ORDER BY position, created_at, id`; `subtask_count`/`progress` — по неудалённым подзадачам; число SQL-запросов не зависит от числа карточек.
+- `Comment {id, task_id, author: UserRef, body: str | null, is_deleted, created_at, edited_at, permissions {edit, delete}}`.
+
+### 11.5. Права MVP (SUPERSEDES §4.5 в части объектных проверок)
+
+```python
+@dataclass(frozen=True)
+class ProjectFacts:
+    project_id: UUID; owner_id: UUID; actor_is_member: bool          # без is_archived и actor_has_task
+@dataclass(frozen=True)
+class TaskFacts:
+    created_by: UUID; assignee_id: UUID | None; parent_id: UUID | None
+def is_own_project(a, p) -> bool          # BA: p.owner_id == a.user_id (владелец всегда участник); MIXED: member; иначе False
+def can_view_project(a, p) -> bool        # BA/MIXED: True; USER: member; иначе False
+def can_read_project_content(a, p) -> bool  # BUSINESS_ACCESS and member
+def can_edit_task_fully(a, p, t) -> bool  # USER: member and created_by == assignee_id == actor; BA: is_own_project; MIXED: member
+def can_change_task_status(a, p, t) -> bool  # fully or (member and assignee_id == actor)  (FR-19b; и перенос на доске)
+def can_create_task(a, p, assignee_id) -> bool  # member and (assignee_id == actor or TASK_ASSIGN_OTHERS)
+def can_create_subtask(a, p, parent, assignee_id) -> bool
+    # can_create_task(a, p, assignee_id) and (can_edit_task_fully(a, p, parent) or parent.assignee_id == actor)
+    # ИСПРАВЛЕНИЕ §4.5: прежняя формула «fully(parent) or …» позволяла «Пользователю» создать
+    # подзадачу своей задачи другому исполнителю — нарушение BR-1 «создание задачи другому — нет»
+def can_change_assignee(a, p, t) -> bool  # role in {BA, MIXED} and can_edit_task_fully
+def can_delete_task(a, p, t) -> bool      # == can_edit_task_fully
+def can_edit_comment(a, author_id) -> bool        # author == actor (участие проверяет сервис)
+def can_delete_comment(a, p, author_id) -> bool   # member and (author == actor or (BA and owner) or MIXED)
+def can_manage_project(a, p) -> bool      # (BA and owner) or MIXED (участие не требуется): правка, владение, удаление
+def can_manage_members(a, p) -> bool      # == can_manage_project
+def can_add_member(a, p, user_id) -> bool # can_manage_members and not (BA and user_id == actor)  (FR-15)
+def can_remove_self(a, p) -> bool         # member and owner_id != actor
+```
+ТА и пользователь без роли — везде `False`. `recipients.check_recipient` — §4.5 без
+`DEAL_RESPONSIBLE`: цели `PROJECT_MEMBER` (БА/СМ/П), `TASK_ASSIGNEE` (БА/СМ/П + участник),
+`PROJECT_OWNER` (БА/СМ + участник); порядок и коды — §4.5.
+
+### 11.6. Модель данных MVP (миграция 0004, SUPERSEDES §4.3 R1.1)
+
+Общее — §4.3: `UUIDPkMixin`, `TimestampMixin`, `WorkspaceMixin`; все FK `DEFERRABLE INITIALLY
+IMMEDIATE`; FK на `app_user` — `RESTRICT`; перечисления — `text` + CHECK (D-3).
+
+| Таблица | Столбцы | Ограничения и индексы |
+|---|---|---|
+| `project` | name varchar(255), description text NOT NULL (`''` по умолчанию в приложении), owner_id, `AuthoredMixin`, `SoftDeleteMixin` | CHECK `char_length(name) BETWEEN 1 AND 255`, `char_length(description) <= 10000`; FK owner_id → app_user |
+| `project_member` | project_id, user_id, workspace_id, created_at, updated_at, created_by | PK(project_id, user_id); FK project CASCADE; индекс (user_id) |
+| `task` | project_id, parent_id NULL, title varchar(255), description text NOT NULL, status, priority, due_date date NULL, assignee_id NULL, position bigint NULL, created_by NOT NULL, `SoftDeleteMixin` | CHECK длин как у проекта; status IN ('todo','in_progress','review','done'); priority IN ('base','high'); `CHECK ((parent_id IS NULL) = (position IS NOT NULL))`; FK project и parent CASCADE; индексы: (project_id, status, position, created_at) WHERE deleted_at IS NULL AND parent_id IS NULL — доска; (workspace_id, assignee_id, due_date) WHERE deleted_at IS NULL — личный список; (project_id, created_at DESC) WHERE deleted_at IS NULL — список проекта; (parent_id) |
+| `comment` | task_id, body text, edited_at NULL, `AuthoredMixin` (автор), `SoftDeleteMixin` | CHECK `char_length(body) BETWEEN 1 AND 10000`; FK task CASCADE; индекс (task_id, created_at) |
+| `domain_event` (изм.) | — | `CHECK ck_domain_event_entity_type_valid`: `entity_type IN` 7 значений `EntityType` (D-41, D-58) |
+
+`downgrade` удаляет 4 таблицы и CHECK журнала. Расширений нет.
+
+### 11.7. Трассировка AC → MVP-задача
+
+Пути тестов — относительно `backend/tests/`. «Частично» — неотложенная часть AC (что отложено —
+§11.9 и реестр `tasks.md`).
+
+| AC | Задачи | Тест |
+|---|---|---|
+| AC-6 | T71, T74, T76, T77 | `api/test_personal_tasks.py::test_ac6_*` |
+| AC-7, AC-8 | T73, T74, T76, T77 | `api/test_subtasks.py` |
+| AC-9, AC-11 | T70, T74, T77 | `api/test_task_permissions.py` |
+| AC-18 (частично: удалённые задача и проект не в списках, на доске, в счётчиках; запись с `deleted_at`) | T71, T75, T76, T78 | `api/test_soft_delete.py` |
+| AC-21 | T35, T72, T77, T78, T80 | `api/test_workspace_isolation.py` |
+| AC-22 (частично: 50 + `has_next`, фильтры исполнитель и статус) | T76, T77 | `api/test_project_task_list.py::test_ac22_*` |
+| AC-24, AC-49, AC-56, AC-68 (формат срока), AC-81, AC-106 (частично: не участник — 403), AC-108 (задача) | T73, T74, T75, T77 | `api/test_tasks.py` |
+| AC-25, AC-61, AC-80 | T73, T76, T78 | `api/test_board.py`, `api/test_board_move.py`, `api/test_personal_tasks.py::test_ac80_*` |
+| AC-42, AC-43 (частично: задачи) | T75, T76, T77 | `api/test_reassign_blocked.py` |
+| AC-46, AC-47 (без меток), AC-48 (в редакции SC-2), AC-103, AC-109 | T70, T74, T75, T77, T79, T80 | `api/test_task_permissions.py`, `api/test_comments.py::test_ac103_*` |
+| AC-50, AC-53, AC-54, AC-73 | T71, T72 | `api/test_project_members.py` |
+| AC-51, AC-52, AC-55, AC-72 (без «архивного»), AC-108 (проект), AC-110 (без 409) | T71, T72 | `api/test_projects.py` |
+| AC-58 | T79, T80 | `api/test_comments.py`, `unit/test_sanitize.py` |
+| AC-65 (частично: передача владения; вход не аудируется — R1.0) | T71, T72 | `api/test_audit.py::test_ac65_*` |
+| AC-74 (частично: участник, исполнитель, владелец) | T70, T71, T72, T74, T77 | `api/test_recipients.py` |
+| AC-75 (проекты, свои задачи) | T72, T77 | `api/test_route_guards.py` |
+| AC-76, AC-77 (в редакции SC-14) | T72, T77 | `api/test_role_change_effect.py` |
+| AC-94 (частично: ТА → проект 403; задача 404; мягко удалённая — 404) | T72, T77 | `api/test_not_found_vs_forbidden.py` |
+| AC-99 (частично: права удаления и каскад) | T70, T75, T77 | `api/test_task_permissions.py::test_ac99_*` |
+| AC-41, AC-104 *инфра* | T87 | `cli/test_demo_data.py` |
+| AC-1, AC-5, AC-97, AC-98 *ручной*; FR-29 (вместо AC-107 *e2e*) | T81–T86, T88, T89 | `docs/acceptance/mvp-demo.md` |
+| FR-7 / D-65 (невалидный JSON → 400) | T68 | `api/test_route_guards.py`, `api/test_errors.py`, `api/test_auth_login.py`, `cli/test_openapi.py` |
+| D-40 (503) | T29 | `api/test_db_busy_errors.py` |
+
+R1.0-AC (AC-2…AC-4, AC-20, AC-23, AC-26…AC-37, AC-39, AC-40, AC-44, AC-45, AC-64, AC-78, AC-79,
+AC-95, AC-105, AC-113…AC-116 в части R1.0, AC-121) — закрыты R1.0, в MVP прогоняются `check.sh`.
+
+### 11.8. Демо-данные (D-63, FR-49, FR-64)
+
+`domain/ops/demo.py::load_demo_data(sessionmaker, settings, *, clock: Clock, seed: int) -> DemoReport`
+и `cli/commands/demo_data.py` (`gostracker demo-data [--seed 1]`, ожидание БД как у `maintenance`).
+- Отказ с кодом 2 и без изменений, если в пространстве есть хоть одна строка `project` или `task`
+  (включая мягко удалённые) или любой не-системный пользователь сверх первого ТА.
+- Пользователи: 1 ТА, 1 СМ, 3 БА, 7 П; логины синтетические по шаблону FR-73 (`demo.ta`,
+  `demo.mixed`, `demo.ba1`…`demo.ba3`, `demo.user1`…`demo.user7`); пароль каждому —
+  `generate_password()`, `must_change_password = true`; файл `secrets/demo-passwords.txt`
+  (`login=…\tpassword=…` по строке, `write_private_file`, 0600); stdout — только путь и счётчики;
+  события аудита `user.created` и `user.role_assigned` с `actor_id = NULL`.
+- Проекты: «Внедрение трекера» (владелец `demo.ba1`) и «Подготовка пилота» (владелец `demo.ba2`);
+  участники — владелец, второй БА, СМ и 4 П (П распределены так, чтобы каждый был хотя бы в одном
+  проекте).
+- Задачи: 30 = по 12 задач верхнего уровня на проект + 3 родителя × 2 подзадачи; статусы по всем
+  4 колонкам, позиции `STEP, 2·STEP, …` в каждой колонке; сроки от `today_msk(clock.now()) − 3` до
+  `+ 14` дней, часть без срока; приоритет «Высокий» у ~ 1/4; исполнители — участники проекта (не
+  ТА); часть задач П — «свои» (автор = исполнитель = П), остальные автор — владелец проекта.
+- Комментарии: ~20 у задач верхнего уровня, авторы — участники.
+- Выбор — `random.Random(seed)`; только синтетика (BR-9).
+
+### 11.9. SPEC_CHANGES (для аналитика / spec-writer; spec.md архитектор не правит)
+
+Нужен новый ADR-0012 «MVP-прототип таск-трекера; CRM и часть R1 — в следующую версию» (C-6:
+меняет объём ADR-0002), затем spec v0.16. Номера требований не удалять — помечать «отложено
+(следующая версия)».
+
+| # | Что | Затронуто в spec |
+|---|---|---|
+| SC-1 | CRM целиком — следующая версия | Purpose/Scope (таблица «Входит»), FR-30…FR-37, FR-25c, CRM-части FR-5 (сделки), FR-16 (связь со сделкой), FR-25/FR-25b (сделки, клиенты, контакты), FR-34 и FR-6 (стадии при первом запуске), FR-38 (лента сделки), FR-39 (клиенты, сделки), FR-41 (стадии, сделки), FR-49 («10 сделок»), FR-68/FR-70 (ответственный), FR-72; UF-7, UF-8; AC-10, AC-13, AC-14, AC-15, AC-67, AC-82…AC-89, AC-91, AC-101, AC-119, AC-120, AC-122; CRM-части AC-18, AC-42, AC-43, AC-65, AC-74, AC-94; AC-114 («стадии по умолчанию» убрать из условия); Data Model: account, contact, pipeline, stage, deal, история; BR-1 строки CRM, BR-6, BR-8, BR-11 строки CRM |
+| SC-2 | «Свой проект» = владелец (решение владельца по Q-6) | FR-19: «свой проект» в строке BR-1 «Изменение чужой задачи в своём проекте» — проект, где сотрудник **владелец**; «БА, создавший себе задачу в чужом проекте, прав управления проектом и чужими задачами не получает; права задаются вручную — передачей владения (FR-14a)». FR-14c — формулировка без изменений по сути (владелец-БА, СМ). З-8 и ADR-0009 п.2 — заменить (новый ADR или ADR-0012). AC-48: «When он создал в проекте задачу и снова меняет чужую задачу Then 403». Глоссарий «Свой проект» |
+| SC-3 | Архив проекта — следующая версия | FR-14b, BR-13, FR-9/FR-45 (409), 409-оговорки FR-14a, FR-14c, FR-15a, FR-18, FR-23, FR-24; FR-17 (поле «статус», фильтр), FR-26 (фильтр архива); AC-70, AC-71; AC-106 (часть 409), AC-110 (часть 409), AC-72 (убрать «архивного»), AC-65 (архивирование); Data Model `project.status` |
+| SC-4 | Корзина — следующая версия; в MVP удаление мягкое без восстановления | FR-25a, FR-25b, FR-16 (восстановление проекта); FR-25 сохраняется; AC-18 («доступна в корзине» — отложено), AC-62, AC-63, AC-66 (часть окончательного удаления), AC-99 (части про восстановление и корзину), AC-112, AC-118; BR-7 («через 30 дней») |
+| SC-5 | Вложения — следующая версия | FR-24, C-7, BR-5, FR-9/FR-45 (413), UF-6 («прикрепляет файл»), AC-16, AC-59, AC-100, AC-117; Data Model attachment |
+| SC-6 | Упоминания — следующая версия | FR-71, пункт упоминаний FR-23, FR-29 (счётчик), FR-73 (последнее предложение), AC-102, AC-116 (последнее предложение); Data Model mention; ADR-0008 |
+| SC-7 | Метки — следующая версия | FR-18 («метки»), FR-18b, BR-11 строка меток, AC-47 («или метки»), AC-57, AC-69; Data Model label |
+| SC-8 | Лента проекта — следующая версия | FR-38 (проект), FR-15a («в ленту пишется событие…»), FR-29 (ленты), UF-9, AC-90, BR-11 строка ленты |
+| SC-9 | Поиск — следующая версия | FR-39, FR-47 (исключение поиска), UF-10, AC-92, AC-18 («в поиске») |
+| SC-10 | Фильтры в MVP — только исполнитель и статус в списке задач проекта | FR-27 (фильтры по сроку и проекту — следующая версия), FR-27a, AC-22 (фильтр проекта = список задач проекта), AC-60, AC-68 (фильтры «сегодня»/«просрочено»), AC-111 |
+| SC-11 | Комментарий показывается простым текстом (markdown не отрисовывается), HTML вырезается | FR-23 |
+| SC-12 | Экспорт/импорт, резервная копия, генератор нагрузки и замеры, e2e — следующая версия | FR-40, FR-50, FR-72, FR-43 (перечень команд), NFR-2 (замер), NFR-10 (таблица категорий), UF-11, UF-12, AC-12, AC-17, AC-19, AC-38 (замер), AC-93, AC-96, AC-107 (в MVP — ручная проверка опроса) |
+| SC-13 | Демо-данные MVP | FR-49: 12 пользователей, 2 проекта, 30 задач (в т.ч. 6 подзадач), без сделок; «бизнес-данные» = проекты и задачи |
+| SC-14 | FR-67/FR-68 проверяются без CRM | AC-76: «Given у БА активная сессия When СМ меняет его роль на „Пользователь“ Then следующий `POST /projects` в той же сессии — 403; When роль возвращена Then — 201». AC-77: без сделки — «его запрос на создание проекта — 403; When СМ находит задачу фильтром по исполнителю и переназначает её Then сохранено» |
+| SC-15 | Доска не пагинируется | FR-47: исключение — доска (FR-28) |
+| SC-16 | FR-15a: исполнитель снимается и у мягко удалённых задач (Q-7), событие ленты не пишется (SC-8) | FR-15a |
+| SC-17 | Экраны опроса MVP | FR-29: доска, список задач проекта, «мои задачи», карточка задачи с комментариями |
+| SC-18 | ТЗ §6 п.8, п.9, п.11, п.12 не входят в приёмку MVP | Scope, NFR-10; ADR-0012 |
+| SC-19 | Аудит MVP | FR-41: учётные записи, сессии, роли, передача владения проектом (архив, стадии, сделки — следующая версия) |
+| SC-20 | Подзадача «Пользователя» другому исполнителю — 403 | FR-19b/FR-20 уточнение (ср. §11.5 `can_create_subtask`): создание подзадачи подчиняется строке BR-1 «создание задачи другому» |
+| SC-21 | Невалидный JSON → 400 (решение владельца по Д-7) | FR-7 (исключение: синтаксически невалидное тело JSON → 400 `bad_request` раньше 401), FR-45 (код 400), NFR-10; `decisions-for-customer.md` Д-7 закрыт |
+
+### 11.10. Зависимости MVP
+
+Backend — новых нет (`python-multipart` отложен). Frontend — только `@dnd-kit/core ^6.3`,
+`@dnd-kit/sortable ^10`, `@dnd-kit/utilities ^3.2` (MIT; `utilities` — `CSS.Transform` для
+сортируемых карточек; без внешних вызовов) в T86; allowlist-тест T32a дополняет test-writer.
+`react-markdown`, `@playwright/test` — не добавлять.
+
+### 11.11. Риски MVP
+
+- **R-M1. Синхронизация spec на критическом пути (T67).** Без spec v0.16 и ADR-0012 исполнители
+  увидят противоречие spec/plan и вернут PLAN_ISSUE. Митигация: T67 первой, параллельно — T29.
+- **R-M2. Цена возврата отложенного.** Архив — аддитивный столбец и шаг 409 во всех изменяющих
+  сервисах; корзина работает с данными MVP благодаря `deleted_batch_id`; лента начнётся пустой
+  для данных MVP (D-55); метки, вложения, упоминания — новые таблицы без правок существующих.
+- **R-M3. Сужение прав БА (D-54)** меняет сценарий демо: БА-не владелец не правит чужие задачи —
+  это нужно показать заказчику как осознанное правило.
+- **R-M4. Доска без пагинации** — на прототипном объёме безопасна; при тысячах задач в проекте
+  потребует лимита (следующая версия, NFR-2).
+- **R-M5. Приёмка ТЗ §6 не полная** (п.8, 9, 11, 12) — коммерческий риск, фиксируется ADR-0012.
+- **R-M6. Общий генерируемый контракт** (`openapi.json`, `schema.d.ts`) — API-задачи только
+  последовательно: T68 → T72 → T77 → T78 → T80.
+- **R-M7. D-65 меняет поведение R1.0**: клиенты, ждавшие 422 на битый JSON, получают 400;
+  фронтенд кода `bad_request` уже знает.

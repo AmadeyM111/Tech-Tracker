@@ -1,6 +1,13 @@
 # Tasks: Пилот GOSTracker R1
 
-Статусы: TODO | IN_PROGRESS | DONE | BLOCKED. Статусы ведёт оркестратор.
+Статусы: TODO | IN_PROGRESS | DONE | BLOCKED | SUPERSEDED (заменена MVP-задачей, номер указан) |
+SKIPPED (следующая версия). Статусы ведёт оркестратор.
+
+> **MVP-пересборка (архитектор, 2026-10-15).** Решением владельца продукта объём сокращён до
+> прототипа таск-трекера (plan §11). Действующий порядок работ — раздел **«MVP-пересборка»** в
+> конце файла (T29, T35, T67–T89). Задачи T33–T66 не удалены: каждая помечена SUPERSEDED (с
+> номером заменяющей задачи) или SKIPPED (следующая версия); реестр с причинами и отложенными
+> AC — раздел **«Отложено (следующая версия)»**. R1.0 (T01–T28) и выполненные T30–T32a не менялись.
 
 Синхронизировано со spec v0.15 (OI-103…OI-118, FR-14c, FR-73, AC-108…AC-122).
 Детально расписаны этапы **R1.0 «Фундамент»** (T01–T28, закрыт) и **R1.1 «Проекты и задачи»**
@@ -788,7 +795,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 ### Backend: модель, права, проекты
 
 ## T33 — Модели R1.1 и миграция 0004
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T69 (MVP: 0004 без меток, упоминаний, вложений, `pg_trgm`, `project.status`)
 - **AC:** AC-108 (уровень БД: пределы длин), FR-13, FR-14, FR-14b, FR-18, FR-18a, FR-18b (уникальность метки без учёта регистра, OI-100), FR-21 (позиция только у задач верхнего уровня), FR-24 (метаданные вложения), FR-71 (упоминание), AC-66 (CHECK журнала не меняет строки); plan §4.3 (R1.1), D-2…D-4, D-22, D-24…D-26, D-41 (CHECK `entity_type`), D-52
 - **Файлы:** `backend/app/domain/projects/models.py`, `backend/app/domain/tasks/models.py`,
   `backend/app/domain/labels/models.py`, `backend/app/domain/comments/models.py`,
@@ -826,7 +833,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T34 — Объектные права и проверка получателей (чистые функции)
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T70 (MVP: «свой проект» = владелец, без архива/вложений/`DEAL_RESPONSIBLE`)
 - **AC:** FR-9, FR-10, FR-11, FR-14a, FR-14b, FR-14c (редакция рабочего дерева), FR-15, FR-15a, FR-16, FR-19, FR-19a, FR-19b, FR-20, FR-23, FR-24, FR-25a, FR-25b (право окончательного удаления = право восстановления), FR-68, FR-70, BR-1, BR-11; unit-уровень AC-9, AC-46, AC-47, AC-48, AC-52, AC-54, AC-73, AC-74, AC-99, AC-100, AC-103, AC-109, AC-110, AC-112; plan §4.5 (policy, recipients), D-45, §10.4, §10.6
 - **Файлы:** `backend/app/domain/access/policy.py`, `backend/app/domain/access/recipients.py`;
   тесты: `backend/tests/unit/test_policy.py`, `backend/tests/unit/test_recipients.py`
@@ -856,6 +863,8 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 
 ## T35 — Справочник пользователей и загрузка получателей; `GET /users`
 - **Статус:** TODO
+- **MVP-пересборка:** задача входит в MVP без изменений по смыслу; зависимость «T34» читать как
+  **T70** (`RecipientFacts` и `recipients` — из T70); цель `DEAL_RESPONSIBLE` не нужна (plan §11.5).
 - **AC:** FR-70 (факты получателя), FR-13, AC-21 (справочник — только своё пространство), AC-75 (без роли — 403, через обход маршрутов); plan §10.2 п.3, §10.3 (`GET /users`, общие схемы), §10.4 (`directory`)
 - **Файлы:** `backend/app/domain/users/directory.py`, `backend/app/api/v1/users.py`,
   `backend/app/api/v1/schemas/common.py` (`UserRef`, `ProjectRef`) (+ подключение в
@@ -873,7 +882,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T36 — Проекты: сервис и выборки
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T71 (MVP: без архива, событий ленты)
 - **AC:** AC-51, AC-52, AC-48 (удаление проекта: не владелец — 403, владелец — мягко), AC-55 (список без содержимого), AC-70 (архив и разархив: права; в архиве правка полей — 409, передача владения и удаление — разрешены), AC-71 (список: архивный — только с фильтром), AC-72, AC-108 (проект), AC-110, AC-65 (события владения и архива), FR-14, FR-14a, FR-14b, FR-14c, FR-16 (мягкое удаление с каскадом), FR-17, FR-41; plan D-43, D-45, D-46, D-52, §10.2, §10.3–§10.5
 - **Файлы:** `backend/app/domain/projects/service.py`, `backend/app/domain/projects/queries.py`;
   тесты: `backend/tests/domain/test_projects_service.py`
@@ -898,7 +907,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T37 — Участники проекта: сервис
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T71 (MVP: объединена с сервисом проектов, без событий ленты)
 - **AC:** AC-50 (исключённый теряет доступ, его задачи остаются без исполнителя), AC-53, AC-54, AC-73, AC-74 (участник: ТА, заблокированный, без роли → 422; снятие роли участника не исключает), AC-70 (добавление участника в архиве — 409), FR-15, FR-15a, FR-38 (`member.*`, `task.unassigned_member_removed`); plan D-46, D-47 (**Q-7**), §10.2, §10.5
 - **Файлы:** `backend/app/domain/projects/members.py`; тесты: `backend/tests/domain/test_project_members_service.py`
 - **Зависит от:** T36
@@ -917,7 +926,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T38 — API проектов и участников
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T72
 - **AC:** AC-51, AC-52, AC-53, AC-54, AC-55 (список; задачи чужого проекта — T45), AC-70 (проектная часть), AC-71 (список проектов), AC-72, AC-73, AC-74 (участник, владелец), AC-75 (список проектов без роли — 403), AC-94 (ТА → проект с несуществующим id — 403), AC-108 (проект), AC-110, AC-65 (через API журнала: записи владения и архива с автором, временем, типом, id, действием, именами полей; без названий и значений), AC-21; FR-14…FR-17, FR-45a; plan §4.5, §10.3 (проекты, участники), D-52
 - **Файлы:** `backend/app/api/v1/projects.py`, `backend/app/api/v1/schemas/projects.py` (+
   `app/api/v1/__init__.py`, генерация контракта); тесты: `backend/tests/api/test_projects.py`,
@@ -938,7 +947,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 ### Backend: задачи и метки
 
 ## T39 — Позиции карточек и прогресс
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T73 (MVP: + `move_task` из R1.2; без `place_after`)
 - **AC:** FR-28a (новая задача — в конец первой колонки; смена статуса без соседей — в конец целевой; перенумерация шагом 1024), AC-81 и AC-61 (часть «новая задача последняя») — уровень домена, AC-118 (помощник `place_after`), FR-22 и AC-7 (функция прогресса); plan §4.8, D-22, §10.2 п.4, §10.4
 - **Файлы:** `backend/app/domain/tasks/positions.py`, `backend/app/domain/tasks/progress.py`;
   тесты: `backend/tests/db/test_positions.py`, `backend/tests/unit/test_progress.py`
@@ -957,7 +966,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T40 — Метки: сервис и API
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — метки отложены (plan §11, SC-7)
 - **AC:** AC-69, AC-57 (удаление метки снимает её со всех задач, прочие поля задач не меняются; несуществующая и 11-я метка — T41/T42), FR-18b, OI-100, AC-21; plan §10.3 (метки), §10.4 (`labels`), D-52
 - **Файлы:** `backend/app/domain/labels/service.py`, `backend/app/api/v1/labels.py`,
   `backend/app/api/v1/schemas/labels.py` (+ `__init__`, генерация контракта);
@@ -974,7 +983,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T41 — Задачи: создание задачи и подзадачи
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T74 (MVP: без меток, архива, событий ленты)
 - **AC:** AC-8 (подзадача у подзадачи — 422), AC-9, AC-24 (новая — «К выполнению»), AC-47 (подзадача себе — да, другому — 403), AC-49 (приоритет по умолчанию «Базовый»), AC-56, AC-57 (метки при создании), AC-61 (часть: новая задача — последняя в первой колонке), AC-74 (исполнитель), AC-106, AC-108 (задача), AC-109, FR-18…FR-21, FR-28a; plan §4.5 (FR-20), §4.8, §10.2, §10.4 (`context`, `create_*`), §10.5 (`task.created`)
 - **Файлы:** `backend/app/domain/tasks/context.py`, `backend/app/domain/tasks/service.py`;
   тесты: `backend/tests/domain/test_tasks_create.py`
@@ -994,7 +1003,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T42 — Задачи: изменение и удаление
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T75 (MVP: без меток, архива, событий ленты)
 - **AC:** AC-7 (родитель закрывается при незакрытых подзадачах), AC-42, AC-43 (кроме «находится фильтром» — R1.2), AC-46, AC-47, AC-48, AC-50 (переназначение после исключения), AC-57 (несуществующая и 11-я метка), AC-81, AC-99 (права удаления, каскад), AC-103 (задачи), AC-70 (изменение и удаление в архиве — 409), FR-19…FR-20, FR-25a, FR-28a, FR-38; plan D-43, D-46, §4.4 (`task.updated`), §10.2, §10.5
 - **Файлы:** `backend/app/domain/tasks/service.py` (`update_task`, `delete_task`); тесты: `backend/tests/domain/test_tasks_update_delete.py`
 - **Зависит от:** T41
@@ -1015,7 +1024,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T43 — Задачи: карточка и списки (выборки)
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T76 (MVP: + фильтры исполнитель/статус; без меток, вложений, архива)
 - **AC:** AC-6 (личный список), AC-7 (прогресс в карточке), AC-11 (не участник → 403), AC-71 (личный список: архивные — по фильтру), AC-80 (подзадачи в списках; число задач проекта — T36), FR-17, FR-22, FR-26, FR-27 (без фильтров — R1.2), FR-47; plan §10.3 (`TaskDetail`, `TaskListItem`), §10.4 (`queries`)
 - **Файлы:** `backend/app/domain/tasks/queries.py`; тесты: `backend/tests/domain/test_tasks_queries.py`
 - **Зависит от:** T39, T41
@@ -1030,7 +1039,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T44 — API карточки задачи и подзадач
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T77 (объединена с T45)
 - **AC:** AC-7, AC-8, AC-9, AC-11, AC-24, AC-42, AC-43 (кроме фильтра — R1.2), AC-46, AC-47, AC-48, AC-49, AC-56, AC-57, AC-68 (формат срока: `2026-10-20` сохраняется и возвращается как есть; `2026-10-20T10:00:00Z`, `2026-02-30` → 422), AC-70 (задачи: создание, изменение, удаление в архиве — 409; чтение — 200), AC-74 (исполнитель), AC-81, AC-94 (несуществующая и мягко удалённая задача — 404), AC-103, AC-106, AC-108 (задача), AC-109, AC-21; plan §10.3 (задачи), D-51, D-52
 - **Файлы:** `backend/app/api/v1/tasks.py`, `backend/app/api/v1/schemas/tasks.py` (+ `__init__`, генерация контракта);
   тесты: `backend/tests/api/test_tasks.py`, `backend/tests/api/test_subtasks.py`,
@@ -1048,7 +1057,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T45 — API списков задач: задачи проекта и личный список
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T77 (объединена с T44)
 - **AC:** AC-6, AC-55 (БА запрашивает задачи проекта, где не участвует, — 403), AC-71 (личный список без фильтра — без задач архивного проекта, с фильтром — с ними), AC-75 (`/me/tasks` без роли — 403), AC-80 (подзадача в списке проекта и в личном списке исполнителя), AC-18 (удалённые задачи не в списках), AC-21; FR-26, FR-27 (без фильтров), FR-47; plan §10.3
 - **Файлы:** `backend/app/api/v1/tasks.py` (маршруты `GET /projects/{id}/tasks`, `GET /me/tasks`),
   `backend/app/api/v1/schemas/tasks.py` (`TaskListItem`, параметры запроса) (+ генерация контракта);
@@ -1062,7 +1071,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 ### Backend: комментарии и упоминания
 
 ## T46 — Комментарии: очистка HTML и разбор упоминаний (чистые функции)
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T79 (`strip_html`); разбор упоминаний — SKIPPED (следующая версия)
 - **AC:** AC-58 (HTML вырезается — unit), AC-116 (`@Ivan.Petrov` распознаётся как `ivan.petrov` — unit), FR-23, FR-71, FR-73; plan D-28, D-39, D-48 (**Q-4**)
 - **Файлы:** `backend/app/domain/comments/sanitize.py`, `backend/app/domain/comments/mentions.py`
   (только `MENTION_RE` и `extract_mention_candidates`); тесты: `backend/tests/unit/test_sanitize.py`,
@@ -1079,7 +1088,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T47 — Комментарии и упоминания: сервис
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T79 (комментарии); упоминания — SKIPPED (следующая версия)
 - **AC:** AC-58 (HTML не сохраняется; чужой комментарий П править/удалять — 403; время правки и «изменён»; удалённый — заглушка с автором и временем; БА удаляет чужой в своём проекте), AC-102, AC-103 (комментарии), AC-116 (упоминание), AC-70 (комментарий в архиве — 409), FR-23, FR-38 (`comment.*`), FR-71; plan D-48, §4.3 (видимость упоминаний), §10.2, §10.4, §10.5
 - **Файлы:** `backend/app/domain/comments/service.py`, `backend/app/domain/comments/mentions.py`
   (`sync_mentions`, `list_mentions`, `unread_count`, `mark_read`); тесты:
@@ -1101,7 +1110,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T48 — API комментариев и упоминаний
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T80 (комментарии); упоминания — SKIPPED (следующая версия)
 - **AC:** AC-58, AC-102, AC-103 (комментарии), AC-116 (упоминание), AC-70 (комментарий в архиве — 409), AC-75 (`/mentions` без роли — 403, обход маршрутов), AC-21; FR-23, FR-29 (счётчик для опроса), FR-71; plan §10.3
 - **Файлы:** `backend/app/api/v1/comments.py`, `backend/app/api/v1/mentions.py`,
   `backend/app/api/v1/schemas/comments.py` (+ `__init__`, генерация контракта);
@@ -1117,7 +1126,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 ### Backend: вложения
 
 ## T49 — Определение типа вложения
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — вложения отложены (SC-5)
 - **AC:** AC-59 (`.exe`, переименованный в `.pdf`; zip с исполняемым файлом), AC-117 (вложенность до уровня 3 — проверяется; уровень 4, зашифрованный и повреждённый элемент — отказ), FR-24, C-7; plan D-27, §4.11
 - **Файлы:** `backend/app/domain/attachments/filetype.py`; тесты: `backend/tests/unit/test_filetype.py`
   (образцы собираются в тесте из байтов и `zipfile`; бинарных файлов в репозитории нет)
@@ -1131,7 +1140,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T50 — Вложения: хранилище и сервис
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — вложения отложены (SC-5)
 - **AC:** AC-16 (10 485 760 байт — сохранён, больше — 413, файл не сохранён), AC-59 (21-й — 422; `../../etc/passwd` — имя сохранено как есть, вне каталога вложений ничего не создано; не участник — 403), AC-100, AC-117 (через сервис), AC-70 (загрузка и удаление в архиве — 409, скачивание — разрешено), FR-24, FR-38 (`attachment.*`); plan §4.11, D-49, §10.2, §10.4
 - **Файлы:** `backend/app/domain/attachments/storage.py`, `backend/app/domain/attachments/service.py`;
   тесты: `backend/tests/domain/test_attachments_service.py`, `backend/tests/unit/test_attachment_storage.py`
@@ -1152,7 +1161,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T51 — API вложений, зависимость `python-multipart`, 413 через прокси
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — вложения отложены (SC-5)
 - **AC:** AC-16, AC-59, AC-100, AC-117, AC-70 (вложения: загрузка — 409, скачивание — 200), AC-21; FR-9 (413), FR-24, FR-45; plan §4.11, §7.1 (`python-multipart>=0.0.20,<0.1`), §10.3
 - **Файлы:** `backend/app/api/v1/attachments.py`, `backend/app/api/v1/schemas/attachments.py`,
   `backend/pyproject.toml` (+ `__init__`, генерация контракта); тесты: `backend/tests/api/test_attachments.py`,
@@ -1171,7 +1180,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 ### Backend: корзина, обслуживание, лента, поиск
 
 ## T52 — Корзина: сервис, восстановление, окончательное удаление
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — корзина отложена (SC-4)
 - **AC:** AC-18 (удалённое — в корзине, запись с `deleted_at`), AC-62, AC-99, AC-112, AC-118, AC-66 (окончательное удаление не меняет журнал), FR-16 (восстановление проекта), FR-25, FR-25a, FR-25b (кнопка), FR-71 (восстановление комментария возвращает упоминания); plan §4.10, §10.6, D-25, D-43, D-49, D-50 (**Q-2**)
 - **Файлы:** `backend/app/domain/trash/service.py`, `backend/app/domain/trash/purge.py`;
   тесты: `backend/tests/domain/test_trash_service.py`
@@ -1191,7 +1200,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T53 — API корзины
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — корзина отложена (SC-4)
 - **AC:** AC-18 (задача и проект не возвращаются в списках и счётчиках; поиск — T56; доска — R1.2), AC-62, AC-99 (корзина П — только своё; корзина ТА — пуста), AC-112, AC-118, AC-66 (кнопка: в журнале не меньше N записей, прежние не изменены), AC-21; FR-25a, FR-25b; plan §4.5 (исключение п.4 для `GET /trash`), §10.3 (корзина), D-44
 - **Файлы:** `backend/app/api/v1/trash.py`, `backend/app/api/v1/schemas/trash.py` (+ `__init__`,
   генерация контракта); тесты: `backend/tests/api/test_trash.py`, `backend/tests/api/test_soft_delete.py`
@@ -1203,7 +1212,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T54 — Обслуживание: автоочистка корзины и файлы-сироты
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — корзина и вложения отложены (SC-4, SC-5)
 - **AC:** AC-63 *инфра*, AC-66 (команда обслуживания) *инфра*, FR-25b, FR-24 (файлы удаляются при окончательном удалении); plan §4.10 п.1 и п.3, D-42, D-49, §10.6
 - **Файлы:** `backend/app/domain/ops/maintenance.py`; тесты: `backend/tests/cli/test_maintenance.py`
   (`@pytest.mark.committed`: AC-63 — задача с вложением, проект, комментарий и вложение в
@@ -1222,7 +1231,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T55 — Лента проекта и признак «объект удалён»
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — лента отложена (SC-8)
 - **AC:** AC-90 (проект: создание задачи, смена статуса, исполнителя и срока, комментарий без текста, вложение, участник, владение, архив — по событию; правка названия — без старого и нового значения; не участник — 403; CRM-событий нет), FR-38, FR-25b (окончательно удалённый объект — «объект удалён» в ленте и журнале, без названия и значений), AC-65 (`entity_deleted`), AC-21; plan §4.4 (представления), §10.3 (`ActivityItem`), **Q-5**
 - **Файлы:** `backend/app/domain/activity/service.py`, `backend/app/domain/events/queries.py`
   (`entity_deleted` для project/task/comment/attachment — один запрос на тип для страницы),
@@ -1239,7 +1248,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T56 — Поиск по задачам и проектам
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — поиск отложен (SC-9)
 - **AC:** AC-92 (задачи и проекты; «КП»/«кп»; 1 символ — 422; ≤ 20 задач из 25; П: только доступное, архивный проект входит, удалённая задача и задача чужого проекта — нет; клиенты и сделки — R1.3), AC-18 (удалённое не в поиске), AC-21; FR-39; plan §4.9, D-24
 - **Файлы:** `backend/app/domain/search/service.py`, `backend/app/api/v1/search.py`,
   `backend/app/api/v1/schemas/search.py` (+ `__init__`, генерация контракта); тесты: `backend/tests/api/test_search.py`
@@ -1253,7 +1262,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T57 — Документация R1.1
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T88
 - **AC:** NFR-11 (модель данных, описание API), NFR-3; plan §3 (`docs/data-model.md` [1]), D-42, D-49
 - **Файлы:** `docs/data-model.md` (каталог событий R1.1 с белыми списками, корзина и пакеты
   удаления, хранение файлов вложений), `README.md` (ru и en: состояние R1.1; вложения — 10 МБ,
@@ -1266,7 +1275,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 ### Фронтенд R1.1
 
 ## T58 — Фронтенд R1.1: навигация, маршруты, коды ошибок, выбор пользователя
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T81
 - **AC:** NFR-6, NFR-7 (видимый фокус, клавиатура), FR-45 (сообщения по кодам R1.1, включая `service_busy`), FR-10 (интерфейс скрывает недоступное по `/me.capabilities`; сервер проверяет сам); plan §4.14, §10.3; заметка T22 п.3 (коды R1.1 не уходят в `error.unknown`)
 - **Файлы:** `frontend/src/app/router.tsx` (маршруты `/projects`, `/projects/:projectId`,
   `/tasks/:taskId`, `/my-tasks`, `/mentions`, `/trash`, `/search`, `/labels` под `SessionGate`;
@@ -1284,7 +1293,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T59 — Экраны проектов: список, создание, карточка, участники, архив, владение, удаление
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T82 (без архива)
 - **AC:** UF-3 (проект и участники), FR-14…FR-17 (интерфейс), FR-15a (подтверждение самоисключения), AC-51…AC-55, AC-70…AC-73, AC-110 (поведение интерфейса по ответам API); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/projects/api.ts`, `frontend/src/features/projects/ProjectsPage.tsx`,
   `frontend/src/features/projects/ProjectPage.tsx` (+ маршруты в `router.tsx`);
@@ -1299,7 +1308,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T60 — Списки задач и создание задачи
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T83 (без меток)
 - **AC:** UF-3, UF-6 (список), FR-20 (П: поле исполнителя не отправляется — задача себе; «без исполнителя» — только БА/СМ), FR-26, FR-27 (без фильтров — R1.2), FR-29 (опрос списков), AC-6, AC-56, AC-109 (интерфейс); NFR-5 (срок — календарная дата без пересчёта пояса, ADR-0007), NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/tasks/api.ts`, `frontend/src/features/tasks/TaskList.tsx`
   (вкладка «Задачи» карточки проекта и страница `/my-tasks` с переключателем «задачи архивных
@@ -1313,7 +1322,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T61 — Карточка задачи: поля, статус, исполнитель, метки, подзадачи, удаление
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T84 (без меток)
 - **AC:** UF-4, UF-6, FR-18…FR-22 (интерфейс; предупреждение при закрытии родителя с незакрытыми подзадачами, FR-22), FR-29 (опрос карточки), AC-7, AC-46, AC-47 (элементы по `permissions`); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/tasks/TaskPage.tsx`, `frontend/src/features/tasks/SubtaskList.tsx`,
   `frontend/src/features/labels/LabelPicker.tsx` (+ функции в `features/tasks/api.ts`, `features/labels/api.ts`);
@@ -1327,7 +1336,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T62 — Комментарии и упоминания
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T85 (комментарии простым текстом, без `react-markdown`); упоминания — SKIPPED (следующая версия)
 - **AC:** UF-6 (комментарий), FR-23, FR-71, FR-29 (опрос счётчика упоминаний), AC-58, AC-102 (интерфейс: «изменён», «комментарий удалён»), D-28 (markdown без HTML); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/comments/Comments.tsx` (+ `features/comments/api.ts`),
   `frontend/src/features/mentions/MentionsPage.tsx`, `frontend/src/features/mentions/MentionCounter.tsx`
@@ -1343,7 +1352,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T63 — Вложения в карточке задачи
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — вложения отложены (SC-5)
 - **AC:** UF-6 (вложение), FR-24 (интерфейс: подсказка типов и 10 МБ; сообщения 413/422 по кодам), AC-16, AC-59, AC-100 (интерфейс); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/attachments/Attachments.tsx`, `frontend/src/features/attachments/api.ts`,
   `frontend/src/shared/api/client.ts` (для `FormData` не ставить `Content-Type: application/json`);
@@ -1356,7 +1365,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T64 — Корзина и управление метками
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — корзина и метки отложены (SC-4, SC-7)
 - **AC:** FR-25a, FR-25b (восстановление и окончательное удаление с подтверждением), FR-18b (экран меток для БА/СМ), AC-62, AC-69, AC-99, AC-112 (интерфейс); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/trash/TrashPage.tsx` (+ `features/trash/api.ts`; фильтр по проекту — D-44),
   `frontend/src/features/labels/LabelsPage.tsx` (+ `features/labels/api.ts`);
@@ -1369,7 +1378,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T65 — Поиск и лента проекта
-- **Статус:** TODO
+- **Статус:** SKIPPED (следующая версия) — поиск и лента отложены (SC-8, SC-9)
 - **AC:** UF-9, UF-10, FR-38, FR-39, FR-29 (опрос ленты проекта), AC-90, AC-92 (интерфейс: «не короче 2 символов», «объект удалён»); NFR-5 (время — Europe/Moscow), NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/search/SearchPage.tsx` (+ `features/search/api.ts`),
   `frontend/src/features/projects/ActivityFeed.tsx` (вкладка «Лента» карточки проекта, `usePolledQuery`);
@@ -1379,7 +1388,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T66 — Приёмка R1.1
-- **Статус:** TODO
+- **Статус:** SUPERSEDED → T89 (приёмка MVP)
 - **AC:** все AC plan §10.7; NFR-10
 - **Файлы:** правок кода нет; вердикт ревьюера оркестратор сохраняет в
   `specs/001-pilot-r1/reviews/R1.1-acceptance.md`; дефекты оформляются задачами `T66a…`
@@ -1393,6 +1402,9 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ### Порядок R1.1 и критический путь
+
+> **SUPERSEDED (MVP-пересборка, 2026-10-15):** действующий порядок — «MVP-пересборка» → «Порядок
+> MVP и критический путь» в конце файла. Таблица ниже сохранена для возврата отложенного.
 
 | Задача | Название | Зависит от |
 |---|---|---|
@@ -1484,6 +1496,10 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 
 ## Этапы R1.2–R1.4 (крупные блоки, детализируются позже)
 
+> **SUPERSEDED (MVP-пересборка, 2026-10-15):** B1.2-A и B1.2-C вошли в MVP (T73, T78, T86);
+> B1.4-A — T87; B1.4-F — T88; B1.4-E — частично (ручной чек-лист, T88/T89). Остальное (B1.2-B
+> фильтры по сроку, R1.3 целиком, B1.4-B/C/D, Playwright) — «Отложено (следующая версия)».
+
 Модули и интерфейсы — plan §3, §4.3–§4.15; трассировка — plan §6.
 
 Прежние блоки R1.1 разложены на задачи выше: B1.1-A → T34–T38; B1.1-B → T39–T45;
@@ -1521,3 +1537,547 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **B1.4-E E2E и ручные проверки.** Playwright (`frontend/e2e`), `docs/acceptance/r1-manual.md`.
   AC-107 *e2e*, AC-1, AC-5, AC-12, AC-97, AC-98 *ручной*.
 - **B1.4-F Документация.** README (финал), `docs/data-model.md` (полностью), `docs/api/openapi.json`. NFR-11.
+
+---
+
+## MVP-пересборка (архитектор, 2026-10-15)
+
+Решение владельца продукта: максимально ускорить прототип таск-трекера для показа заказчику, CRM —
+в следующую версию, MVP без оверинжиниринга. Архитектура, решения D-53…D-65, API, права, модель,
+трассировка и SPEC_CHANGES — **plan §11** (имеет приоритет над plan §1–§10 при расхождении).
+Решения владельца по вопросам plan §10.8: Q-1 — 503 `service_busy` (T29); Q-6 — «свой проект» БА
+= владелец (D-54); Q-9/Д-7 — невалидный JSON → 400 `bad_request` (T68); Q-7 — дефолт; Q-8 — этот
+раздел; Q-2…Q-5 — закрыты переносом функций.
+
+Итого до демо: **25 задач** (T29, T35, T67–T89), из них 1 — синхронизация spec (T67, не код)
+и 1 — приёмка (T89).
+
+### Общие условия для задач MVP
+
+- Действуют «Общие условия для всех задач R1.0» и «Общие условия для задач R1.1» выше, **кроме**:
+  нет 409 `project_archived` (архива нет, D-57), нет меток, упоминаний, вложений, корзины, ленты,
+  поиска; в общих условиях R1.1 фабрики `make_label`, `make_mention`, `make_attachment` не нужны;
+  новая зависимость фронтенда в MVP одна группа — `@dnd-kit/*` (T86), `react-markdown` не добавлять.
+- Источник интерфейсов — plan **§11.4** (API и схемы), **§11.5** (права), **§11.6** (модель);
+  порядок проверок — plan §4.5 без п.8, п.5 — по D-65; блокировки — plan §10.2 п.1–п.4.
+- События: пишутся только события аудита — `user.*` и `project.ownership_transferred` (D-55).
+  События ленты (`project.updated`, `member.*`, `task.*`, `comment.*`) **не пишутся**.
+- Удаление — мягкое с каскадом и общим `deleted_batch_id` (D-56); восстановления нет; удалённое — 404.
+- Экраны с опросом (`usePolledQuery`): доска, список задач проекта, «мои задачи», карточка задачи
+  и её комментарии; прочие — `useQuery`.
+- Задачи с API выполняются последовательно (общий генерируемый контракт): T68 → T72 → T77 → T78 → T80.
+- Если формулировка spec расходится с plan §11 и T67 ещё не DONE — `PLAN_ISSUE`, не додумывать.
+
+### Синхронизация и техдолг
+
+## T67 — Синхронизация spec и ADR с объёмом MVP (аналитик / spec-writer)
+- **Статус:** TODO
+- **AC:** C-6 (изменение принятых решений — через ADR); plan §11.9 SC-1…SC-21
+- **Файлы:** `specs/001-pilot-r1/spec.md`, `docs/adr/0012-mvp-task-tracker-first.md` (новый),
+  `docs/glossary.md` («Свой проект»), `docs/open-questions.md` (вопросы 13, 14, 18 — решения)
+- **Зависит от:** —
+- **Описание:** Не код; выполняет аналитик/spec-writer, не исполнитель. ADR-0012: MVP-прототип
+  таск-трекера, CRM и прочее из plan §11.1 — в следующую версию (меняет объём ADR-0002), «свой
+  проект» = владелец (заменяет ADR-0009 п.2 и З-8), невалидный JSON → 400 (Д-7). Spec v0.16:
+  применить SC-1…SC-21 plan §11.9; номера FR/AC не удалять, отложенное помечать «отложено
+  (следующая версия), ADR-0012»; переформулировать AC-48, AC-72, AC-76, AC-77, AC-114 и частичные AC
+  по §11.9. Утверждение — владелец продукта.
+- **Готово, когда:** spec v0.16 и ADR-0012 утверждены владельцем; ревьюер подтверждает, что каждый
+  пункт SC-1…SC-21 отражён; `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёный.
+- **Попытки:** 0
+
+## T68 — Невалидный JSON в теле: 400 `bad_request` (решение владельца по Д-7)
+- **Статус:** TODO
+- **AC:** FR-7 и FR-45 в редакции SC-21, FR-57 (тело не возвращается), plan D-65; Д-7 закрыт
+- **Файлы:** `backend/app/core/errors.py`, `backend/app/api/openapi.py`, `backend/app/api/v1/auth.py`,
+  `backend/app/api/v1/admin_users.py` (только объявление 400 у маршрутов с телом),
+  `specs/001-pilot-r1/decisions-for-customer.md` (строка Д-7: «РЕШЕНО владельцем 2026-10-15: 400»)
+  (+ генерация контракта); тесты (только ассерты о битом JSON и объявлениях 400):
+  `backend/tests/api/test_route_guards.py`, `backend/tests/api/test_auth_login.py`,
+  `backend/tests/api/test_errors.py`, `backend/tests/cli/test_openapi.py`
+  (больше 3 файлов кода: объявления 400 у существующих маршрутов неотделимы от смены поведения)
+- **Зависит от:** — (решение владельца уже зафиксировано в plan D-65; SC-21 вносит T67)
+- **Описание:** В `_validation_error_handler`: если список ошибок не пуст и у **всех** `type ==
+  "json_invalid"` — ответ 400 `{"detail": "Некорректный JSON в теле запроса", "code": "bad_request"}`
+  (код — из `_HTTP_STATUS_MAP[400]`), без `loc`/`msg`/фрагментов тела; иначе — прежний 422
+  `validation_error`. Своё `APIRoute` и middleware не делать. Поведение (проверяется тестами):
+  битый JSON без cookie, с действующей сессией и с одноразовым паролем — 400 (FastAPI разбирает
+  тело до зависимостей; это принято владельцем); валидный JSON с неверными полями без cookie —
+  401, с сессией без роли / с одноразовым паролем — 403 гейта, у активного пользователя — 422
+  (как сейчас); `Content-Type` не JSON — как сейчас; невалидный JSON размером ~1 МиБ — 400, ответ не
+  содержит фрагментов тела; паролей в ответе и логе нет (FR-57). Размер тела ограничивает nginx
+  (`client_max_body_size 12m`), приложение тело дополнительно не читает. OpenAPI: в `_DESCRIPTIONS`
+  — `400: "Некорректный JSON в теле запроса (code: bad_request)"`, правило в docstring «400 — есть
+  тело запроса»; у маршрутов с телом (`POST /auth/login`, `POST /auth/password`, `POST /admin/users`,
+  `POST /admin/users/{id}/reset-password`, `PUT /admin/users/{id}/role`) — `error_responses(400, …)`.
+  Словарь фронтенда уже содержит `error.bad_request` — не трогать. Тесты R1.0, ждущие 422 на битый
+  JSON (`test_plan_4_5_p5_broken_json_without_cookie_is_422_before_401`,
+  `test_fr57_malformed_json_is_422_without_echo`), test-writer меняет на 400; прочие 422-ассерты
+  (неверные поля, одиночный суррогат, если его тип не `json_invalid`) не ослабляются.
+- **Готово, когда:** `pytest -q backend/tests/api/test_route_guards.py backend/tests/api/test_auth_login.py backend/tests/api/test_errors.py backend/tests/api/test_password_change.py backend/tests/api/test_admin_users.py backend/tests/cli/test_openapi.py backend/tests/infra/test_frontend_api_types.py`
+  зелёный, линтер чистый.
+- **Попытки:** 0
+
+(T29 — 503 `service_busy` — выполняется как описано выше, без изменений; T35 — тоже, с зависимостью от T70.)
+
+### Backend MVP: модель, права, проекты
+
+## T69 — Модели MVP и миграция 0004
+- **Статус:** TODO
+- **AC:** AC-108 (уровень БД), FR-13, FR-14, FR-18, FR-18a, FR-21 (позиция только у задач верхнего уровня), FR-23 (длина комментария), AC-66 (CHECK журнала не меняет строки); plan §11.6, D-2…D-4, D-22, D-25, D-26, D-41, D-52, D-56…D-58
+- **Файлы:** `backend/app/domain/projects/models.py`, `backend/app/domain/tasks/models.py`,
+  `backend/app/domain/comments/models.py` (+ `__init__.py` пакетов), `backend/app/domain/events/models.py`
+  (CHECK), `backend/app/domain/registry.py`, `backend/migrations/versions/0004_projects_tasks.py`,
+  `docs/data-model.md` (таблицы MVP, CHECK журнала, строка миграции 0004);
+  тесты: `backend/tests/db/test_r11_models.py`, `backend/tests/db/test_migrations.py` (цикл
+  upgrade → downgrade → upgrade с 0004, `alembic check`), `backend/tests/factories.py` (`make_project`,
+  `make_project_member`, `make_task`, `make_comment`)
+  (больше 3 файлов: модели и миграция неразделимы — модели без миграции ломают `alembic check`)
+- **Зависит от:** T67
+- **Описание:** Ровно 4 таблицы plan §11.6: `project`, `project_member`, `task`, `comment`, и
+  `CHECK ck_domain_event_entity_type_valid` (7 значений `EntityType`; тот же `CheckConstraint` — в
+  модели `DomainEvent`). **Не создавать:** `pg_trgm`, GIN-индексы, `label`, `task_label`, `mention`,
+  `attachment`, столбец `project.status`. Миксины: `UUIDPkMixin`, `TimestampMixin`, `WorkspaceMixin`
+  у всех (у `project_member` — составной PK вместо `id`); `AuthoredMixin` — `project`,
+  `project_member`, `comment`; у `task` `created_by NOT NULL`; `SoftDeleteMixin` — `project`, `task`,
+  `comment`. `TaskStatus` (`todo`, `in_progress`, `review`, `done`), `TaskPriority` (`base`, `high`) —
+  `StrEnum` в `tasks/models.py`, в БД `text` + CHECK. FK, CHECK и частичные индексы — §11.6 (через
+  `postgresql_where`, чтобы `alembic check` был чистым). `downgrade` удаляет 4 таблицы и CHECK журнала.
+- **Готово, когда:** `pytest -q backend/tests/db/test_r11_models.py backend/tests/db/test_migrations.py backend/tests/db/test_event_log.py` и
+  `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёные, линтер чистый.
+- **Попытки:** 0
+
+## T70 — Объектные права MVP и проверка получателей (чистые функции)
+- **Статус:** TODO
+- **AC:** FR-9, FR-10, FR-11, FR-14a, FR-14c, FR-15, FR-15a, FR-16, FR-19 (в редакции SC-2: «свой проект» БА = владелец), FR-19a, FR-19b, FR-20, FR-23, FR-68, FR-70, BR-1, BR-11; unit-уровень AC-9, AC-46, AC-47, AC-48 (SC-2), AC-52, AC-54, AC-73, AC-74, AC-99 (права удаления), AC-103, AC-109, AC-110; plan §11.5, D-45, D-54
+- **Файлы:** `backend/app/domain/access/policy.py`, `backend/app/domain/access/recipients.py`;
+  тесты: `backend/tests/unit/test_policy.py`, `backend/tests/unit/test_recipients.py`
+- **Зависит от:** T67
+- **Описание:** Без БД. `ProjectFacts {project_id, owner_id, actor_is_member}`, `TaskFacts
+  {created_by, assignee_id, parent_id}` и функции **ровно по plan §11.5** (роль — текущая
+  `actor.role`; ТА и «без роли» — везде `False`). Ключевое отличие от прежнего T34: `is_own_project`
+  для БА — только `owner_id == actor` (решение владельца, Q-6): БА, создавший себе задачу в чужом
+  проекте, чужие задачи не правит, исполнителя не меняет, чужие комментарии не удаляет;
+  `can_create_subtask` = `can_create_task(a, p, assignee_id) and (can_edit_task_fully(parent) or
+  parent.assignee_id == actor)`. `recipients.py`: `RecipientFacts {user_id, in_workspace, is_blocked,
+  role}`, `RecipientPurpose` = `PROJECT_MEMBER`, `TASK_ASSIGNEE`, `PROJECT_OWNER` (без
+  `DEAL_RESPONSIBLE`), `check_recipient(target, purpose, *, project_member_ids)` — порядок и коды
+  plan §4.5 (`user_not_found`, `user_blocked`, `recipient_wrong_role`, `not_project_member`, все —
+  `Unprocessable`). Тесты — таблицей «роль × факты → ожидание», включая случай «БА-участник, не
+  владелец, автор своей задачи в проекте → чужую задачу править нельзя».
+- **Готово, когда:** `pytest -q backend/tests/unit/test_policy.py backend/tests/unit/test_recipients.py` зелёный, линтер чистый.
+- **Попытки:** 0
+
+## T71 — Проекты и участники: сервис и выборки
+- **Статус:** TODO
+- **AC:** AC-50, AC-51, AC-52, AC-53, AC-54, AC-55 (список без содержимого), AC-72 (без «архивного»), AC-73, AC-74 (участник, владелец), AC-108 (проект), AC-110 (без 409), AC-48 (удаление проекта: не владелец — 403, владелец — мягко), AC-65 (событие передачи владения), FR-14, FR-14a, FR-14c, FR-15, FR-15a, FR-16 (мягкое удаление, каскад), FR-17 (без статуса), FR-41; plan §11.4, §11.5, D-45, D-46, D-47, D-52, D-55, D-56, §10.2
+- **Файлы:** `backend/app/domain/projects/service.py`, `backend/app/domain/projects/queries.py`,
+  `backend/app/domain/projects/members.py`; тесты: `backend/tests/domain/test_projects_service.py`,
+  `backend/tests/domain/test_project_members_service.py`
+- **Зависит от:** T35, T69, T70
+- **Описание:** Сигнатуры — plan §10.4 (`queries`, `service`, `members`) без `set_archived` и
+  без фильтра статуса. `load_project_facts(db, actor, project_id, *, lock: Literal["update", "share"]
+  | None = None) -> ProjectFacts` — один запрос; 404 для несуществующего, мягко удалённого и
+  чужого; `lock` — plan §10.2 п.1/п.2. `create_project`: `PROJECT_CREATE` (403), владелец и участник —
+  актор, событий нет. `update_project`: `can_manage_project` (403) → изменение; событий нет; без
+  изменений — ничего (D-46). `transfer_ownership`: проект `FOR NO KEY UPDATE` → `can_manage_project`
+  → `load_recipient(lock=True)` + `check_recipient(PROJECT_OWNER)` (422) → тот же владелец — ничего
+  → `owner_id` + `record_event(PROJECT_OWNERSHIP_TRANSFERRED, project_id=…, changed_fields=["owner_id"],
+  changes=[{"field": "owner_id", "old": {"id", "login"}, "new": {"id", "login"}}])` (аудит).
+  `delete_project`: `can_manage_project` → одно `deleted_at`/`deleted_batch_id` у проекта, всех его
+  неудалённых задач и подзадач и их неудалённых комментариев (D-56); событий нет. `list_projects`:
+  БА/СМ — все неудалённые, П — где участник; `task_count` — неудалённые задачи верхнего уровня;
+  `ORDER BY lower(name), id`; `paginate`. `get_project`: `can_view_project` (403) → `ProjectView` с
+  `permissions` из policy. `add_member`: проект `FOR NO KEY UPDATE` → `can_add_member` (403; БА добавляет
+  себя — 403) → получатель `PROJECT_MEMBER` (422) → уже участник — ничего → вставка. `remove_member`:
+  блокировка проекта → цель не участник — 404 → `can_manage_members` или (цель = актор и
+  `can_remove_self`) (403) → цель — владелец → 422 `owner_cannot_be_removed` («сначала передайте
+  владение») → `assignee_id = NULL` у всех задач проекта, где цель — исполнитель (включая подзадачи
+  и мягко удалённые, Q-7) → удалить членство; событий нет. `list_members` — `can_view_project`,
+  `ORDER BY login, id`. Событий ленты не писать (D-55).
+- **Готово, когда:** `pytest -q backend/tests/domain/test_projects_service.py backend/tests/domain/test_project_members_service.py` зелёный, линтер чистый.
+- **Попытки:** 0
+
+## T72 — API проектов и участников
+- **Статус:** TODO
+- **AC:** AC-21, AC-51…AC-55, AC-72, AC-73, AC-74 (участник, владелец), AC-75 (список проектов без роли — 403), AC-76 (в редакции SC-14: после смены роли БА → П `POST /projects` — 403, после возврата — 201), AC-94 (ТА → проект с несуществующим id — 403), AC-108 (проект), AC-110 (без 409), AC-65 (через API журнала: запись передачи владения с автором, временем, типом, id, действием, `changed_fields`; без названий и значений); FR-14…FR-17, FR-45a; plan §11.4 (проекты, участники), D-52, D-65
+- **Файлы:** `backend/app/api/v1/projects.py`, `backend/app/api/v1/schemas/projects.py` (+
+  `app/api/v1/__init__.py`, генерация контракта); тесты: `backend/tests/api/test_projects.py`,
+  `backend/tests/api/test_project_members.py`, `backend/tests/api/test_not_found_vs_forbidden.py`
+  (новый), `backend/tests/api/test_role_change_effect.py` (новый), дополнения
+  `backend/tests/api/test_workspace_isolation.py`, `backend/tests/api/test_audit.py`
+- **Зависит от:** T68, T71
+- **Описание:** Маршруты проектов и участников plan §11.4; router-level
+  `require_capability(BUSINESS_ACCESS)`, у `POST /projects` ещё `PROJECT_CREATE` (П → 403). Схемы:
+  `ProjectCreate {name: str (1–255), description: str (≤ 10 000) = ""}`, `ProjectPatch` (оба
+  необязательны), `OwnerChange {user_id}`, `MemberAdd {user_id}`; название из одних пробелов — 422
+  (D-52); ответы `ProjectDetail`, `ProjectListItem`, `ProjectMember` (§11.4, без `status`). Ответы об
+  ошибках — `error_responses(...)` по таблице §11.4, у маршрутов с телом — и 400 (D-65).
+- **Готово, когда:** `pytest -q backend/tests/api/test_projects.py backend/tests/api/test_project_members.py backend/tests/api/test_not_found_vs_forbidden.py backend/tests/api/test_role_change_effect.py backend/tests/api/test_workspace_isolation.py backend/tests/api/test_audit.py`
+  и проверки контракта (общие условия R1.1) зелёные, линтер чистый.
+- **Попытки:** 0
+
+### Backend MVP: задачи и доска
+
+## T73 — Позиции карточек, перемещение по соседям, прогресс
+- **Статус:** TODO
+- **AC:** FR-28a (новая — в конец первой колонки; смена статуса без соседей — в конец целевой; перемещение по соседям; перенумерация шагом 1024), AC-61 (домен: 1000 последовательных перемещений в одной колонке — порядок ожидаемый, позиции уникальны), AC-81 (домен), FR-22 и AC-7 (функция прогресса); plan §4.8 (без `place_after`), D-22, §10.2 п.4
+- **Файлы:** `backend/app/domain/tasks/positions.py`, `backend/app/domain/tasks/progress.py`;
+  тесты: `backend/tests/db/test_positions.py`, `backend/tests/unit/test_progress.py`
+- **Зависит от:** T69
+- **Описание:** `STEP = 1024`. `lock_columns(db, project_id, *statuses)` — уникальные статусы в
+  отсортированном порядке, `pg_advisory_xact_lock(hashtext(:key))`, ключ `f"{project_id}:{status}"`.
+  `append_position(db, project_id, status)` — `max(position) + STEP` по неудалённым задачам верхнего
+  уровня колонки или `STEP`. `renumber_column` — `STEP, 2·STEP, …` по `(position, created_at, id)`.
+  `move_task(db, task, *, status, before_task_id, after_task_id) -> None` — сам вызывает
+  `lock_columns(project, старый, новый)`; соседи — неудалённые задачи верхнего уровня того же проекта
+  в целевой колонке, не сама задача, иначе 422 `invalid_neighbors`; оба `None` — конец колонки
+  (`append_position`); алгоритм и семантика `after`/`before` — plan §4.8; промежуток < 2 —
+  `renumber_column` и повторный расчёт; меняет `task.status` и `task.position`. `progress(done,
+  total)` — `None` при `total == 0`, иначе `done * 100 // total`.
+- **Готово, когда:** `pytest -q backend/tests/db/test_positions.py backend/tests/unit/test_progress.py` зелёный, линтер чистый.
+- **Попытки:** 0
+
+## T74 — Задачи: создание задачи и подзадачи
+- **Статус:** TODO
+- **AC:** AC-8, AC-9, AC-24, AC-47 (подзадача себе — да, другому — 403), AC-49, AC-56, AC-61 (новая — последняя в первой колонке), AC-74 (исполнитель), AC-106 (не участник — 403), AC-108 (задача), AC-109, FR-18…FR-21, FR-28a; plan §11.4, §11.5 (`can_create_task`, `can_create_subtask`), §4.5 (FR-20), §10.2, §10.4 (`context`)
+- **Файлы:** `backend/app/domain/tasks/context.py`, `backend/app/domain/tasks/service.py`
+  (`create_task`, `create_subtask`); тесты: `backend/tests/domain/test_tasks_create.py`
+- **Зависит от:** T71, T73
+- **Описание:** `load_task_context(db, actor, task_id, *, lock_project: Literal["share"] | None = None)
+  -> TaskContext` (plan §10.4): задача и `ProjectFacts`; 404 для несуществующей, мягко удалённой,
+  чужой и задачи удалённого проекта. `TaskCreateData {title, description, assignee, due_date,
+  priority}`, `assignee: UUID | None | Unset` (сентинел `UNSET` в `service.py`); «не передан» → П:
+  актор, БА/СМ: `None`. `create_task`: проект (404) → `FOR SHARE` → `can_create_task` (403; П с явным
+  `null` — 403) → получатель `TASK_ASSIGNEE` (422) → вставка (`todo`, приоритет по умолчанию `base`,
+  `lock_columns` + `append_position(todo)`). `create_subtask`: родитель (404, `FOR SHARE` проекта) →
+  `can_create_subtask` (403) → родитель — подзадача → 422 `subtask_depth_exceeded` → получатель →
+  вставка (`position = NULL`, `status = todo`). Событий не писать (D-55). Возвращают `UUID`.
+- **Готово, когда:** `pytest -q backend/tests/domain/test_tasks_create.py` зелёный, линтер чистый.
+- **Попытки:** 0
+
+## T75 — Задачи: изменение, удаление, перемещение
+- **Статус:** TODO
+- **AC:** AC-7 (родитель закрывается при незакрытых подзадачах), AC-42, AC-43 (задачи), AC-46, AC-47, AC-48 (SC-2), AC-50 (переназначение после исключения), AC-81, AC-99 (права удаления; каскад на подзадачи и комментарии), AC-103 (задачи), FR-19…FR-20, FR-19b (перенос исполнителем), FR-28a; plan §11.4, §11.5, D-46, D-56, §10.2
+- **Файлы:** `backend/app/domain/tasks/service.py` (`update_task`, `delete_task`, `move`);
+  тесты: `backend/tests/domain/test_tasks_update_delete.py`, `backend/tests/domain/test_tasks_move.py`
+- **Зависит от:** T74
+- **Описание:** `update_task(db, actor, task_id, patch: TaskPatch)`: контекст (404, `FOR SHARE`) →
+  реально меняющиеся поля (D-46) → права по полям: `status` — `can_change_task_status`,
+  `assignee_id` — `can_change_assignee`, `title`/`description`/`due_date`/`priority` —
+  `can_edit_task_fully`; любое запрещённое — 403, ничего не меняется → новый исполнитель —
+  `TASK_ASSIGNEE` (422; `null` допустим для БА/СМ) → смена статуса задачи верхнего уровня —
+  `move_task(…, before=None, after=None)` (конец целевой колонки), у подзадачи — только `status`.
+  `delete_task`: `can_delete_task` (403) → одно `deleted_at`/`deleted_batch_id` у задачи, её неудалённых
+  подзадач и неудалённых комментариев задачи и подзадач (D-56). `move(db, actor, task_id, *, status,
+  before_task_id, after_task_id)`: контекст (404, `FOR SHARE`) → подзадача → 422 `validation_error`
+  («подзадачи не размещаются на доске») → `can_change_task_status` (403) → `positions.move_task`
+  (422 `invalid_neighbors`). Событий не писать (D-55).
+- **Готово, когда:** `pytest -q backend/tests/domain/test_tasks_update_delete.py backend/tests/domain/test_tasks_move.py` зелёный, линтер чистый.
+- **Попытки:** 0
+
+## T76 — Задачи: карточка и списки (выборки)
+- **Статус:** TODO
+- **AC:** AC-6, AC-7 (прогресс в карточке), AC-11, AC-22 (частично: фильтры исполнитель и статус, пагинация), AC-43 («находится фильтром по исполнителю»), AC-80 (подзадачи в списках), AC-18 (удалённое не в списках), FR-17, FR-22, FR-26, FR-27 (в редакции SC-10), FR-47; plan §11.4 (`TaskDetail`, `TaskListItem`), D-62
+- **Файлы:** `backend/app/domain/tasks/queries.py`; тесты: `backend/tests/domain/test_tasks_queries.py`
+- **Зависит от:** T73, T74
+- **Описание:** `get_task(db, actor, task_id) -> TaskView`: контекст (404) → `can_read_project_content`
+  (403) → неудалённые подзадачи (`ORDER BY created_at, id`), `progress` по ним, `UserRef` автора и
+  исполнителей одним запросом (`user_refs`), `permissions` из policy; число SQL-запросов не зависит от
+  числа подзадач. `list_project_tasks(db, actor, project_id, params, *, assignee_id: UUID | None,
+  status: TaskStatus | None)`: участник (403), неудалённые задачи и подзадачи, фильтры через «И»,
+  `ORDER BY created_at DESC, id DESC`, `paginate`. `list_my_tasks(db, actor, params)`: исполнитель =
+  актор, неудалённые задача и проект, актор — участник, `ORDER BY due_date ASC NULLS LAST, id`.
+- **Готово, когда:** `pytest -q backend/tests/domain/test_tasks_queries.py` зелёный, линтер чистый.
+- **Попытки:** 0
+
+## T77 — API задач: карточка, подзадачи, списки
+- **Статус:** TODO
+- **AC:** AC-6, AC-7, AC-8, AC-9, AC-11, AC-18 (частично), AC-21, AC-22 (частично), AC-24, AC-42, AC-43 (задачи), AC-46, AC-47, AC-48 (SC-2), AC-49, AC-55 (задачи чужого проекта — 403), AC-56, AC-68 (формат срока), AC-74 (исполнитель), AC-75 (`/me/tasks` без роли — 403), AC-77 (в редакции SC-14), AC-80 (списки), AC-81, AC-94 (несуществующая и мягко удалённая задача — 404), AC-99 (частично), AC-103 (задачи), AC-106 (частично), AC-108 (задача), AC-109; plan §11.4, D-51, D-52, D-65
+- **Файлы:** `backend/app/api/v1/tasks.py`, `backend/app/api/v1/schemas/tasks.py` (+ `__init__`,
+  генерация контракта); тесты: `backend/tests/api/test_tasks.py`, `backend/tests/api/test_subtasks.py`,
+  `backend/tests/api/test_task_permissions.py`, `backend/tests/api/test_reassign_blocked.py`,
+  `backend/tests/api/test_recipients.py`, `backend/tests/api/test_personal_tasks.py`,
+  `backend/tests/api/test_project_task_list.py`, `backend/tests/api/test_soft_delete.py`, дополнения
+  `test_not_found_vs_forbidden.py`, `test_workspace_isolation.py`, `test_role_change_effect.py`
+- **Зависит от:** T72, T75, T76
+- **Описание:** Маршруты `POST|GET /projects/{id}/tasks` (`?assignee_id&status&page&page_size`),
+  `GET /me/tasks`, `GET|PATCH|DELETE /tasks/{id}`, `POST /tasks/{id}/subtasks` (plan §11.4). `DueDate` —
+  D-51; названия — D-52; `TaskStatus`, `TaskPriority` — перечисления в схеме (вне набора → 422);
+  «исполнитель не передан» и «передан `null`» различаются по `model_fields_set` → `UNSET`/`None`.
+  Ответ карточки — `TaskDetail` из `get_task`. Маршрута `move` здесь нет (T78).
+- **Готово, когда:** все перечисленные тест-файлы `pytest -q backend/tests/api/test_tasks.py backend/tests/api/test_subtasks.py backend/tests/api/test_task_permissions.py backend/tests/api/test_reassign_blocked.py backend/tests/api/test_recipients.py backend/tests/api/test_personal_tasks.py backend/tests/api/test_project_task_list.py backend/tests/api/test_soft_delete.py backend/tests/api/test_not_found_vs_forbidden.py backend/tests/api/test_workspace_isolation.py backend/tests/api/test_role_change_effect.py`
+  и проверки контракта зелёные, линтер чистый.
+- **Попытки:** 0
+
+## T78 — Доска: выборка и API переноса
+- **Статус:** TODO
+- **AC:** AC-25, AC-61 (через API: второй пользователь после перемещения видит тот же порядок), AC-80 (доска: одна карточка при 2 подзадачах, `subtask_count`, `progress`), AC-18 (удалённое не на доске), AC-21, FR-19b (исполнитель переносит свою чужую задачу), FR-28, FR-28a, FR-47 (исключение — SC-15); plan §11.4 (`Board`, `move`), D-61
+- **Файлы:** `backend/app/domain/boards/service.py` (+ `__init__.py`), `backend/app/api/v1/boards.py`,
+  `backend/app/api/v1/schemas/boards.py` (+ `app/api/v1/__init__.py`, генерация контракта);
+  тесты: `backend/tests/api/test_board.py`, `backend/tests/api/test_board_move.py`
+- **Зависит от:** T75, T77
+- **Описание:** `get_board(db, actor, project_id) -> BoardView`: неудалённый проект (404) → участник
+  (403) → 4 колонки в порядке FR-18a (пустые тоже), карточки — неудалённые задачи верхнего уровня
+  `ORDER BY position, created_at, id`; `subtask_count` и `progress` — по неудалённым подзадачам одним
+  агрегирующим запросом на доску. Маршруты `GET /projects/{id}/board` → `Board`, `POST
+  /tasks/{id}/move` `{status, before_task_id?, after_task_id?}` → 204 (сервис `tasks.service.move`,
+  T75). Конкурентный сценарий (образец `tests/api/test_session_row_lock.py`): ≥ 100 параллельных
+  перемещений и смен статуса в одной колонке через HTTP — без 500 (допустим 503 `service_busy`),
+  позиции неудалённых задач колонки уникальны.
+- **Готово, когда:** `pytest -q backend/tests/api/test_board.py backend/tests/api/test_board_move.py` и проверки контракта зелёные, линтер чистый.
+- **Попытки:** 0
+
+### Backend MVP: комментарии
+
+## T79 — Комментарии: очистка HTML и сервис
+- **Статус:** TODO
+- **AC:** AC-58, AC-103 (комментарии: СМ-участник удаляет чужой, СМ-не участник — 403), FR-23 (без упоминаний; SC-11); plan D-28, D-60, §11.5 (`can_edit_comment`, `can_delete_comment`), §10.2 п.2
+- **Файлы:** `backend/app/domain/comments/sanitize.py`, `backend/app/domain/comments/service.py`;
+  тесты: `backend/tests/unit/test_sanitize.py`, `backend/tests/domain/test_comments_service.py`
+- **Зависит от:** T74
+- **Описание:** `strip_html(text)` — как в T46 (`html.parser.HTMLParser`, `convert_charrefs=False`:
+  теги, комментарии, декларации, инструкции удаляются; содержимое `script`/`style`, включая
+  незакрытые, удаляется; сущности и прочий текст — как есть, `>` и `a < b` не портятся).
+  `create_comment(db, actor, task_id, body)`: контекст задачи (404, `FOR SHARE`) → участник (403) →
+  `strip_html`; пусто или одни пробелы после очистки → 422 `validation_error` → вставка.
+  `edit_comment`: неудалённый комментарий неудалённой задачи (404) → участник и автор (403) →
+  очистка → `body`, `edited_at = now`. `delete_comment`: `can_delete_comment` (403) → мягкое удаление
+  (свой `deleted_batch_id`). `list_comments`: участник (403), все комментарии задачи, включая
+  удалённые (`body = None`, `is_deleted = True`, автор и время сохраняются), `ORDER BY created_at,
+  id`, `paginate`; `permissions {edit, delete}`. Событий и упоминаний нет.
+- **Готово, когда:** `pytest -q backend/tests/unit/test_sanitize.py backend/tests/domain/test_comments_service.py` зелёный, линтер чистый.
+- **Попытки:** 0
+
+## T80 — API комментариев
+- **Статус:** TODO
+- **AC:** AC-58, AC-103 (комментарии), AC-21; FR-23; plan §11.4 (комментарии), D-65
+- **Файлы:** `backend/app/api/v1/comments.py`, `backend/app/api/v1/schemas/comments.py` (+ `__init__`,
+  генерация контракта); тесты: `backend/tests/api/test_comments.py`, дополнение
+  `backend/tests/api/test_workspace_isolation.py`
+- **Зависит от:** T78, T79
+- **Описание:** `GET|POST /tasks/{id}/comments`, `PATCH|DELETE /comments/{id}`. Тело `{body: str}`,
+  1–10 000 символов до очистки (иначе 422). Ответ `Comment` (§11.4).
+- **Готово, когда:** `pytest -q backend/tests/api/test_comments.py backend/tests/api/test_workspace_isolation.py` и проверки контракта зелёные, линтер чистый.
+- **Попытки:** 0
+
+### Фронтенд MVP
+
+## T81 — Фронтенд MVP: навигация, маршруты, коды ошибок, выбор пользователя
+- **Статус:** TODO
+- **AC:** NFR-6, NFR-7 (видимый фокус, клавиатура), FR-45 (сообщения по кодам MVP: `service_busy`, `owner_cannot_be_removed`, `subtask_depth_exceeded`, `invalid_neighbors`, коды получателей), FR-10 (меню по `/me.capabilities`; сервер проверяет сам); plan §4.14, §11.4; заметка ревью T32 п.1 (сканер строк на compiler API — до экранов)
+- **Файлы:** `frontend/src/app/router.tsx` (маршруты `/projects`, `/projects/:projectId`,
+  `/tasks/:taskId`, `/my-tasks` под `SessionGate`, страницы-заглушки заменяют T82–T84; меню:
+  «Проекты» и «Мои задачи» при `business_access`, администрирование — как в R1.0),
+  `frontend/src/shared/i18n/ru.ts`, `frontend/src/shared/ui/UserPicker.tsx`, `frontend/src/features/users/api.ts`;
+  тесты: `frontend/tests/app/navigation.test.tsx`, `frontend/tests/shared/UserPicker.test.tsx`,
+  `frontend/tests/shared/i18n.test.ts` (коды MVP в словаре; `scanLatinUi` на compiler API `typescript`),
+  `backend/tests/infra/test_frontend_scaffold.py` (список файлов `src`)
+- **Зависит от:** T29, T35, T72
+- **Описание:** `UserPicker` — поиск по `GET /users?q=` (стрелки, Enter, Esc; `aria-*`), опционально
+  ограничивает выбор переданным набором id (участники проекта). Пунктов меню для CRM, меток,
+  корзины, поиска, упоминаний нет.
+- **Готово, когда:** фронтенд зелёный (общие условия R1.1).
+- **Попытки:** 0
+
+## T82 — Экраны проектов: список, создание, карточка, участники, владение, удаление
+- **Статус:** TODO
+- **AC:** UF-3 (проект и участники), FR-14…FR-17 (интерфейс, без статуса), FR-15a (подтверждение самоисключения), AC-51…AC-55, AC-72, AC-73, AC-110 (поведение по ответам API); NFR-6, NFR-7
+- **Файлы:** `frontend/src/features/projects/api.ts`, `frontend/src/features/projects/ProjectsPage.tsx`,
+  `frontend/src/features/projects/ProjectPage.tsx` (+ маршруты в `router.tsx`);
+  тесты: `frontend/tests/features/projects/ProjectsPage.test.tsx`, `frontend/tests/features/projects/ProjectPage.test.tsx`
+- **Зависит от:** T81
+- **Описание:** Список с пагинацией (название, владелец, число задач); создание (при
+  `project_create`); карточка: правка названия и описания (`permissions.manage`), передача владения
+  (`UserPicker` по участникам), удаление с `ConfirmDialog`, участники (добавление через `UserPicker`,
+  исключение, самоисключение с подтверждением). Вкладки «Доска» (по умолчанию, T86), «Задачи» (T83),
+  «Участники» — места под T83/T86. Ошибки — по `code`.
+- **Готово, когда:** фронтенд зелёный.
+- **Попытки:** 0
+
+## T83 — Списки задач и создание задачи
+- **Статус:** TODO
+- **AC:** UF-3, UF-6 (список и фильтр), FR-20 (П: поле исполнителя не отправляется; «без исполнителя» — только БА/СМ), FR-26, FR-27 (фильтры исполнитель и статус, SC-10), FR-29 (опрос списков), AC-6, AC-56, AC-109 (интерфейс); NFR-5 (срок — календарная дата без пересчёта пояса), NFR-6, NFR-7
+- **Файлы:** `frontend/src/features/tasks/api.ts`, `frontend/src/features/tasks/TaskList.tsx`
+  (вкладка «Задачи» проекта с фильтрами исполнителя и статуса; страница `/my-tasks`),
+  `frontend/src/features/tasks/CreateTaskForm.tsx`;
+  тесты: `frontend/tests/features/tasks/TaskList.test.tsx`, `frontend/tests/features/tasks/CreateTaskForm.test.tsx`
+- **Зависит от:** T77, T82
+- **Описание:** Списки — `usePolledQuery`. Форма: название, описание, срок (`input type=date`,
+  отправляется `YYYY-MM-DD`), приоритет, исполнитель (`UserPicker` по участникам; для П поля нет).
+  Меток нет.
+- **Готово, когда:** фронтенд зелёный.
+- **Попытки:** 0
+
+## T84 — Карточка задачи: поля, статус, исполнитель, подзадачи, удаление
+- **Статус:** TODO
+- **AC:** UF-4, UF-6, FR-18…FR-22 (интерфейс; предупреждение при закрытии родителя с незакрытыми подзадачами), FR-29 (опрос карточки), AC-7, AC-46, AC-47 (элементы по `permissions`); NFR-6, NFR-7
+- **Файлы:** `frontend/src/features/tasks/TaskPage.tsx`, `frontend/src/features/tasks/SubtaskList.tsx`
+  (+ функции в `features/tasks/api.ts`);
+  тесты: `frontend/tests/features/tasks/TaskPage.test.tsx`, `frontend/tests/features/tasks/SubtaskList.test.tsx`
+- **Зависит от:** T83
+- **Описание:** Карточка — `usePolledQuery`; форма правки — локальное состояние до сохранения (опрос
+  не затирает ввод). Подзадачи с прогрессом (`null` — «нет подзадач»), создание подзадачи, смена
+  статуса, удаление с подтверждением; место под комментарии (T85).
+- **Готово, когда:** фронтенд зелёный.
+- **Попытки:** 0
+
+## T85 — Комментарии в карточке задачи
+- **Статус:** TODO
+- **AC:** UF-6 (комментарий), FR-23 (SC-11: простой текст), FR-29 (опрос), AC-58 (интерфейс: «изменён», «комментарий удалён»); NFR-6, NFR-7
+- **Файлы:** `frontend/src/features/comments/Comments.tsx`, `frontend/src/features/comments/api.ts`
+  (+ подключение в `TaskPage.tsx`); тесты: `frontend/tests/features/comments/Comments.test.tsx`
+- **Зависит от:** T80, T84
+- **Описание:** Список — `usePolledQuery`, пагинация; текст — обычный текстовый узел React со стилем
+  `white-space: pre-wrap` (без `dangerouslySetInnerHTML`, без `react-markdown`); правка и удаление — по
+  `permissions`; удалённый — заглушка с автором и временем; время — Europe/Moscow (NFR-5).
+- **Готово, когда:** фронтенд зелёный.
+- **Попытки:** 0
+
+## T86 — Канбан-доска: перетаскивание и клавиатурная замена
+- **Статус:** TODO
+- **AC:** UF-5, FR-28, FR-28a (клиент передаёт соседей), FR-29 (опрос доски), FR-19b (перенос по ответу 403 откатывается с сообщением), AC-5 *ручной* (подготовка), AC-97 (клавиатура доски) *ручной*, NFR-7; plan D-61, §11.10
+- **Файлы:** `frontend/src/features/boards/BoardView.tsx`, `frontend/src/features/boards/api.ts`,
+  `frontend/src/features/boards/dnd.ts` (чистая функция соседей после сброса),
+  `frontend/package.json`, `frontend/package-lock.json` (`@dnd-kit/core ^6.3`, `@dnd-kit/sortable ^10`,
+  `@dnd-kit/utilities ^3.2`) (+ подключение во вкладку «Доска» `ProjectPage.tsx`);
+  тесты: `frontend/tests/features/boards/BoardView.test.tsx`, `frontend/tests/features/boards/dnd.test.ts`,
+  `backend/tests/infra/test_frontend_scaffold.py` (список файлов), `backend/tests/arch/test_dependencies_allowlist.py` (три пакета)
+- **Зависит от:** T78, T82
+- **Описание:** Доска — `usePolledQuery(GET /projects/{id}/board)`; 4 колонки, карточка: название,
+  приоритет, срок, исполнитель, прогресс подзадач. `DndContext` с `PointerSensor` и `KeyboardSensor`
+  (`sortableKeyboardCoordinates`) — перемещение между колонками и внутри колонки с клавиатуры;
+  `dnd.ts::neighborsAfterDrop(columnTaskIds, movedId, targetIndex) -> {after_task_id, before_task_id}`
+  (верхний и нижний сосед в целевой колонке без самой карточки). После `POST /tasks/{id}/move` —
+  инвалидация доски; ошибка (403, 422, 503) — сообщение по коду и возврат к данным сервера.
+  Сетевые вызовы — только через общий клиент.
+- **Готово, когда:** `cd frontend && npm ci` успешен; фронтенд зелёный; `pytest -q backend/tests/arch` зелёный.
+- **Попытки:** 0
+
+### Демо, документация, приёмка
+
+## T87 — Команда демо-данных
+- **Статус:** TODO
+- **AC:** AC-41 *инфра*, AC-104 *инфра*, FR-49 (в редакции SC-13), FR-64, FR-57, BR-9, FR-41 (создание учётных записей и назначение ролей — в журнале, автор «система»); plan §11.8, D-63, D-6, §4.13
+- **Файлы:** `backend/app/domain/ops/demo.py`, `backend/app/cli/commands/demo_data.py`,
+  `backend/app/cli/main.py` (регистрация); тесты: `backend/tests/cli/test_demo_data.py`
+  (`@pytest.mark.committed`)
+- **Зависит от:** T69, T73
+- **Описание:** Строго по plan §11.8. `load_demo_data(sessionmaker, settings, *, clock, seed) ->
+  DemoReport`: одна транзакция; отказ (код 2, данные не меняются) при существующих проектах/задачах
+  или пользователях сверх первого ТА; пароли — `generate_password()`, хеш — `PasswordHasher` из
+  настроек, `must_change_password = true`; файл `secrets/demo-passwords.txt` — `write_private_file`
+  (0600) после успешного создания строк, при ошибке фиксации удаляется (как файл первого ТА, plan
+  §4.7); stdout — только путь к файлу и счётчики, паролей в stdout/stderr/логах нет. Тесты: 13
+  учётных записей; 12 разных паролей ≥ 12 символов; права файла 0600; вход демо-пользователя требует
+  смены пароля; 2 проекта, 30 задач (6 подзадач), каждый исполнитель — участник проекта и не ТА,
+  позиции в колонке уникальны, у подзадач `position IS NULL`; журнал содержит `user.created` и
+  `user.role_assigned` с автором «система»; повторный запуск — код 2, данные не изменены.
+- **Готово, когда:** `pytest -q backend/tests/cli/test_demo_data.py` зелёный, линтер чистый.
+- **Попытки:** 0
+
+## T88 — Документация MVP и чек-лист демо
+- **Статус:** TODO
+- **AC:** NFR-3, NFR-11, AC-1 (подготовка), D-64; заметки ревью T31 п.1 (README: каталог клона, `-p`, `date -u`)
+- **Файлы:** `README.md` (ru и en: состав MVP-демо и что отложено; загрузка демо-данных
+  `docker compose exec api gostracker demo-data` и чтение паролей; сценарий демо; обслуживание — только
+  истёкшие сессии, корзины в MVP нет), `docs/data-model.md` (раздел MVP: мягкое удаление без корзины,
+  `deleted_batch_id`, какие события пишутся), `docs/acceptance/mvp-demo.md` (новый чек-лист: AC-1,
+  AC-5, AC-97 в объёме MVP, AC-98, сценарий UF-2…UF-6, проверка опроса ≤ 15 с вместо AC-107);
+  тесты: `backend/tests/infra/test_docs_static.py` (дополнение, `infra_static`)
+- **Зависит от:** T86, T87
+- **Готово, когда:** `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёный; ревьюер подтверждает
+  соответствие plan §11 и рабочие ссылки.
+- **Попытки:** 0
+
+## T89 — Приёмка MVP
+- **Статус:** TODO
+- **AC:** все AC plan §11.7; NFR-10
+- **Файлы:** правок кода нет; вердикт ревьюера оркестратор сохраняет в
+  `specs/001-pilot-r1/reviews/MVP-acceptance.md`; дефекты — задачами `T89a…`
+- **Зависит от:** T29, T35, T67–T88
+- **Описание:** Сверить трассировку plan §11.7 (каждый AC — тест существует и зелёный; частичные
+  AC — отложенная часть в реестре); `bash scripts/check.sh`; свежий стек `up -d --build --wait` и
+  `infra_stack` целиком; на стеке — `gostracker demo-data`, вход демо-пользователем, смена пароля;
+  `gostracker maintenance --dry-run`; `alembic downgrade 0003` → `upgrade head` на тестовой БД; ручной
+  прогон `docs/acceptance/mvp-demo.md` в Chromium (в т.ч. с клавиатуры и двумя пользователями на
+  доске).
+- **Готово, когда:** `bash scripts/check.sh` и `infra_stack` зелёные; чек-лист пройден; ревьюер подтверждает трассировку.
+- **Попытки:** 0
+
+### Порядок MVP и критический путь
+
+| Задача | Название | Зависит от |
+|---|---|---|
+| T29 | 503 `service_busy` | — |
+| T67 | Синхронизация spec, ADR-0012 (аналитик) | — |
+| T68 | Невалидный JSON → 400 | — |
+| T69 | Модели и миграция 0004 (MVP) | T67 |
+| T70 | Права MVP и получатели | T67 |
+| T35 | Справочник пользователей, `GET /users` | T70 |
+| T71 | Проекты и участники: сервис | T35, T69, T70 |
+| T72 | API проектов и участников | T68, T71 |
+| T73 | Позиции, перемещение, прогресс | T69 |
+| T74 | Создание задач и подзадач | T71, T73 |
+| T75 | Изменение, удаление, перемещение задач | T74 |
+| T76 | Выборки задач | T73, T74 |
+| T77 | API задач | T72, T75, T76 |
+| T78 | Доска: выборка и API переноса | T75, T77 |
+| T79 | Комментарии: сервис | T74 |
+| T80 | API комментариев | T78, T79 |
+| T81 | Фронтенд: навигация, коды, UserPicker | T29, T35, T72 |
+| T82 | Фронтенд: проекты | T81 |
+| T83 | Фронтенд: списки и создание задач | T77, T82 |
+| T84 | Фронтенд: карточка задачи | T83 |
+| T85 | Фронтенд: комментарии | T80, T84 |
+| T86 | Фронтенд: доска | T78, T82 |
+| T87 | Демо-данные | T69, T73 |
+| T88 | Документация и чек-лист | T86, T87 |
+| T89 | Приёмка MVP | все выше |
+
+Рекомендуемый порядок выполнения одним исполнителем — по строкам таблицы. Критический путь
+(12 задач): **T67 → T70 → T35 → T71 → T74 → T75 → T77 → T78 → T80 → T85 → T88 → T89**; ветвь той же
+длины: T77 → T83 → T84 → T85. Без зависимостей и в начале: T29, T67, T68; параллельно с T70/T35 —
+T69 → T73.
+
+### Риски MVP
+
+См. plan §11.11: R-M1 (T67 на критическом пути), R-M2 (цена возврата отложенного), R-M3 (сужение прав
+БА меняет сценарий демо), R-M4 (доска без пагинации), R-M5 (приёмка ТЗ §6 не полная), R-M6
+(последовательные API-задачи), R-M7 (D-65 меняет поведение R1.0). Дополнительно: T68 и T86 правят
+тесты/зависимости, проверяемые сторожевыми тестами (allowlist, контракт) — test-writer обновляет их в
+той же задаче.
+
+### Вопросы к владельцу продукта (MVP)
+
+Только то, что нельзя закрыть дефолтом; до ответа работа идёт по дефолту.
+- **Q-M1 (D-54):** «права на проект задаются вручную» = только передача владения (один владелец) и
+  роль СМ? Или нужен признак «со-управляющий проекта» у участника (несколько БА с правами
+  владельца)? Дефолт: один владелец + СМ; признак — аддитивный столбец `project_member` позже.
+- **Q-M2 (ADR-0012):** подтвердить заказчику, что показ MVP — промежуточный этап, а не приёмка R1:
+  пункты ТЗ §6 п.8, п.9 (CRM), п.11 (экспорт/импорт), п.12 (бэкап) в него не входят. Дефолт: да.
+- **Q-M3:** будет ли заказчик вести в прототипе реальную работу неделями (тогда нужна резервная
+  копия FR-50, +1 задача из B1.4-C)? Дефолт: нет, прототип только для показа.
+
+---
+
+## Отложено (следующая версия)
+
+Реестр для возврата (MVP-пересборка, архитектор, 2026-10-15). Возврат — отдельной детализацией по
+plan §1–§10 с учётом plan §11.2 (D-53…D-65) и §11.11 R-M2. Номера задач и блоков не переиспользуются.
+
+| Исходное | Что | Причина | Что остаётся в MVP | Отложенные FR / AC | Как вернуть |
+|---|---|---|---|---|---|
+| R1.3 целиком: B1.3-A…G, миграция 0005, plan §4.3 R1.3, §4.15, D-23 | CRM: клиенты, контакты, сделки, воронка, история и лента сделки, связь сделка ↔ проект, CRM в корзине, `restore-crm`, поиск по CRM, фронтенд CRM | решение владельца: CRM — после одобрения таск-трекера | задел R1.0 без изменений (D-53): capabilities `crm_*`, `pipeline_manage`, `EntityType.STAGE/DEAL`, `domain_event.deal_id`, коды ошибок [3] | FR-30…FR-37, FR-25c, CRM-части FR-5, FR-16, FR-25/25b, FR-34/FR-6, FR-38, FR-39, FR-41, FR-49, FR-68, FR-70, FR-72; AC-10, 13, 14, 15, 67, 82–89, 91, 101, 119, 120, 122; CRM-части AC-18, 42, 43, 65, 74, 94 | детализировать B1.3-A…G; миграция 0005; `deal_link` в `ProjectDetail` |
+| T40, T64 (метки) | метки, экран меток | не нужны для демо | — | FR-18b, AC-57, AC-69, «метки» в FR-18/AC-47 | таблицы `label`, `task_label` новой миграцией; `label_ids` в схемах задач |
+| T46 (упоминания), T47, T48, T62 (упоминания) | `@упоминания`, уведомления, счётчик | не нужны для демо | комментарии без упоминаний (T79, T80, T85) | FR-71, AC-102, AC-116 (упоминание) | таблица `mention`; D-48, Q-4 — дефолт «не снимать» |
+| T49, T50, T51, T63 | вложения, `python-multipart`, 413 через прокси | не нужны для демо | nginx уже ограничивает тело 12 МБ (R1.0) | FR-24, C-7, AC-16, 59, 100, 117 | таблица `attachment`; D-27, D-49 |
+| T52, T53, T54, T64 (корзина) | корзина, восстановление, окончательное удаление, автоочистка корзины и файлов | не нужны для демо | мягкое удаление с `deleted_batch_id` (D-56); `maintenance` — только сессии | FR-25a, FR-25b, AC-62, 63, 99 (восстановление), 112, 118, AC-18 («в корзине»), AC-66 (окончательное удаление) | `trash` по plan §10.6, `place_after`; Q-2/Q-3 — дефолты |
+| T36/T38/T59 (архив) | архив проекта, 409 `project_archived` | не нужен для прав (D-57) | — | FR-14b, BR-13, AC-70, AC-71, 409-части AC-106, AC-110, AC-65 (архив) | `ADD COLUMN status … DEFAULT 'active'`; шаг 409 во всех изменяющих сервисах |
+| T55, T65 (лента) | лента активности проекта, «объект удалён» | не нужна для демо | события аудита пишутся (D-55) | FR-38, AC-90, UF-9 | писать события ленты во всех сервисах (каталог T30 готов); Q-5 — дефолт |
+| T56, T65 (поиск) | поиск по названиям, `pg_trgm` | не нужен для демо | — | FR-39, AC-92, UF-10 | расширение и GIN-индексы новой миграцией |
+| B1.2-B (часть) | фильтры по сроку, общий список `GET /tasks` | часовые пояса FR-27a — отдельная работа | фильтры исполнитель и статус в списке проекта (D-62) | FR-27a, AC-60, AC-68 (фильтры), AC-111 | `tasks/queries` |
+| B1.4-B | экспорт/импорт JSON | прототип | — | FR-40, AC-17, AC-93, UF-11 | plan §4.10 (экспорт/импорт) |
+| B1.4-C | резервная копия и восстановление | прототип (Q-M3) | — | FR-50, AC-12, UF-12 | сервис `ops`, D-35 |
+| B1.4-D | генератор нагрузки, замер NFR-2, калибровка Argon2 | прототип | индексы plan §11.6; команда `hash-bench` (R1.0) | FR-72, NFR-2, AC-19, AC-38 (замер), AC-96 | plan §5.1, D-36, D-37 |
+| B1.4-E (часть) | Playwright e2e | прототип | ручная проверка опроса в чек-листе (T88) | AC-107 | `@playwright/test`, plan §7.2 |
