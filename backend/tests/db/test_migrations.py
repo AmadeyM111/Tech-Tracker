@@ -616,3 +616,129 @@ def test_commit_durably_used_only_by_auth_service() -> None:
     assert users == allowed_users, (
         f"commit_durably: ожидалось {sorted(allowed_users)}, найдено {sorted(users)}"
     )
+
+
+# --- T69: миграция 0004 (plan §11.6, D-58) -------------------------------------------------
+
+MVP_TABLES_0004 = ("project", "project_member", "task", "comment")
+ENTITY_CHECK_0004 = "ck_domain_event_entity_type_valid"
+MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_projects_tasks.py"
+
+
+def test_t69_migration_0004_file_and_single_head() -> None:
+    """Файл 0004 на месте, цепочка 0003 -> 0004, голова ревизий одна."""
+    from alembic.script import ScriptDirectory
+
+    assert MIGRATION_0004.is_file(), "нет backend/migrations/versions/0004_projects_tasks.py"
+    tree = ast.parse(MIGRATION_0004.read_text(encoding="utf-8"))
+    values: dict[str, Any] = {}
+    for n in tree.body:
+        if isinstance(n, ast.Assign):
+            for t in n.targets:
+                if isinstance(t, ast.Name) and isinstance(n.value, ast.Constant):
+                    values[t.id] = n.value.value
+        elif (
+            isinstance(n, ast.AnnAssign)
+            and isinstance(n.target, ast.Name)
+            and isinstance(n.value, ast.Constant)
+        ):
+            values[n.target.id] = n.value.value
+    assert values.get("revision") == "0004"
+    assert values.get("down_revision") == "0003"
+    funcs = {n.name for n in tree.body if isinstance(n, ast.FunctionDef)}
+    assert {"upgrade", "downgrade"} <= funcs
+    script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
+    heads = script.get_heads()
+    assert len(heads) == 1, f"несколько голов ревизий: {heads}"
+    assert "0004" in {r.revision for r in script.walk_revisions()}
+
+
+async def _alembic_ok(url: str, *args: str) -> str:
+    result = await asyncio.to_thread(run_alembic, url, *args)
+    assert result.returncode == 0, (
+        f"alembic {' '.join(args)} rc={result.returncode}\n{result.stdout}\n{result.stderr}"
+    )
+    return str(result.stdout) + str(result.stderr)
+
+
+async def _tables_and_check(maker: Any) -> tuple[set[str], int]:
+    async with maker() as s:
+        rows = await s.execute(
+            text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+        )
+        check = await s.execute(
+            text("SELECT count(*) FROM pg_constraint WHERE conname = :n"), {"n": ENTITY_CHECK_0004}
+        )
+        return {r.table_name for r in rows}, int(check.scalar_one())
+
+
+@pytest.mark.committed
+async def test_t69_upgrade_downgrade_0003_upgrade_check_keeps_r10_data(
+    committed: Any, test_database_url: str
+) -> None:
+    """head -> downgrade 0003 -> head: 4 таблицы и CHECK журнала уходят и возвращаются,
+    данные R1.0 (пользователи, события) целы; downgrade при непустых таблицах MVP проходит
+    (§11.6: «удаляет 4 таблицы и CHECK»; сохранения данных MVP план не требует)."""
+    from tests.factories import (
+        make_comment,
+        make_domain_event,
+        make_project,
+        make_project_member,
+        make_task,
+        make_user,
+    )
+
+    tables, check = await _tables_and_check(committed)
+    assert set(MVP_TABLES_0004) <= tables
+    assert check == 1
+
+    async with committed() as s, s.begin():
+        user = await make_user(s, role="business_admin")
+        project = await make_project(s, workspace_id=user.workspace_id, owner_id=user.id)
+        await make_project_member(
+            s, project_id=project.id, user_id=user.id, workspace_id=user.workspace_id
+        )
+        task = await make_task(
+            s, project_id=project.id, workspace_id=user.workspace_id, created_by=user.id
+        )
+        await make_comment(s, task_id=task.id, workspace_id=user.workspace_id, created_by=user.id)
+        event_id = await make_domain_event(
+            s, workspace_id=user.workspace_id, actor_id=user.id, entity_type="project"
+        )
+
+    await _alembic_ok(test_database_url, "downgrade", "0003")
+    tables, check = await _tables_and_check(committed)
+    assert not (set(MVP_TABLES_0004) & tables), "downgrade 0004 оставил таблицы MVP"
+    assert check == 0, "downgrade 0004 оставил CHECK журнала"
+    assert {"workspace", "app_user", "workspace_member", "user_session", "domain_event"} <= tables
+    async with committed() as s:
+        version = (await s.execute(text("SELECT version_num FROM alembic_version"))).scalars().all()
+        assert version == ["0003"]
+        kept_user = (
+            await s.execute(text("SELECT count(*) FROM app_user WHERE id = :u"), {"u": user.id})
+        ).scalar_one()
+        kept_event = (
+            await s.execute(
+                text("SELECT entity_type FROM domain_event WHERE id = :i"), {"i": event_id}
+            )
+        ).scalar_one()
+    assert kept_user == 1
+    assert kept_event == "project"
+
+    await _alembic_ok(test_database_url, "upgrade", "head")
+    tables, check = await _tables_and_check(committed)
+    assert set(MVP_TABLES_0004) <= tables
+    assert check == 1
+    async with committed() as s:
+        for table in MVP_TABLES_0004:
+            count = (await s.execute(text(f"SELECT count(*) FROM {table}"))).scalar_one()  # noqa: S608
+            assert count == 0, f"{table} после повторного upgrade не пуста"
+    await _alembic_ok(test_database_url, "check")
+
+
+@pytest.mark.committed
+async def test_t69_alembic_check_clean_at_head(committed: Any, test_database_url: str) -> None:
+    """Модели (4 таблицы + CHECK DomainEvent) и миграция 0004 не расходятся."""
+    tables, _ = await _tables_and_check(committed)
+    assert set(MVP_TABLES_0004) <= tables
+    await _alembic_ok(test_database_url, "check")

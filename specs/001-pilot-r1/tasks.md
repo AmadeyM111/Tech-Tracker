@@ -1626,7 +1626,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 ### Backend MVP: модель, права, проекты
 
 ## T69 — Модели MVP и миграция 0004
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-108 (уровень БД), FR-13, FR-14, FR-18, FR-18a, FR-21 (позиция только у задач верхнего уровня), FR-23 (длина комментария), AC-66 (CHECK журнала не меняет строки); plan §11.6, D-2…D-4, D-22, D-25, D-26, D-41, D-52, D-56…D-58
 - **Файлы:** `backend/app/domain/projects/models.py`, `backend/app/domain/tasks/models.py`,
   `backend/app/domain/comments/models.py` (+ `__init__.py` пакетов), `backend/app/domain/events/models.py`
@@ -1648,7 +1648,8 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   `postgresql_where`, чтобы `alembic check` был чистым). `downgrade` удаляет 4 таблицы и CHECK журнала.
 - **Готово, когда:** `pytest -q backend/tests/db/test_r11_models.py backend/tests/db/test_migrations.py backend/tests/db/test_event_log.py` и
   `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёные, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T69 (в T71–T77/T88):** (1) решение архитектора: целостность workspace и иерархии в MVP обеспечивает СЕРВИС, не БД (KISS) — БД допускает задачу workspace B в проекте workspace A, участника/комментарий с чужим `workspace_id`, подзадачу с родителем из другого проекта, второй уровень вложенности и `parent_id = id`; обязательны тесты на каждый инвариант в T71 (участник/проект), T74 (создание задачи/подзадачи → 422), T75 (перенос/правка), T79/T80 (комментарий ↔ workspace задачи); при росте — составные FK и `CHECK (parent_id <> id)` отдельной миграцией (бэклог); (2) формулировка D-58/T69 про `alembic check` неверна: он не сравнивает текст CHECK и предикаты частичных индексов — защита только каталожные тесты по `pg_indexes`/`pg_constraint`; не полагаться на `alembic check` при следующих миграциях; (3) FK `workspace_id` у новых таблиц NO ACTION, у R1.0 RESTRICT (`WorkspaceMixin` без `ondelete`) — унифицировать в D-26/следующей миграции; (4) CHECK статуса/приоритета строить из `TaskStatus`/`TaskPriority`; (5) тесты `test_t69_app_user_is_not_deletable_while_referenced` (проверять 23001 на пользователе без `workspace_member`) и `assert_too_long` (требовать 22001) ужесточить; (6) падение 0004 при «чужом» `entity_type` в журнале (удалить строку нельзя — append-only): описать в runbook T88; при росте журнала — `NOT VALID` + `VALIDATE`.
+- **Попытки:** 1
 
 ## T70 — Объектные права MVP и проверка получателей (чистые функции)
 - **Статус:** TODO

@@ -15,7 +15,7 @@ from __future__ import annotations
 import itertools
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from app.core.clock import utcnow
@@ -188,3 +188,175 @@ async def make_domain_event(
         .returning(get_table("domain_event").c.id)
     )
     return int(result.scalar_one())
+
+
+# --- MVP (T69, plan §11.6): проекты, участники, задачи, комментарии -----------------------
+
+_UNSET: object = object()
+
+
+@dataclass(frozen=True)
+class ProjectRow:
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    owner_id: uuid.UUID
+    name: str
+
+
+@dataclass(frozen=True)
+class ProjectMemberRow:
+    project_id: uuid.UUID
+    user_id: uuid.UUID
+    workspace_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class TaskRow:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    workspace_id: uuid.UUID
+    parent_id: uuid.UUID | None
+    position: int | None
+    created_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class CommentRow:
+    id: uuid.UUID
+    task_id: uuid.UUID
+    workspace_id: uuid.UUID
+
+
+async def make_project(
+    db: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    owner_id: uuid.UUID,
+    name: str = "Проект",
+    description: str = "",
+    created_by: uuid.UUID | None | object = _UNSET,
+    **extra: object,
+) -> ProjectRow:
+    """Строка ``project`` напрямую через Core; ``extra`` переопределяет/добавляет столбцы."""
+    now = utcnow()
+    project_id = uuid.uuid4()
+    values: dict[str, object] = {
+        "id": project_id,
+        "workspace_id": workspace_id,
+        "name": name,
+        "description": description,
+        "owner_id": owner_id,
+        "created_by": owner_id if created_by is _UNSET else created_by,
+        "created_at": now,
+        "updated_at": now,
+        "deleted_at": None,
+        "deleted_batch_id": None,
+    }
+    values.update(extra)
+    await db.execute(get_table("project").insert().values(**values))
+    return ProjectRow(
+        id=project_id, workspace_id=workspace_id, owner_id=owner_id, name=str(values["name"])
+    )
+
+
+async def make_project_member(
+    db: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    user_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    created_by: uuid.UUID | None = None,
+    **extra: object,
+) -> ProjectMemberRow:
+    now = utcnow()
+    values: dict[str, object] = {
+        "project_id": project_id,
+        "user_id": user_id,
+        "workspace_id": workspace_id,
+        "created_by": created_by,
+        "created_at": now,
+        "updated_at": now,
+    }
+    values.update(extra)
+    await db.execute(get_table("project_member").insert().values(**values))
+    return ProjectMemberRow(project_id=project_id, user_id=user_id, workspace_id=workspace_id)
+
+
+async def make_task(
+    db: AsyncSession,
+    *,
+    project_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    created_by: uuid.UUID,
+    parent_id: uuid.UUID | None = None,
+    title: str = "Задача",
+    description: str = "",
+    status: str = "todo",
+    priority: str = "base",
+    due_date: date | None = None,
+    assignee_id: uuid.UUID | None = None,
+    position: int | None | object = _UNSET,
+    **extra: object,
+) -> TaskRow:
+    """Строка ``task``. По умолчанию позиция 1024 у верхнего уровня и ``None`` у подзадачи."""
+    now = utcnow()
+    task_id = uuid.uuid4()
+    pos: int | None = (
+        (None if parent_id is not None else 1024) if position is _UNSET else position  # type: ignore[assignment]
+    )
+    values: dict[str, object] = {
+        "id": task_id,
+        "workspace_id": workspace_id,
+        "project_id": project_id,
+        "parent_id": parent_id,
+        "title": title,
+        "description": description,
+        "status": status,
+        "priority": priority,
+        "due_date": due_date,
+        "assignee_id": assignee_id,
+        "position": pos,
+        "created_by": created_by,
+        "created_at": now,
+        "updated_at": now,
+        "deleted_at": None,
+        "deleted_batch_id": None,
+    }
+    values.update(extra)
+    await db.execute(get_table("task").insert().values(**values))
+    return TaskRow(
+        id=task_id,
+        project_id=project_id,
+        workspace_id=workspace_id,
+        parent_id=parent_id,
+        position=pos,
+        created_by=created_by,
+    )
+
+
+async def make_comment(
+    db: AsyncSession,
+    *,
+    task_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    created_by: uuid.UUID | None = None,
+    body: str = "Комментарий",
+    **extra: object,
+) -> CommentRow:
+    now = utcnow()
+    comment_id = uuid.uuid4()
+    values: dict[str, object] = {
+        "id": comment_id,
+        "workspace_id": workspace_id,
+        "task_id": task_id,
+        "body": body,
+        "edited_at": None,
+        "created_by": created_by,
+        "created_at": now,
+        "updated_at": now,
+        "deleted_at": None,
+        "deleted_batch_id": None,
+    }
+    values.update(extra)
+    await db.execute(get_table("comment").insert().values(**values))
+    return CommentRow(id=comment_id, task_id=task_id, workspace_id=workspace_id)

@@ -16,6 +16,7 @@ from sqlalchemy import (
     ARRAY,
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Identity,
@@ -28,10 +29,17 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.models import Base
+from app.domain.events.catalog import EntityType
+
+_ENTITY_TYPES_SQL = ",".join(f"'{e.value}'" for e in EntityType)
 
 
 class DomainEvent(Base):
     __tablename__ = "domain_event"
+    __table_args__ = (
+        # D-41, D-58: тип объекта — одно из значений EntityType (в БД их 7, как в каталоге).
+        CheckConstraint(f"entity_type IN ({_ENTITY_TYPES_SQL})", name="entity_type_valid"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     workspace_id: Mapped[UUID] = mapped_column(
