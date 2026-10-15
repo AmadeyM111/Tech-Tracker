@@ -375,6 +375,26 @@ export interface paths {
         patch: operations["update_project"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Board
+         * @description Доска: 4 колонки со всеми карточками задач верхнего уровня, без пагинации (FR-47).
+         */
+        get: operations["get_board"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/members": {
         parameters: {
             query?: never;
@@ -491,6 +511,26 @@ export interface paths {
         patch: operations["update_task"];
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Task
+         * @description Переносит карточку в колонку между соседями; позиция считается на сервере (FR-28a).
+         */
+        post: operations["move_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/subtasks": {
         parameters: {
             query?: never;
@@ -599,6 +639,39 @@ export interface components {
              * Format: date-time
              */
             occurred_at: string;
+        };
+        /** Board */
+        Board: {
+            /** Columns */
+            columns: components["schemas"]["BoardColumn"][];
+            project: components["schemas"]["ProjectRef"];
+        };
+        /** BoardCard */
+        BoardCard: {
+            assignee: components["schemas"]["UserRef"] | null;
+            /** Due Date */
+            due_date: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Position */
+            position: number;
+            priority: components["schemas"]["TaskPriority"];
+            /** Progress */
+            progress: number | null;
+            status: components["schemas"]["TaskStatus"];
+            /** Subtask Count */
+            subtask_count: number;
+            /** Title */
+            title: string;
+        };
+        /** BoardColumn */
+        BoardColumn: {
+            status: components["schemas"]["TaskStatus"];
+            /** Tasks */
+            tasks: components["schemas"]["BoardCard"][];
         };
         /**
          * Capability
@@ -1028,6 +1101,17 @@ export interface components {
             status: components["schemas"]["TaskStatus"];
             /** Title */
             title: string;
+        };
+        /**
+         * TaskMove
+         * @description ``after_task_id`` — сосед сверху, ``before_task_id`` — снизу; без соседей — в конец.
+         */
+        TaskMove: {
+            /** After Task Id */
+            after_task_id?: string | null;
+            /** Before Task Id */
+            before_task_id?: string | null;
+            status: components["schemas"]["TaskStatus"];
         };
         /** TaskPermissions */
         TaskPermissions: {
@@ -2235,6 +2319,64 @@ export interface operations {
             };
         };
     };
+    get_board: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Board"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_members: {
         parameters: {
             query?: {
@@ -2764,6 +2906,75 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TaskDetail"];
                 };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    move_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskMove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Некорректный JSON в теле запроса (code: bad_request) */
             400: {

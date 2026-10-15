@@ -1825,8 +1825,10 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   и проверки контракта зелёные, линтер чистый.
 - **Попытки:** 1
 
+- **Заметки ревью T78 (в T79/T80/T88):** APPROVE с 1-й попытки (431 тест, 15 мутаций: 13 убиты, M7 эквивалентна). (1) порядок проверок `tasks.service.move` изменён на 404 → 403 → 422 домена (plan §4.5), описание T75 про «подзадача → 422 раньше 403» УСТАРЕЛО; правки вне списка: `domain/tasks/service.py`, `tests/domain/test_tasks_move.py`, `tests/api/test_projects.py`, `tests/cli/test_openapi.py`; (2) `after_task_id` имеет приоритет, если соседи не смежны или в обратном порядке (plan §4.8) — зафиксировано тестом; (3) нет теста на `extra="forbid"` у `TaskMove` (M15) и на число SQL-запросов доски (7, не зависит от числа карточек) — добавить при случае; (4) имя проекта читается вторым запросом (trivial).
+
 ## T78 — Доска: выборка и API переноса
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-25, AC-61 (через API: второй пользователь после перемещения видит тот же порядок), AC-80 (доска: одна карточка при 2 подзадачах, `subtask_count`, `progress`), AC-18 (удалённое не на доске), AC-21, FR-19b (исполнитель переносит свою чужую задачу), FR-28, FR-28a, FR-47 (исключение — SC-15); plan §11.4 (`Board`, `move`), D-61
 - **Файлы:** `backend/app/domain/boards/service.py` (+ `__init__.py`), `backend/app/api/v1/boards.py`,
   `backend/app/api/v1/schemas/boards.py` (+ `app/api/v1/__init__.py`, генерация контракта);
@@ -1841,12 +1843,12 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   перемещений и смен статуса в одной колонке через HTTP — без 500 (допустим 503 `service_busy`),
   позиции неудалённых задач колонки уникальны.
 - **Готово, когда:** `pytest -q backend/tests/api/test_board.py backend/tests/api/test_board_move.py` и проверки контракта зелёные, линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ### Backend MVP: комментарии
 
 ## T79 — Комментарии: очистка HTML и сервис
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-58, AC-103 (комментарии: СМ-участник удаляет чужой, СМ-не участник — 403), FR-23 (без упоминаний; SC-11); plan D-28, D-60, §11.5 (`can_edit_comment`, `can_delete_comment`), §10.2 п.2
 - **Файлы:** `backend/app/domain/comments/sanitize.py`, `backend/app/domain/comments/service.py`;
   тесты: `backend/tests/unit/test_sanitize.py`, `backend/tests/domain/test_comments_service.py`

@@ -822,6 +822,7 @@ EXPECTED_OPERATIONS: set[tuple[str, str]] = {
     # T77: задачи проекта (подробно — test_tasks.py, test_project_task_list.py)
     ("GET", "/api/v1/projects/{project_id}/tasks"),
     ("POST", "/api/v1/projects/{project_id}/tasks"),
+    ("GET", "/api/v1/projects/{project_id}/board"),  # T78
 }
 
 

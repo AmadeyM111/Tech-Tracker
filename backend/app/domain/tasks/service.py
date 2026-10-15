@@ -396,10 +396,10 @@ async def move(
 ) -> None:
     """Перенос карточки между соседями (FR-28a): ``after`` — сосед сверху, ``before`` — снизу."""
     ctx = await load_task_context(db, actor, task_id, lock_project="share")
-    if ctx.task.parent_id is not None:
-        raise _invalid(positions.SUBTASK_NOT_ON_BOARD)
     if not can_change_task_status(actor, ctx.project, ctx.task):
         raise Forbidden()
+    if ctx.task.parent_id is not None:  # 422 только после 403: не участник не узнает о подзадаче
+        raise _invalid(positions.SUBTASK_NOT_ON_BOARD)
     target = _status(status)
     task = await _load_task(db, task_id)
     await positions.move_task(
