@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -38,6 +39,9 @@ from app.domain.events.writer import UserEventDetails
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import WorkspaceMember
 
+logger = logging.getLogger(__name__)
+
+_ENTITY_TYPES: Final = frozenset(t.value for t in EntityType)
 _DETAILS_KEYS: Final = frozenset(UserEventDetails.__annotations__)
 _MAX_ENTRY_ID: Final = 2**63 - 1  # bigint: больше такого идентификатора не существует
 
@@ -101,7 +105,17 @@ async def _to_records(
     db: AsyncSession, workspace_id: UUID, events: Iterable[DomainEvent]
 ) -> list[AuditRecord]:
     """Один батч: логины авторов и существование пользователей-сущностей пространства."""
-    rows = list(events)
+    rows: list[DomainEvent] = []
+    for event in events:
+        if event.entity_type not in _ENTITY_TYPES:
+            # откат кода к версии без нового типа (D-41): строку пропускаем, значения не логируем
+            logger.warning(
+                "domain_event id=%s: неизвестный entity_type=%r, запись пропущена",
+                event.id,
+                event.entity_type,
+            )
+            continue
+        rows.append(event)
     wanted: set[UUID] = set()
     for event in rows:
         if event.actor_id is not None:
@@ -148,7 +162,12 @@ async def list_audit(
     entity_type: EntityType | None = None,
     actor_id: UUID | None = None,
 ) -> tuple[list[AuditRecord], bool]:
-    """Страница журнала аудита пространства актора, ``id DESC``; второй элемент — ``has_next``."""
+    """Страница журнала аудита пространства актора, ``id DESC``; второй элемент — ``has_next``.
+
+    Строки с неизвестным ``entity_type`` пропускаются: страница может быть короче
+    ``page_size``; ``has_next`` считается по «сырой» выборке, поэтому соседние строки
+    не теряются и не дублируются.
+    """
     _require_view(actor)
     stmt = _audit_select().where(
         DomainEvent.workspace_id == actor.workspace_id,
@@ -163,7 +182,7 @@ async def list_audit(
 
 
 async def get_audit_entry(db: AsyncSession, actor: Actor, entry_id: int) -> AuditRecord:
-    """Запись по ``id``; чужая, несуществующая и не аудитная (``in_audit = false``) — 404."""
+    """Запись по ``id``; чужая, несуществующая, не аудитная и с типом вне ``EntityType`` — 404."""
     _require_view(actor)
     if not 0 < entry_id <= _MAX_ENTRY_ID:
         raise NotFound()
@@ -178,5 +197,7 @@ async def get_audit_entry(db: AsyncSession, actor: Actor, entry_id: int) -> Audi
     ).one_or_none()
     if event is None:
         raise NotFound()
-    (record,) = await _to_records(db, actor.workspace_id, [event])
-    return record
+    records = await _to_records(db, actor.workspace_id, [event])
+    if not records:  # entity_type вне EntityType: запись нечитаема этой версией (D-41)
+        raise NotFound()
+    return records[0]

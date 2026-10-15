@@ -388,13 +388,14 @@ def test_t07_entity_type_enum_matches_plan() -> None:
     assert EntityType("user") == "user"
 
 
-def test_t07_event_action_has_only_user_actions_at_this_stage() -> None:
+def test_t07_event_action_contains_user_actions_and_is_strenum() -> None:
+    """T30: в R1.1 к ``user.*`` добавлены действия §10.5 (полный состав — unit-тест каталога)."""
     from enum import StrEnum
 
     from app.domain.events.catalog import EventAction
 
     assert issubclass(EventAction, StrEnum)
-    assert {m.value for m in EventAction} == USER_ACTIONS
+    assert {m.value for m in EventAction} >= USER_ACTIONS
 
 
 def test_t07_event_spec_is_frozen_dataclass_with_plan_fields() -> None:
@@ -406,13 +407,15 @@ def test_t07_event_spec_is_frozen_dataclass_with_plan_fields() -> None:
         "audit",
         "feed",
         "deal_history",
+        "fields",
+        "value_fields",
     ]
     spec = EventSpec(entity_type=EntityType("user"), audit=True, feed=None, deal_history=False)
     with pytest.raises(dataclasses.FrozenInstanceError):
         spec.audit = False  # type: ignore[misc]
 
 
-def test_t07_catalog_covers_every_action_as_audited_user_event() -> None:
+def test_t07_catalog_covers_every_action_and_user_actions_are_audited_user_events() -> None:
     from collections.abc import Mapping
 
     from app.domain.events.catalog import (
@@ -426,6 +429,8 @@ def test_t07_catalog_covers_every_action_as_audited_user_event() -> None:
     assert set(EVENT_CATALOG) == set(EventAction)
     for action, spec in EVENT_CATALOG.items():
         assert isinstance(spec, EventSpec)
+        if action.value not in USER_ACTIONS:
+            continue
         assert spec.entity_type == EntityType.USER, action
         assert spec.audit is True, action
         assert spec.feed is None, action
@@ -522,6 +527,7 @@ async def test_t07_changed_fields_and_changes_roundtrip(
     event_id = await _record(
         db,
         ws.id,
+        action=_action("task.updated"),
         changed_fields=["status", "due_date"],
         project_id=pid,
         deal_id=did,
@@ -622,6 +628,197 @@ async def test_ac65_details_allowed_only_for_user_entity_type(
     with pytest.raises(ValueError):
         await _record(db, ws.id, action=action, details={"role_from": "user", "role_to": "mixed"})
     assert await _count(db) == before
+
+
+# --- T30: белые списки полей (plan D-41, §10.5; BR-2, AC-65) ----------------------------
+
+SECRET = "TOP-SECRET-value-9f3a"
+
+
+async def _assert_rejected(db: AsyncSession, ws_id: uuid.UUID, **kw: Any) -> ValueError:
+    """``ValueError``, строка не записана, транзакция сессии рабочая."""
+    before = await _count(db)
+    with pytest.raises(ValueError) as info:
+        await _record(db, ws_id, **kw)
+    assert await _count(db) == before
+    assert (await db.execute(text("SELECT 1"))).scalar_one() == 1  # транзакция не испорчена
+    return info.value
+
+
+async def test_ac65_changed_field_outside_whitelist_is_rejected(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    exc = await _assert_rejected(
+        db,
+        ws.id,
+        action=_action("task.updated"),
+        project_id=uuid.uuid4(),
+        changed_fields=["status", "priority"],
+    )
+    assert "task.updated" in str(exc)
+    assert "priority" in str(exc)
+
+
+async def test_ac65_changed_fields_for_event_without_fields_are_rejected(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    exc = await _assert_rejected(
+        db, ws.id, action=_action("user.created"), changed_fields=["login"]
+    )
+    assert "user.created" in str(exc)
+    assert "login" in str(exc)
+
+
+async def test_ac65_duplicate_changed_field_is_rejected(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    exc = await _assert_rejected(
+        db,
+        ws.id,
+        action=_action("task.updated"),
+        project_id=uuid.uuid4(),
+        changed_fields=["status", "status"],
+    )
+    assert "task.updated" in str(exc)
+    assert "status" in str(exc)
+
+
+async def test_br2_changes_for_event_with_empty_value_fields_are_rejected(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    exc = await _assert_rejected(
+        db,
+        ws.id,
+        action=_action("project.updated"),
+        project_id=uuid.uuid4(),
+        changed_fields=["name"],
+        changes=[{"field": "name", "old": SECRET, "new": "x"}],
+    )
+    assert "project.updated" in str(exc)
+    assert "name" in str(exc)
+    assert SECRET not in str(exc)
+
+
+async def test_br2_change_field_outside_value_fields_is_rejected_without_values(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    exc = await _assert_rejected(
+        db,
+        ws.id,
+        action=_action("task.updated"),
+        project_id=uuid.uuid4(),
+        changed_fields=["title"],
+        changes=[{"field": "title", "old": SECRET, "new": SECRET + "-2"}],
+    )
+    text_ = str(exc)
+    assert "task.updated" in text_
+    assert "title" in text_
+    assert SECRET not in text_
+    assert SECRET not in repr(exc)
+
+
+async def test_br2_exception_text_has_no_values_for_invalid_changed_field(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    exc = await _assert_rejected(
+        db,
+        ws.id,
+        action=_action("task.updated"),
+        project_id=uuid.uuid4(),
+        changed_fields=["priority"],
+        changes=[{"field": "status", "old": SECRET, "new": "done"}],
+    )
+    assert SECRET not in str(exc)
+
+
+async def test_fr41_project_feed_event_without_project_id_is_rejected(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    exc = await _assert_rejected(db, ws.id, action=_action("task.created"), project_id=None)
+    assert "task.created" in str(exc)
+
+
+async def test_fr41_every_project_feed_action_requires_project_id(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    from app.domain.events.catalog import EVENT_CATALOG
+
+    ws = await make_workspace(db)
+    project_actions = [a for a, s in EVENT_CATALOG.items() if s.feed == "project"]
+    assert project_actions, "в каталоге нет событий ленты проекта"
+    for action in project_actions:
+        await _assert_rejected(db, ws.id, action=action, project_id=None)
+
+
+async def test_fr41_every_r11_event_is_recorded_with_catalog_attributes(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    """Валидные события R1.1: максимум полей из белых списков; строка пишется и читается."""
+    from app.domain.events.catalog import EVENT_CATALOG
+
+    ws = await make_workspace(db)
+    pid = uuid.uuid4()
+    recorded = 0
+    for action, spec in EVENT_CATALOG.items():
+        if spec.feed != "project":
+            continue
+        fields = sorted(spec.fields)
+        changes = [{"field": f, "old": "a", "new": "b"} for f in sorted(spec.value_fields)] or None
+        event_id = await _record(
+            db, ws.id, action=action, project_id=pid, changed_fields=fields, changes=changes
+        )
+        row = await _row(db, event_id)
+        assert row["action"] == action.value
+        assert row["entity_type"] == spec.entity_type.value
+        assert row["in_audit"] is spec.audit
+        assert row["project_id"] == pid
+        assert row["changed_fields"] == fields
+        assert row["changes"] == changes
+        recorded += 1
+    assert recorded == 15
+
+
+async def test_t30_valid_event_with_subset_of_fields_and_no_changes(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    event_id = await _record(
+        db,
+        ws.id,
+        action=_action("task.updated"),
+        project_id=uuid.uuid4(),
+        changed_fields=["description"],
+    )
+    row = await _row(db, event_id)
+    assert row["changed_fields"] == ["description"]
+    assert row["changes"] is None
+
+
+async def test_t30_user_event_without_project_id_still_valid(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    event_id = await _record(db, ws.id, action=_action("user.blocked"))
+    assert (await _row(db, event_id))["project_id"] is None
+
+
+async def test_t30_rejection_does_not_break_following_valid_write(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    await _assert_rejected(
+        db, ws.id, action=_action("task.updated"), project_id=uuid.uuid4(), changed_fields=["zzz"]
+    )
+    before = await _count(db)
+    await _record(db, ws.id, action=_action("user.created"))
+    assert await _count(db) == before + 1
 
 
 # --- транзакционность (AC-67) ------------------------------------------------------------

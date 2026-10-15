@@ -803,3 +803,94 @@ async def test_t18_list_plan_uses_partial_audit_index_for_small_workspace(
 
     assert "ix_domain_event_workspace_id_id_audit" in plan, plan
     assert "Seq Scan on domain_event" not in plan, plan
+
+
+# --- T30: устойчивое чтение журнала (plan D-41, §4.4) ---------------------------------------------
+
+UNKNOWN_TYPE = "gizmo"
+
+
+async def _drop_entity_type_check(env: ApiEnv) -> None:
+    """Снимает CHECK (если T33 уже добавил) внутри транзакции теста; INSERT остаётся допустимым."""
+    await env.execute(
+        text("ALTER TABLE domain_event DROP CONSTRAINT IF EXISTS ck_domain_event_entity_type_valid")
+    )
+
+
+async def _seed_with_unknown_type(
+    env: ApiEnv, ws_id: uuid.UUID, actor_id: uuid.UUID, layout: list[str]
+) -> list[int]:
+    """События по порядку ``layout`` (``"user"`` или неизвестный тип); id в том же порядке."""
+    await _drop_entity_type_check(env)
+    specs: list[dict[str, Any]] = [
+        {
+            "actor_id": actor_id,
+            "entity_type": et,
+            "action": "user.created" if et == "user" else "gizmo.created",
+            "details": {"role_from": SECRET_NAME, "role_to": SECRET_VALUE},
+            "changes": [{"field": "name", "old": SECRET_NAME, "new": SECRET_VALUE}],
+            "occurred_at": T0 + timedelta(minutes=i),
+        }
+        for i, et in enumerate(layout)
+    ]
+    return await _add_events(env, ws_id, specs)
+
+
+async def test_t30_unknown_entity_type_row_is_skipped_with_warning(
+    api_env: ApiEnv, caplog: pytest.LogCaptureFixture
+) -> None:
+    env = api_env
+    ws, admin, token = await admin_in_new_workspace(env)
+    ids = await _seed_with_unknown_type(env, ws.id, admin.id, ["user", UNKNOWN_TYPE, "user"])
+    bad_id = ids[1]
+
+    with caplog.at_level("WARNING"):
+        r = await _get_list(env, token, page_size=100)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert [e["id"] for e in body["items"]] == [ids[2], ids[0]]
+    assert body["has_next"] is False
+    assert UNKNOWN_TYPE not in r.text
+
+    warnings = [rec for rec in caplog.records if rec.levelname == "WARNING"]
+    mentioning = [rec for rec in warnings if str(bad_id) in rec.getMessage()]
+    assert mentioning, "нет warning с id пропущенной записи"
+    assert any(UNKNOWN_TYPE in rec.getMessage() for rec in mentioning)
+    for rec in caplog.records:
+        rendered = rec.getMessage() + " " + str(rec.__dict__.get("args", ""))
+        assert SECRET_NAME not in rendered
+        assert SECRET_VALUE not in rendered
+    assert SECRET_NAME not in caplog.text
+    assert SECRET_VALUE not in caplog.text
+
+
+async def test_t30_pagination_survives_skipped_rows(api_env: ApiEnv) -> None:
+    env = api_env
+    ws, admin, token = await admin_in_new_workspace(env)
+    layout = ["user", "user", UNKNOWN_TYPE, "user", "user", UNKNOWN_TYPE, "user"]
+    ids = await _seed_with_unknown_type(env, ws.id, admin.id, layout)
+    good_desc = [i for i, et in sorted(zip(ids, layout, strict=True), reverse=True) if et == "user"]
+
+    seen: list[int] = []
+    page, last_has_next = 1, True
+    while last_has_next:
+        assert page <= len(layout) + 1, "has_next не становится False"
+        r = await _get_list(env, token, page=page, page_size=2)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["page"] == page
+        assert len(body["items"]) <= 2
+        seen.extend(e["id"] for e in body["items"])
+        last_has_next = body["has_next"]
+        page += 1
+    assert seen == good_desc  # без пропусков порядка, дублей и неизвестных типов
+
+
+async def test_t30_unknown_entity_type_by_id_is_404_not_500(api_env: ApiEnv) -> None:
+    env = api_env
+    ws, admin, token = await admin_in_new_workspace(env)
+    ids = await _seed_with_unknown_type(env, ws.id, admin.id, ["user", UNKNOWN_TYPE])
+    ok = await env.client.get(f"{AUDIT}/{ids[0]}", headers=env.auth(token))
+    assert ok.status_code == 200, ok.text
+    r = await env.client.get(f"{AUDIT}/{ids[1]}", headers=env.auth(token))
+    assert (r.status_code, code_of(r)) == (404, "not_found")

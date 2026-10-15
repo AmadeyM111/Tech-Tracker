@@ -671,7 +671,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T30 — Каталог событий R1.1, белые списки полей, устойчивое чтение журнала
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** FR-41, BR-2, AC-65 (основа: в журнале только имена полей из белого списка), AC-66 (журнал не меняется); plan D-41, §4.4, §10.5; приёмка «R1.1!» (расширение `EntityType`, белый список `changed_fields`), ревью T18/T19
 - **Файлы:** `backend/app/domain/events/catalog.py`, `backend/app/domain/events/writer.py`,
   `backend/app/domain/events/queries.py`; тесты: `backend/tests/unit/test_event_catalog.py`,
@@ -690,10 +690,11 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
   CHECK `ck_domain_event_entity_type_valid` добавляет T33 (миграция 0004); тест пропуска строки
   снимает этот CHECK внутри транзакции теста (`ALTER TABLE … DROP CONSTRAINT IF EXISTS`), если он уже есть.
 - **Готово, когда:** `pytest -q backend/tests/unit/test_event_catalog.py backend/tests/db/test_event_log.py backend/tests/api/test_audit.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T30 (в T36/T41/T55/T58):** (1) `record_event`: `changes=[]` у события с непустым `value_fields` пишется как `[]`, у события с пустым — `ValueError`; вызывающим (T36 `project.updated`, T41 `task.updated`) передавать `None`, когда значений нет, лента T55 должна понимать `[]` и `None`; добавить тест на `changes=[]`; (2) нет требования «поля `changes` ⊆ `changed_fields`» и проверки повторов в `changes` — решить в T41; (3) подписи в `AuditPage.ACTION_CODES` для `project.ownership_transferred|archived|unarchived` — в T58/T64 (иначе показываются сырые коды, AC-98); (4) пустая страница журнала при `has_next=true` после пропуска строки — допустимо.
+- **Попытки:** 1
 
 ## T31 — Команда обслуживания: каркас, `--dry-run`, границы истечения сессий, регулярный запуск
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** FR-25b (каркас автоочистки), FR-59 (истёкшие сессии удаляются), AC-63 и AC-66 *инфра* (каркас; содержательная часть — T54); plan D-42, §4.13, §10.4 (`run_maintenance`, `MaintenanceReport`); приёмка «R1.1!» (регулярный `maintenance`, `--dry-run`, unit-тест границ), заметки T16a/T19/T27
 - **Файлы:** `backend/app/domain/ops/__init__.py`, `backend/app/domain/ops/maintenance.py`,
   `backend/app/domain/system/maintenance.py` (параметр `dry_run`), `backend/app/cli/commands/maintenance.py`,
