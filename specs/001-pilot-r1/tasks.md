@@ -1847,8 +1847,10 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 
 ### Backend MVP: комментарии
 
+- **Заметки ревью T79 (в T80/T88/backlog):** 2 итерации (CHANGES_REQUESTED → APPROVE по дельте). Исправлено по ревью: (1) запасной путь `strip_html` после 16 проходов собирал тег — теперь вырезается серия `<+`; (2) терялся `&` в конце текста (sentinel `\n`); (3) гонка `create_comment` ↔ `delete_task` — `_lock_task_rows` (FOR SHARE: родитель → задача, `deleted_at IS NULL`). Остаток: (а) **ВЗАИМОБЛОКИРОВКА в `tasks/service.py::delete_task` (T75)**: комментарии обновляются раньше задач, при параллельном `delete_task(parent)` и `delete_task(sub)` с комментариями у подзадачи — 40P01 (≈56/30 раундов в стрессе) → 500 вместо 503; фикс: сначала `UPDATE task` (или `FOR NO KEY UPDATE ORDER BY id` на семье), потом `UPDATE comment`; выполнить до T89 вместе с T80; (б) нет теста на позицию sentinel (мутант M5): `strip_html("line1\n<br>line2") == "line1\nline2"`, `strip_html("x\n&amp;y") == "x\n&amp;y"`; (в) `a<b` без пробелов в конце/середине ввода вырезается как тег (поведение HTMLParser) — записать как известное; (г) `create_comment` держит FOR SHARE на родителе и задаче до конца транзакции — T80: короткие транзакции; (д) тест длины >10 000 на уровне сервиса есть; NUL строго 422.
+
 ## T79 — Комментарии: очистка HTML и сервис
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-58, AC-103 (комментарии: СМ-участник удаляет чужой, СМ-не участник — 403), FR-23 (без упоминаний; SC-11); plan D-28, D-60, §11.5 (`can_edit_comment`, `can_delete_comment`), §10.2 п.2
 - **Файлы:** `backend/app/domain/comments/sanitize.py`, `backend/app/domain/comments/service.py`;
   тесты: `backend/tests/unit/test_sanitize.py`, `backend/tests/domain/test_comments_service.py`
@@ -1864,10 +1866,10 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   удалённые (`body = None`, `is_deleted = True`, автор и время сохраняются), `ORDER BY created_at,
   id`, `paginate`; `permissions {edit, delete}`. Событий и упоминаний нет.
 - **Готово, когда:** `pytest -q backend/tests/unit/test_sanitize.py backend/tests/domain/test_comments_service.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T80 — API комментариев
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-58, AC-103 (комментарии), AC-21; FR-23; plan §11.4 (комментарии), D-65
 - **Файлы:** `backend/app/api/v1/comments.py`, `backend/app/api/v1/schemas/comments.py` (+ `__init__`,
   генерация контракта); тесты: `backend/tests/api/test_comments.py`, дополнение
