@@ -1789,7 +1789,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Попытки:** 3
 
 ## T76 — Задачи: карточка и списки (выборки)
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-6, AC-7 (прогресс в карточке), AC-11, AC-22 (частично: фильтры исполнитель и статус, пагинация), AC-43 («находится фильтром по исполнителю»), AC-80 (подзадачи в списках), AC-18 (удалённое не в списках), FR-17, FR-22, FR-26, FR-27 (в редакции SC-10), FR-47; plan §11.4 (`TaskDetail`, `TaskListItem`), D-62
 - **Файлы:** `backend/app/domain/tasks/queries.py`; тесты: `backend/tests/domain/test_tasks_queries.py`
 - **Зависит от:** T73, T74
@@ -1801,10 +1801,11 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   `ORDER BY created_at DESC, id DESC`, `paginate`. `list_my_tasks(db, actor, params)`: исполнитель =
   актор, неудалённые задача и проект, актор — участник, `ORDER BY due_date ASC NULLS LAST, id`.
 - **Готово, когда:** `pytest -q backend/tests/domain/test_tasks_queries.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T76 (в T77/T78):** (1) `permissions.create_subtask` = «операция пройдёт»: для подзадачи False (plan §11.4 записать); (2) `list_my_tasks`: ТА/без роли → строго 403 (в домене); (3) карточка и TaskFacts для permissions — из одного чтения строки (NotFound при исчезновении); (4) списки: `defer(Task.description)`; `get_task` 5 запросов при любом числе подзадач; списки page_size=100 — 3–4 запроса; (5) нарушение инварианта (id не найден в user_refs) → `RuntimeError("UserRef missing …")` — в R1 недостижимо; (6) EXPLAIN на 50 000 задач: индексы `ix_task_project_id_created_at`, `ix_task_workspace_id_assignee_id_due_date` используются; (7) тесты гонок «исчезновение строки между чтениями» и «снятие исполнителя между чтениями» — перенести в test_tasks_queries.py (образцы `/tmp/t76rev/test_rev.py` — может быть удалён); (8) `list_my_tasks` join с project без `Project.workspace_id` (прикрыт `Task.workspace_id`); (9) plan §10.4 сигнатуры list_project_tasks/list_my_tasks заменены §11.4 — пометить SUPERSEDED.
+- **Попытки:** 2
 
 ## T77 — API задач: карточка, подзадачи, списки
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-6, AC-7, AC-8, AC-9, AC-11, AC-18 (частично), AC-21, AC-22 (частично), AC-24, AC-42, AC-43 (задачи), AC-46, AC-47, AC-48 (SC-2), AC-49, AC-55 (задачи чужого проекта — 403), AC-56, AC-68 (формат срока), AC-74 (исполнитель), AC-75 (`/me/tasks` без роли — 403), AC-77 (в редакции SC-14), AC-80 (списки), AC-81, AC-94 (несуществующая и мягко удалённая задача — 404), AC-99 (частично), AC-103 (задачи), AC-106 (частично), AC-108 (задача), AC-109; plan §11.4, D-51, D-52, D-65
 - **Файлы:** `backend/app/api/v1/tasks.py`, `backend/app/api/v1/schemas/tasks.py` (+ `__init__`,
   генерация контракта); тесты: `backend/tests/api/test_tasks.py`, `backend/tests/api/test_subtasks.py`,
