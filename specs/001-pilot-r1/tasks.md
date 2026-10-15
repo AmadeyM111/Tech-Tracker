@@ -2018,7 +2018,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Заметки ревью T88 (в T89/backlog):** CHANGES_REQUESTED → правки (прогресс 66 %, «at least every 15 s», HTML вырезается, формулировка 503, шаг D-54 в демо, ENV=production в stderr, FR-27a в «Отложено», AC-107 ручной) — приняты без повторного ревью (текстовые). Вне списка: два T31-теста без требования «корзина 30 дней» (ADR-0012 п.3), whitelist `test_frontend_scaffold` (+features/comments), T89a: `AuditPage` показывает `project.ownership_transferred` текстом и поле `owner_id` → «Владелец проекта». Бэклог: «кто → кому» в журнале передачи владения (нужна правка `events/queries.py`/`schemas/audit.py`/openapi); текст предупреждения CLI demo-data «удалите их» против README «заблокируйте» (удаления УЗ нет).
 
 ## T89 — Приёмка MVP
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE (автоматическая и API-часть; ручной чек-лист в Chromium — за владельцем)
 - **AC:** все AC plan §11.7; NFR-10
 - **Файлы:** правок кода нет; вердикт ревьюера оркестратор сохраняет в
   `specs/001-pilot-r1/reviews/MVP-acceptance.md`; дефекты — задачами `T89a…`
@@ -2030,7 +2030,8 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   прогон `docs/acceptance/mvp-demo.md` в Chromium (в т.ч. с клавиатуры и двумя пользователями на
   доске).
 - **Готово, когда:** `bash scripts/check.sh` и `infra_stack` зелёные; чек-лист пройден; ревьюер подтверждает трассировку.
-- **Попытки:** 0
+- **Попытки:** 1
+- **Вердикт:** `specs/001-pilot-r1/reviews/MVP-acceptance.md` — ПРИНЯТО С ЗАМЕЧАНИЯМИ. Дефекты: T89b (503 при плотных переносах, positions.py `lock_task_columns`), T89c (таблица §11.7), T89d (текст предупреждения demo-data), T89e (Cache-Control no-store) — после показа.
 
 ### Порядок MVP и критический путь
 
