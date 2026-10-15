@@ -1,0 +1,17 @@
+# Контекст сборки образа API: только исходники, миграции и конфигурация (NFR-4).
+.venv
+venv
+tests
+.git
+.gitignore
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+**/.env*
+docs
+node_modules
+.pytest_cache
+.mypy_cache
+.ruff_cache
+Dockerfile
+.dockerignore

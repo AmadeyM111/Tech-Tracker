@@ -11,3 +11,13 @@ dist/
 .ruff_cache/
 .DS_Store
 .claude/settings.local.json
+*.egg-info/
+frontend/dist
+deploy/tls/*.crt
+deploy/tls/*.key
+backups/
+deploy/tls/*
+!deploy/tls/README.md
+
+# dev DATA_DIR (секреты: secret_key, файл пароля первого администратора)
+.data/

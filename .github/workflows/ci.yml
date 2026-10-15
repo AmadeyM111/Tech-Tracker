@@ -1,0 +1,142 @@
+# CI GOSTracker (T27, NFR-10, N-6): backend, frontend, contract, infra.
+# Секретов нет; права токена - только чтение; публикаций в репозиторий нет.
+name: CI
+
+# push - только main (PR из ветки не прогоняется дважды); pull_request - любые ветви.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Новый push в ветку PR отменяет устаревший прогон; прогоны main не отменяются никогда.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tracker
+          POSTGRES_PASSWORD: tracker
+          POSTGRES_DB: tracker_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tracker -d tracker_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Только БД *_test: тесты отказываются работать с другими именами (plan §5).
+      TEST_DATABASE_URL: postgresql+asyncpg://tracker:tracker@localhost:5432/tracker_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Установка зависимостей
+        run: pip install -e "backend[dev]"
+      - name: ruff check (чистая выгрузка, без кэша)
+        run: ruff check --no-cache backend
+      - name: ruff format
+        run: ruff format --check backend
+      - name: mypy
+        run: mypy --config-file backend/pyproject.toml backend/app
+      - name: Миграции на тестовой БД
+        env:
+          DATABASE_URL: postgresql+asyncpg://tracker:tracker@localhost:5432/tracker_test
+          ENV: test
+        run: alembic -c backend/alembic.ini upgrade head
+      - name: Модели совпадают с миграциями
+        env:
+          DATABASE_URL: postgresql+asyncpg://tracker:tracker@localhost:5432/tracker_test
+          ENV: test
+        run: alembic -c backend/alembic.ini check
+      - name: pytest (без infra_stack)
+        run: pytest -q backend/tests -m "not infra_stack"
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  contract:
+    name: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Установка зависимостей
+        run: |
+          pip install -e "backend[dev]"
+          npm --prefix frontend ci
+      - name: Перегенерация API-артефактов (БД не нужна)
+        run: bash scripts/gen-api.sh
+      - name: Артефакты совпадают с закоммиченными
+        run: git diff --exit-code -- docs/api frontend/src/shared/api/schema.d.ts
+
+  infra:
+    name: infra
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    timeout-minutes: 40
+    env:
+      GT_INFRA_STACK: "1"
+      GT_INFRA_PROJECT: gostracker-infratest
+      HTTP_PORT: "18080"
+      HTTPS_PORT: "18443"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Установка зависимостей тестов
+        run: pip install -e "backend[dev]"
+      - name: Подъём стека (отдельный проект, порты 18080/18443)
+        run: docker compose -p gostracker-infratest up -d --build --wait
+      - name: Тесты работающего стека
+        run: pytest -q -m infra_stack backend/tests/infra
+      - name: Логи стека при ошибке
+        if: failure()
+        run: docker compose -p gostracker-infratest logs
+      - name: Остановка стека и удаление томов
+        if: always()
+        run: docker compose -p gostracker-infratest down -v

@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "tracker-backend"
 version = "0.0.1"
@@ -5,26 +9,62 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
-    "sqlalchemy>=2.0",
+    "sqlalchemy>=2.0,<2.2",
     "alembic>=1.13",
     "asyncpg>=0.30",
     "pydantic-settings>=2.6",
+    "argon2-cffi>=25.1,<26",
+    "tzdata>=2025.2",
+    "greenlet>=3.0,<4",
 ]
 
+[project.scripts]
+gostracker = "app.cli.main:main"
+
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-asyncio>=0.24", "httpx>=0.28", "ruff>=0.7", "mypy>=1.13"]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "httpx>=0.28", "ruff==0.17.0", "mypy>=1.13",
+    "pyyaml>=6.0,<7", "types-PyYAML>=6.0,<7"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+"app.core.security" = ["data/*"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = ["E", "F", "I", "UP", "B", "SIM", "C901", "PLR0912", "PLR0913", "PLR0915", "ARG"]
+
+# Ratchet (T32a): пороги равны текущим максимумам backend/app; менять можно только вниз.
+[tool.ruff.lint.mccabe]
+max-complexity = 16
+
+[tool.ruff.lint.pylint]
+max-branches = 16
+max-args = 10
+max-statements = 34
+
+[tool.ruff.lint.per-file-ignores]
+# тесты: сложность и фикстуры (ARG) не ограничиваем; больше ничего не отключать
+"tests/**" = ["C901", "PLR0912", "PLR0913", "PLR0915", "ARG"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+pythonpath = ["."]
+markers = [
+    "committed: тест с реальной фиксацией транзакций в БД (без отката)",
+    "infra_static: статическая проверка инфраструктурных файлов (без запуска стека)",
+    "infra_stack: проверка в реальном стеке docker compose",
+]
 
 [tool.mypy]
 strict = true
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
 ignore_missing_imports = true

@@ -1,0 +1,84 @@
+/* Visible keyboard focus (NFR-7). #0b3d91 on white: contrast about 10:1 (>= 4.5:1). */
+:focus-visible {
+  outline: 3px solid #0b3d91;
+  outline-offset: 2px;
+}
+
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.ui-hint {
+  color: #3d3d3d;
+  font-size: 0.875rem;
+}
+
+.ui-error {
+  color: #9b1c1c;
+  margin: 0 0 12px;
+}
+
+.ui-form {
+  max-width: 24rem;
+  margin: 2rem auto;
+}
+
+.ui-wide {
+  max-width: 72rem;
+  margin: 2rem auto;
+}
+
+.ui-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.ui-table th,
+.ui-table td {
+  border-bottom: 1px solid #c4c4c4;
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ui-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ui-pagination {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 0;
+}
+
+.ui-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ui-dialog {
+  background: #fff;
+  max-width: 28rem;
+  padding: 1.5rem;
+}
+
+.ui-secret {
+  border: 2px solid #0b3d91;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.ui-secret code {
+  font-size: 1.25rem;
+  user-select: all;
+}
