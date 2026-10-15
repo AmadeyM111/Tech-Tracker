@@ -32,18 +32,20 @@ const PAGE_PATHS = [
 ];
 // T82 replaced the stubs of /projects and /projects/:id by real screens (own requests, dynamic h1);
 // T83/T84 will do the same for the rest. STUB_PATHS keep the "stub" checks of T81.
-const STUB_PATHS = PAGE_PATHS.slice(2);
+const STUB_PATHS = PAGE_PATHS.slice(2, 3);
 const PROJECT_ID = "33333333-3333-4333-8333-333333333333";
 const PROJECT_ROUTES = {
   "GET /api/v1/projects": () => j(200, page([])),
+  "GET /api/v1/me/tasks": () => j(200, page([])),
   [`GET /api/v1/projects/${PROJECT_ID}`]: () => err(404, "not_found"),
   [`GET /api/v1/projects/${PROJECT_ID}/members`]: () => err(404, "not_found"),
 };
 const FORBIDDEN_LINKS = ["/crm", "/labels", "/trash", "/search", "/mentions", "/deals", "/pipeline"];
 
 function hrefs(): string[] {
-  const nav = screen.getByRole("navigation");
-  return Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href") ?? "");
+  // Страницы со списками содержат ещё и nav пагинации (без ссылок): собираем ссылки со всех.
+  const navs = screen.getAllByRole("navigation");
+  return navs.flatMap((nav) => Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href") ?? ""));
 }
 
 describe("T81 routes under the session gate", () => {
@@ -64,7 +66,7 @@ describe("T81 routes under the session gate", () => {
     const home = renderApp("/");
     titles.push((await screen.findByRole("heading", { level: 1 })).textContent ?? "");
     home.unmount();
-    for (const p of ["/projects", ...STUB_PATHS]) {
+    for (const p of ["/projects", "/my-tasks", ...STUB_PATHS]) {
       const r = renderApp(p);
       await screen.findByRole("main");
       titles.push(screen.getByRole("heading", { level: 1 }).textContent ?? "");

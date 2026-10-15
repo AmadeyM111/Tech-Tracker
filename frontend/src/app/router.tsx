@@ -7,6 +7,7 @@ import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
+import { MyTasksPage } from "../features/tasks/TaskList";
 import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
 import { me, type MeResponse } from "../features/auth/api";
@@ -301,7 +302,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/projects/:projectId"
         element={
           <BusinessScreen insideMain={insideMain}>
-            {(profile) => <ProjectPage currentUserId={profile.id} />}
+            {(profile) => <ProjectPage currentUserId={profile.id} currentRole={profile.role} />}
           </BusinessScreen>
         }
       />
@@ -317,7 +318,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/my-tasks"
         element={
           <BusinessScreen insideMain={insideMain}>
-            {() => <h1>{t("tasks.my_title")}</h1>}
+            {() => <MyTasksPage />}
           </BusinessScreen>
         }
       />
