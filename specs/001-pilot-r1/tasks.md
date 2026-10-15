@@ -1749,7 +1749,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Попытки:** 3
 
 ## T74 — Задачи: создание задачи и подзадачи
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-8, AC-9, AC-24, AC-47 (подзадача себе — да, другому — 403), AC-49, AC-56, AC-61 (новая — последняя в первой колонке), AC-74 (исполнитель), AC-106 (не участник — 403), AC-108 (задача), AC-109, FR-18…FR-21, FR-28a; plan §11.4, §11.5 (`can_create_task`, `can_create_subtask`), §4.5 (FR-20), §10.2, §10.4 (`context`)
 - **Файлы:** `backend/app/domain/tasks/context.py`, `backend/app/domain/tasks/service.py`
   (`create_task`, `create_subtask`); тесты: `backend/tests/domain/test_tasks_create.py`
@@ -1874,7 +1874,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 ### Фронтенд MVP
 
 ## T81 — Фронтенд MVP: навигация, маршруты, коды ошибок, выбор пользователя
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** NFR-6, NFR-7 (видимый фокус, клавиатура), FR-45 (сообщения по кодам MVP: `service_busy`, `owner_cannot_be_removed`, `subtask_depth_exceeded`, `invalid_neighbors`, коды получателей), FR-10 (меню по `/me.capabilities`; сервер проверяет сам); plan §4.14, §11.4; заметка ревью T32 п.1 (сканер строк на compiler API — до экранов)
 - **Файлы:** `frontend/src/app/router.tsx` (маршруты `/projects`, `/projects/:projectId`,
   `/tasks/:taskId`, `/my-tasks` под `SessionGate`, страницы-заглушки заменяют T82–T84; меню:
@@ -1888,10 +1888,11 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   ограничивает выбор переданным набором id (участники проекта). Пунктов меню для CRM, меток,
   корзины, поиска, упоминаний нет.
 - **Готово, когда:** фронтенд зелёный (общие условия R1.1).
-- **Попытки:** 0
+- **Заметки ревью T81:** кандидатов для `allowedIds` брать из GET /projects/{id}/members (не /users); UserPicker: live region, maxLength 64, Escape — сделано в T82; сканер `scanLatinUi` на compiler API; известные лазейки: вызовы/объектные литералы/массивы, `value`/`defaultValue` в TECHNICAL_ATTRS.
+- **Попытки:** 1
 
 ## T82 — Экраны проектов: список, создание, карточка, участники, владение, удаление
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** UF-3 (проект и участники), FR-14…FR-17 (интерфейс, без статуса), FR-15a (подтверждение самоисключения), AC-51…AC-55, AC-72, AC-73, AC-110 (поведение по ответам API); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/projects/api.ts`, `frontend/src/features/projects/ProjectsPage.tsx`,
   `frontend/src/features/projects/ProjectPage.tsx` (+ маршруты в `router.tsx`);
@@ -1903,7 +1904,8 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   исключение, самоисключение с подтверждением). Вкладки «Доска» (по умолчанию, T86), «Задачи» (T83),
   «Участники» — места под T83/T86. Ошибки — по `code`.
 - **Готово, когда:** фронтенд зелёный.
-- **Попытки:** 0
+- **Заметки ревью T82 (в T83/T84/T86):** ключи задач и доски держать под префиксом `["projects", id, …]`; `listAllMembers` вынести и переиспользовать (`["projects", id, "members"]`) для `allowedIds` исполнителя; опрос карточки не ведётся — `usePolledQuery` в списках/доске (FR-29); фокус на h1 при входе на экран — паттерн; UserPicker `busy`/`quietError`; общий `Pagination` при busy не теряет фокус, но на граничной странице нажатая кнопка становится disabled и фокус уходит в BODY (перевести на соседнюю кнопку); правка T82 вне списка: ru.ts, UserPicker.tsx, ui.css, Pagination.tsx; `.ui-pre` — перенос длинных слов сделан.
+- **Попытки:** 2
 
 ## T83 — Списки задач и создание задачи
 - **Статус:** TODO
