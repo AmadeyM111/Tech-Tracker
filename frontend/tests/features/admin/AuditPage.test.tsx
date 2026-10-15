@@ -360,6 +360,28 @@ describe("action texts, roles, timezone (review T24 attempt 2)", () => {
     }
   });
 
+  it("project_ownership_transfer_shows_text_not_raw_code_or_owner_id", async () => {
+    const transfer = {
+      id: 400,
+      occurred_at: "2026-10-13T09:00:00Z",
+      actor: { kind: "user", id: ADMIN_ID, login: "demo.ba1" },
+      action: "project.ownership_transferred",
+      entity_type: "project",
+      entity_id: "55555555-5555-4555-8555-555555555555",
+      entity_deleted: false,
+      changed_fields: ["owner_id"],
+      details: null,
+    };
+    const { container } = await open({ [AUDIT]: () => j(200, page([transfer])) });
+    const row = entry(container, 400);
+    expect(cell(row, "action").textContent).toBe("Передано владение проектом");
+    expect(cell(row, "action").textContent).toBe(ru["admin.audit.action.project.ownership_transferred"]);
+    expect(row.textContent).not.toMatch(/ownership_transferred|owner_id|[{}]/);
+    expect(cell(row, "changed_fields").textContent).toBe("Владелец проекта");
+    expect(cell(row, "details").textContent).toBe("");
+    expect(DICT).toContain(cell(row, "entity_type").textContent);
+  });
+
   it("nfr5_time_is_europe_moscow_not_utc", async () => {
     const { container } = await open();
     // 2026-10-12T21:30:00Z -> 13.10.2026 00:30 MSK (UTC+3)

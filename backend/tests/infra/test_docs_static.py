@@ -482,12 +482,11 @@ def test_t31_readme_regular_maintenance_section(which: int, heading_re: str) -> 
 
 
 @pytest.mark.parametrize(
-    ("which", "heading_re", "trash", "sessions", "no_sched"),
+    ("which", "heading_re", "sessions", "no_sched"),
     [
         (
             0,
             r"Регулярное обслуживание",
-            r"корзин\w*.{0,200}30\s*(дн|суток)|30\s*(дн|суток).{0,200}корзин",
             r"сесси",
             r"(нет|не\s+(запуска|использ|добав)\w*).{0,160}(планировщик|сервис)"
             r"|(планировщик|сервис).{0,160}(нет|не\s+(входит|добавл)\w*)",
@@ -495,7 +494,6 @@ def test_t31_readme_regular_maintenance_section(which: int, heading_re: str) -> 
         (
             1,
             r"Regular maintenance",
-            r"trash.{0,200}30\s*days|30\s*days.{0,200}trash|30-day",
             r"session",
             r"(no|not|without).{0,160}(scheduler|background|compose service)"
             r"|(scheduler|background).{0,160}(not|no\b|absent)",
@@ -504,10 +502,9 @@ def test_t31_readme_regular_maintenance_section(which: int, heading_re: str) -> 
     ids=["ru", "en"],
 )
 def test_t31_readme_maintenance_explains_why_and_no_scheduler(
-    which: int, heading_re: str, trash: str, sessions: str, no_sched: str
+    which: int, heading_re: str, sessions: str, no_sched: str
 ) -> None:
     section = _maintenance_section(_parts()[which], heading_re)
-    assert _has(section, trash), "не сказано про срок корзины 30 дней"
     assert _has(section, sessions), "не сказано про истёкшие сессии"
     assert _has(section, no_sched), "нет пометки: фонового планировщика/сервиса compose в R1 нет"
 
@@ -540,4 +537,277 @@ def test_t32_quick_start_waits_for_healthy_before_reading_password(which: int) -
     assert ups, "перед чтением файла нет `docker compose up -d --build --wait` в том же блоке"
     assert not re.search(r"^docker compose up\b(?![^\n]*--wait)[^\n]*$", before, re.M), (
         "в блоке остался запуск без --wait перед чтением файла пароля"
+    )
+
+
+# --- T88: документация MVP и чек-лист демо (NFR-3, NFR-11, AC-1 подготовка, D-64) -----------
+# Проверки намеренно нестрогие к формулировкам: ключевые слова/регулярки отдельно для ru и en.
+
+CHECKLIST = ROOT / "docs" / "acceptance" / "mvp-demo.md"
+_LANGS = [0, 1]
+_LANG_IDS = ["ru", "en"]
+
+# (ru-регэксп, en-регэксп, описание)
+MVP_README_TERMS: list[tuple[str, str, str]] = [
+    (r"MVP", r"MVP", "название MVP"),
+    (
+        r"отложен|не\s+входит|вне\s+MVP",
+        r"deferred|postponed|not\s+(included|part)|out\s+of\s+scope",
+        "что отложено",
+    ),
+    (r"CRM", r"CRM", "CRM отложен"),
+    (r"метк", r"labels?|tags?", "метки отложены"),
+    (r"вложени", r"attachments?", "вложения отложены"),
+    (r"корзин", r"trash|recycle", "корзина отложена"),
+    (r"поиск", r"search", "поиск отложен"),
+    (r"экспорт", r"export", "экспорт отложен"),
+    (r"резервн\w*\s+копи|бэкап|backup", r"backup", "резервная копия отложена"),
+    (
+        r"docker compose exec api gostracker demo-data",
+        r"docker compose exec api gostracker demo-data",
+        "команда demo-data",
+    ),
+    (r"demo-passwords\.txt", r"demo-passwords\.txt", "файл паролей демо"),
+    (r"reset-password", r"reset-password", "восстановление: reset-password"),
+    (
+        r"(удален\w+|удалени\w+|снос\w+|-v\b).{0,80}том|том.{0,80}(удал|-v\b)",
+        r"(remov|delet|drop|-v\b).{0,80}volume|volume.{0,80}(remov|delet|drop|-v\b)",
+        "переустановка с удалением тома",
+    ),
+    (r"ENV\s*=\s*production", r"ENV\s*=\s*production", "предупреждение ENV=production"),
+    (r"demo\.", r"demo\.", "учётные записи demo.*"),
+    (r"заблок|удал", r"block|disabl|delet|remov", "demo.* удалить/заблокировать"),
+    (
+        r"UF-2.{0,10}UF-6|UF-2\s*[…\-–—.]+\s*(UF-)?6",
+        r"UF-2.{0,10}UF-6|UF-2\s*[…\-–—.]+\s*(UF-)?6",
+        "сценарий UF-2…UF-6",
+    ),
+    (r"сесси", r"session", "обслуживание: истёкшие сессии"),
+    (r"503", r"503", "503"),
+    (r"service_busy", r"service_busy", "service_busy"),
+    (r"Retry-After", r"Retry-After", "Retry-After"),
+    (r"\b5\s*(с\b|сек)", r"\b5\s*(s\b|sec)", "5 секунд"),
+    (r"перезапуск|restart", r"restart", "перезапуск api"),
+    (r"22\.12", r"22\.12", "Node >= 22.12"),
+    (r"/healthz", r"/healthz", "/healthz"),
+    (r"SECRET_KEY", r"SECRET_KEY", "правила SECRET_KEY"),
+    (r"docker compose down", r"docker compose down", "смена имени TLS: down"),
+    (r"\s-p\s|`-p`|--project-name", r"\s-p\s|`-p`|--project-name", "каталог клона и -p"),
+    (r"date\s+-u", r"date\s+-u", "date -u"),
+    (r"docs/acceptance/mvp-demo\.md", r"docs/acceptance/mvp-demo\.md", "ссылка на чек-лист"),
+]
+
+
+@pytest.mark.parametrize("which", _LANGS, ids=_LANG_IDS)
+@pytest.mark.parametrize(
+    ("ru_re", "en_re", "label"), MVP_README_TERMS, ids=[t[2] for t in MVP_README_TERMS]
+)
+def test_t88_readme_mvp_term(which: int, ru_re: str, en_re: str, label: str) -> None:
+    """NFR-11, D-64: README в обеих частях описывает MVP-демо и эксплуатацию."""
+    part = _parts()[which]
+    if (
+        MVP_README_TERMS.index((ru_re, en_re, label)) < 9
+    ):  # состав MVP/отложенное — в разделе про MVP
+        part = _mvp_section(part)
+    assert _has(part, ru_re if which == 0 else en_re), f"в README ({_LANG_IDS[which]}) нет: {label}"
+
+
+@pytest.mark.parametrize("which", _LANGS, ids=_LANG_IDS)
+def test_t88_readme_maintenance_is_sessions_only_no_trash(which: int) -> None:
+    """Обслуживание MVP: только истёкшие сессии; корзины нет (D-64)."""
+    heading = r"Регулярное обслуживание" if which == 0 else r"Regular maintenance"
+    section = _maintenance_section(_parts()[which], heading)
+    assert _has(section, r"сесси" if which == 0 else r"session")
+    no_trash = (
+        r"корзин\w*.{0,120}(нет|не\s+\w+|отложен)|(нет|не\s+\w+|отложен\w*).{0,120}корзин"
+        if which == 0
+        else r"trash.{0,120}(no\b|not|deferred|absent)|(no|not|without|deferred).{0,120}trash"
+    )
+    assert _has(section, no_trash), "в разделе обслуживания не сказано, что корзины в MVP нет"
+    assert not _has(
+        section,
+        r"корзин\w*.{0,200}30\s*(дн|суток)" if which == 0 else r"trash.{0,200}30[\s-]*days?",
+    ), "обслуживание не должно обещать очистку корзины через 30 дней"
+
+
+_DEFER_MARK = re.compile(
+    r"отложен|не\s+входит|нет\b|не\s+(реализ|поддерж|доступн|предусмотр|умеет)|вне\s+MVP"
+    r"|deferred|postponed|not\s+(included|part|supported|available|implemented)"
+    r"|\bno\b|without|out\s+of\s+scope|later|future|planned",
+    re.I,
+)
+_UNSUPPORTED = re.compile(r"корзин|восстановлен|вложени|\bCRM\b|trash|restor|attachment", re.I)
+
+
+def _mvp_section(part: str) -> str:
+    m = re.search(r"^(#{2,4})\s+.*\bMVP\b.*$", part, re.M)
+    assert m, "в части README нет заголовка раздела про MVP"
+    level = len(m.group(1))
+    rest = part[m.end() :]
+    nxt = re.search(rf"^#{{1,{level}}}\s", rest, re.M)
+    return rest[: nxt.start()] if nxt else rest
+
+
+@pytest.mark.parametrize("which", _LANGS, ids=_LANG_IDS)
+def test_t88_readme_unsupported_features_only_as_deferred(which: int) -> None:
+    """Корзина/восстановление/вложения/CRM в разделе MVP упоминаются только как отложенные."""
+    section = _mvp_section(_parts()[which])
+    paragraphs = re.split(r"\n\s*\n|\n(?=\s*[-*]\s)", section)
+    hits = [p for p in paragraphs if _UNSUPPORTED.search(p)]
+    assert hits, "в разделе MVP нет перечня отложенного"
+    bad = [p.strip()[:100] for p in hits if not _DEFER_MARK.search(p)]
+    assert not bad, f"неподдерживаемое подано без пометки «отложено»: {bad}"
+
+
+# --- T88: команды README совпадают с реальным CLI ----------------------------------------
+
+
+def test_t88_readme_cli_commands_exist_in_parser() -> None:
+    import argparse
+
+    from app.cli.main import build_parser
+
+    parser = build_parser()
+    sub = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    assert "demo-data" in sub.choices
+    assert "maintenance" in sub.choices
+    maint_opts = {o for a in sub.choices["maintenance"]._actions for o in a.option_strings}
+    assert "--dry-run" in maint_opts
+    for part in _parts():
+        assert "gostracker demo-data" in part
+        assert re.search(r"gostracker maintenance\s+--dry-run", part)
+        # в README нет несуществующих подкоманд gostracker
+        for name in re.findall(r"gostracker\s+([a-z][a-z-]+)", part):
+            if name in {"is", "and", "the", "to", "command", "cli"}:
+                continue
+            assert name in sub.choices, f"README ссылается на неизвестную команду gostracker {name}"
+
+
+def test_t88_readme_demo_passwords_file_matches_code() -> None:
+    src = (ROOT / "backend/app/cli/commands/demo_data.py").read_text(encoding="utf-8")
+    assert "demo-passwords.txt" in src
+    for part in _parts():
+        assert "demo-passwords.txt" in part
+
+
+# --- T88: docs/data-model.md, раздел MVP -------------------------------------------------
+
+
+def test_t88_data_model_mvp_section() -> None:
+    text = _text(DATA_MODEL)
+    m = re.search(r"^#{2,3}\s+.*\bMVP\b.*$", text, re.M)
+    assert m, "в docs/data-model.md нет раздела про MVP"
+    nxt = re.search(r"^#{1,2}\s", text[m.end() :], re.M)
+    section = text[m.end() : m.end() + nxt.start()] if nxt else text[m.end() :]
+    assert "deleted_batch_id" in section
+    assert _has(section, r"мягк\w+\s+удален|soft[- ]delet")
+    assert _has(
+        section,
+        r"корзин.{0,120}(нет|не\s|отложен)|(нет|без|не\s).{0,120}корзин|no\s+trash|without.{0,40}trash",
+    )
+    assert _has(section, r"событ|event")
+    # D-55: задачи/проекты событий не пишут
+    assert _has(
+        section,
+        r"(задач|проект).{0,160}(не\s+(пиш|создают|порожда|ведут)|нет\s+событ|без\s+событ)"
+        r"|(tasks?|projects?).{0,160}(do\s+not|don't|no\s+events?|not\s+(write|emit|record))",
+    ), "не сказано, что задачи/проекты событий не пишут (D-55)"
+    assert "D-55" in section or _has(section, r"audit|аудит|журнал")
+
+
+# --- T88: docs/acceptance/mvp-demo.md ----------------------------------------------------
+
+
+def test_t88_checklist_exists_and_is_checklist() -> None:
+    text = _text(CHECKLIST)
+    assert len(re.findall(r"^\s*[-*]\s+\[ \]", text, re.M)) >= 10, "нужны пункты `- [ ]`"
+
+
+@pytest.mark.parametrize(
+    "ac", ["AC-1", "AC-5", "AC-97", "AC-98", "AC-107", "UF-2", "UF-3", "UF-4", "UF-5", "UF-6"]
+)
+def test_t88_checklist_mentions(ac: str) -> None:
+    assert re.search(rf"{ac}\b(?!\d)", _text(CHECKLIST)), f"в чек-листе нет {ac}"
+
+
+def test_t88_checklist_polling_instead_of_ac107() -> None:
+    text = _text(CHECKLIST)
+    assert _has(text, r"15\s*(с\b|сек|s\b|sec)"), "нет порога опроса 15 с"
+    assert _has(text, r"опрос|poll")
+    # AC-107 упомянут как заменённый/отложенный, а не как проверяемый
+    assert _has(
+        text,
+        r"AC-107.{0,200}(вместо|заменен|отложен|instead|replac|deferred)|(вместо|instead\s+of).{0,80}AC-107",
+    )
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        r"мыш|mouse",
+        r"клавиатур|keyboard",
+        r"Escape|Esc\b",
+        r"Space|пробел",
+        r"\bTab\b",
+        r"скринридер|screen\s*reader",
+        r"пуст\w+\s+колонк|empty\s+column",
+        r"заголов|header|heading",
+        r"Enter",
+        r"Chromium",
+    ],
+)
+def test_t88_checklist_drag_manual_items(pattern: str) -> None:
+    """AC-5/AC-97: перечень ручной проверки перетаскивания из заметок ревью T86."""
+    assert _has(_text(CHECKLIST), pattern), f"нет пункта /{pattern}/"
+
+
+def test_t88_checklist_lists_deferred_explicitly() -> None:
+    text = _text(CHECKLIST)
+    m = re.search(
+        r"^#{2,4}\s+.*(отложен|Deferred|не\s+проверя|Out\s+of\s+scope).*$", text, re.M | re.I
+    )
+    assert m, "нет раздела с перечнем отложенного"
+    tail = text[m.end() :]
+    for ru, en in [
+        ("CRM", "CRM"),
+        ("корзин", "trash"),
+        ("вложени", "attachment"),
+        ("метк", "label"),
+        ("поиск", "search"),
+    ]:
+        assert _has(tail, f"{ru}|{en}"), f"в отложенном нет {ru}"
+
+
+# --- T88: внутренние ссылки и пути -------------------------------------------------------
+
+_LINK_RE = re.compile(r"\]\(([^)#\s]+)(?:#[^)]*)?\)")
+_BACKTICK_PATH_RE = re.compile(r"`((?:backend|frontend|deploy|docs|scripts|specs)/[\w./-]+)`")
+
+
+def _local_refs(path: Path) -> set[Path]:
+    text = _text(path)
+    refs: set[Path] = set()
+    for target in _LINK_RE.findall(text):
+        if re.match(r"[a-z]+:", target):
+            continue
+        refs.add((path.parent / target).resolve())
+    for target in _BACKTICK_PATH_RE.findall(text):
+        if any(c in target for c in "*<{") or target.endswith("/..."):
+            continue
+        refs.add((ROOT / target).resolve())
+    return refs
+
+
+@pytest.mark.parametrize("doc", [README, CHECKLIST], ids=["README", "mvp-demo"])
+def test_t88_internal_links_and_paths_exist(doc: Path) -> None:
+    missing = sorted(str(r.relative_to(ROOT)) for r in _local_refs(doc) if not r.exists())
+    assert not missing, f"{doc.name}: нет файлов {missing}"
+
+
+def test_t88_docs_do_not_require_docker() -> None:
+    """Статическая проверка: сами тесты T88 не вызывают docker."""
+    src = Path(__file__).read_text(encoding="utf-8")
+    assert (
+        "subprocess"
+        not in src.split("# --- T88")[1].split("def test_t88_docs_do_not_require_docker")[0]
     )

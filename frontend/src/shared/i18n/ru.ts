@@ -124,6 +124,8 @@ export const ru = {
   "admin.audit.action.user.role_assigned": "Роль назначена",
   "admin.audit.action.user.role_changed": "Роль изменена",
   "admin.audit.action.user.role_removed": "Роль снята",
+  "admin.audit.action.project.ownership_transferred": "Передано владение проектом",
+  "admin.audit.field.owner_id": "Владелец проекта",
   "admin.audit.actor_system": "Система",
   "admin.audit.entity_deleted": "(объект удалён)",
   "admin.audit.empty": "Записей нет",

@@ -260,6 +260,8 @@ def test_t21_src_files_only_expected() -> None:
         "features/tasks/TaskPage.tsx", "features/tasks/SubtaskList.tsx",
         # T86
         "features/boards/api.ts", "features/boards/BoardView.tsx", "features/boards/dnd.ts",
+        # T85
+        "features/comments/api.ts", "features/comments/Comments.tsx",
     }  # fmt: skip
     assert {"main.tsx", "app/App.tsx", "app/providers.tsx"} <= found
     assert found <= allowed, f"лишние файлы: {sorted(found - allowed)}"
