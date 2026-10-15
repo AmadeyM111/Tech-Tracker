@@ -1677,7 +1677,7 @@ class TaskFacts:
 def is_own_project(a, p) -> bool          # BA: p.owner_id == a.user_id (владелец всегда участник); MIXED: member; иначе False
 def can_view_project(a, p) -> bool        # BA/MIXED: True; USER: member; иначе False
 def can_read_project_content(a, p) -> bool  # BUSINESS_ACCESS and member
-def can_edit_task_fully(a, p, t) -> bool  # USER: member and created_by == assignee_id == actor; BA: is_own_project OR (member and created_by == assignee_id == actor) [OI-127 вариант (а), временно]; MIXED: member
+def can_edit_task_fully(a, p, t) -> bool  # USER: member and created_by == assignee_id == actor; BA: is_own_project OR (member and created_by == assignee_id == actor) [OI-127 вариант (а), подтверждено владельцем 2026-10-15]; MIXED: member
 def can_change_task_status(a, p, t) -> bool  # fully or (member and assignee_id == actor)  (FR-19b; и перенос на доске)
 def can_create_task(a, p, assignee_id) -> bool  # member and (assignee_id == actor or TASK_ASSIGN_OTHERS)
 def can_create_subtask(a, p, parent, assignee_id) -> bool
