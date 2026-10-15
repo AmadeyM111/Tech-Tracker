@@ -1,12 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, type ReactNode } from "react";
-import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { AuditPage } from "../features/admin/AuditPage";
 import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
+import { ProjectPage } from "../features/projects/ProjectPage";
+import { ProjectsPage } from "../features/projects/ProjectsPage";
 import { me, type MeResponse } from "../features/auth/api";
 import { useLogout } from "../features/auth/useLogout";
 import { ApiError, setNavigationHandlers } from "../shared/api/client";
@@ -73,6 +75,35 @@ function SessionGate({
   return <>{children(session.data)}</>;
 }
 
+/** Menu items by capabilities (FR-10); the server checks access itself. */
+function MenuItems({ profile }: { profile: MeResponse }) {
+  const has = (capability: MeResponse["capabilities"][number]) => profile.capabilities.includes(capability);
+  return (
+    <>
+      {has("business_access") ? (
+        <>
+          <p>
+            <NavLink to="/projects" end>{t("nav.projects")}</NavLink>
+          </p>
+          <p>
+            <NavLink to="/my-tasks">{t("nav.my_tasks")}</NavLink>
+          </p>
+        </>
+      ) : null}
+      {has("manage_accounts") ? (
+        <p>
+          <NavLink to="/admin/users">{t("admin.home_users_link")}</NavLink>
+        </p>
+      ) : null}
+      {has("view_audit") ? (
+        <p>
+          <NavLink to="/admin/audit">{t("admin.home_audit_link")}</NavLink>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function Home({ profile }: { profile: MeResponse }) {
   const alert = useAlertState();
   const logout = useLogout(alert);
@@ -81,16 +112,7 @@ function Home({ profile }: { profile: MeResponse }) {
       <h1>{t("app.home_title")}</h1>
       <ErrorAlert message={alert.message} seq={alert.seq} />
       <nav>
-        {profile.capabilities.includes("manage_accounts") ? (
-          <p>
-            <Link to="/admin/users">{t("admin.home_users_link")}</Link>
-          </p>
-        ) : null}
-        {profile.capabilities.includes("view_audit") ? (
-          <p>
-            <Link to="/admin/audit">{t("admin.home_audit_link")}</Link>
-          </p>
-        ) : null}
+        <MenuItems profile={profile} />
         <p>
           <Link to="/change-password">{t("app.change_password_link")}</Link>
         </p>
@@ -148,6 +170,28 @@ function AdminScreen({
         )
       }
     </SessionGate>
+  );
+}
+
+// Business screen (T82-T84 replace the stub bodies); needs business_access.
+function BusinessScreen({
+  insideMain,
+  children,
+}: {
+  insideMain: boolean;
+  children: (profile: MeResponse) => ReactNode;
+}) {
+  return (
+    <AdminScreen insideMain={insideMain} capability="business_access">
+      {(profile) => (
+        <>
+          <nav>
+            <MenuItems profile={profile} />
+          </nav>
+          {children(profile)}
+        </>
+      )}
+    </AdminScreen>
   );
 }
 
@@ -243,6 +287,38 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           <AdminScreen insideMain={insideMain} capability="view_audit">
             {() => <AuditPage />}
           </AdminScreen>
+        }
+      />
+      <Route
+        path="/projects"
+        element={
+          <BusinessScreen insideMain={insideMain}>
+            {(profile) => <ProjectsPage canCreate={profile.capabilities.includes("project_create")} />}
+          </BusinessScreen>
+        }
+      />
+      <Route
+        path="/projects/:projectId"
+        element={
+          <BusinessScreen insideMain={insideMain}>
+            {(profile) => <ProjectPage currentUserId={profile.id} />}
+          </BusinessScreen>
+        }
+      />
+      <Route
+        path="/tasks/:taskId"
+        element={
+          <BusinessScreen insideMain={insideMain}>
+            {() => <h1>{t("tasks.task_title")}</h1>}
+          </BusinessScreen>
+        }
+      />
+      <Route
+        path="/my-tasks"
+        element={
+          <BusinessScreen insideMain={insideMain}>
+            {() => <h1>{t("tasks.my_title")}</h1>}
+          </BusinessScreen>
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />

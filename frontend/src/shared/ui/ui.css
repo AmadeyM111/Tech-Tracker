@@ -31,6 +31,14 @@
   margin: 2rem auto;
 }
 
+/* Long unbroken names must not break the layout (NFR-6). */
+h1,
+.ui-table td,
+.ui-pre,
+.ui-list {
+  overflow-wrap: anywhere;
+}
+
 .ui-table {
   border-collapse: collapse;
   width: 100%;
@@ -81,4 +89,44 @@
 .ui-secret code {
   font-size: 1.25rem;
   user-select: all;
+}
+
+/* Project screens (T82). */
+.ui-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #0b3d91;
+  margin: 16px 0;
+}
+
+.ui-tabs [role="tab"] {
+  border: 1px solid #c4c4c4;
+  border-bottom: none;
+  background: #f2f2f2;
+  color: #1a1a1a;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.ui-tabs [role="tab"][aria-selected="true"] {
+  background: #0b3d91;
+  border-color: #0b3d91;
+  color: #ffffff;
+}
+
+.ui-pre {
+  white-space: pre-wrap;
+}
+
+.ui-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.ui-list li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 4px 0;
 }
