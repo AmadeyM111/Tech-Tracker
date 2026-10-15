@@ -1677,14 +1677,14 @@ class TaskFacts:
 def is_own_project(a, p) -> bool          # BA: p.owner_id == a.user_id (владелец всегда участник); MIXED: member; иначе False
 def can_view_project(a, p) -> bool        # BA/MIXED: True; USER: member; иначе False
 def can_read_project_content(a, p) -> bool  # BUSINESS_ACCESS and member
-def can_edit_task_fully(a, p, t) -> bool  # USER: member and created_by == assignee_id == actor; BA: is_own_project; MIXED: member
+def can_edit_task_fully(a, p, t) -> bool  # USER: member and created_by == assignee_id == actor; BA: is_own_project OR (member and created_by == assignee_id == actor) [OI-127 вариант (а), временно]; MIXED: member
 def can_change_task_status(a, p, t) -> bool  # fully or (member and assignee_id == actor)  (FR-19b; и перенос на доске)
 def can_create_task(a, p, assignee_id) -> bool  # member and (assignee_id == actor or TASK_ASSIGN_OTHERS)
 def can_create_subtask(a, p, parent, assignee_id) -> bool
     # can_create_task(a, p, assignee_id) and (can_edit_task_fully(a, p, parent) or parent.assignee_id == actor)
     # ИСПРАВЛЕНИЕ §4.5: прежняя формула «fully(parent) or …» позволяла «Пользователю» создать
     # подзадачу своей задачи другому исполнителю — нарушение BR-1 «создание задачи другому — нет»
-def can_change_assignee(a, p, t) -> bool  # role in {BA, MIXED} and can_edit_task_fully
+def can_change_assignee(a, p, t) -> bool  # TASK_ASSIGN_OTHERS and is_own_project (FR-19a; ревью T70: БА — только владелец, СМ — участник); SUPERSEDES «can_edit_task_fully»
 def can_delete_task(a, p, t) -> bool      # == can_edit_task_fully
 def can_edit_comment(a, author_id) -> bool        # author == actor (участие проверяет сервис)
 def can_delete_comment(a, p, author_id) -> bool   # member and (author == actor or (BA and owner) or MIXED)
