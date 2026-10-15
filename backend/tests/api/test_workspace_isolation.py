@@ -355,3 +355,45 @@ async def test_t77_ac21_foreign_user_as_assignee_is_user_not_found(api_env: ApiE
     )
 
     assert error(r) == (422, "user_not_found")
+
+
+# --- T80: комментарии (AC-21, IDOR) -----------------------------------------------------------
+
+
+async def test_t80_ac21_foreign_comments_are_invisible_and_untouched(api_env: ApiEnv) -> None:
+    from tests.projects_api_support import error, make_api_world, make_foreign, send
+    from tests.tasks_api_support import rows
+
+    env = api_env
+    w = await make_api_world(env)
+    foreign = await make_foreign(env)
+    made = await send(
+        env,
+        foreign.ba_token,
+        "POST",
+        f"/api/v1/projects/{foreign.project_id}/tasks",
+        {"title": "Чужая"},
+    )
+    tid = made.json()["id"]
+    created = await send(
+        env, foreign.ba_token, "POST", f"/api/v1/tasks/{tid}/comments", {"body": "тайна"}
+    )
+    assert created.status_code == 201, created.text
+    cid = created.json()["id"]
+
+    for who in ("ba", "sm_m", "usr"):
+        for method, url, body in (
+            ("GET", f"/api/v1/tasks/{tid}/comments", None),
+            ("POST", f"/api/v1/tasks/{tid}/comments", {"body": "взлом"}),
+            ("PATCH", f"/api/v1/comments/{cid}", {"body": "взлом"}),
+            ("DELETE", f"/api/v1/comments/{cid}", None),
+        ):
+            r = await send(env, w.tok(who), method, url, body)
+            assert error(r) == (404, "not_found"), (who, method)
+            assert "тайна" not in r.text
+    found = await rows(
+        env,
+        "SELECT body, edited_at, deleted_at FROM comment WHERE task_id = :t",
+        t=uuid.UUID(tid),
+    )
+    assert [tuple(r) for r in found] == [("тайна", None, None)]

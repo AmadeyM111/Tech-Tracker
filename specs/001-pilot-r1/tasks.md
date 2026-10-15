@@ -1869,7 +1869,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Попытки:** 1
 
 ## T80 — API комментариев
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-58, AC-103 (комментарии), AC-21; FR-23; plan §11.4 (комментарии), D-65
 - **Файлы:** `backend/app/api/v1/comments.py`, `backend/app/api/v1/schemas/comments.py` (+ `__init__`,
   генерация контракта); тесты: `backend/tests/api/test_comments.py`, дополнение
@@ -1878,7 +1878,9 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Описание:** `GET|POST /tasks/{id}/comments`, `PATCH|DELETE /comments/{id}`. Тело `{body: str}`,
   1–10 000 символов до очистки (иначе 422). Ответ `Comment` (§11.4).
 - **Готово, когда:** `pytest -q backend/tests/api/test_comments.py backend/tests/api/test_workspace_isolation.py` и проверки контракта зелёные, линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 1
+
+- **Заметки ревью T80 (в T85/T88/backlog):** APPROVE с 1-й попытки (589 тестов, 15 мутаций: 12 убиты, 2 эквивалентны, 1 пробел). Вне списка файлов (обосновано): `domain/tasks/service.py::delete_task` — порядок блокировок «задача → живые подзадачи ORDER BY id → UPDATE task → UPDATE comment» (взаимоблокировка из ревью T79 закрыта; стресс 840 раундов: 0 deadlock, 0 сирот) и `tests/domain/test_delete_task_deadlock.py`. Желательное: (1) в тест пагинации добавить `assert p3["page"] == 3` (мутант M8); (2) кейс `"д"*10_001` на несуществующую задачу (422 раньше 404; M13); (3) API-цепочка AC-103: СМ-не участник DELETE → 403 → добавил себя → 204; (4) тест delete_task против create_comment/edit/move; (5) пустое тело → 422 `missing` (не 400) — действующий контракт T68, Д-7 касается только json_invalid.
 
 ### Фронтенд MVP
 
@@ -1944,7 +1946,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Попытки:** 0
 
 ## T85 — Комментарии в карточке задачи
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** UF-6 (комментарий), FR-23 (SC-11: простой текст), FR-29 (опрос), AC-58 (интерфейс: «изменён», «комментарий удалён»); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/comments/Comments.tsx`, `frontend/src/features/comments/api.ts`
   (+ подключение в `TaskPage.tsx`); тесты: `frontend/tests/features/comments/Comments.test.tsx`
