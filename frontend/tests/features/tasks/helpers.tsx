@@ -46,7 +46,9 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect } from "vitest";
 
 import {
+  BOARD_GET,
   BUSINESS,
+  emptyBoard,
   ID_KUZNETSOV,
   ME,
   MEMBERS,
@@ -131,6 +133,7 @@ export function taskRoutes(
     [ONE]: () => j(200, detail({ permissions: opts.perms ?? PERM_READ })),
     [MEMBERS]: () => j(200, page([M_OWNER, M_ME, M_KUZNETSOV, M_SIDOROV])),
     [PROJ_TASKS]: () => j(200, page(opts.items ?? [T1, T2, T3])),
+    [BOARD_GET]: () => j(200, emptyBoard()),
     ...over,
   };
 }

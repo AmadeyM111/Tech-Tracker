@@ -176,6 +176,15 @@ export const MEMBERS = `GET /api/v1/projects/${PID}/members`;
 export const ADD = `POST /api/v1/projects/${PID}/members`;
 export const REMOVE = (uid: string) => `DELETE /api/v1/projects/${PID}/members/${uid}`;
 export const USERS = "GET /api/v1/users";
+export const BOARD_GET = `GET /api/v1/projects/${PID}/board`;
+
+/** Пустая доска из 4 колонок (вкладка «Доска» открыта по умолчанию, T86). */
+export function emptyBoard() {
+  return {
+    project: { id: PID, name: "Альфа" },
+    columns: ["todo", "in_progress", "review", "done"].map((status) => ({ status, tasks: [] })),
+  };
+}
 
 /** Маршруты страницы проекта по умолчанию; over перекрывает. */
 export function projectRoutes(
@@ -187,6 +196,7 @@ export function projectRoutes(
     [ME]: () => j(200, meWith(caps, "business_admin")),
     [ONE]: () => j(200, detail(opts.detail)),
     [MEMBERS]: () => j(200, page(opts.members ?? [M_OWNER, M_ME, M_PETROV, M_SIDOROV])),
+    [BOARD_GET]: () => j(200, emptyBoard()),
     ...over,
   };
 }

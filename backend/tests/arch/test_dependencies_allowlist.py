@@ -30,6 +30,9 @@ BACKEND_DEV = {
     "types-pyyaml",
 }
 FRONTEND_RUNTIME = {
+    "@dnd-kit/core",
+    "@dnd-kit/sortable",
+    "@dnd-kit/utilities",
     "@tanstack/react-query",
     "openapi-fetch",
     "react",
@@ -96,6 +99,19 @@ def test_backend_has_no_other_optional_groups() -> None:
 def test_frontend_dependencies_allowlist() -> None:
     actual = set(_package_json().get("dependencies", {}))
     _compare(actual, FRONTEND_RUNTIME, "frontend dependencies")
+
+
+def test_t86_dnd_kit_packages_pinned_to_planned_majors() -> None:
+    """T86 / plan D-61: три пакета @dnd-kit с планируемыми диапазонами версий."""
+    deps = _package_json().get("dependencies", {})
+    expected = {
+        "@dnd-kit/core": "^6.3",
+        "@dnd-kit/sortable": "^10",
+        "@dnd-kit/utilities": "^3.2",
+    }
+    for name, prefix in expected.items():
+        assert name in deps, f"нет {name} в frontend dependencies"
+        assert deps[name].startswith(prefix), f"{name}: {deps[name]!r}, ожидается {prefix}"
 
 
 def test_frontend_dev_dependencies_allowlist() -> None:

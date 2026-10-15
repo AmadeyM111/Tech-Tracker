@@ -18,6 +18,7 @@ import {
   type ProjectDetail,
   type ProjectMember,
 } from "./api";
+import { BoardView } from "../boards/BoardView";
 import { ProjectTaskList } from "../tasks/TaskList";
 import { ProjectFields } from "./ProjectsPage";
 
@@ -327,6 +328,7 @@ function ProjectCard({
 
       <div role="tabpanel" id={panelId} aria-labelledby={tabId(tab)} tabIndex={panelHasFocusable ? undefined : 0}>
         <h2>{t(TAB_LABELS[tab])}</h2>
+        {tab === "board" ? <BoardView projectId={project.id} /> : null}
         {tab === "tasks" ? (
           <ProjectTaskList
             projectId={project.id}
