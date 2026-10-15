@@ -15,7 +15,7 @@ GOSTracker is a self-hosted tracker for client pipelines, projects and employee 
 ```bash
 git clone <URL репозитория> gostracker && cd gostracker
 cp .env.example .env
-docker compose up -d --build
+docker compose up -d --build --wait
 docker compose exec api cat /data/secrets/initial-admin-password.txt
 ```
 
@@ -243,7 +243,7 @@ them).
 ```bash
 git clone <repository URL> gostracker && cd gostracker
 cp .env.example .env
-docker compose up -d --build
+docker compose up -d --build --wait
 docker compose exec api cat /data/secrets/initial-admin-password.txt
 ```
 

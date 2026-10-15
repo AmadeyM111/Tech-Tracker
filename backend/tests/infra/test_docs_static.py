@@ -516,3 +516,28 @@ def test_t31_readme_maintenance_cron_example_and_dry_run_hint() -> None:
     """Пример crontab с `-T` (без TTY) в обеих частях; `--dry-run` упомянут как проверка."""
     for part in _parts():
         assert _has(part, r"(?m)^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+[^\n]*" + re.escape(_CRON_CMD))
+
+
+# --- T32: быстрый старт ждёт готовности стека (приёмка R1.0, замечание 2; NFR-3) ----------
+
+_CAT_SECRET = "docker compose exec api cat /data/secrets/initial-admin-password.txt"
+
+
+@pytest.mark.parametrize("which", [0, 1], ids=["ru", "en"])
+def test_t32_quick_start_waits_for_healthy_before_reading_password(which: int) -> None:
+    """Файл пароля читается только после ``up -d --build --wait`` (в том же блоке кода)."""
+    part = _parts()[which]
+    cat_at = part.find(_CAT_SECRET)
+    assert cat_at != -1, "в быстром старте нет чтения файла пароля"
+    block_start = part.rfind("```", 0, cat_at)
+    assert block_start != -1
+    before = part[block_start:cat_at]
+    ups = [
+        m
+        for m in re.finditer(r"^docker compose up\b[^\n]*$", before, re.M)
+        if "--build" in m.group(0) and "--wait" in m.group(0)
+    ]
+    assert ups, "перед чтением файла нет `docker compose up -d --build --wait` в том же блоке"
+    assert not re.search(r"^docker compose up\b(?![^\n]*--wait)[^\n]*$", before, re.M), (
+        "в блоке остался запуск без --wait перед чтением файла пароля"
+    )

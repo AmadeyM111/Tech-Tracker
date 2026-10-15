@@ -79,8 +79,12 @@ export function stripComments(src: string): string {
 
 describe("stripComments (self-check of the AC-98 scanner)", () => {
   it("drops real comments", () => {
-    expect(CYRILLIC.test(stripComments("const a = 1; // Привет\n"))).toBe(false);
-    expect(CYRILLIC.test(stripComments("/* Привет */ const a = 1;"))).toBe(false);
+    expect(CYRILLIC.test(stripComments("const a = 1; // Привет\n"))).toBe(
+      false,
+    );
+    expect(CYRILLIC.test(stripComments("/* Привет */ const a = 1;"))).toBe(
+      false,
+    );
     expect(CYRILLIC.test(stripComments("a();//Привет"))).toBe(false);
   });
 
@@ -132,7 +136,9 @@ describe("ru dictionary (NFR-6)", () => {
 
 describe("t()", () => {
   it("returns the dictionary value for a known key", () => {
-    expect(t("error.not_found" as keyof typeof ru)).toBe(dict["error.not_found"]);
+    expect(t("error.not_found" as keyof typeof ru)).toBe(
+      dict["error.not_found"],
+    );
   });
 
   it("password hint lives in its own key and substitutes {min} from PASSWORD_MIN_LENGTH", () => {
@@ -149,7 +155,12 @@ describe("t()", () => {
 
   it("the parametrised hint is not used as an error message", () => {
     const hint = dict["auth.password_min_length_hint"];
-    for (const code of [...API_CODES, ...CLIENT_CODES, ...HTTP_CODES, "unknown"]) {
+    for (const code of [
+      ...API_CODES,
+      ...CLIENT_CODES,
+      ...HTTP_CODES,
+      "unknown",
+    ]) {
       expect(errorMessage(code), code).not.toBe(hint);
     }
   });
@@ -182,13 +193,194 @@ describe("errorMessage()", () => {
     }
   });
 
-  it.each([...API_CODES, ...CLIENT_CODES, ...HTTP_CODES])("maps %s to its dictionary message", (code) => {
-    expect(errorMessage(code)).toBe(dict[`error.${code}`]);
-  });
+  it.each([...API_CODES, ...CLIENT_CODES, ...HTTP_CODES])(
+    "maps %s to its dictionary message",
+    (code) => {
+      expect(errorMessage(code)).toBe(dict[`error.${code}`]);
+    },
+  );
 
   it("falls back to error.unknown for an unknown code", () => {
     expect(errorMessage("brand_new_code")).toBe(dict["error.unknown"]);
     expect(errorMessage("")).toBe(dict["error.unknown"]);
+  });
+});
+
+// --- Latin JSX text and literal user-visible attributes (T32, AC-98, acceptance note 4) ---------
+//
+// Scanner for .tsx sources (comments stripped first). It reports:
+//   1. JSX text nodes with a Latin letter: `>Hello<`, `>Hello {x}<`, `{x} Hello</p>`,
+//      `>{"Hello"}<`;
+//   2. user-visible attributes given as a string literal (`aria-label="Close"`,
+//      `placeholder={'Search'}`, backticks without `${}`): aria-label, aria-description,
+//      aria-placeholder, aria-roledescription, aria-valuetext, placeholder, title, alt, label.
+// Not reported (technical or dictionary values): type, name, id, role, className, href,
+// autoComplete, data-*, aria-labelledby/-describedby (element ids), aria-modal, and any value
+// coming from t(...) or another expression - they are not string literals of a listed attribute.
+// Known limits (heuristic, no TS parser): text containing any of `;=()&|` is skipped so that
+// generics and statements such as `useState<Foo>(null);` are not mistaken for JSX text.
+
+const VISIBLE_ATTRS = [
+  "aria-label",
+  "aria-description",
+  "aria-placeholder",
+  "aria-roledescription",
+  "aria-valuetext",
+  "placeholder",
+  "title",
+  "alt",
+  "label",
+];
+// Explicit whitelist of Latin literals that are allowed outside the dictionary. Everything else
+// with a Latin letter must live in ru.ts. Values without Latin letters (numbers, punctuation,
+// "—", "×", "/", "…", " ") are never reported.
+const LATIN_ALLOWED = new Set<string>([
+  "GOSTracker", // product name: a proper noun, not translated (NFR-6)
+]);
+const LATIN = /[A-Za-z]/;
+
+export interface Finding {
+  line: number;
+  kind: "text" | "attribute";
+  value: string;
+}
+
+function lineOf(src: string, index: number): number {
+  return src.slice(0, index).split("\n").length;
+}
+
+function isViolation(value: string): boolean {
+  const v = value.trim();
+  return LATIN.test(v) && !LATIN_ALLOWED.has(v);
+}
+
+export function scanLatinUi(source: string): Finding[] {
+  const src = stripComments(source);
+  const found: Finding[] = [];
+  const add = (index: number, kind: Finding["kind"], value: string): void => {
+    if (isViolation(value))
+      found.push({ line: lineOf(src, index), kind, value: value.trim() });
+  };
+
+  // text after a tag end ">" (up to "<" or "{")
+  for (const m of src.matchAll(/>([^<>{};=()&|]*)(?=[<{])/g)) {
+    const before = src[m.index! - 1];
+    if (before === "=" || before === "-") continue; // arrow function, not a tag end
+    add(m.index! + 1, "text", m[1]!);
+  }
+  // text after "}" on the same line, followed by a tag
+  for (const m of src.matchAll(/\}([^<>{}\n;=()]+)(?=<[/A-Za-z])/g)) {
+    add(m.index! + 1, "text", m[1]!);
+  }
+  // string literal in a JSX expression container: >{"Hello"}<
+  for (const m of src.matchAll(/>\s*\{\s*(["'])([^"'\n]*)\1\s*\}/g)) {
+    add(m.index!, "text", m[2]!);
+  }
+  // literal values of user-visible attributes
+  const names = VISIBLE_ATTRS.map((a) => a.replace("-", "\\-")).join("|");
+  const attr = new RegExp(
+    `(?<![\\w-])(?:${names})=(?:"([^"]*)"|'([^']*)'|\\{\\s*(?:"([^"]*)"|'([^']*)'|` +
+      "`([^`$]*)`" +
+      `)\\s*\\})`,
+    "g",
+  );
+  for (const m of src.matchAll(attr)) {
+    add(m.index!, "attribute", m.slice(1).find((x) => x !== undefined) ?? "");
+  }
+  return found;
+}
+
+describe("scanLatinUi (self-check of the T32 scanner)", () => {
+  const caught = (code: string): Finding[] => scanLatinUi(code);
+
+  it("catches a Latin aria-label literal", () => {
+    expect(caught('const a = <button aria-label="Close">×</button>;')).toEqual([
+      { line: 1, kind: "attribute", value: "Close" },
+    ]);
+  });
+
+  it("catches a Latin JSX text node", () => {
+    expect(caught("const a = <p>Hello</p>;")).toEqual([
+      { line: 1, kind: "text", value: "Hello" },
+    ]);
+  });
+
+  it("catches placeholder/title/alt in all literal forms", () => {
+    for (const code of [
+      '<input placeholder="Search" />',
+      "<input placeholder={'Search'} />",
+      '<input placeholder={"Search"} />',
+      "<input placeholder={`Search`} />",
+      '<span title="Hint">·</span>',
+      '<img alt="Logo" />',
+    ]) {
+      expect(caught(code).length, code).toBeGreaterThan(0);
+    }
+  });
+
+  it("catches a string literal in an expression container and text next to an expression", () => {
+    expect(caught('<p>{"Hello"}</p>').length).toBe(1);
+    expect(caught("<p>{count} items</p>").length).toBe(1);
+    expect(caught("<p>Hello {name}</p>").length).toBe(1);
+  });
+
+  it("reports the line of the offence", () => {
+    expect(caught("const a = 1;\nconst b = <p>\n  Hello\n</p>;")[0]?.line).toBe(
+      2,
+    );
+  });
+
+  it("ignores dictionary values and technical attributes", () => {
+    for (const code of [
+      '<button aria-label={t("common.close")}>{t("common.ok")}</button>',
+      '<input type="password" name="login" id="login" autoComplete="off" />',
+      '<a href="/admin" className="link" role="button" data-testid="x">{t("a.b")}</a>',
+      '<div aria-labelledby="admin-password-title" aria-modal="true" />',
+      '<input placeholder={t("a.hint")} title={`${id}-t`} />',
+      "<p>—</p>",
+      "<p>{n} / {m}</p>",
+      "<span>{label}: {value}</span>",
+      "const [a, setA] = useState<Foo | null>(null);\nconst r = useRef<HTMLDivElement>(null);",
+      "const f = async (): Promise<void> => {};\nconst g = (x: number) => x > 1 && x < 3;",
+      "const c = <Select<Option> />;",
+    ]) {
+      expect(caught(code), code).toEqual([]);
+    }
+  });
+
+  it("does not look into comments", () => {
+    expect(caught('// <p>Hello</p>\n/* <b aria-label="Close"/> */')).toEqual(
+      [],
+    );
+  });
+
+  it("allows only the explicit whitelist", () => {
+    expect(caught("<h1>GOSTracker</h1>")).toEqual([]);
+    expect(caught("<h1>GOSTracker CRM</h1>").length).toBe(1);
+  });
+});
+
+describe("no Latin UI literals in src/**/*.tsx (AC-98, NFR-6, T32)", () => {
+  const tsx = import.meta.glob("../../src/**/*.tsx", {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  }) as Record<string, string>;
+
+  it("scans the JSX sources", () => {
+    expect(Object.keys(tsx).length).toBeGreaterThanOrEqual(10);
+  });
+
+  it("JSX text nodes and visible attributes come from the dictionary", () => {
+    const offenders: string[] = [];
+    for (const [path, source] of Object.entries(tsx)) {
+      for (const f of scanLatinUi(source)) {
+        offenders.push(
+          `${path.replace("../../", "")}:${f.line} ${f.kind} ${JSON.stringify(f.value)}`,
+        );
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });
 
@@ -233,7 +425,9 @@ describe("no UI strings outside the dictionary (AC-98, NFR-6)", () => {
   });
 
   it("the dictionary itself lives in src/shared/i18n and contains the Russian text", () => {
-    const ruPath = Object.keys(files).find((p) => p.endsWith("src/shared/i18n/ru.ts"));
+    const ruPath = Object.keys(files).find((p) =>
+      p.endsWith("src/shared/i18n/ru.ts"),
+    );
     expect(ruPath).toBeDefined();
     expect(CYRILLIC.test(files[ruPath!]!)).toBe(true);
   });

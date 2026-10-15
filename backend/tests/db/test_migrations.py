@@ -45,6 +45,14 @@ FIXED_NOW = datetime(2026, 10, 13, 9, 0, 0, tzinfo=UTC)
 SECRET = "s3cr3t-value-xyz-9141"
 
 
+def _assert_engine_on_configured_test_db(engine: Any) -> None:
+    """Движок смотрит на настроенную тестовую БД (``TEST_DATABASE_URL``), имя — ``*_test``."""
+    expected = assert_test_database_url(database_url_from_env()).database
+    assert expected is not None
+    assert expected.endswith("_test")
+    assert engine.url.database == expected
+
+
 # --- защита имени тестовой БД (plan §5) --------------------------------------------------
 
 
@@ -378,7 +386,7 @@ def test_create_engine_sets_hide_parameters_and_pre_ping(settings: Settings) -> 
     assert engine.sync_engine.hide_parameters is True
     assert engine.sync_engine.pool._pre_ping is True  # type: ignore[attr-defined]
     assert engine.url.drivername == "postgresql+asyncpg"
-    assert engine.url.database == "tracker_test"
+    _assert_engine_on_configured_test_db(engine)
 
 
 async def test_create_engine_hides_parameters_in_errors(db_engine: Any, settings: Settings) -> None:
@@ -570,7 +578,7 @@ async def test_lifespan_puts_engine_and_sessionmaker_into_app_state(
         sessionmaker = application.state.sessionmaker
         assert isinstance(engine, AsyncEngine)
         assert isinstance(sessionmaker, async_sessionmaker)
-        assert engine.url.database == "tracker_test"
+        _assert_engine_on_configured_test_db(engine)
         async with sessionmaker() as session:
             assert isinstance(session, AsyncSession)
             assert (await session.execute(text("SELECT 1"))).scalar_one() == 1
