@@ -7,6 +7,7 @@
 //                            export function errorMessage(code: string): string
 //   Плейсхолдеры в значениях: {name}. Неизвестный ключ: t() возвращает сам ключ и не бросает.
 //   errorMessage(code): ru["error.<code>"], а для неизвестного кода — ru["error.unknown"].
+import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { PASSWORD_MIN_LENGTH, errorMessage, t } from "../../src/shared/i18n";
@@ -32,6 +33,17 @@ const API_CODES = [
   "invalid_current_password",
   "password_reused",
   "internal_error",
+  // MVP (T71, T72, T29, T81)
+  "owner_cannot_be_removed",
+  "not_project_member",
+  "recipient_wrong_role",
+  "user_blocked",
+  "user_not_found",
+  "service_busy",
+  "subtask_depth_exceeded",
+  "invalid_neighbors",
+  "project_deleted",
+  "parent_task_deleted",
 ];
 const CLIENT_CODES = ["network_error", "invalid_response"];
 // Коды из общего обработчика HTTP-ошибок backend (core/errors.py, _HTTP_STATUS_MAP).
@@ -134,6 +146,29 @@ describe("ru dictionary (NFR-6)", () => {
   });
 });
 
+describe("MVP error codes (T81, FR-45)", () => {
+  const MVP = [
+    "owner_cannot_be_removed",
+    "not_project_member",
+    "recipient_wrong_role",
+    "user_blocked",
+    "user_not_found",
+    "service_busy",
+    "subtask_depth_exceeded",
+    "invalid_neighbors",
+  ];
+
+  it.each(MVP)("ac_fr45_%s_is_a_human_readable_russian_sentence", (code) => {
+    const msg = errorMessage(code);
+    expect(msg).not.toBe(dict["error.unknown"]);
+    expect(msg).toBe(dict[`error.${code}`]);
+    expect(CYRILLIC.test(msg)).toBe(true);
+    expect(msg).not.toMatch(/[{}]/);
+    expect(msg).not.toContain(code);
+    expect(msg.trim().split(/\s+/).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
 describe("t()", () => {
   it("returns the dictionary value for a known key", () => {
     expect(t("error.not_found" as keyof typeof ru)).toBe(
@@ -206,34 +241,33 @@ describe("errorMessage()", () => {
   });
 });
 
-// --- Latin JSX text and literal user-visible attributes (T32, AC-98, acceptance note 4) ---------
+// --- Latin UI literals in .tsx sources (T32, T81: compiler API `typescript`, AC-98, NFR-6) --------
 //
-// Scanner for .tsx sources (comments stripped first). It reports:
-//   1. JSX text nodes with a Latin letter: `>Hello<`, `>Hello {x}<`, `{x} Hello</p>`,
-//      `>{"Hello"}<`;
-//   2. user-visible attributes given as a string literal (`aria-label="Close"`,
-//      `placeholder={'Search'}`, backticks without `${}`): aria-label, aria-description,
-//      aria-placeholder, aria-roledescription, aria-valuetext, placeholder, title, alt, label.
-// Not reported (technical or dictionary values): type, name, id, role, className, href,
-// autoComplete, data-*, aria-labelledby/-describedby (element ids), aria-modal, and any value
-// coming from t(...) or another expression - they are not string literals of a listed attribute.
-// Known limits (heuristic, no TS parser): text containing any of `;=()&|` is skipped so that
-// generics and statements such as `useState<Foo>(null);` are not mistaken for JSX text.
-
-const VISIBLE_ATTRS = [
-  "aria-label",
-  "aria-description",
-  "aria-placeholder",
-  "aria-roledescription",
-  "aria-valuetext",
-  "placeholder",
-  "title",
-  "alt",
-  "label",
-];
-// Explicit whitelist of Latin literals that are allowed outside the dictionary. Everything else
-// with a Latin letter must live in ru.ts. Values without Latin letters (numbers, punctuation,
-// "—", "×", "/", "…", " ") are never reported.
+// Scanner on the TypeScript AST (comments are not nodes). It reports Latin letters in:
+//   1. JsxText nodes (`<p>Hello</p>`, `{n} items`);
+//   2. string / template literals that are rendered: JsxExpression children, including inside
+//      ternaries, `&&` / `||` / `??`, parentheses and template substitutions
+//      (`{c ? "Loading" : t("x")}`, `{ok && "Done"}`, `{`Total ${n}`}`; template parts count
+//      only if they contain whitespace: `${id}-t` is an identifier);
+//   3. string literals in attributes (`aria-label="Close"`, `message={"Failed"}`,
+//      `title={c ? "A" : t("b")}`) for every attribute except the technical list below;
+//   4. identifiers in the positions 2-3 that resolve to a `const X = "literal"` of the same file
+//      (the finding is reported at the declaration: `const MSG = "Failed"` ... `{MSG}`).
+// Not reported: arguments of calls (`t("x")`, `errorMessage("code")`), technical attributes
+// (type, name, id, role, className, href, data-*, aria-* that are not user-visible, ...),
+// comparisons and JSX inside expressions (`{a > b ? <hr/> : null}`), values without Latin letters.
+const TECHNICAL_ATTRS = new Set([
+  "key", "ref", "type", "name", "id", "role", "className", "style", "href", "to", "src",
+  "htmlFor", "autoComplete", "autoCapitalize", "spellCheck", "inputMode", "tabIndex", "target",
+  "rel", "method", "action", "lang", "dir", "min", "max", "step", "pattern", "accept", "value",
+  "defaultValue", "variant", "size", "kind", "level", "as", "scope", "path", "colSpan", "rowSpan",
+  "headers", "capability",
+  "aria-labelledby", "aria-describedby", "aria-controls", "aria-owns", "aria-activedescendant",
+  "aria-modal", "aria-live", "aria-current", "aria-expanded", "aria-haspopup", "aria-autocomplete",
+  "aria-selected", "aria-checked", "aria-pressed", "aria-hidden", "aria-invalid", "aria-busy",
+  "aria-sort", "aria-atomic", "aria-relevant", "aria-orientation",
+]); // fmt: skip
+// Whitelist of Latin literals allowed outside the dictionary (exact match after trim).
 const LATIN_ALLOWED = new Set<string>([
   "GOSTracker", // product name: a proper noun, not translated (NFR-6)
 ]);
@@ -241,12 +275,8 @@ const LATIN = /[A-Za-z]/;
 
 export interface Finding {
   line: number;
-  kind: "text" | "attribute";
+  kind: "text" | "attribute" | "literal";
   value: string;
-}
-
-function lineOf(src: string, index: number): number {
-  return src.slice(0, index).split("\n").length;
 }
 
 function isViolation(value: string): boolean {
@@ -254,44 +284,94 @@ function isViolation(value: string): boolean {
   return LATIN.test(v) && !LATIN_ALLOWED.has(v);
 }
 
-export function scanLatinUi(source: string): Finding[] {
-  const src = stripComments(source);
-  const found: Finding[] = [];
-  const add = (index: number, kind: Finding["kind"], value: string): void => {
-    if (isViolation(value))
-      found.push({ line: lineOf(src, index), kind, value: value.trim() });
-  };
-
-  // text after a tag end ">" (up to "<" or "{")
-  for (const m of src.matchAll(/>([^<>{};=()&|]*)(?=[<{])/g)) {
-    const before = src[m.index! - 1];
-    if (before === "=" || before === "-") continue; // arrow function, not a tag end
-    add(m.index! + 1, "text", m[1]!);
-  }
-  // text after "}" on the same line, followed by a tag
-  for (const m of src.matchAll(/\}([^<>{}\n;=()]+)(?=<[/A-Za-z])/g)) {
-    add(m.index! + 1, "text", m[1]!);
-  }
-  // string literal in a JSX expression container: >{"Hello"}<
-  for (const m of src.matchAll(/>\s*\{\s*(["'])([^"'\n]*)\1\s*\}/g)) {
-    add(m.index!, "text", m[2]!);
-  }
-  // literal values of user-visible attributes
-  const names = VISIBLE_ATTRS.map((a) => a.replace("-", "\\-")).join("|");
-  const attr = new RegExp(
-    `(?<![\\w-])(?:${names})=(?:"([^"]*)"|'([^']*)'|\\{\\s*(?:"([^"]*)"|'([^']*)'|` +
-      "`([^`$]*)`" +
-      `)\\s*\\})`,
-    "g",
-  );
-  for (const m of src.matchAll(attr)) {
-    add(m.index!, "attribute", m.slice(1).find((x) => x !== undefined) ?? "");
-  }
-  return found;
+function isTechnicalAttr(name: string): boolean {
+  return TECHNICAL_ATTRS.has(name) || name.startsWith("data-");
 }
 
-describe("scanLatinUi (self-check of the T32 scanner)", () => {
+export function scanLatinUi(source: string): Finding[] {
+  const sf = ts.createSourceFile("scan.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const found: Finding[] = [];
+  const lineAt = (pos: number): number => sf.getLineAndCharacterOfPosition(pos).line + 1;
+  const add = (pos: number, kind: Finding["kind"], value: string): void => {
+    if (isViolation(value)) found.push({ line: lineAt(pos), kind, value: value.trim() });
+  };
+
+  // const NAME = "literal" (any scope; the last declaration of a name wins)
+  const consts = new Map<string, ts.StringLiteralLike>();
+  const collect = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      ts.isStringLiteralLike(node.initializer) &&
+      (ts.getCombinedNodeFlags(node) & ts.NodeFlags.Const) !== 0
+    ) {
+      consts.set(node.name.text, node.initializer);
+    }
+    ts.forEachChild(node, collect);
+  };
+  collect(sf);
+
+  // Literals that end up on the screen when `expr` is rendered / passed as a visible value.
+  const rendered = (expr: ts.Expression, kind: Finding["kind"]): void => {
+    if (ts.isParenthesizedExpression(expr) || ts.isAsExpression(expr) || ts.isNonNullExpression(expr)) {
+      rendered(expr.expression, kind);
+    } else if (ts.isStringLiteralLike(expr)) {
+      add(expr.getStart(sf), kind, expr.text);
+    } else if (ts.isTemplateExpression(expr)) {
+      // Literal parts of a template are phrases only if they contain whitespace: `${id}-title`
+      // is a technical identifier, `Total ${n}` is text.
+      const part = (lit: ts.TemplateHead | ts.TemplateMiddle | ts.TemplateTail): void => {
+        if (/\s/.test(lit.text)) add(lit.getStart(sf), kind, lit.text);
+      };
+      part(expr.head);
+      for (const span of expr.templateSpans) {
+        rendered(span.expression, kind);
+        part(span.literal);
+      }
+    } else if (ts.isConditionalExpression(expr)) {
+      rendered(expr.whenTrue, kind);
+      rendered(expr.whenFalse, kind);
+    } else if (ts.isBinaryExpression(expr)) {
+      const op = expr.operatorToken.kind;
+      if (
+        op === ts.SyntaxKind.AmpersandAmpersandToken ||
+        op === ts.SyntaxKind.BarBarToken ||
+        op === ts.SyntaxKind.QuestionQuestionToken
+      ) {
+        rendered(expr.left, kind);
+        rendered(expr.right, kind);
+      }
+    } else if (ts.isIdentifier(expr)) {
+      const decl = consts.get(expr.text);
+      if (decl !== undefined) add(decl.getStart(sf), kind, decl.text);
+    }
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isJsxText(node)) {
+      add(node.pos, "text", node.text);
+    } else if (ts.isJsxExpression(node) && node.expression !== undefined) {
+      if (!ts.isJsxAttribute(node.parent)) rendered(node.expression, "literal");
+    } else if (ts.isJsxAttribute(node) && node.initializer !== undefined) {
+      const name = ts.isIdentifier(node.name) ? node.name.text : node.name.getText(sf);
+      if (!isTechnicalAttr(name)) {
+        const init = node.initializer;
+        if (ts.isStringLiteral(init)) add(init.getStart(sf), "attribute", init.text);
+        else if (ts.isJsxExpression(init) && init.expression !== undefined) {
+          rendered(init.expression, "attribute");
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return found.sort((a, b) => a.line - b.line);
+}
+
+describe("scanLatinUi (self-check of the compiler-API scanner)", () => {
   const caught = (code: string): Finding[] => scanLatinUi(code);
+  const values = (code: string): string[] => caught(code).map((f) => f.value);
 
   it("catches a Latin aria-label literal", () => {
     expect(caught('const a = <button aria-label="Close">×</button>;')).toEqual([
@@ -300,12 +380,10 @@ describe("scanLatinUi (self-check of the T32 scanner)", () => {
   });
 
   it("catches a Latin JSX text node", () => {
-    expect(caught("const a = <p>Hello</p>;")).toEqual([
-      { line: 1, kind: "text", value: "Hello" },
-    ]);
+    expect(caught("const a = <p>Hello</p>;")).toEqual([{ line: 1, kind: "text", value: "Hello" }]);
   });
 
-  it("catches placeholder/title/alt in all literal forms", () => {
+  it("catches literals in every attribute form", () => {
     for (const code of [
       '<input placeholder="Search" />',
       "<input placeholder={'Search'} />",
@@ -314,20 +392,46 @@ describe("scanLatinUi (self-check of the T32 scanner)", () => {
       '<span title="Hint">·</span>',
       '<img alt="Logo" />',
     ]) {
-      expect(caught(code).length, code).toBeGreaterThan(0);
+      expect(caught(code).length, code).toBe(1);
     }
   });
 
+  it("catches a custom prop and ternary/&& branches in props", () => {
+    expect(values('<ErrorAlert message="Failed" />')).toEqual(["Failed"]);
+    expect(values('<Field hint={c ? "Required" : t("a.b")} />')).toEqual(["Required"]);
+    expect(values('<Field hint={ok && "Done"} />')).toEqual(["Done"]);
+  });
+
   it("catches a string literal in an expression container and text next to an expression", () => {
-    expect(caught('<p>{"Hello"}</p>').length).toBe(1);
-    expect(caught("<p>{count} items</p>").length).toBe(1);
-    expect(caught("<p>Hello {name}</p>").length).toBe(1);
+    expect(values('<p>{"Hello"}</p>')).toEqual(["Hello"]);
+    expect(values("<p>{count} items</p>")).toEqual(["items"]);
+    expect(values("<p>Hello {name}</p>")).toEqual(["Hello"]);
+  });
+
+  it("catches text with ( ) ; = & | that the regexp scanner skipped", () => {
+    expect(values("<p>Total (all) & more</p>")).toEqual(["Total (all) & more"]);
+    expect(values("<p>a = b; c | d</p>")).toEqual(["a = b; c | d"]);
+  });
+
+  it("catches literals in ternaries, && and template literals", () => {
+    expect(values('<p>{c ? "Loading" : t("x")}</p>')).toEqual(["Loading"]);
+    expect(values('<p>{ok && "Done"}</p>')).toEqual(["Done"]);
+    expect(values('<p>{a || "Empty"}</p>')).toEqual(["Empty"]);
+    expect(values("<p>{`Total ${n}`}</p>")).toEqual(["Total"]);
+    expect(values("<p>{`${n} rows`}</p>")).toEqual(["rows"]);
+    expect(values('<p>{(c ? "A" : "B")}</p>')).toEqual(["A", "B"]);
+  });
+
+  it("catches a const string used in JSX, reported at the declaration", () => {
+    const code = 'function C() {\n  const MSG = "Failed";\n  return <p>{MSG}</p>;\n}';
+    expect(caught(code)).toEqual([{ line: 2, kind: "literal", value: "Failed" }]);
+    const attr = 'const LABEL = "Close";\nfunction C() {\n  return <button aria-label={LABEL} />;\n}';
+    expect(caught(attr)).toEqual([{ line: 1, kind: "attribute", value: "Close" }]);
   });
 
   it("reports the line of the offence", () => {
-    expect(caught("const a = 1;\nconst b = <p>\n  Hello\n</p>;")[0]?.line).toBe(
-      2,
-    );
+    expect(caught("const a = 1;\nconst b = <p>\n  Hello\n</p>;")[0]?.line).toBe(2);
+    expect(caught('const a = (\n  <p>\n    {c ? "Hi" : null}\n  </p>\n);')[0]?.line).toBe(3);
   });
 
   it("ignores dictionary values and technical attributes", () => {
@@ -337,25 +441,34 @@ describe("scanLatinUi (self-check of the T32 scanner)", () => {
       '<a href="/admin" className="link" role="button" data-testid="x">{t("a.b")}</a>',
       '<div aria-labelledby="admin-password-title" aria-modal="true" />',
       '<input placeholder={t("a.hint")} title={`${id}-t`} />',
+      '<select name="role"><option value="tech_admin">{t("role.tech_admin")}</option></select>',
       "<p>—</p>",
       "<p>{n} / {m}</p>",
       "<span>{label}: {value}</span>",
+      '<ErrorAlert message={errorMessage("forbidden")} />',
       "const [a, setA] = useState<Foo | null>(null);\nconst r = useRef<HTMLDivElement>(null);",
       "const f = async (): Promise<void> => {};\nconst g = (x: number) => x > 1 && x < 3;",
       "const c = <Select<Option> />;",
+      'const KEY = "tasks";\nconst k = useQuery({ queryKey: [KEY, "list"] });',
     ]) {
       expect(caught(code), code).toEqual([]);
     }
   });
 
+  it("no false positive on comparison with JSX in a branch", () => {
+    expect(caught("const a = <div>{a > b ? <hr /> : null}</div>;")).toEqual([]);
+    expect(caught("const a = <div>{a < b && <hr />}</div>;")).toEqual([]);
+    expect(caught('const a = <div>{items.map((i) => <li key={i.id}>{i.login}</li>)}</div>;')).toEqual([]);
+  });
+
   it("does not look into comments", () => {
-    expect(caught('// <p>Hello</p>\n/* <b aria-label="Close"/> */')).toEqual(
-      [],
-    );
+    expect(caught('// <p>Hello</p>\n/* <b aria-label="Close"/> */')).toEqual([]);
+    expect(caught("<p>{/* Hello */}</p>")).toEqual([]);
   });
 
   it("allows only the explicit whitelist", () => {
     expect(caught("<h1>GOSTracker</h1>")).toEqual([]);
+    expect(caught('<h1>{"GOSTracker"}</h1>')).toEqual([]);
     expect(caught("<h1>GOSTracker CRM</h1>").length).toBe(1);
   });
 });
