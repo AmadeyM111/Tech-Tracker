@@ -27,6 +27,7 @@ STEP: Final = 1024
 # и все функции модуля (соседи, границы, перенумерация).
 COLUMN_ORDER: Final = (Task.position, Task.created_at, Task.id)
 _LOCK_ATTEMPTS: Final = 3
+SUBTASK_NOT_ON_BOARD: Final = "Подзадачи не размещаются на доске"
 
 
 async def lock_columns(db: AsyncSession, project_id: UUID, *statuses: TaskStatus) -> None:
@@ -137,8 +138,32 @@ async def _read_state(db: AsyncSession, task_id: UUID, *, lock: bool) -> str:
     if row is None or row.deleted_at is not None:
         raise NotFound("Задача не найдена")
     if row.parent_id is not None:
-        raise Unprocessable("Подзадачу нельзя перемещать по доске", code=ErrorCode.validation_error)
+        raise Unprocessable(SUBTASK_NOT_ON_BOARD, code=ErrorCode.validation_error)
     return str(row.status)
+
+
+async def lock_task_columns(db: AsyncSession, task: Task, status: TaskStatus) -> None:
+    """Колонки текущего статуса задачи и ``status``, затем её строка (§10.2 п.4 -> п.5).
+
+    Статус сверяется по актуальной строке: сменился — блокировка повторяется по актуальному
+    (до ``_LOCK_ATTEMPTS`` раз, затем ``503 service_busy``, D-40); строка берётся
+    ``FOR NO KEY UPDATE``, и статус под ней сверяется с заблокированным ещё раз. Удалена —
+    ``404``, подзадача — ``422``. ``task.status``/``task.position`` обновляются из строки.
+    """
+    locked = str(task.status)
+    for _ in range(_LOCK_ATTEMPTS):
+        await lock_columns(db, task.project_id, TaskStatus(locked), status)
+        # Без блокировки строки: её нельзя держать, пока ждём advisory-блокировку другой колонки
+        # (дедлок с перенумерацией). Статус меняют только под блокировкой его колонки.
+        actual = await _read_state(db, task.id, lock=False)
+        if actual == locked:
+            actual = await _read_state(db, task.id, lock=True)
+            if actual == locked:
+                break
+        locked = actual
+    else:
+        raise ServiceBusy("Задача перемещается одновременно, повторите запрос")
+    await db.refresh(task, ["status", "position", "parent_id", "deleted_at"])
 
 
 async def move_task(
@@ -155,33 +180,18 @@ async def move_task(
     без соседей — в конец целевой колонки.
 
     Контракт для вызывающего (T77): доступ и существование задачи проверяются до вызова;
-    ``move_task`` права не проверяет. Сама функция после блокировки колонок перечитывает
-    строку задачи: удалённая — ``404``; сменившийся статус — блокировка повторяется по
-    актуальному (до ``_LOCK_ATTEMPTS`` раз, затем ``503 service_busy``, D-40); строка берётся
-    ``FOR NO KEY UPDATE``, и статус под этой блокировкой сверяется с заблокированным ещё раз.
+    ``move_task`` права не проверяет. Блокировки и перечитывание строки — ``lock_task_columns``
+    (повторный вызов в той же транзакции под уже взятыми блокировками ничего не ждёт).
     ``task.status``/``task.position`` обновляются по актуальной строке, а не по снимку объекта.
     """
     if task.parent_id is not None:
-        raise Unprocessable("Подзадачу нельзя перемещать по доске", code=ErrorCode.validation_error)
+        raise Unprocessable(SUBTASK_NOT_ON_BOARD, code=ErrorCode.validation_error)
     if before_task_id is not None and before_task_id == after_task_id:
         raise Unprocessable(
             "Соседи сверху и снизу должны различаться", code=ErrorCode.invalid_neighbors
         )
 
-    locked = str(task.status)
-    for _ in range(_LOCK_ATTEMPTS):
-        await lock_columns(db, task.project_id, TaskStatus(locked), status)
-        # Без блокировки строки: её нельзя держать, пока ждём advisory-блокировку другой колонки
-        # (дедлок с перенумерацией). Статус меняют только под блокировкой его колонки.
-        actual = await _read_state(db, task.id, lock=False)
-        if actual == locked:
-            actual = await _read_state(db, task.id, lock=True)
-            if actual == locked:
-                break
-        locked = actual
-    else:
-        raise ServiceBusy("Задача перемещается одновременно, повторите запрос")
-    await db.refresh(task, ["status", "position", "parent_id", "deleted_at"])
+    await lock_task_columns(db, task, status)
 
     after = await _neighbor(db, task, status, after_task_id) if after_task_id else None
     before = await _neighbor(db, task, status, before_task_id) if before_task_id else None
