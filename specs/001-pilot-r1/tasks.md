@@ -1729,7 +1729,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 ### Backend MVP: задачи и доска
 
 ## T73 — Позиции карточек, перемещение по соседям, прогресс
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** FR-28a (новая — в конец первой колонки; смена статуса без соседей — в конец целевой; перемещение по соседям; перенумерация шагом 1024), AC-61 (домен: 1000 последовательных перемещений в одной колонке — порядок ожидаемый, позиции уникальны), AC-81 (домен), FR-22 и AC-7 (функция прогресса); plan §4.8 (без `place_after`), D-22, §10.2 п.4
 - **Файлы:** `backend/app/domain/tasks/positions.py`, `backend/app/domain/tasks/progress.py`;
   тесты: `backend/tests/db/test_positions.py`, `backend/tests/unit/test_progress.py`
@@ -1745,7 +1745,8 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   `renumber_column` и повторный расчёт; меняет `task.status` и `task.position`. `progress(done,
   total)` — `None` при `total == 0`, иначе `done * 100 // total`.
 - **Готово, когда:** `pytest -q backend/tests/db/test_positions.py backend/tests/unit/test_progress.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T73 (в T77/T32b):** (1) `ServiceBusy`, брошенный из домена (исчерпание попыток `move_task`), проходит через `_app_error_handler` БЕЗ `Retry-After: 5` (D-40 требует) — добавить заголовок в обработчике AppError (errors.py, вне T73) — в T77; (2) тест на расхождение статуса под блокировкой строки (`_read_state(lock=False)` → locked, `lock=True` → другой): убьёт выжившие мутанты «игнорировать возвращённый статус» и «обычное чтение вместо блокирующего»; (3) `conftest.py::_reset_schema`: `SET lock_timeout` перед `DROP SCHEMA` — чужая открытая транзакция на `tracker_test` вешает прогон бесконечно (причина зависания исполнителя); в отчётах указывать БД прогона — T32b; (4) контракт `move_task` для T77: вызывающий проверяет доступ/существование до вызова, `move_task` сам перечитывает и блокирует, права не проверяет; ошибки: 404 (удалена), 422 `invalid_neighbors`/подзадача, 503 `service_busy` (исчерпание, 40P01, 55P03); (5) `renumber_column` не меняет `updated_at`; порядок колонки — `COLUMN_ORDER = (position, created_at, id)` — использовать в выдаче доски; (6) SQL-агрегация прогресса подзадач одним запросом — в T76/T77.
+- **Попытки:** 3
 
 ## T74 — Задачи: создание задачи и подзадачи
 - **Статус:** TODO
@@ -1873,7 +1874,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 ### Фронтенд MVP
 
 ## T81 — Фронтенд MVP: навигация, маршруты, коды ошибок, выбор пользователя
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** NFR-6, NFR-7 (видимый фокус, клавиатура), FR-45 (сообщения по кодам MVP: `service_busy`, `owner_cannot_be_removed`, `subtask_depth_exceeded`, `invalid_neighbors`, коды получателей), FR-10 (меню по `/me.capabilities`; сервер проверяет сам); plan §4.14, §11.4; заметка ревью T32 п.1 (сканер строк на compiler API — до экранов)
 - **Файлы:** `frontend/src/app/router.tsx` (маршруты `/projects`, `/projects/:projectId`,
   `/tasks/:taskId`, `/my-tasks` под `SessionGate`, страницы-заглушки заменяют T82–T84; меню:
@@ -1890,7 +1891,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Попытки:** 0
 
 ## T82 — Экраны проектов: список, создание, карточка, участники, владение, удаление
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** UF-3 (проект и участники), FR-14…FR-17 (интерфейс, без статуса), FR-15a (подтверждение самоисключения), AC-51…AC-55, AC-72, AC-73, AC-110 (поведение по ответам API); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/projects/api.ts`, `frontend/src/features/projects/ProjectsPage.tsx`,
   `frontend/src/features/projects/ProjectPage.tsx` (+ маршруты в `router.tsx`);
