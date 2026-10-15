@@ -18,6 +18,8 @@ import {
   type ProjectDetail,
   type ProjectMember,
 } from "./api";
+import { BoardView } from "../boards/BoardView";
+import { ProjectTaskList } from "../tasks/TaskList";
 import { ProjectFields } from "./ProjectsPage";
 
 type TabId = "board" | "tasks" | "members";
@@ -53,7 +55,14 @@ function roleText(role: ProjectMember["role"]): string {
   return t(role === null ? "admin.role.none" : (`admin.role.${role}` as MessageKey));
 }
 
-export function ProjectPage({ currentUserId }: { currentUserId: string }) {
+export function ProjectPage({
+  currentUserId,
+  currentRole = null,
+}: {
+  currentUserId: string;
+  /** Role of the current user from /me (decides whether an assignee may be chosen). */
+  currentRole?: string | null;
+}) {
   const { projectId = "" } = useParams();
   const project = useQuery({
     queryKey: ["projects", projectId],
@@ -61,7 +70,14 @@ export function ProjectPage({ currentUserId }: { currentUserId: string }) {
     retry: false,
   });
   if (project.data !== undefined) {
-    return <ProjectCard key={project.data.id} project={project.data} currentUserId={currentUserId} />;
+    return (
+      <ProjectCard
+        key={project.data.id}
+        project={project.data}
+        currentUserId={currentUserId}
+        currentRole={currentRole}
+      />
+    );
   }
   return (
     <section className="ui-wide">
@@ -77,7 +93,15 @@ export function ProjectPage({ currentUserId }: { currentUserId: string }) {
 
 type Confirmation = "delete" | "leave";
 
-function ProjectCard({ project, currentUserId }: { project: ProjectDetail; currentUserId: string }) {
+function ProjectCard({
+  project,
+  currentUserId,
+  currentRole,
+}: {
+  project: ProjectDetail;
+  currentUserId: string;
+  currentRole: string | null;
+}) {
   const baseId = useId();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -211,8 +235,10 @@ function ProjectCard({ project, currentUserId }: { project: ProjectDetail; curre
   const membersError = members.isError ? errorMessage(codeOf(members.error)) : null;
   const tabId = (id: TabId) => `${baseId}-tab-${id}`;
   const panelId = `${baseId}-panel`;
-  // A panel with nothing to focus is itself reachable by keyboard.
-  const panelHasFocusable = tab === "members" && (permissions.manage_members || permissions.remove_self);
+  // A panel with nothing to focus is itself reachable by keyboard. The "tasks" tab always
+  // has the filters, the "members" tab only with a management / leave action.
+  const panelHasFocusable =
+    tab === "tasks" || (tab === "members" && (permissions.manage_members || permissions.remove_self));
 
   return (
     <section className="ui-wide">
@@ -302,6 +328,15 @@ function ProjectCard({ project, currentUserId }: { project: ProjectDetail; curre
 
       <div role="tabpanel" id={panelId} aria-labelledby={tabId(tab)} tabIndex={panelHasFocusable ? undefined : 0}>
         <h2>{t(TAB_LABELS[tab])}</h2>
+        {tab === "board" ? <BoardView projectId={project.id} /> : null}
+        {tab === "tasks" ? (
+          <ProjectTaskList
+            projectId={project.id}
+            members={all}
+            canCreate={permissions.create_task}
+            actorRole={currentRole}
+          />
+        ) : null}
         {tab === "members" ? (
           <>
             {permissions.manage_members ? (
