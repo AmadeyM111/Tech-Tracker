@@ -2,7 +2,8 @@
 
 Истёкшая: ``now - last_activity_at >= 8 ч`` или ``now >= absolute_expires_at`` (D-13, FR-58).
 Времена сидов отсчитываются от реальных часов с запасом в минуты: команда читает текущее
-время сама. В stdout печатается только число удалённых; событий в ``domain_event`` нет.
+время сама. T31 (D-42, plan §10.4): stdout — строки ``ключ=значение`` в порядке полей отчёта,
+``--dry-run`` только считает; событий в ``domain_event`` нет.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from sqlalchemy import select, text
 
+from app.core.clock import FixedClock
 from app.core.config import get_settings
 from tests.db_support import ALEMBIC_INI
 from tests.factories import get_table, make_user
@@ -44,6 +46,28 @@ def cli_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, test_database_url: 
     get_settings.cache_clear()
     yield data_dir
     get_settings.cache_clear()
+
+
+REPORT_KEYS = [
+    "dry_run",
+    "sessions_expired",
+    "projects_purged",
+    "tasks_purged",
+    "comments_purged",
+    "attachments_purged",
+    "files_removed",
+    "orphan_files_removed",
+]
+
+
+def _report(out: str) -> dict[str, int]:
+    """Разбирает stdout: ровно строки ``ключ=целое`` в порядке REPORT_KEYS."""
+    lines = out.strip().splitlines()
+    pairs = [line.split("=", 1) for line in lines]
+    assert all(len(p) == 2 for p in pairs), f"ожидаются строки ключ=значение: {lines!r}"
+    assert [p[0] for p in pairs] == REPORT_KEYS, lines
+    assert all(p[1].isdigit() for p in pairs), lines
+    return {k: int(v) for k, v in pairs}
 
 
 def _run(argv: list[str]) -> int:
@@ -132,7 +156,12 @@ async def test_t16a_maintenance_deletes_only_expired_sessions(
 
     assert code == 0
     out, err = capfd.readouterr()
-    assert out.strip() == str(len(dead))
+    report = _report(out)
+    assert report["dry_run"] == 0
+    assert report["sessions_expired"] == len(dead)
+    assert {
+        k: v for k, v in report.items() if k not in ("dry_run", "sessions_expired")
+    } == dict.fromkeys(REPORT_KEYS[2:], 0)
     assert await _session_ids(committed) == live
     for sid in live | dead:
         assert sid.hex() not in out + err + caplog.text
@@ -150,19 +179,109 @@ async def test_t16a_maintenance_is_idempotent(
     assert await asyncio.to_thread(_run, ["maintenance"]) == 0
     capfd.readouterr()
     assert await asyncio.to_thread(_run, ["maintenance"]) == 0
-    assert capfd.readouterr().out.strip() == "0"
+    second = _report(capfd.readouterr().out)
+    assert second["sessions_expired"] == 0
+    assert second["dry_run"] == 0
     assert await _session_ids(committed) == live
     assert await _event_count(committed) == 0
 
 
 @pytest.mark.committed
-async def test_t16a_maintenance_empty_database_prints_zero(
+async def test_t16a_maintenance_empty_database_prints_all_zeros(
     committed: async_sessionmaker[AsyncSession],
     cli_env: Path,
     capfd: pytest.CaptureFixture[str],
 ) -> None:
     assert await asyncio.to_thread(_run, ["maintenance"]) == 0
-    assert capfd.readouterr().out.strip() == "0"
+    report = _report(capfd.readouterr().out)
+    assert report == {**dict.fromkeys(REPORT_KEYS, 0)}
+
+
+@pytest.mark.committed
+async def test_fr25b_maintenance_dry_run_counts_and_deletes_nothing(
+    committed: async_sessionmaker[AsyncSession],
+    cli_env: Path,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    """AC-63 (каркас): --dry-run печатает dry_run=1 и те же числа, не удаляя."""
+    live, dead = await _seed_sessions(committed)
+    before = live | dead
+    capfd.readouterr()
+
+    assert await asyncio.to_thread(_run, ["maintenance", "--dry-run"]) == 0
+    dry = _report(capfd.readouterr().out)
+    assert dry["dry_run"] == 1
+    assert dry["sessions_expired"] == len(dead)
+    assert await _session_ids(committed) == before
+    assert await _event_count(committed) == 0
+
+    assert await asyncio.to_thread(_run, ["maintenance"]) == 0
+    real = _report(capfd.readouterr().out)
+    assert real["dry_run"] == 0
+    assert real["sessions_expired"] == dry["sessions_expired"]
+    assert await _session_ids(committed) == live
+
+
+@pytest.mark.committed
+async def test_fr25b_maintenance_dry_run_empty_database(
+    committed: async_sessionmaker[AsyncSession],
+    cli_env: Path,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    assert await asyncio.to_thread(_run, ["maintenance", "--dry-run"]) == 0
+    assert _report(capfd.readouterr().out) == {**dict.fromkeys(REPORT_KEYS, 0), "dry_run": 1}
+
+
+@pytest.mark.committed
+async def test_t31_run_maintenance_report_and_clock(
+    committed: async_sessionmaker[AsyncSession],
+    settings: Any,
+) -> None:
+    """plan §10.4: ``run_maintenance`` -> frozen ``MaintenanceReport``; время берётся из clock."""
+    import dataclasses
+
+    from app.domain.ops.maintenance import MaintenanceReport, run_maintenance
+
+    assert [f.name for f in dataclasses.fields(MaintenanceReport)] == REPORT_KEYS
+    default = MaintenanceReport()
+    assert default.dry_run is False
+    assert all(getattr(default, k) == 0 for k in REPORT_KEYS[1:])
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        default.sessions_expired = 1  # type: ignore[misc]
+
+    now = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
+    table = get_table("user_session")
+    async with committed() as session:
+        user = await make_user(session, role="tech_admin")
+        for last, absolute in (
+            (now - settings.session_idle_timeout, now + timedelta(days=1)),  # граница: истекла
+            (now, now),  # граница абсолютного срока: истекла
+            (
+                now - settings.session_idle_timeout + timedelta(microseconds=1),
+                now + timedelta(days=1),
+            ),
+        ):
+            await session.execute(
+                table.insert().values(
+                    id=os.urandom(32),
+                    user_id=user.id,
+                    workspace_id=user.workspace_id,
+                    created_at=now - timedelta(days=1),
+                    last_activity_at=last,
+                    absolute_expires_at=absolute,
+                )
+            )
+        await session.commit()
+
+    clock = FixedClock(now)
+    dry = await run_maintenance(committed, settings, clock=clock, dry_run=True)
+    assert isinstance(dry, MaintenanceReport)
+    assert dry == MaintenanceReport(dry_run=True, sessions_expired=2)
+    assert len(await _session_ids(committed)) == 3
+
+    real = await run_maintenance(committed, settings, clock=clock, dry_run=False)
+    assert real == MaintenanceReport(dry_run=False, sessions_expired=2)
+    assert len(await _session_ids(committed)) == 1
 
 
 @pytest.mark.committed
@@ -269,7 +388,7 @@ def test_t16a_maintenance_without_db_fails_within_60s_without_secrets(
 
     code = _run(["maintenance"])
 
-    assert code != 0
+    assert code == 1
     assert code != 2, "2 — ошибка аргументов; подкоманда должна существовать"
     assert fake.offset <= 75, f"ожидание БД превысило 60 с (учтено {fake.offset:.0f} с)"
     out, err = capfd.readouterr()
@@ -282,4 +401,32 @@ def test_t16a_maintenance_without_db_fails_within_60s_without_secrets(
 
 def test_t16a_maintenance_help_ok(capfd: pytest.CaptureFixture[str]) -> None:
     assert _run(["maintenance", "--help"]) == 0
-    assert capfd.readouterr().out.strip()
+    out = capfd.readouterr().out
+    assert out.strip()
+    assert "--dry-run" in out
+
+
+def test_t31_maintenance_invalid_configuration_exits_1_without_secrets(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    """Неверная конфигурация: код 1, stderr без пароля из DSN, stdout пуст."""
+    password = "s3cretpw-cfg-9d2f"
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    monkeypatch.setenv("ENV", "test")
+    monkeypatch.setenv(
+        "DATABASE_URL", f"postgresql+asyncpg://tracker:{password}@127.0.0.1:1/tracker_test"
+    )
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("SESSION_IDLE_TIMEOUT", "not-a-duration")
+    get_settings.cache_clear()
+    try:
+        code = _run(["maintenance"])
+    finally:
+        get_settings.cache_clear()
+    assert code == 1
+    out, err = capfd.readouterr()
+    assert out.strip() == ""
+    assert err.strip()
+    assert password not in out + err

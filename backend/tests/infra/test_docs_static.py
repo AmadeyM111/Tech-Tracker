@@ -452,3 +452,67 @@ def test_t28_readme_operator_cert_and_volumes() -> None:
             and re.search(r"содерж|хран|contains|holds|stores", w, re.I)
             for w in _windows(part, r"appdata", 250)
         ), f"{name}: не сказано, что appdata содержит secret_key и файл пароля"
+
+
+# --- T31: регулярное обслуживание (FR-25b, D-42) -------------------------------------------
+
+_CRON_CMD = "docker compose exec -T api gostracker maintenance"
+
+
+def _maintenance_section(part: str, heading_re: str) -> str:
+    """Текст от заголовка раздела обслуживания до следующего заголовка того же или выше уровня."""
+    m = re.search(rf"^(#{{2,4}})\s+.*(?:{heading_re}).*$", part, re.M | re.I)
+    assert m, f"нет заголовка раздела /{heading_re}/"
+    level = len(m.group(1))
+    rest = part[m.end() :]
+    nxt = re.search(rf"^#{{1,{level}}}\s", rest, re.M)
+    return rest[: nxt.start()] if nxt else rest
+
+
+@pytest.mark.parametrize(
+    ("which", "heading_re"),
+    [(0, r"Регулярное обслуживание"), (1, r"Regular maintenance")],
+    ids=["ru", "en"],
+)
+def test_t31_readme_regular_maintenance_section(which: int, heading_re: str) -> None:
+    """FR-25b: раздел регулярного обслуживания в обеих частях README."""
+    section = _maintenance_section(_parts()[which], heading_re)
+    for term in ("gostracker maintenance", "--dry-run", "crontab", _CRON_CMD):
+        assert term in section, f"в разделе нет «{term}»"
+
+
+@pytest.mark.parametrize(
+    ("which", "heading_re", "trash", "sessions", "no_sched"),
+    [
+        (
+            0,
+            r"Регулярное обслуживание",
+            r"корзин\w*.{0,200}30\s*(дн|суток)|30\s*(дн|суток).{0,200}корзин",
+            r"сесси",
+            r"(нет|не\s+(запуска|использ|добав)\w*).{0,160}(планировщик|сервис)"
+            r"|(планировщик|сервис).{0,160}(нет|не\s+(входит|добавл)\w*)",
+        ),
+        (
+            1,
+            r"Regular maintenance",
+            r"trash.{0,200}30\s*days|30\s*days.{0,200}trash|30-day",
+            r"session",
+            r"(no|not|without).{0,160}(scheduler|background|compose service)"
+            r"|(scheduler|background).{0,160}(not|no\b|absent)",
+        ),
+    ],
+    ids=["ru", "en"],
+)
+def test_t31_readme_maintenance_explains_why_and_no_scheduler(
+    which: int, heading_re: str, trash: str, sessions: str, no_sched: str
+) -> None:
+    section = _maintenance_section(_parts()[which], heading_re)
+    assert _has(section, trash), "не сказано про срок корзины 30 дней"
+    assert _has(section, sessions), "не сказано про истёкшие сессии"
+    assert _has(section, no_sched), "нет пометки: фонового планировщика/сервиса compose в R1 нет"
+
+
+def test_t31_readme_maintenance_cron_example_and_dry_run_hint() -> None:
+    """Пример crontab с `-T` (без TTY) в обеих частях; `--dry-run` упомянут как проверка."""
+    for part in _parts():
+        assert _has(part, r"(?m)^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+[^\n]*" + re.escape(_CRON_CMD))

@@ -694,7 +694,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 1
 
 ## T31 — Команда обслуживания: каркас, `--dry-run`, границы истечения сессий, регулярный запуск
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** FR-25b (каркас автоочистки), FR-59 (истёкшие сессии удаляются), AC-63 и AC-66 *инфра* (каркас; содержательная часть — T54); plan D-42, §4.13, §10.4 (`run_maintenance`, `MaintenanceReport`); приёмка «R1.1!» (регулярный `maintenance`, `--dry-run`, unit-тест границ), заметки T16a/T19/T27
 - **Файлы:** `backend/app/domain/ops/__init__.py`, `backend/app/domain/ops/maintenance.py`,
   `backend/app/domain/system/maintenance.py` (параметр `dry_run`), `backend/app/cli/commands/maintenance.py`,
@@ -718,10 +718,11 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
   (D-42: «фонового планировщика в R1 нет»).
 - **Готово, когда:** `pytest -q backend/tests/db/test_purge_sessions_boundaries.py backend/tests/cli/test_maintenance.py` и
   `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёные, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T31 (в T54/T57):** (1) README: `/opt/gostracker` заменить на «каталог клона», запуск под пользователем с доступом к Docker, при `COMPOSE_PROJECT_NAME`/`-p` указать его в cron-строке; добавить `date -u` перед командой в примере; (2) предикат истечения сессий продублирован в dry-run и удалении — вынести в одно выражение (T54); (3) T54: срок корзины — момент UTC (`deleted_at <= now − 30 дней`, plan §4.10), пакеты короткие, занятые строки пропускаются — сохранить верным в README; снимок `FixedClock` на запуск корректен.
+- **Попытки:** 1
 
 ## T32 — Мелочи приёмки R1.0: сквозные AC-2/AC-64, сканер строк, `--wait`, имя тестовой БД
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-2, AC-64 (по одному сквозному API-сценарию), AC-98 (автопроверка словаря: латиница и атрибуты), NFR-3 (README); приёмка R1.0, замечания 1–4
 - **Файлы:** `README.md` (`docker compose up -d --build --wait` в ru и en перед `exec api cat …`),
   `frontend/src/**` и `frontend/src/shared/i18n/ru.ts` (только перенос строк, найденных новым

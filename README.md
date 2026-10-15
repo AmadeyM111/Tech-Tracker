@@ -144,6 +144,29 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
   `appdata`: в R1.0 том содержит `secret_key` и файл пароля первого администратора
   (`initial-admin-password.txt`); вложений пока нет. Используйте `-v` только для тестового проекта (см. ниже).
 
+### Регулярное обслуживание
+
+Команда `gostracker maintenance` выполняет служебную очистку: удаляет истёкшие сессии
+пользователей и (по мере появления функций R1.1) очищает корзину и осиротевшие файлы. Без
+регулярного запуска корзина (срок хранения 30 дней) и истёкшие сессии не очищаются: данные
+остаются в БД и на диске. Запускайте команду раз в сутки, например из `crontab` хоста:
+
+```
+17 3 * * * cd /opt/gostracker && docker compose exec -T api gostracker maintenance >> /var/log/gostracker-maintenance.log 2>&1
+```
+
+Ключ `-T` отключает TTY, без него `cron` не сможет выполнить `docker compose exec`.
+
+- Для проверки перед первым запуском: `docker compose exec -T api gostracker maintenance --dry-run`
+  только считает, что было бы очищено, и ничего не меняет.
+- Вывод - ровно восемь строк `ключ=значение` (`dry_run`, `sessions_expired`, `projects_purged`,
+  `tasks_purged`, `comments_purged`, `attachments_purged`, `files_removed`,
+  `orphan_files_removed`); при ошибке команда пишет сообщение в stderr и завершается с кодом 1.
+- Команда безопасна при работающем API: обработка идёт короткими пакетами, строки, занятые
+  запросами пользователей, пропускаются; повторный запуск ничего не ломает.
+- Фонового планировщика в R1 нет: сервиса compose для обслуживания нет, `api` его сам не
+  запускает. Запуск по расписанию остаётся за оператором.
+
 ## Разработка
 
 Dev-конфигурация `deploy/compose.dev.yml` подключается только явно и публикует порт БД
@@ -359,6 +382,30 @@ cannot be deleted.
 - **Removing volumes.** `docker compose down -v` removes the volumes, including the database
   (`pgdata`) and `appdata`: in R1.0 that volume contains `secret_key` and the first
   administrator password file (`initial-admin-password.txt`); there are no attachments yet. Use `-v` for the test project only (see below).
+
+### Regular maintenance
+
+The `gostracker maintenance` command performs the housekeeping: it deletes expired user
+sessions and (as R1.1 features appear) purges the trash and orphaned files. Without regular
+runs the trash (30-day retention) and expired sessions are not cleaned up: the data stays in
+the database and on disk. Run the command once a day, for example from the host `crontab`:
+
+```
+17 3 * * * cd /opt/gostracker && docker compose exec -T api gostracker maintenance >> /var/log/gostracker-maintenance.log 2>&1
+```
+
+The `-T` flag disables the TTY; without it `cron` cannot run `docker compose exec`.
+
+- To check before the first run: `docker compose exec -T api gostracker maintenance --dry-run`
+  only counts what would be cleaned up and changes nothing.
+- The output is exactly eight `key=value` lines (`dry_run`, `sessions_expired`,
+  `projects_purged`, `tasks_purged`, `comments_purged`, `attachments_purged`, `files_removed`,
+  `orphan_files_removed`); on failure the command writes a message to stderr and exits with
+  code 1.
+- The command is safe while the API is running: it works in short batches, rows held by user
+  requests are skipped, and a repeated run breaks nothing.
+- There is no background scheduler in R1 and no compose service for maintenance; `api` does
+  not start it by itself. Scheduled runs are up to the operator.
 
 ## Development
 
