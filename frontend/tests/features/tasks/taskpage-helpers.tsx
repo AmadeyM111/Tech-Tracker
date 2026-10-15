@@ -150,6 +150,8 @@ export function cardRoutes(
     [ME]: () => j(200, meWith(role === "user" ? USER_CAPS : BA_CAPS, role)),
     [TASK]: () => j(200, cardFn()),
     [MEMBERS]: () => j(200, page([M_OWNER, M_ME, M_KUZNETSOV, M_SIDOROV])),
+    // T85: карточка читает комментарии; по умолчанию их нет.
+    [`GET /api/v1/tasks/${TID1}/comments`]: () => j(200, page([])),
     ...over,
   };
 }
