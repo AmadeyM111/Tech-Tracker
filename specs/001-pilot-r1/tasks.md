@@ -1810,7 +1810,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Файлы:** `backend/app/api/v1/tasks.py`, `backend/app/api/v1/schemas/tasks.py` (+ `__init__`,
   генерация контракта); тесты: `backend/tests/api/test_tasks.py`, `backend/tests/api/test_subtasks.py`,
   `backend/tests/api/test_task_permissions.py`, `backend/tests/api/test_reassign_blocked.py`,
-  `backend/tests/api/test_recipients.py`, `backend/tests/api/test_personal_tasks.py`,
+  `backend/tests/api/test_task_recipients.py`, `backend/tests/api/test_personal_tasks.py`,
   `backend/tests/api/test_project_task_list.py`, `backend/tests/api/test_soft_delete.py`, дополнения
   `test_not_found_vs_forbidden.py`, `test_workspace_isolation.py`, `test_role_change_effect.py`
 - **Зависит от:** T72, T75, T76
@@ -1819,7 +1819,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   D-51; названия — D-52; `TaskStatus`, `TaskPriority` — перечисления в схеме (вне набора → 422);
   «исполнитель не передан» и «передан `null`» различаются по `model_fields_set` → `UNSET`/`None`.
   Ответ карточки — `TaskDetail` из `get_task`. Маршрута `move` здесь нет (T78).
-- **Готово, когда:** все перечисленные тест-файлы `pytest -q backend/tests/api/test_tasks.py backend/tests/api/test_subtasks.py backend/tests/api/test_task_permissions.py backend/tests/api/test_reassign_blocked.py backend/tests/api/test_recipients.py backend/tests/api/test_personal_tasks.py backend/tests/api/test_project_task_list.py backend/tests/api/test_soft_delete.py backend/tests/api/test_not_found_vs_forbidden.py backend/tests/api/test_workspace_isolation.py backend/tests/api/test_role_change_effect.py`
+- **Готово, когда:** все перечисленные тест-файлы `pytest -q backend/tests/api/test_tasks.py backend/tests/api/test_subtasks.py backend/tests/api/test_task_permissions.py backend/tests/api/test_reassign_blocked.py backend/tests/api/test_task_recipients.py backend/tests/api/test_personal_tasks.py backend/tests/api/test_project_task_list.py backend/tests/api/test_soft_delete.py backend/tests/api/test_not_found_vs_forbidden.py backend/tests/api/test_workspace_isolation.py backend/tests/api/test_role_change_effect.py`
   и проверки контракта зелёные, линтер чистый.
 - **Попытки:** 0
 
