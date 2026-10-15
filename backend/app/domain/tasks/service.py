@@ -357,6 +357,8 @@ async def delete_task(db: AsyncSession, actor: Actor, task_id: UUID) -> None:
     ctx = await load_task_context(db, actor, task_id, lock_project="share")
     if not can_delete_task(actor, ctx.project, ctx.task):
         raise Forbidden()
+    # Порядок §10.2 п.5: сначала строки задач (сама задача, затем живые подзадачи по ``id``),
+    # потом комментарии — как у параллельного удаления подзадачи; иначе взаимоблокировка.
     # Строка под FOR NO KEY UPDATE: ждёт создателя подзадачи (FOR SHARE) и закрывает новых.
     locked = (
         await db.execute(
@@ -367,21 +369,31 @@ async def delete_task(db: AsyncSession, actor: Actor, task_id: UUID) -> None:
     ).first()
     if locked is None:
         raise NotFound("Задача не найдена")
+    sub_ids = (
+        (
+            await db.execute(
+                select(Task.id)
+                .where(Task.parent_id == task_id, Task.deleted_at.is_(None))
+                .order_by(Task.id)
+                .with_for_update(key_share=True)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    # Семья — только неудалённые (под уже удалённой подзадачей пакет комментариев прежний).
+    family = [task_id, *sub_ids]
     stamp = {"deleted_at": utcnow(), "deleted_batch_id": uuid4()}
-    # Комментарии под уже удалённой подзадачей не трогаем (их пакет — прежний).
-    family = select(Task.id).where(
-        (Task.id == task_id) | ((Task.parent_id == task_id) & Task.deleted_at.is_(None))
+    await db.execute(
+        update(Task)
+        .where(Task.id.in_(family), Task.deleted_at.is_(None))
+        .values(**stamp)
+        .execution_options(synchronize_session=False)
     )
     await db.execute(
         update(Comment)
         .where(Comment.task_id.in_(family), Comment.deleted_at.is_(None))
         .values(**stamp)
-    )
-    await db.execute(
-        update(Task)
-        .where((Task.id == task_id) | (Task.parent_id == task_id), Task.deleted_at.is_(None))
-        .values(**stamp)
-        .execution_options(synchronize_session=False)
     )
 
 
