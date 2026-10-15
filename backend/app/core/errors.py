@@ -14,6 +14,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import DBAPIError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger("app.errors")
@@ -149,6 +150,14 @@ class PayloadTooLarge(AppError):
     default_detail = "Файл слишком большой"
 
 
+class ServiceBusy(AppError):
+    """Занятая блокировка или взаимоблокировка БД (D-40): состояние временное, можно повторить."""
+
+    status_code = 503
+    code = "service_busy"
+    default_detail = "Сервер занят, повторите запрос"
+
+
 class Unprocessable(AppError):
     """422; код обязателен (``ErrorCode`` или строка)."""
 
@@ -224,8 +233,40 @@ async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSON
     return _error_response(500, INTERNAL_ERROR_DETAIL, "internal_error")
 
 
+# SQLSTATE: lock_not_available (превышен lock_timeout) и deadlock_detected (D-40).
+_BUSY_SQLSTATES = frozenset({"55P03", "40P01"})
+_RETRY_AFTER_SECONDS = "5"
+
+
+def _sqlstate(exc: DBAPIError) -> str | None:
+    """SQLSTATE из ``orig.sqlstate``/``orig.pgcode``, затем из ``orig.__cause__`` (asyncpg)."""
+    orig = exc.orig
+    for source in (orig, getattr(orig, "__cause__", None)):
+        for attr in ("sqlstate", "pgcode"):
+            value = getattr(source, attr, None)
+            if isinstance(value, str) and value:
+                return value
+    return None
+
+
+async def _dbapi_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """55P03/40P01 -> 503 ``service_busy``; прочие ошибки БД — как любое необработанное (500).
+
+    В лог идёт только SQLSTATE: текст ``DBAPIError`` содержит SQL (FR-57, NFR-9).
+    """
+    state = _sqlstate(cast(DBAPIError, exc))
+    if state not in _BUSY_SQLSTATES:
+        return await _unhandled_exception_handler(request, exc)
+    logger.warning("Database is busy: SQLSTATE %s", state)
+    busy = ServiceBusy()
+    return _error_response(
+        busy.status_code, busy.detail, busy.code, headers={"Retry-After": _RETRY_AFTER_SECONDS}
+    )
+
+
 def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, _app_error_handler)
     app.add_exception_handler(RequestValidationError, _validation_error_handler)
     app.add_exception_handler(StarletteHTTPException, _http_exception_handler)
+    app.add_exception_handler(DBAPIError, _dbapi_error_handler)
     app.add_exception_handler(Exception, _unhandled_exception_handler)

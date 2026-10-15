@@ -658,7 +658,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 ### Подготовка: техдолг приёмки R1.0, блокирующий R1.1
 
 ## T29 — Занятая блокировка БД и взаимоблокировка: 503 `service_busy`
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** FR-45 (единый формат ошибок), FR-57 и NFR-9 (в ответе и логе нет SQL и параметров); plan D-40, §10.2; приёмка R1.0 «R1.1!» (код для `LockNotAvailableError`), ревью T26 п.3, T27 п.1. **Q-1** (подтверждение заказчика, Д-8)
 - **Файлы:** `backend/app/core/errors.py`; тесты: `backend/tests/api/test_db_busy_errors.py`
 - **Зависит от:** —
@@ -675,7 +675,8 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
   получается `SET LOCAL lock_timeout = '50ms'` + `SELECT … FOR UPDATE` строки, занятой вторым
   соединением, на тестовом маршруте приложения теста.
 - **Готово, когда:** `pytest -q backend/tests/api/test_db_busy_errors.py backend/tests/api/test_errors.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T29:** (1) прочие `DBAPIError` теперь обрабатывает `ExceptionMiddleware` (ответ 500 и ERROR прежние; проброса в uvicorn больше нет); (2) `test_t29_transaction_rolled_back_on_busy` не различает наличие rollback (транзакция после 55P03 уже прервана) — регрессионный; (3) перечисление логинов через 503 на входе возможно только при занятой >30 с строке `app_user` (до T29 это был 500; reserve-before-verify не нарушен) — в бэклог; (4) в T88 (документация) исправить «админ-действие при занятой блокировке → 500» на «503 `service_busy`, `Retry-After: 5`»; (5) код `service_busy` во фронтенд-словаре — в T81…T85; (6) порядок-зависимый ERROR `cli/test_openapi.py::…stdout_is_valid_json` (JSON-логи alembic в stdout после `configure_logging`) — предсуществующий, чинится в тестах: импортировать `app.cli.main` до `capfd.readouterr()` (включить в T68 или T32b).
+- **Попытки:** 1
 
 ## T30 — Каталог событий R1.1, белые списки полей, устойчивое чтение журнала
 - **Статус:** DONE
