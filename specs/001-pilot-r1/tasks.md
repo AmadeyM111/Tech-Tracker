@@ -863,7 +863,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T35 — Справочник пользователей и загрузка получателей; `GET /users`
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **MVP-пересборка:** задача входит в MVP без изменений по смыслу; зависимость «T34» читать как
   **T70** (`RecipientFacts` и `recipients` — из T70); цель `DEAL_RESPONSIBLE` не нужна (plan §11.5).
 - **AC:** FR-70 (факты получателя), FR-13, AC-21 (справочник — только своё пространство), AC-75 (без роли — 403, через обход маршрутов); plan §10.2 п.3, §10.3 (`GET /users`, общие схемы), §10.4 (`directory`)
@@ -880,7 +880,8 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
   Маршрут `GET /users` — router-level `require_capability(BUSINESS_ACCESS)` (ТА → 403).
 - **Готово, когда:** `pytest -q backend/tests/domain/test_directory.py backend/tests/api/test_users_directory.py` и проверки контракта
   (общие условия) зелёные, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T35 (в T71/T72/T88):** (1) `list_directory` повторяет LIMIT+1/OFFSET из `core/pagination.paginate` (колонки из JOIN, не сущность): при втором потребителе (T71 `GET /projects/{id}/members` — строки `{user, role, is_blocked}`) завести `paginate_rows` с проверкой `ORDER BY` и использовать в обоих местах (AHA — после третьего повторения); (2) тело 422 для `q` содержит технический текст регулярки (`^[^\x00]*$`) — человекочитаемость через общий обработчик валидации, не в T35; (3) `ProjectRef` в `schemas/common.py` — задел для T72; (4) `q` ≤ 64 символов, без NUL; список и роль одним SELECT; Seq Scan по логину допустим (pg_trgm отложен, D-24/D-58).
+- **Попытки:** 2
 
 ## T36 — Проекты: сервис и выборки
 - **Статус:** SUPERSEDED → T71 (MVP: без архива, событий ленты)
@@ -1675,11 +1676,11 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Попытки:** 2
 
 ## T71 — Проекты и участники: сервис и выборки
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-50, AC-51, AC-52, AC-53, AC-54, AC-55 (список без содержимого), AC-72 (без «архивного»), AC-73, AC-74 (участник, владелец), AC-108 (проект), AC-110 (без 409), AC-48 (удаление проекта: не владелец — 403, владелец — мягко), AC-65 (событие передачи владения), FR-14, FR-14a, FR-14c, FR-15, FR-15a, FR-16 (мягкое удаление, каскад), FR-17 (без статуса), FR-41; plan §11.4, §11.5, D-45, D-46, D-47, D-52, D-55, D-56, §10.2
 - **Файлы:** `backend/app/domain/projects/service.py`, `backend/app/domain/projects/queries.py`,
   `backend/app/domain/projects/members.py`; тесты: `backend/tests/domain/test_projects_service.py`,
-  `backend/tests/domain/test_project_members_service.py`
+  `backend/tests/domain/test_project_members_service.py`, `backend/tests/projects_support.py` (общие фикстуры тестов)
 - **Зависит от:** T35, T69, T70
 - **Описание:** Сигнатуры — plan §10.4 (`queries`, `service`, `members`) без `set_archived` и
   без фильтра статуса. `load_project_facts(db, actor, project_id, *, lock: Literal["update", "share"]
