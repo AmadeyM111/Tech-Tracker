@@ -8,6 +8,7 @@ import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
 import { MyTasksPage } from "../features/tasks/TaskList";
+import { TaskPage } from "../features/tasks/TaskPage";
 import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
 import { me, type MeResponse } from "../features/auth/api";
@@ -174,7 +175,7 @@ function AdminScreen({
   );
 }
 
-// Business screen (T82-T84 replace the stub bodies); needs business_access.
+// Business screen (T82-T84 replaced the stub bodies); needs business_access.
 function BusinessScreen({
   insideMain,
   children,
@@ -310,7 +311,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/tasks/:taskId"
         element={
           <BusinessScreen insideMain={insideMain}>
-            {() => <h1>{t("tasks.task_title")}</h1>}
+            {() => <TaskPage />}
           </BusinessScreen>
         }
       />

@@ -77,3 +77,44 @@ export async function createTask(projectId: string, body: TaskCreate): Promise<T
   if (data === undefined) throw invalidBody(201);
   return data;
 }
+
+/** Body of the update request: only the keys present are changed; `null` clears a due date / assignee. */
+export type TaskUpdate = components["schemas"]["TaskUpdate"];
+
+/** Body of the subtask request: only the title is sent, the server fills in the rest (FR-20). */
+export type SubtaskCreate = Pick<TaskCreate, "title"> & Partial<TaskCreate>;
+
+export async function getTask(id: string, options: ReadOptions = {}): Promise<TaskDetail> {
+  const { data } = await getAppClient().GET("/api/v1/tasks/{task_id}", {
+    params: { path: { task_id: id } },
+    headers: options.headers,
+    signal: options.signal,
+  });
+  if (data === undefined) throw invalidBody(200);
+  return data;
+}
+
+export async function updateTask(id: string, body: TaskUpdate): Promise<TaskDetail> {
+  const { data } = await getAppClient().PATCH("/api/v1/tasks/{task_id}", {
+    params: { path: { task_id: id } },
+    body,
+  });
+  if (data === undefined) throw invalidBody(200);
+  return data;
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  await getAppClient().DELETE("/api/v1/tasks/{task_id}", {
+    params: { path: { task_id: id } },
+  });
+}
+
+export async function createSubtask(id: string, body: SubtaskCreate): Promise<TaskDetail> {
+  // The schema marks `description` / `priority` as required only because they have server defaults.
+  const { data } = await getAppClient().POST("/api/v1/tasks/{task_id}/subtasks", {
+    params: { path: { task_id: id } },
+    body: body as components["schemas"]["TaskCreate"],
+  });
+  if (data === undefined) throw invalidBody(201);
+  return data;
+}
