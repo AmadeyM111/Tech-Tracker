@@ -35,7 +35,7 @@ import { describe, expect, it, vi } from "vitest";
 import { listDirectory } from "../../src/features/users/api";
 import { errorMessage, ru } from "../../src/shared/i18n";
 import { UserPicker } from "../../src/shared/ui/UserPicker";
-import { err, installFetch, j, page } from "../features/admin/helpers";
+import { deferred, err, installFetch, j, page } from "../features/admin/helpers";
 
 const DICT = Object.values(ru) as string[];
 const USERS = "GET /api/v1/users";
@@ -118,8 +118,8 @@ describe("UserPicker search", () => {
     installFetch({ [USERS]: () => j(200, page([])) });
     const { input } = setup();
     type(input, "zzz");
-    const status = await screen.findByRole("status");
-    expect(DICT).toContain(status.textContent);
+    await waitFor(() => expect(DICT).toContain(screen.getByRole("status").textContent));
+    expect(screen.getByRole("status").textContent).toBe(ru["user_picker.empty"]);
     expect(options()).toEqual([]);
   });
 
@@ -246,8 +246,7 @@ describe("UserPicker allowedIds (project members)", () => {
     installFetch({ [USERS]: () => j(200, page([B])) });
     const { input } = setup({ allowedIds: [A.id] });
     type(input, "iv");
-    const status = await screen.findByRole("status");
-    expect(DICT).toContain(status.textContent);
+    await waitFor(() => expect(DICT).toContain(screen.getByRole("status").textContent));
     expect(options()).toEqual([]);
   });
 
@@ -255,9 +254,102 @@ describe("UserPicker allowedIds (project members)", () => {
     installFetch({ [USERS]: () => j(200, page([A])) });
     const { input, onSelect } = setup({ allowedIds: [] });
     type(input, "iv");
-    await screen.findByRole("status");
+    await waitFor(() => expect(DICT).toContain(screen.getByRole("status").textContent));
     key(input, "ArrowDown");
     key(input, "Enter");
     expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+describe("UserPicker review T81 fixes (NFR-7)", () => {
+  const status = () => document.querySelector<HTMLElement>('div[role="status"]');
+
+  it("ac_field_has_max_length_64", () => {
+    const { input } = setup();
+    expect((input as HTMLInputElement).maxLength).toBe(64);
+  });
+
+  it("ac_live_region_is_permanent_div_with_stable_identity", async () => {
+    installFetch({ [USERS]: () => j(200, page([A, B])) });
+    const { input } = setup();
+    const region = status();
+    expect(region).toBeTruthy();
+    expect(region!.tagName).toBe("DIV");
+    expect(region!.textContent).toBe("");
+    expect(document.querySelectorAll('[role="status"]').length).toBe(1);
+    type(input, "iv");
+    await screen.findAllByRole("option");
+    expect(status()).toBe(region);
+    expect(document.querySelectorAll('[role="status"]').length).toBe(1);
+  });
+
+  it("ac_live_region_announces_result_count", async () => {
+    installFetch({ [USERS]: () => j(200, page([A, B])) });
+    const { input } = setup();
+    type(input, "iv");
+    await screen.findAllByRole("option");
+    await waitFor(() => expect(status()!.textContent).toMatch(/2/));
+  });
+
+  it("ac_live_region_announces_loading", async () => {
+    const d = deferred<Response>();
+    installFetch({ [USERS]: () => d.promise });
+    const { input } = setup();
+    type(input, "iv");
+    await waitFor(() => expect(status()!.textContent).not.toBe(""));
+    expect(DICT).toContain(status()!.textContent);
+    d.resolve(j(200, page([A])));
+    await screen.findAllByRole("option");
+  });
+
+  it("ac_live_region_announces_nothing_found", async () => {
+    installFetch({ [USERS]: () => j(200, page([])) });
+    const { input } = setup();
+    type(input, "zzz");
+    await waitFor(() => expect(status()!.textContent).toBe(ru["user_picker.empty"]));
+  });
+
+  it("ac_escape_with_open_list_does_not_bubble_to_parent", async () => {
+    installFetch({ [USERS]: () => j(200, page([A, B])) });
+    const parentKey = vi.fn();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <div onKeyDown={(e) => parentKey(e.key)}>
+          <UserPicker label="Исполнитель" onSelect={vi.fn()} />
+        </div>
+      </QueryClientProvider>,
+    );
+    const input = screen.getByRole("combobox", { name: "Исполнитель" });
+    type(input, "iv");
+    await screen.findAllByRole("option");
+    key(input, "Escape");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(parentKey).not.toHaveBeenCalledWith("Escape");
+    // список закрыт: Escape всплывает дальше (закрывает окно-владельца)
+    key(input, "Escape");
+    expect(parentKey).toHaveBeenCalledWith("Escape");
+  });
+
+  it("ac_has_next_with_no_visible_options_asks_to_refine_query", async () => {
+    installFetch({ [USERS]: () => j(200, page([B], 1, true)) });
+    const { input } = setup({ allowedIds: [A.id] });
+    type(input, "iv");
+    await waitFor(() => expect(status()!.textContent).toMatch(/уточн/i));
+    expect(DICT).toContain(status()!.textContent);
+    expect(status()!.textContent).not.toBe(ru["user_picker.empty"]);
+    expect(options()).toEqual([]);
+  });
+
+  it("ac_active_option_has_visible_outline_for_forced_colors", async () => {
+    installFetch({ [USERS]: () => j(200, page([A, B])) });
+    const { input } = setup();
+    type(input, "i");
+    await screen.findAllByRole("option");
+    key(input, "ArrowDown");
+    const active = options()[0]!;
+    expect(active.getAttribute("aria-selected")).toBe("true");
+    expect(active.style.outline).toMatch(/\S/);
+    expect(active.style.outline).not.toMatch(/^none|^0(px)?\b/);
   });
 });

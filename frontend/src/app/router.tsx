@@ -7,6 +7,8 @@ import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
+import { ProjectPage } from "../features/projects/ProjectPage";
+import { ProjectsPage } from "../features/projects/ProjectsPage";
 import { me, type MeResponse } from "../features/auth/api";
 import { useLogout } from "../features/auth/useLogout";
 import { ApiError, setNavigationHandlers } from "../shared/api/client";
@@ -81,7 +83,7 @@ function MenuItems({ profile }: { profile: MeResponse }) {
       {has("business_access") ? (
         <>
           <p>
-            <NavLink to="/projects">{t("nav.projects")}</NavLink>
+            <NavLink to="/projects" end>{t("nav.projects")}</NavLink>
           </p>
           <p>
             <NavLink to="/my-tasks">{t("nav.my_tasks")}</NavLink>
@@ -171,8 +173,14 @@ function AdminScreen({
   );
 }
 
-// Stub of a business screen (T82-T84 replace the body); needs business_access.
-function BusinessScreen({ insideMain, children }: { insideMain: boolean; children: ReactNode }) {
+// Business screen (T82-T84 replace the stub bodies); needs business_access.
+function BusinessScreen({
+  insideMain,
+  children,
+}: {
+  insideMain: boolean;
+  children: (profile: MeResponse) => ReactNode;
+}) {
   return (
     <AdminScreen insideMain={insideMain} capability="business_access">
       {(profile) => (
@@ -180,7 +188,7 @@ function BusinessScreen({ insideMain, children }: { insideMain: boolean; childre
           <nav>
             <MenuItems profile={profile} />
           </nav>
-          {children}
+          {children(profile)}
         </>
       )}
     </AdminScreen>
@@ -285,7 +293,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/projects"
         element={
           <BusinessScreen insideMain={insideMain}>
-            <h1>{t("projects.title")}</h1>
+            {(profile) => <ProjectsPage canCreate={profile.capabilities.includes("project_create")} />}
           </BusinessScreen>
         }
       />
@@ -293,7 +301,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/projects/:projectId"
         element={
           <BusinessScreen insideMain={insideMain}>
-            <h1>{t("projects.project_title")}</h1>
+            {(profile) => <ProjectPage currentUserId={profile.id} />}
           </BusinessScreen>
         }
       />
@@ -301,7 +309,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/tasks/:taskId"
         element={
           <BusinessScreen insideMain={insideMain}>
-            <h1>{t("tasks.task_title")}</h1>
+            {() => <h1>{t("tasks.task_title")}</h1>}
           </BusinessScreen>
         }
       />
@@ -309,7 +317,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/my-tasks"
         element={
           <BusinessScreen insideMain={insideMain}>
-            <h1>{t("tasks.my_title")}</h1>
+            {() => <h1>{t("tasks.my_title")}</h1>}
           </BusinessScreen>
         }
       />

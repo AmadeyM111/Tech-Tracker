@@ -11,9 +11,15 @@ export interface UserPickerProps {
   /** When set, only these ids may be chosen (e.g. project members); `[]` allows nobody. */
   allowedIds?: readonly string[];
   disabled?: boolean;
+  /** An action on the chosen user is in flight: the field stays enabled (focus), marked aria-busy. */
+  busy?: boolean;
+  /** The search error is a status line, not a second alert (the page has its own alert). */
+  quietError?: boolean;
 }
 
 const DEBOUNCE_MS = 300;
+// A fast answer is not announced as "loading": the status would only flicker.
+const LOADING_DELAY_MS = 200;
 // Inline: ui.css is outside the T81 file list. The active option is visibly marked (NFR-7).
 const LIST_STYLE: CSSProperties = {
   listStyle: "none",
@@ -24,10 +30,19 @@ const LIST_STYLE: CSSProperties = {
   overflowY: "auto",
 };
 const OPTION_STYLE: CSSProperties = { padding: "6px 8px", cursor: "pointer" };
-const ACTIVE_STYLE: CSSProperties = { ...OPTION_STYLE, background: "#0b3d91", color: "#ffffff" };
+// The outline stays visible when forced colors drop the background.
+const ACTIVE_STYLE: CSSProperties = {
+  ...OPTION_STYLE,
+  background: "#0b3d91",
+  color: "#ffffff",
+  outline: "2px solid #ffffff",
+  outlineOffset: "-4px",
+};
+// Mirrors the backend login length limit; the server stays authoritative.
+const MAX_QUERY_LENGTH = 64;
 
 /** Combobox over the users directory: search by login, keyboard and click selection. */
-export function UserPicker({ label, onSelect, allowedIds, disabled }: UserPickerProps) {
+export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietError }: UserPickerProps) {
   const baseId = useId();
   const inputId = `${baseId}-input`;
   const listId = `${baseId}-list`;
@@ -67,9 +82,26 @@ export function UserPicker({ label, onSelect, allowedIds, disabled }: UserPicker
       : [];
   const activeIndex = active < options.length ? active : -1;
   const expanded = options.length > 0;
-  const showEmpty = current && search.isSuccess && options.length === 0;
+  const hasMore = search.data?.has_next === true;
   const showError = current && search.isError;
   const optionId = (i: number) => `${listId}-${i}`;
+
+  // One permanent live region: loading, number of results, nothing found (NFR-7).
+  const fetching = current && search.isFetching;
+  // Query for which the answer is already late (set only by the timer).
+  const [lateFor, setLateFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fetching) return undefined;
+    const id = setTimeout(() => setLateFor(query), LOADING_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [fetching, query]);
+  let statusText = "";
+  if (fetching) {
+    statusText = lateFor === query ? t("user_picker.loading") : "";
+  } else if (current && search.isSuccess) {
+    if (options.length > 0) statusText = t("user_picker.count", { count: options.length });
+    else statusText = t(hasMore ? "user_picker.refine" : "user_picker.empty");
+  }
 
   const choose = (user: DirectoryUser) => {
     cancelTimer();
@@ -110,6 +142,8 @@ export function UserPicker({ label, onSelect, allowedIds, disabled }: UserPicker
         choose(user);
       }
     } else if (e.key === "Escape") {
+      // An open list takes the key; a closed one lets it reach the owner window.
+      if (open) e.stopPropagation();
       setOpen(false);
       setActive(-1);
     }
@@ -123,6 +157,7 @@ export function UserPicker({ label, onSelect, allowedIds, disabled }: UserPicker
         ref={inputRef}
         type="text"
         role="combobox"
+        maxLength={MAX_QUERY_LENGTH}
         autoComplete="off"
         autoCapitalize="off"
         spellCheck={false}
@@ -131,6 +166,7 @@ export function UserPicker({ label, onSelect, allowedIds, disabled }: UserPicker
         aria-controls={listId}
         aria-activedescendant={expanded && activeIndex >= 0 ? optionId(activeIndex) : undefined}
         disabled={disabled}
+        aria-busy={busy === true ? "true" : undefined}
         value={typed}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
@@ -154,9 +190,11 @@ export function UserPicker({ label, onSelect, allowedIds, disabled }: UserPicker
           ))}
         </ul>
       ) : null}
-      {showEmpty ? <p role="status">{t("user_picker.empty")}</p> : null}
+      <div role="status" className="ui-hint">
+        {statusText}
+      </div>
       {showError ? (
-        <p role="alert" className="ui-error">
+        <p role={quietError === true ? "status" : "alert"} className="ui-error">
           {errorMessage(search.error instanceof ApiError ? search.error.code : "unknown")}
         </p>
       ) : null}

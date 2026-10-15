@@ -18,7 +18,7 @@ import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { ru } from "../../src/shared/i18n";
-import { err, expectAt, installFetch, j, meWith, renderApp, where } from "../features/admin/helpers";
+import { err, expectAt, installFetch, j, meWith, page, renderApp, where } from "../features/admin/helpers";
 
 const DICT = Object.values(ru) as string[];
 const ME = "GET /api/v1/me";
@@ -30,6 +30,15 @@ const PAGE_PATHS = [
   "/tasks/44444444-4444-4444-8444-444444444444",
   "/my-tasks",
 ];
+// T82 replaced the stubs of /projects and /projects/:id by real screens (own requests, dynamic h1);
+// T83/T84 will do the same for the rest. STUB_PATHS keep the "stub" checks of T81.
+const STUB_PATHS = PAGE_PATHS.slice(2);
+const PROJECT_ID = "33333333-3333-4333-8333-333333333333";
+const PROJECT_ROUTES = {
+  "GET /api/v1/projects": () => j(200, page([])),
+  [`GET /api/v1/projects/${PROJECT_ID}`]: () => err(404, "not_found"),
+  [`GET /api/v1/projects/${PROJECT_ID}/members`]: () => err(404, "not_found"),
+};
 const FORBIDDEN_LINKS = ["/crm", "/labels", "/trash", "/search", "/mentions", "/deals", "/pipeline"];
 
 function hrefs(): string[] {
@@ -38,7 +47,7 @@ function hrefs(): string[] {
 }
 
 describe("T81 routes under the session gate", () => {
-  it.each(PAGE_PATHS)("ac_fr10_%s_shows_dictionary_h1_for_business_access", async (path) => {
+  it.each(STUB_PATHS)("ac_fr10_%s_shows_dictionary_h1_for_business_access", async (path) => {
     const f = installFetch({ [ME]: () => j(200, meWith(BUSINESS, "user")) });
     renderApp(path);
     const main = await screen.findByRole("main");
@@ -50,12 +59,12 @@ describe("T81 routes under the session gate", () => {
   });
 
   it("ac_stub_titles_are_distinct_and_differ_from_home", async () => {
-    installFetch({ [ME]: () => j(200, meWith(BUSINESS, "user")) });
+    installFetch({ [ME]: () => j(200, meWith(BUSINESS, "user")), ...PROJECT_ROUTES });
     const titles: string[] = [];
     const home = renderApp("/");
     titles.push((await screen.findByRole("heading", { level: 1 })).textContent ?? "");
     home.unmount();
-    for (const p of PAGE_PATHS) {
+    for (const p of ["/projects", ...STUB_PATHS]) {
       const r = renderApp(p);
       await screen.findByRole("main");
       titles.push(screen.getByRole("heading", { level: 1 }).textContent ?? "");
@@ -137,10 +146,31 @@ describe("T81 menu by capabilities (FR-10)", () => {
   });
 
   it.each(PAGE_PATHS)("ac_menu_is_present_on_%s", async (path) => {
-    installFetch({ [ME]: () => j(200, meWith(BUSINESS, "user")) });
+    installFetch({ [ME]: () => j(200, meWith(BUSINESS, "user")), ...PROJECT_ROUTES });
     renderApp(path);
     await screen.findByRole("main");
     await waitFor(() => expect(hrefs()).toContain("/projects"));
     expect(hrefs()).toContain("/my-tasks");
+  });
+});
+
+describe("T82 projects screens in the shell", () => {
+  it("ac_projects_page_h1_is_dictionary_title", async () => {
+    installFetch({ [ME]: () => j(200, meWith(BUSINESS, "user")), ...PROJECT_ROUTES });
+    renderApp("/projects");
+    const h1 = await screen.findByRole("heading", { level: 1 });
+    expect(h1.textContent).toBe(ru["projects.title"]);
+  });
+
+  it("ac_nav_projects_link_has_aria_current_only_on_projects_list", async () => {
+    installFetch({ [ME]: () => j(200, meWith(BUSINESS, "user")), ...PROJECT_ROUTES });
+    const list = renderApp("/projects");
+    const link = () => screen.getByRole("navigation").querySelector<HTMLAnchorElement>('a[href="/projects"]')!;
+    await waitFor(() => expect(link()).toBeTruthy());
+    expect(link().getAttribute("aria-current")).toBe("page");
+    list.unmount();
+    renderApp(`/projects/${PROJECT_ID}`);
+    await waitFor(() => expect(link()).toBeTruthy());
+    expect(link().getAttribute("aria-current")).toBeNull();
   });
 });
