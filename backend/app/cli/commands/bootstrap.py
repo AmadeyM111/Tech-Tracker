@@ -176,7 +176,7 @@ def _warn(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
-def run(args: argparse.Namespace) -> int:
+def run(args: argparse.Namespace) -> int:  # noqa: ARG001  # сигнатура задана фреймворком
     """Выполняет ``gostracker bootstrap``; возвращает код выхода (0 — успех)."""
     step = "настройки"
     loaded: Settings | None = None  # для маскирования секретов, если сбой случится позже

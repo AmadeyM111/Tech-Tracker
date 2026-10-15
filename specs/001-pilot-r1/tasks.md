@@ -745,11 +745,11 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 1
 
 ## T32a — Принципы разработки закреплены проверками (scope-guard, allowlist зависимостей, сложность)
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** NFR-10 (проверки качества), `AGENTS.md` «Принципы разработки»; решение владельца 2026-10-15
-- **Файлы:** `scripts/task_scope.py`, `backend/pyproject.toml` (правила `ruff`: `C901`, `PLR0912`, `PLR0913`, `PLR0915`, `ARG`),
+- **Файлы:** `scripts/task_scope.py`, `backend/app/core/errors.py` и `backend/app/cli/commands/bootstrap.py` (только строки `noqa`), `backend/pyproject.toml` (правила `ruff`: `C901`, `PLR0912`, `PLR0913`, `PLR0915`, `ARG`),
   `AGENTS.md` (только ссылка на команду scope-guard в блоке «Команды», если ещё нет);
-  тесты: `backend/tests/arch/test_task_scope.py`, `backend/tests/arch/test_dependencies_allowlist.py`
+  тесты: `backend/tests/arch/test_task_scope.py`, `backend/tests/arch/test_dependencies_allowlist.py`, `backend/tests/arch/test_ruff_complexity_rules.py`
   (каталог `backend/tests/arch/` — новый, с `__init__.py`, если так заведено в `backend/tests`)
 - **Зависит от:** —
 - **Описание:** (1) `scripts/task_scope.py <T..> [--base <ref>]`: читает поле «Файлы» задачи из
@@ -766,9 +766,24 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
   без правок (зафиксировать выбранные пороги и максимумы текущего кода в отчёте; порог только
   уменьшается); нарушения в существующем коде — не чинить рефакторингом (вне задачи), а при
   необходимости добавлять точечные `# noqa` с причиной (не более 5 и перечислить в отчёте).
+  **Доработка по ревью (попытка 2, архитектор 2026-10-15):** (а) пути из групп `(+ …)` входят в список
+  (path-подобные токены: содержат `/` или расширение, без пробелов); прочие скобочные пояснения игнорируются;
+  токен, не начинающийся с корневого каталога репозитория (`router.tsx`, `features/x/api.ts`), сопоставляется
+  как суффикс пути (`path == token` или `path.endswith('/' + token)`); (б) ошибки git (нет репозитория,
+  несуществующий `--base`) — понятное сообщение в stderr и код 2, без traceback; `--base` передаётся
+  безопасно (`--end-of-options`/проверка, что не начинается с `-`, и `--` перед путями); (в) флаг `--staged`:
+  проверять только индекс (`git diff --cached --name-status -z <base> --`, без неотслеженных) — режим для
+  оркестратора перед коммитом; (г) один ID задачи в нескольких `specs/*/tasks.md` → код 2 (неоднозначность);
+  (д) `**/__init__.py` допустим всегда — зафиксировано как правило в описании скрипта; семантика `*`/`**`
+  описана в docstring; (е) пороги ruff равны текущим максимумам `backend/app` (16/16/10/34; ratchet в тесте
+  по ним же: `max-statements` ≤ 34); ARG001 — ровно 5 точечных `# noqa: ARG001  # <причина>` в
+  `app/core/errors.py` и `app/cli/commands/bootstrap.py` вместо `per-file-ignores` на файл; `per-file-ignores`
+  допустимы только для `tests/**` (тест проверяет явно); файлы `app/core/errors.py` и
+  `app/cli/commands/bootstrap.py` включены в «Файлы» T32a (только строки `noqa`).
 - **Готово, когда:** `pytest -q backend/tests/arch` зелёный; `ruff check --no-cache backend` чист;
   `python scripts/task_scope.py T32a` печатает «в рамках задачи» для собственных изменений; `bash scripts/check.sh` зелёный.
-- **Попытки:** 0
+- **Заметки ревью T32a:** scope-guard: в режиме по умолчанию на рабочем дереве с чужими правками всегда код 1 — перед коммитом оркестратор делает `git add` файлов задачи и запускает `python scripts/task_scope.py T.. --staged`; голые токены сопоставляются суффиксом; `scripts/` не покрыт ruff/mypy (вне `backend`).
+- **Попытки:** 2
 
 ### Backend: модель, права, проекты
 

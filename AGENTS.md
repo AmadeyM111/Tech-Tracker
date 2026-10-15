@@ -26,6 +26,8 @@ cd frontend && npm run dev                          # фронт на :5173
 bash scripts/check.sh                   # линтер + типы + тесты, backend и frontend
 pytest -q backend/tests                 # только backend-тесты
 ruff check backend && ruff format --check backend
+python scripts/task_scope.py T<NN>      # изменения в рамках файлов задачи
+python scripts/task_scope.py T<NN> --staged   # перед коммитом: только индекс
 cd frontend && npm run lint && npm run typecheck && npm test
 
 # миграции (любое изменение модели = новая миграция)

@@ -186,12 +186,12 @@ def _error_response(
     )
 
 
-async def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:
+async def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком
     err = cast(AppError, exc)
     return _error_response(err.status_code, err.detail, err.code)
 
 
-async def _validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
+async def _validation_error_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком
     """422 без ``input``, ``ctx``, ``url``: введённое значение (пароль) не возвращается (FR-57)."""
     errors = cast(RequestValidationError, exc).errors()
     detail = [
@@ -205,7 +205,7 @@ async def _validation_error_handler(request: Request, exc: Exception) -> JSONRes
     return _error_response(422, detail, ErrorCode.validation_error)
 
 
-async def _http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def _http_exception_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком
     http_exc = cast(StarletteHTTPException, exc)
     status = http_exc.status_code
     if status in _HTTP_STATUS_MAP:
@@ -218,7 +218,7 @@ async def _http_exception_handler(request: Request, exc: Exception) -> JSONRespo
     return _error_response(status, detail, code, headers=http_exc.headers)
 
 
-async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком
     """500 с фиксированным телом; трассировка — только в лог (FR-57)."""
     logger.error("Unhandled exception", exc_info=exc)
     return _error_response(500, INTERNAL_ERROR_DETAIL, "internal_error")
