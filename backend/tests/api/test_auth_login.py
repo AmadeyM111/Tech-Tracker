@@ -262,13 +262,17 @@ async def test_fr57_wrong_field_types_422_without_echo(api_env: ApiEnv) -> None:
     _assert_clean_422(response, SECRET)
 
 
-async def test_fr57_malformed_json_is_422_without_echo(api_env: ApiEnv) -> None:
+async def test_fr57_malformed_json_is_400_without_echo(api_env: ApiEnv) -> None:
     response = await api_env.client.post(
         LOGIN_URL,
         content=('{"login": "kevin.good", "password": "' + SECRET).encode(),
         headers={"Content-Type": "application/json"},
     )
-    _assert_clean_422(response, SECRET, "kevin.good")
+    assert response.status_code == 400, response.text
+    assert response.json() == {"detail": "Некорректный JSON в теле запроса", "code": "bad_request"}
+    assert SECRET not in response.text
+    assert "kevin.good" not in response.text
+    assert not response.headers.get_list("set-cookie")
 
 
 async def test_non_json_content_type_is_rejected_and_logs_nobody_in(api_env: ApiEnv) -> None:

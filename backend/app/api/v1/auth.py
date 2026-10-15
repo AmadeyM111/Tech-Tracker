@@ -31,7 +31,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     response_model=LoginResponse,
     responses={
         **error_response(401, "Неверный логин или пароль (code: invalid_credentials)"),
-        **error_responses(403, 422),
+        **error_responses(400, 403, 422),
     },
 )
 async def login(
@@ -111,7 +111,7 @@ async def logout(
     "/password",
     status_code=204,
     response_class=Response,
-    responses=error_responses(401, 403, 422),
+    responses=error_responses(400, 401, 403, 422),
 )
 async def change_password(
     body: ChangePasswordRequest,

@@ -55,7 +55,7 @@ async def list_users(
     )
 
 
-@router.post("", status_code=201, response_model=AdminUser, responses=error_responses(422))
+@router.post("", status_code=201, response_model=AdminUser, responses=error_responses(400, 422))
 async def create_user(
     body: CreateUserRequest, request: Request, db: DbSession, actor: CurrentActor
 ) -> AdminUser:
@@ -104,7 +104,7 @@ async def unblock_user(user_id: UUID, db: DbSession, actor: CurrentActor) -> Res
     "/{user_id}/reset-password",
     status_code=204,
     response_class=Response,
-    responses=error_responses(404, 422),
+    responses=error_responses(400, 404, 422),
 )
 async def reset_password(
     user_id: UUID,
@@ -141,7 +141,7 @@ async def revoke_sessions(
     "/{user_id}/role",
     response_model=AdminUser,
     dependencies=[Depends(require_capability(Capability.ASSIGN_ROLES))],
-    responses=error_responses(404, 422),
+    responses=error_responses(400, 404, 422),
 )
 async def set_role(
     user_id: UUID, body: SetRoleRequest, db: DbSession, actor: CurrentActor

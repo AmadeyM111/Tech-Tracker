@@ -822,6 +822,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
           "401": {
             "content": {
               "application/json": {
@@ -1030,6 +1040,16 @@
           "204": {
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
           "401": {
             "content": {
               "application/json": {
@@ -1181,6 +1201,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
           "401": {
             "content": {
               "application/json": {
@@ -1320,6 +1350,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
           "401": {
             "content": {
               "application/json": {
@@ -1409,6 +1449,16 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
           },
           "401": {
             "content": {

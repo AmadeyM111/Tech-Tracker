@@ -201,8 +201,13 @@ async def _app_error_handler(request: Request, exc: Exception) -> JSONResponse: 
 
 
 async def _validation_error_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком
-    """422 без ``input``, ``ctx``, ``url``: введённое значение (пароль) не возвращается (FR-57)."""
+    """422 без ``input``, ``ctx``, ``url``: введённое значение (пароль) не возвращается (FR-57).
+
+    Синтаксически невалидный JSON (все ошибки ``json_invalid``) — 400 ``bad_request`` (D-65).
+    """
     errors = cast(RequestValidationError, exc).errors()
+    if errors and all(e.get("type") == "json_invalid" for e in errors):
+        return _error_response(400, "Некорректный JSON в теле запроса", _HTTP_STATUS_MAP[400][0])
     detail = [
         {
             "loc": list(e.get("loc", ())),

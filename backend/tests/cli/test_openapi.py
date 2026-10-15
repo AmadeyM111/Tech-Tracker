@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -50,6 +51,9 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(socket.socket, "connect_ex", refuse)
     monkeypatch.setattr(socket, "create_connection", refuse)
     monkeypatch.setattr(socket, "getaddrinfo", refuse)
+
+
+import app.cli.main  # noqa: E402,F401  # до capfd.readouterr(): иначе JSON-логи alembic попадают в stdout
 
 
 def _run(argv: list[str]) -> int:
@@ -381,3 +385,29 @@ def test_fr44_committed_openapi_json_matches_generation(spec_text: str) -> None:
     assert COMMITTED_SPEC.read_bytes() == spec_text.encode("utf-8"), (
         "docs/api/openapi.json устарел: перегенерируйте scripts/gen-api.sh"
     )
+
+
+BODY_ROUTES_400 = {
+    ("POST", "/api/v1/auth/login"),
+    ("POST", "/api/v1/auth/password"),
+    ("POST", "/api/v1/admin/users"),
+    ("POST", "/api/v1/admin/users/{user_id}/reset-password"),
+    ("PUT", "/api/v1/admin/users/{user_id}/role"),
+}
+BAD_JSON_DESCRIPTION = "Некорректный JSON в теле запроса (code: bad_request)"
+
+
+def test_t68_400_declared_exactly_on_routes_with_body(spec: dict[str, Any]) -> None:
+    """D-65: 400 объявлен у маршрутов с телом (ErrorResponse) и только у них."""
+    declared: set[tuple[str, str]] = set()
+    for method, path, op in _operations(spec):
+        has_400 = "400" in op["responses"]
+        has_body = "requestBody" in op
+        assert has_400 == has_body, (method, path)
+        if has_400:
+            declared.add((method, path))
+            assert op["responses"]["400"]["description"] == BAD_JSON_DESCRIPTION
+            ref = _error_ref(op, "400")
+            assert ref is not None and ref.endswith("/ErrorResponse"), (method, path)
+    normalized = {(m, re.sub(r"\{[^}]+\}", "{user_id}", p)) for m, p in declared}
+    assert normalized == BODY_ROUTES_400

@@ -1588,7 +1588,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Попытки:** 0
 
 ## T68 — Невалидный JSON в теле: 400 `bad_request` (решение владельца по Д-7)
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** FR-7 и FR-45 в редакции SC-21, FR-57 (тело не возвращается), plan D-65; Д-7 закрыт
 - **Файлы:** `backend/app/core/errors.py`, `backend/app/api/openapi.py`, `backend/app/api/v1/auth.py`,
   `backend/app/api/v1/admin_users.py` (только объявление 400 у маршрутов с телом),
@@ -1617,7 +1617,8 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   (неверные поля, одиночный суррогат, если его тип не `json_invalid`) не ослабляются.
 - **Готово, когда:** `pytest -q backend/tests/api/test_route_guards.py backend/tests/api/test_auth_login.py backend/tests/api/test_errors.py backend/tests/api/test_password_change.py backend/tests/api/test_admin_users.py backend/tests/cli/test_openapi.py backend/tests/infra/test_frontend_api_types.py`
   зелёный, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T68 (в T88/T67):** (1) юнит-тест `RequestValidationError([])` → 422 (мутация «убрать `errors and`» выживает); (2) `test_t68_non_json_content_type_is_still_422` допускает 415|422 — закрепить 422; (3) в `BODY_ROUTES` теста поле называется `password`, в схемах `one_time_password` — поправить имена; (4) невалидный UTF-8 и глубокая вложенность дают 400 `bad_request` с текстом «Некорректный запрос» (FastAPI `HTTPException`), обычный битый JSON — «Некорректный JSON в теле запроса»: код один, решить в spec/T88, унифицировать ли; (5) формулировка Д-7: 400 раньше проверки Origin (битый JSON с чужим Origin → 400, не 403 `origin_mismatch`).
+- **Попытки:** 1
 
 (T29 — 503 `service_busy` — выполняется как описано выше, без изменений; T35 — тоже, с зависимостью от T70.)
 

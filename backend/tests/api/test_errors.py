@@ -231,6 +231,24 @@ async def test_fr57_validation_response_does_not_echo_non_dict_body(
     _assert_error_shape(r.json(), "validation_error")
 
 
+async def test_t68_broken_json_is_400_bad_request_without_echo(client: httpx.AsyncClient) -> None:
+    r = await client.post(
+        "/_t/login",
+        content=('{"login": "abcd", "password": "' + SECRET_VALUE).encode(),
+        headers={"content-type": "application/json"},
+    )
+    assert r.status_code == 400
+    assert r.json() == {"detail": "Некорректный JSON в теле запроса", "code": "bad_request"}
+    assert SECRET_VALUE not in r.text
+    assert "abcd" not in r.text
+
+
+async def test_t68_valid_json_with_wrong_fields_stays_422(client: httpx.AsyncClient) -> None:
+    r = await client.post("/_t/login", json={"login": "ab"})
+    assert r.status_code == 422
+    assert r.json()["code"] == "validation_error"
+
+
 # --- FR-7 / D-32 -------------------------------------------------------------------------
 
 

@@ -5,7 +5,8 @@
 новые маршруты следующих задач попадают под проверку автоматически.
 
 Порядок проверок для тела запроса (plan §4.5 п.5, уточнение ревью T12): синтаксически битый
-JSON даёт 422 раньше 401/403/``origin_mismatch``; валидация полей по схеме — после гейтов.
+JSON даёт 400 ``bad_request`` (D-65, решение владельца по Д-7) раньше 401/403/``origin_mismatch``;
+валидация полей по схеме (422) — после гейтов.
 
 Имя cookie с префиксом ``__Host-``: plan §4.6/D-13 называют cookie ``gt_session`` и
 ``Settings.cookie_name`` его задаёт; автоматического переключения имени по ``cookie_secure``
@@ -153,7 +154,7 @@ def body_routes(api_env: ApiEnv) -> ApiEnv:
     return api_env
 
 
-async def test_plan_4_5_p5_broken_json_without_cookie_is_422_before_401(
+async def test_plan_4_5_p5_broken_json_without_cookie_is_400_before_401(
     body_routes: ApiEnv,
 ) -> None:
     response = await body_routes.client.post(
@@ -161,8 +162,8 @@ async def test_plan_4_5_p5_broken_json_without_cookie_is_422_before_401(
         content=b'{"name": "abc',
         headers={"Content-Type": "application/json"},
     )
-    assert response.status_code == 422
-    assert _code(response) == "validation_error"
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Некорректный JSON в теле запроса", "code": "bad_request"}
     assert "abc" not in response.text
 
 
@@ -606,3 +607,185 @@ async def test_t17_every_admin_unsafe_route_rejects_foreign_origin(api_env: ApiE
         if (response.status_code, _code(response)) != (403, "origin_mismatch"):
             failures.append(f"{method} {path}: {response.status_code} {response.text}")
     assert failures == []
+
+
+# --- T68 / D-65: невалидный JSON в теле -> 400 bad_request -----------------------------------
+
+BAD_JSON_DETAIL = {"detail": "Некорректный JSON в теле запроса", "code": "bad_request"}
+JSON_HEADERS = {"Content-Type": "application/json"}
+LEAK = "LeakMarker-Zq81"
+# (метод, путь, корректное тело) для каждого маршрута с телом
+BODY_ROUTES: list[tuple[str, str, dict[str, Any]]] = [
+    ("POST", "/api/v1/auth/login", {"login": "kevin.good", "password": PW}),
+    ("POST", PASSWORD_URL, {"current_password": PW, "new_password": "N3w-Sup3r-Pa55phrase-q"}),
+    ("POST", "/api/v1/admin/users", {"login": "ivan.petrov", "password": PW}),
+    ("POST", f"/api/v1/admin/users/{SOME_ID}/reset-password", {"password": PW}),
+    ("PUT", f"/api/v1/admin/users/{SOME_ID}/role", {"role": "user"}),
+]
+BODY_ROUTE_IDS = ["login", "password", "create-user", "reset-password", "role"]
+
+
+def _broken(route_body: dict[str, Any]) -> bytes:
+    """Битый JSON: обрезанный на середине значения, содержит секрет и значения полей."""
+    import json as _json
+
+    text = _json.dumps(route_body)
+    return (text[: text.rindex('"')] + LEAK).encode()
+
+
+def _assert_bad_json(response: httpx.Response, *forbidden: str) -> None:
+    assert response.status_code == 400, response.text
+    assert response.json() == BAD_JSON_DETAIL
+    for item in (LEAK, "loc", "msg", "input", "ctx", "json_invalid", *forbidden):
+        assert item not in response.text
+    assert not response.headers.get_list("set-cookie")
+
+
+@pytest.mark.parametrize(("method", "path", "good"), BODY_ROUTES, ids=BODY_ROUTE_IDS)
+async def test_t68_broken_json_without_cookie_is_400_on_every_body_route(
+    api_env: ApiEnv, method: str, path: str, good: dict[str, Any]
+) -> None:
+    response = await api_env.client.request(
+        method, path, content=_broken(good), headers=JSON_HEADERS
+    )
+    _assert_bad_json(response, *[str(v) for v in good.values() if len(str(v)) > 4])
+
+
+@pytest.mark.parametrize(("method", "path", "good"), BODY_ROUTES, ids=BODY_ROUTE_IDS)
+async def test_t68_broken_json_with_active_session_is_400(
+    api_env: ApiEnv, method: str, path: str, good: dict[str, Any]
+) -> None:
+    env = api_env
+    user = await env.new_user(role="tech_admin", password=PW)
+    token = await env.login_ok(user)
+    response = await env.client.request(
+        method, path, content=_broken(good), headers={**JSON_HEADERS, **env.auth(token)}
+    )
+    _assert_bad_json(response)
+
+
+@pytest.mark.parametrize(("method", "path", "good"), BODY_ROUTES, ids=BODY_ROUTE_IDS)
+async def test_t68_broken_json_with_one_time_password_session_is_400(
+    api_env: ApiEnv, method: str, path: str, good: dict[str, Any]
+) -> None:
+    env = api_env
+    user = await env.new_user(role="tech_admin", password=PW, must_change_password=True)
+    token = await env.login_ok(user)
+    response = await env.client.request(
+        method, path, content=_broken(good), headers={**JSON_HEADERS, **env.auth(token)}
+    )
+    _assert_bad_json(response)
+
+
+@pytest.mark.parametrize(
+    ("method", "path"), [(m, p) for m, p, _ in BODY_ROUTES[1:]], ids=BODY_ROUTE_IDS[1:]
+)
+async def test_t68_valid_json_wrong_fields_gates_precede_422(
+    api_env: ApiEnv, method: str, path: str
+) -> None:
+    env = api_env
+    wrong = {"unexpected": 1}
+    anon = await env.client.request(method, path, json=wrong)
+    assert (anon.status_code, _code(anon)) == (401, "not_authenticated")
+
+    if path != PASSWORD_URL:  # смена пароля доступна при одноразовом пароле и без роли
+        norole = await env.new_user(role=None, password=PW)
+        response = await env.client.request(
+            method, path, json=wrong, headers=env.auth(await env.login_ok(norole))
+        )
+        assert (response.status_code, _code(response)) == (403, "no_role")
+        locked = await env.new_user(role="tech_admin", password=PW, must_change_password=True)
+        response = await env.client.request(
+            method, path, json=wrong, headers=env.auth(await env.login_ok(locked))
+        )
+        assert (response.status_code, _code(response)) == (403, "password_change_required")
+
+    admin = await env.new_user(role="tech_admin", password=PW)
+    response = await env.client.request(
+        method, path, json=wrong, headers=env.auth(await env.login_ok(admin))
+    )
+    assert (response.status_code, _code(response)) == (422, "validation_error")
+
+
+async def test_t68_login_valid_json_wrong_fields_is_422_no_gates(api_env: ApiEnv) -> None:
+    response = await api_env.client.post(LOGIN_URL, json={"unexpected": 1})
+    assert (response.status_code, _code(response)) == (422, "validation_error")
+
+
+@pytest.mark.parametrize(("method", "path", "good"), BODY_ROUTES, ids=BODY_ROUTE_IDS)
+async def test_t68_empty_body_is_422_missing_not_400(
+    api_env: ApiEnv, method: str, path: str, good: dict[str, Any]
+) -> None:
+    """Пустое тело (Content-Length: 0): текущее поведение FastAPI — ``missing`` (422)."""
+    env = api_env
+    admin = await env.new_user(role="tech_admin", password=PW)
+    token = await env.login_ok(admin)
+    response = await env.client.request(
+        method, path, content=b"", headers={**JSON_HEADERS, **env.auth(token)}
+    )
+    assert response.status_code == 422, response.text
+    assert _code(response) == "validation_error"
+    for item in response.json()["detail"]:
+        assert item["type"] == "missing"
+
+
+async def test_t68_non_json_content_type_is_still_422(api_env: ApiEnv) -> None:
+    response = await api_env.client.post(
+        LOGIN_URL, content=b'{"login": "a', headers={"Content-Type": "text/plain"}
+    )
+    assert response.status_code in (415, 422), response.text
+    assert response.status_code != 400
+
+
+async def test_t68_one_mebibyte_broken_json_is_400_without_body_fragments(
+    api_env: ApiEnv,
+) -> None:
+    filler = "QwXyZfiller" * 100_000  # ~1.1 МиБ
+    raw = ('{"login": "kevin.good", "password": "' + filler + LEAK).encode()
+    assert len(raw) > 1_048_576
+    response = await api_env.client.post(LOGIN_URL, content=raw, headers=JSON_HEADERS)
+    _assert_bad_json(response, "QwXyZ", "kevin.good")
+    assert len(response.content) < 1024
+
+
+async def test_t68_broken_json_password_not_in_response_or_log(
+    api_env: ApiEnv, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+
+    caplog.set_level(logging.DEBUG)
+    secret = "Hunter2-Broken-Body-Secret"
+    raw = ('{"login": "kevin.good", "password": "' + secret).encode()
+    response = await api_env.client.post(LOGIN_URL, content=raw, headers=JSON_HEADERS)
+    assert response.status_code == 400
+    assert secret not in response.text
+    assert secret not in caplog.text
+    for record in caplog.records:
+        assert secret not in record.getMessage()
+        assert secret not in repr(record.__dict__)
+
+
+async def test_t68_json_invalid_mixed_with_other_errors_is_not_400() -> None:
+    """Если среди ошибок есть не ``json_invalid``, ответ остаётся 422 (все — условие 400)."""
+    from fastapi import FastAPI
+    from fastapi.exceptions import RequestValidationError
+
+    from app.core.errors import install_error_handlers
+
+    app = FastAPI()
+    install_error_handlers(app)
+
+    @app.get("/mixed")
+    async def mixed() -> None:
+        raise RequestValidationError(
+            [
+                {"type": "json_invalid", "loc": ("body", 1), "msg": "bad", "input": {}},
+                {"type": "missing", "loc": ("body", "x"), "msg": "Field required", "input": {}},
+            ]
+        )
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/mixed")
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"

@@ -722,6 +722,15 @@ export interface operations {
                     "application/json": components["schemas"]["AdminUser"];
                 };
             };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
             401: {
                 headers: {
@@ -887,6 +896,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
             401: {
                 headers: {
@@ -1005,6 +1023,15 @@ export interface operations {
                     "application/json": components["schemas"]["AdminUser"];
                 };
             };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
             401: {
                 headers: {
@@ -1121,6 +1148,15 @@ export interface operations {
                     "application/json": components["schemas"]["LoginResponse"];
                 };
             };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Неверный логин или пароль (code: invalid_credentials) */
             401: {
                 headers: {
@@ -1205,6 +1241,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
             401: {
