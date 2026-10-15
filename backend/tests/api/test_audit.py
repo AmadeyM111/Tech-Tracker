@@ -894,3 +894,91 @@ async def test_t30_unknown_entity_type_by_id_is_404_not_500(api_env: ApiEnv) -> 
     assert ok.status_code == 200, ok.text
     r = await env.client.get(f"{AUDIT}/{ids[1]}", headers=env.auth(token))
     assert (r.status_code, code_of(r)) == (404, "not_found")
+
+
+# --- T72: передача владения проектом в журнале (AC-65, FR-41, BR-2) --------------------------
+
+
+async def _project_world(env: ApiEnv) -> Any:
+    from tests.projects_api_support import make_api_world
+
+    return await make_api_world(env)
+
+
+async def test_t72_ac65_ownership_transfer_entry_via_audit_api(api_env: ApiEnv) -> None:
+    from tests.projects_api_support import error, pj, send
+
+    env = api_env
+    w = await _project_world(env)
+    moved = await send(
+        env, w.tok("ba"), "PUT", f"{pj(w.project_id)}/owner", {"user_id": str(w.uid("ba2"))}
+    )
+    assert moved.status_code == 200, moved.text
+
+    for reader in ("ta", "sm"):  # ТА и СМ читают журнал
+        r = await _get_list(env, w.tok(reader), entity_type="project")
+        assert r.status_code == 200, r.text
+        items = r.json()["items"]
+        assert len(items) == 1, items
+        entry = items[0]
+        assert set(entry) == ENTRY_FIELDS
+        assert "changes" not in entry
+        assert entry["action"] == "project.ownership_transferred"
+        assert entry["entity_type"] == "project"
+        assert entry["entity_id"] == str(w.project_id)
+        assert entry["entity_deleted"] is False
+        assert entry["changed_fields"] == ["owner_id"]
+        assert entry["actor"] == {"kind": "user", "id": str(w.uid("ba")), "login": w.login("ba")}
+        occurred = datetime.fromisoformat(entry["occurred_at"].replace("Z", "+00:00"))
+        assert occurred.utcoffset() == timedelta(0)  # UTC
+        assert entry.get("details") is None  # ни названий, ни логинов
+        # BR-2: ни названия проекта, ни логина нового владельца, ни значений полей
+        assert w.project_name not in r.text
+        assert w.login("ba2") not in r.text
+        assert str(w.uid("ba2")) not in r.text
+        by_id = await env.client.get(f"{AUDIT}/{entry['id']}", headers=env.auth(w.tok(reader)))
+        assert by_id.status_code == 200
+        assert by_id.json() == entry
+        assert w.login("ba2") not in by_id.text
+    for denied in ("ba", "usr"):
+        r = await _get_list(env, w.tok(denied), entity_type="project")
+        assert error(r) == (403, "forbidden")
+
+
+async def test_t72_ac65_repeat_and_failed_transfers_write_nothing(api_env: ApiEnv) -> None:
+    from tests.projects_api_support import pj, send
+
+    env = api_env
+    w = await _project_world(env)
+    url = f"{pj(w.project_id)}/owner"
+
+    same = await send(env, w.tok("ba"), "PUT", url, {"user_id": str(w.uid("ba"))})  # D-46
+    wrong_role = await send(env, w.tok("ba"), "PUT", url, {"user_id": str(w.uid("usr"))})
+    denied = await send(env, w.tok("ba2"), "PUT", url, {"user_id": str(w.uid("ba2"))})
+
+    assert (same.status_code, wrong_role.status_code, denied.status_code) == (200, 422, 403)
+    assert await _all_entries(env, w.tok("ta"), entity_type="project") == []
+
+
+async def test_t72_d55_other_project_operations_do_not_write_audit(api_env: ApiEnv) -> None:
+    from tests.projects_api_support import PROJECTS, members_url, pj, send
+
+    env = api_env
+    w = await _project_world(env)
+    before = await _all_entries(env, w.tok("ta"))
+
+    created = await send(env, w.tok("ba"), "POST", PROJECTS, {"name": "Журнал-проект"})
+    assert created.status_code == 201
+    new_id = created.json()["id"]
+    assert (
+        await send(env, w.tok("ba"), "PATCH", pj(new_id), {"name": "Другое"})
+    ).status_code == 200
+    add = await send(env, w.tok("ba"), "POST", members_url(new_id), {"user_id": str(w.uid("usr"))})
+    assert add.status_code == 204
+    rem = await send(env, w.tok("ba"), "DELETE", members_url(new_id, w.uid("usr")))
+    assert rem.status_code == 204
+    assert (await send(env, w.tok("ba"), "DELETE", pj(new_id))).status_code == 204
+
+    after = await _all_entries(env, w.tok("ta"))
+    assert after == before
+    assert await _all_entries(env, w.tok("ta"), entity_type="project") == []

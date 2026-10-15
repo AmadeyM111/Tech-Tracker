@@ -98,6 +98,9 @@ async def add_member(db: AsyncSession, actor: Actor, project_id: UUID, user_id: 
 
 async def remove_member(db: AsyncSession, actor: Actor, project_id: UUID, user_id: UUID) -> None:
     facts = await load_project_facts(db, actor, project_id, lock="update")
+    # видимость проекта раньше «цель не участник»: иначе 404 раскрывает состав (D-45, ревью T71)
+    if not can_view_project(actor, facts):
+        raise Forbidden()
     is_member = (
         user_id == facts.owner_id
         or (

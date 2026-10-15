@@ -1707,7 +1707,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Попытки:** 1
 
 ## T72 — API проектов и участников
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-21, AC-51…AC-55, AC-72, AC-73, AC-74 (участник, владелец), AC-75 (список проектов без роли — 403), AC-76 (в редакции SC-14: после смены роли БА → П `POST /projects` — 403, после возврата — 201), AC-94 (ТА → проект с несуществующим id — 403), AC-108 (проект), AC-110 (без 409), AC-65 (через API журнала: запись передачи владения с автором, временем, типом, id, действием, `changed_fields`; без названий и значений); FR-14…FR-17, FR-45a; plan §11.4 (проекты, участники), D-52, D-65
 - **Файлы:** `backend/app/api/v1/projects.py`, `backend/app/api/v1/schemas/projects.py` (+
   `app/api/v1/__init__.py`, генерация контракта); тесты: `backend/tests/api/test_projects.py`,
@@ -1723,7 +1723,8 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   ошибках — `error_responses(...)` по таблице §11.4, у маршрутов с телом — и 400 (D-65).
 - **Готово, когда:** `pytest -q backend/tests/api/test_projects.py backend/tests/api/test_project_members.py backend/tests/api/test_not_found_vs_forbidden.py backend/tests/api/test_role_change_effect.py backend/tests/api/test_workspace_isolation.py backend/tests/api/test_audit.py`
   и проверки контракта (общие условия R1.1) зелёные, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T72 (в T73+/T81/T88):** (1) правка `members.py::remove_member` вне списка T72 — `can_view_project` → 403 первым, затем «цель не участник» → 404 (решение архитектора по T71 п.1); (2) `ProjectPatch.name/description` — без `None` в типе, `Field(default_factory=str)` и `model_fields_set` (явный null → 422, в контракте нет null); приём описан в docstring; (3) `extra="forbid"` на всех схемах тел (контракт `additionalProperties: false`); (4) `list_projects` по-прежнему `select(Project)` с `populate_existing` — `paginate` принимает только сущность; при втором потребителе колонок выделить `paginate_rows` (заметки T35/T71); (5) AC-50/AC-55 части про задачи и доску — T74/T77 (тест `test_d45_user_non_member_gets_403_on_tasks_and_board_when_routes_exist` включится в T77); (6) 503 не объявлен в OpenAPI (решение T29); (7) в `entity_deleted` журнала у мягко удалённого проекта `false` — вне R1 (FR-25b отложено).
+- **Попытки:** 2
 
 ### Backend MVP: задачи и доска
 

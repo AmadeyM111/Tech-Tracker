@@ -393,6 +393,10 @@ BODY_ROUTES_400 = {
     ("POST", "/api/v1/admin/users"),
     ("POST", "/api/v1/admin/users/{user_id}/reset-password"),
     ("PUT", "/api/v1/admin/users/{user_id}/role"),
+    ("POST", "/api/v1/projects"),
+    ("PATCH", "/api/v1/projects/{user_id}"),
+    ("PUT", "/api/v1/projects/{user_id}/owner"),
+    ("POST", "/api/v1/projects/{user_id}/members"),
 }
 BAD_JSON_DESCRIPTION = "Некорректный JSON в теле запроса (code: bad_request)"
 

@@ -181,3 +181,118 @@ async def test_ac21_foreign_user_login_in_create_is_login_taken_not_leaking_prof
         text("SELECT count(*) FROM workspace_member WHERE user_id = :u").bindparams(u=victim.id)
     )
     assert rows and rows[0][0] == 1
+
+
+# --- T72: проекты и участники (AC-21, AC-94, BR-2, FR-13) ----------------------------------
+
+
+async def test_t72_ac21_foreign_projects_and_members_are_invisible_and_untouched(
+    api_env: ApiEnv,
+) -> None:
+    from tests.projects_api_support import (
+        PROJECTS,
+        error,
+        make_api_world,
+        make_foreign,
+        member_ids,
+        members_url,
+        pj,
+        project_db,
+        send,
+    )
+
+    env = api_env
+    w = await make_api_world(env)
+    foreign = await make_foreign(env)
+    pid = foreign.project_id
+    missing = uuid.uuid4()
+    before_members = await member_ids(env, pid)
+    before_row = await project_db(env, pid)
+
+    # списки
+    for who in ("sm", "ba", "usr"):
+        listed = await send(env, w.tok(who), "GET", PROJECTS)
+        assert listed.status_code == 200, listed.text
+        assert str(pid) not in listed.text
+        assert foreign.ba.login not in listed.text
+    # карточка, правка, владелец, удаление, участники: 404, неотличимо от несуществующего
+    calls = [
+        ("GET", pj(pid), None),
+        ("PATCH", pj(pid), {"name": "Взлом"}),
+        ("PUT", f"{pj(pid)}/owner", {"user_id": str(w.uid("ba2"))}),
+        ("DELETE", pj(pid), None),
+        ("GET", members_url(pid), None),
+        ("POST", members_url(pid), {"user_id": str(w.uid("usr2"))}),
+        ("DELETE", members_url(pid, foreign.usr.id), None),
+    ]
+    for who in ("sm", "ba", "usr2"):
+        for method, url, body in calls:
+            r = await send(env, w.tok(who), method, url, body)
+            ref = await send(env, w.tok(who), method, url.replace(str(pid), str(missing)), body)
+            assert error(r) == (404, "not_found"), (who, method, url)
+            assert r.json() == ref.json()
+
+    # состояние чужого проекта не изменилось
+    assert await member_ids(env, pid) == before_members
+    after_row = await project_db(env, pid)
+    assert (after_row.name, after_row.owner_id, after_row.deleted_at) == (
+        before_row.name,
+        before_row.owner_id,
+        None,
+    )
+
+
+async def test_t72_ac21_foreign_user_cannot_be_member_or_owner_of_own_project(
+    api_env: ApiEnv,
+) -> None:
+    from tests.projects_api_support import (
+        error,
+        make_api_world,
+        make_foreign,
+        member_ids,
+        members_url,
+        pj,
+        project_db,
+        send,
+    )
+
+    env = api_env
+    w = await make_api_world(env)
+    foreign = await make_foreign(env)
+    before = await member_ids(env, w.project_id)
+
+    added = await send(
+        env, w.tok("ba"), "POST", members_url(w.project_id), {"user_id": str(foreign.usr.id)}
+    )
+    moved = await send(
+        env,
+        w.tok("sm"),
+        "PUT",
+        f"{pj(w.project_id)}/owner",
+        {"user_id": str(foreign.ba.id)},
+    )
+    removed = await send(env, w.tok("ba"), "DELETE", members_url(w.project_id, foreign.usr.id))
+
+    assert error(added) == (422, "user_not_found")
+    assert error(moved) == (422, "user_not_found")
+    assert error(removed) == (404, "not_found")
+    assert foreign.usr.login not in added.text + moved.text
+    assert await member_ids(env, w.project_id) == before
+    assert (await project_db(env, w.project_id)).owner_id == w.uid("ba")
+
+
+async def test_t72_ac21_foreign_workspace_user_sees_nothing_symmetrically(
+    api_env: ApiEnv,
+) -> None:
+    from tests.projects_api_support import PROJECTS, make_api_world, make_foreign, pj, send
+
+    env = api_env
+    w = await make_api_world(env)
+    foreign = await make_foreign(env)
+
+    mine = await send(env, foreign.ba_token, "GET", PROJECTS)
+    card = await send(env, foreign.ba_token, "GET", pj(w.project_id))
+
+    assert [i["id"] for i in mine.json()["items"]] == [str(foreign.project_id)]
+    assert card.status_code == 404
+    assert "Основной" not in mine.text
