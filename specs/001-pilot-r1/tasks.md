@@ -1749,7 +1749,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Попытки:** 3
 
 ## T74 — Задачи: создание задачи и подзадачи
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-8, AC-9, AC-24, AC-47 (подзадача себе — да, другому — 403), AC-49, AC-56, AC-61 (новая — последняя в первой колонке), AC-74 (исполнитель), AC-106 (не участник — 403), AC-108 (задача), AC-109, FR-18…FR-21, FR-28a; plan §11.4, §11.5 (`can_create_task`, `can_create_subtask`), §4.5 (FR-20), §10.2, §10.4 (`context`)
 - **Файлы:** `backend/app/domain/tasks/context.py`, `backend/app/domain/tasks/service.py`
   (`create_task`, `create_subtask`); тесты: `backend/tests/domain/test_tasks_create.py`
@@ -1764,10 +1764,11 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   `can_create_subtask` (403) → родитель — подзадача → 422 `subtask_depth_exceeded` → получатель →
   вставка (`position = NULL`, `status = todo`). Событий не писать (D-55). Возвращают `UUID`.
 - **Готово, когда:** `pytest -q backend/tests/domain/test_tasks_create.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T74 (в T75/T77/plan):** (1) тест перечитывания в `load_task_context` под FOR SHARE: другая сессия под FOR NO KEY UPDATE проекта меняет `assignee_id` родителя и фиксирует; `create_subtask` бывшего исполнителя → 403 (мутант «убрать перечитывание» выживает) — добавить в T75; (2) тип `assignee`/`project_id` в сервисе не проверяется (assignee=5 → 500): через API приведёт pydantic в T77 (или `isinstance(UUID)` → 422); (3) T75: `delete_task` блокирует строку задачи FOR NO KEY UPDATE, `create_subtask` перечитывает родителя под FOR SHARE строки — иначе параллельная подзадача останется неудалённой под удалённым родителем (каскад D-56 её не увидит); (4) T77: ограничения title/description/due_date/priority — в pydantic-схеме `TaskCreate` (порядок 422 схемы → 404 → 403); (5) plan §10.4: параметр `include_deleted` у `load_task_context` — SUPERSEDED (корзина отложена); (6) FR-19b/BR-11: зафиксировать, что БА-участник не владелец не создаёт подзадачу к чужой задаче и к задаче, созданной им другому/без исполнителя (формула plan §11.5, 403); (7) D-52: названия из невидимых символов (U+200B) принимаются — уточнить при необходимости; (8) `Subtask depth` код `subtask_depth_exceeded` — в словаре фронтенда есть (T81).
+- **Попытки:** 2
 
 ## T75 — Задачи: изменение, удаление, перемещение
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-7 (родитель закрывается при незакрытых подзадачах), AC-42, AC-43 (задачи), AC-46, AC-47, AC-48 (SC-2), AC-50 (переназначение после исключения), AC-81, AC-99 (права удаления; каскад на подзадачи и комментарии), AC-103 (задачи), FR-19…FR-20, FR-19b (перенос исполнителем), FR-28a; plan §11.4, §11.5, D-46, D-56, §10.2
 - **Файлы:** `backend/app/domain/tasks/service.py` (`update_task`, `delete_task`, `move`);
   тесты: `backend/tests/domain/test_tasks_update_delete.py`, `backend/tests/domain/test_tasks_move.py`
@@ -1969,7 +1970,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 ### Демо, документация, приёмка
 
 ## T87 — Команда демо-данных
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-41 *инфра*, AC-104 *инфра*, FR-49 (в редакции SC-13), FR-64, FR-57, BR-9, FR-41 (создание учётных записей и назначение ролей — в журнале, автор «система»); plan §11.8, D-63, D-6, §4.13
 - **Файлы:** `backend/app/domain/ops/demo.py`, `backend/app/cli/commands/demo_data.py`,
   `backend/app/cli/main.py` (регистрация); тесты: `backend/tests/cli/test_demo_data.py`
