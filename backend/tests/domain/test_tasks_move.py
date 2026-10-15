@@ -268,13 +268,15 @@ async def test_fr13_move_404_unknown_deleted_foreign_deleted_project(
             await not_found(db, _mv(svc, db, who, tid, "done"))
 
 
-async def test_fr21_moving_subtask_is_422_validation_error_before_403(
+async def test_fr21_moving_subtask_is_403_before_422_for_non_permitted(
     db: AsyncSession, svc: Any
 ) -> None:
     w = await make_world(db)
     parent = await mk_task(db, w)
     sub = await mk_task(db, w, parent_id=parent, assignee_id=w.usr.id)
-    for who in (w.ba, w.usr, w.usr2, w.ta):  # подзадача раньше проверки прав
+    for who in (w.usr2, w.ta):  # порядок plan §4.5: 404 -> 403 -> 422 домена
+        await forbidden(db, _mv(svc, db, who, sub, "done"))
+    for who in (w.ba, w.usr):  # допущенный к переносу получает 422 подзадачи
         await fails(db, _mv(svc, db, who, sub, "done"), "validation_error")
     r = await task_row(db, sub)
     assert (r.status, r.position) == ("todo", None)
