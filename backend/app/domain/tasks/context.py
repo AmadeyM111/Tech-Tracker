@@ -66,7 +66,11 @@ async def load_task_context(
     row = await _read_task(db, actor, task_id)
     if row is None:
         raise NotFound("Задача не найдена")
-    project = await load_project_facts(db, actor, row.project_id, lock=lock_project)
+    try:
+        project = await load_project_facts(db, actor, row.project_id, lock=lock_project)
+    except NotFound:
+        # Задача удалённого проекта неотличима от несуществующей и по тексту (AC-94).
+        raise NotFound("Задача не найдена") from None
     if lock_project is not None:
         row = await _read_task(db, actor, task_id)
         if row is None or row.project_id != project.project_id:

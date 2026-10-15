@@ -303,6 +303,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Tasks
+         * @description Мои задачи и подзадачи (исполнитель — я), по сроку (FR-27).
+         */
+        get: operations["list_my_tasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -413,6 +433,78 @@ export interface paths {
          */
         put: operations["change_owner"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Project Tasks
+         * @description Задачи и подзадачи проекта, новые сверху; фильтры исполнителя и статуса — через «И».
+         */
+        get: operations["list_project_tasks"];
+        put?: never;
+        /**
+         * Create Task
+         * @description Создаёт задачу в конце колонки «К выполнению» (FR-18, FR-28a).
+         */
+        post: operations["create_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Task
+         * @description Карточка задачи с подзадачами, прогрессом и правами актора.
+         */
+        get: operations["get_task"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Task
+         * @description Мягко удаляет задачу с подзадачами и комментариями (D-56).
+         */
+        delete: operations["delete_task"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Task
+         * @description Меняет переданные поля; права — по реально меняющимся (D-46), всё или ничего.
+         */
+        patch: operations["update_task"];
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/subtasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Subtask
+         * @description Создаёт подзадачу; родитель — задача верхнего уровня (FR-21).
+         */
+        post: operations["create_subtask"];
         delete?: never;
         options?: never;
         head?: never;
@@ -690,6 +782,17 @@ export interface components {
             /** Page Size */
             page_size: number;
         };
+        /** Page[TaskListItem] */
+        Page_TaskListItem_: {
+            /** Has Next */
+            has_next: boolean;
+            /** Items */
+            items: components["schemas"]["TaskListItem"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
         /** ProjectCreate */
         ProjectCreate: {
             /**
@@ -778,6 +881,16 @@ export interface components {
             /** Remove Self */
             remove_self: boolean;
         };
+        /** ProjectRef */
+        ProjectRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
         /**
          * ResetPasswordRequest
          * @description ``POST /admin/users/{user_id}/reset-password`` (FR-65).
@@ -817,6 +930,146 @@ export interface components {
          */
         SetRoleRequest: {
             role: components["schemas"]["Role"] | null;
+        };
+        /** TaskBrief */
+        TaskBrief: {
+            assignee: components["schemas"]["UserRef"] | null;
+            /** Due Date */
+            due_date: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            priority: components["schemas"]["TaskPriority"];
+            status: components["schemas"]["TaskStatus"];
+            /** Title */
+            title: string;
+        };
+        /**
+         * TaskCreate
+         * @description Создание задачи и подзадачи.
+         *
+         *     ``assignee_id``: не передан — «Пользователь» назначается сам, БА и СМ — без исполнителя;
+         *     ``null`` — явно без исполнителя (различаются по ``model_fields_set``, FR-20).
+         */
+        TaskCreate: {
+            /** Assignee Id */
+            assignee_id?: string | null;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Due Date */
+            due_date?: string | null;
+            /** @default base */
+            priority: components["schemas"]["TaskPriority"];
+            /** Title */
+            title: string;
+        };
+        /** TaskDetail */
+        TaskDetail: {
+            assignee: components["schemas"]["UserRef"] | null;
+            author: components["schemas"]["UserRef"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Due Date */
+            due_date: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            permissions: components["schemas"]["TaskPermissions"];
+            /** Position */
+            position: number | null;
+            priority: components["schemas"]["TaskPriority"];
+            /** Progress */
+            progress: number | null;
+            project: components["schemas"]["ProjectRef"];
+            status: components["schemas"]["TaskStatus"];
+            /** Subtasks */
+            subtasks: components["schemas"]["TaskBrief"][];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** TaskListItem */
+        TaskListItem: {
+            assignee: components["schemas"]["UserRef"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due Date */
+            due_date: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            priority: components["schemas"]["TaskPriority"];
+            project: components["schemas"]["ProjectRef"];
+            status: components["schemas"]["TaskStatus"];
+            /** Title */
+            title: string;
+        };
+        /** TaskPermissions */
+        TaskPermissions: {
+            /** Change Assignee */
+            change_assignee: boolean;
+            /** Change Status */
+            change_status: boolean;
+            /** Create Subtask */
+            create_subtask: boolean;
+            /** Delete */
+            delete: boolean;
+            /** Edit */
+            edit: boolean;
+        };
+        /**
+         * TaskPriority
+         * @enum {string}
+         */
+        TaskPriority: "base" | "high";
+        /**
+         * TaskStatus
+         * @enum {string}
+         */
+        TaskStatus: "todo" | "in_progress" | "review" | "done";
+        /**
+         * TaskUpdate
+         * @description Все поля необязательны; не переданное поле не меняется (``model_fields_set``).
+         *
+         *     ``null`` допустим только у ``assignee_id`` и ``due_date`` (снимает значение). У остальных
+         *     ``default_factory`` лишь делает поле необязательным без ``null``/``default`` в OpenAPI.
+         */
+        TaskUpdate: {
+            /** Assignee Id */
+            assignee_id?: string | null;
+            /** Description */
+            description?: string;
+            /** Due Date */
+            due_date?: string | null;
+            priority?: components["schemas"]["TaskPriority"];
+            status?: components["schemas"]["TaskStatus"];
+            /** Title */
+            title?: string;
         };
         /** UserRef */
         UserRef: {
@@ -1637,6 +1890,56 @@ export interface operations {
             };
         };
     };
+    list_my_tasks: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TaskListItem_"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_projects: {
         parameters: {
             query?: {
@@ -2141,6 +2444,396 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectDetail"];
+                };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_project_tasks: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                assignee_id?: string | null;
+                status?: components["schemas"]["TaskStatus"] | null;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TaskListItem_"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_subtask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
                 };
             };
             /** @description Некорректный JSON в теле запроса (code: bad_request) */

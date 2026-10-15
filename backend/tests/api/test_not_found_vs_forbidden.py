@@ -194,3 +194,81 @@ async def test_ac21_other_workspace_project_is_404_not_403_even_for_user_and_ba(
             )
             assert error(r) == (404, "not_found"), (who, name)
             assert r.json() == ref.json()
+
+
+# --- T77: задачи (AC-11, AC-94, AC-21, D-45) -------------------------------------------------
+
+
+def _task_routes(task_id: Any, project_id: Any) -> list[tuple[str, str, str, Any]]:
+    base = f"/api/v1/tasks/{task_id}"
+    return [
+        ("card", "GET", base, None),
+        ("patch", "PATCH", base, {"title": "x"}),
+        ("delete", "DELETE", base, None),
+        ("subtask", "POST", f"{base}/subtasks", {"title": "x"}),
+        ("list", "GET", f"{pj(project_id)}/tasks", None),
+        ("create", "POST", f"{pj(project_id)}/tasks", {"title": "x"}),
+    ]
+
+
+async def test_t77_ac94_unknown_deleted_foreign_task_is_404_with_same_body(
+    api_env: ApiEnv,
+) -> None:
+    from tests.tasks_api_support import mk
+
+    env = api_env
+    w = await make_api_world(env)
+    foreign = await make_foreign(env)
+    deleted_task = await mk(env, w, deleted=True)
+    dead_project = await add_project(env, w.ws, w.people["ba"].user, name="Удалён", deleted=True)
+    in_dead = await mk(env, w, project_id=dead_project)
+    foreign_task = (
+        await send(env, foreign.ba_token, "POST", f"{pj(foreign.project_id)}/tasks", {"title": "Ч"})
+    ).json()["id"]
+
+    for who in ("ba", "ba2", "ba3", "sm", "sm_m", "usr", "usr2"):
+        reference: Any = None
+        for task_id in (uuid.uuid4(), deleted_task, in_dead, foreign_task):
+            for name, method, url, body in _task_routes(task_id, w.project_id)[:4]:
+                r = await send(env, w.tok(who), method, url, body)
+                assert error(r) == (404, "not_found"), (who, task_id, name)
+                reference = reference or r.json()
+                assert r.json() == reference
+
+
+async def test_t77_ac94_ta_gets_403_on_any_task_id(api_env: ApiEnv) -> None:
+    from tests.tasks_api_support import mk
+
+    env = api_env
+    w = await make_api_world(env)
+    real = await mk(env, w)
+    for task_id in (real, uuid.uuid4()):
+        for name, method, url, body in _task_routes(task_id, w.project_id):
+            r = await send(env, w.tok("ta"), method, url, body)
+            assert error(r) == (403, "forbidden"), name
+
+
+async def test_t77_ac11_non_member_gets_403_for_existing_task_same_body(api_env: ApiEnv) -> None:
+    from tests.tasks_api_support import mk
+
+    env = api_env
+    w = await make_api_world(env)
+    real = await mk(env, w, title="Секрет-название")
+    bodies = []
+    for who in ("usr2", "ba3", "sm"):
+        for name, method, url, body in _task_routes(real, w.project_id):
+            r = await send(env, w.tok(who), method, url, body)
+            assert error(r) == (403, "forbidden"), (who, name)
+            bodies.append(r.json())
+    assert all(b == bodies[0] for b in bodies)
+    assert "Секрет-название" not in str(bodies)
+
+
+async def test_t77_ac21_foreign_project_tasks_routes_are_404(api_env: ApiEnv) -> None:
+    env = api_env
+    w = await make_api_world(env)
+    foreign = await make_foreign(env)
+    for who in ("ba", "usr", "sm"):
+        for _n, method, url, body in _task_routes(uuid.uuid4(), foreign.project_id)[4:]:
+            r = await send(env, w.tok(who), method, url, body)
+            assert error(r) == (404, "not_found"), (who, method)

@@ -819,6 +819,9 @@ EXPECTED_OPERATIONS: set[tuple[str, str]] = {
     ("GET", "/api/v1/projects/{project_id}/members"),
     ("POST", "/api/v1/projects/{project_id}/members"),
     ("DELETE", "/api/v1/projects/{project_id}/members/{user_id}"),
+    # T77: задачи проекта (подробно — test_tasks.py, test_project_task_list.py)
+    ("GET", "/api/v1/projects/{project_id}/tasks"),
+    ("POST", "/api/v1/projects/{project_id}/tasks"),
 }
 
 
@@ -852,6 +855,7 @@ async def test_t72_declared_errors_follow_the_table(api_env: ApiEnv) -> None:
         ("PATCH", "/api/v1/projects/{}"),
         ("PUT", "/api/v1/projects/{}/owner"),
         ("POST", "/api/v1/projects/{}/members"),
+        ("POST", "/api/v1/projects/{}/tasks"),
     }
     for key, op in ops.items():
         declared = set(op["responses"])

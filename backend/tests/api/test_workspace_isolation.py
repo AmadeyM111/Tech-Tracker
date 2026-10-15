@@ -296,3 +296,62 @@ async def test_t72_ac21_foreign_workspace_user_sees_nothing_symmetrically(
     assert [i["id"] for i in mine.json()["items"]] == [str(foreign.project_id)]
     assert card.status_code == 404
     assert "Основной" not in mine.text
+
+
+# --- T77: задачи (AC-21, IDOR) ---------------------------------------------------------------
+
+
+async def test_t77_ac21_foreign_task_is_invisible_and_untouched(api_env: ApiEnv) -> None:
+    from tests.projects_api_support import error, make_api_world, make_foreign, send
+    from tests.tasks_api_support import task_db, task_url
+
+    env = api_env
+    w = await make_api_world(env)
+    foreign = await make_foreign(env)
+    made = await send(
+        env,
+        foreign.ba_token,
+        "POST",
+        f"/api/v1/projects/{foreign.project_id}/tasks",
+        {"title": "Чужая", "assignee_id": str(foreign.usr.id)},
+    )
+    assert made.status_code == 201, made.text
+    tid = made.json()["id"]
+    before = await task_db(env, tid)
+
+    for who in ("ba", "sm_m", "usr"):
+        for method, url, body in (
+            ("GET", task_url(tid), None),
+            ("PATCH", task_url(tid), {"title": "Взлом", "assignee_id": str(w.uid("usr"))}),
+            ("DELETE", task_url(tid), None),
+            ("POST", f"{task_url(tid)}/subtasks", {"title": "Взлом"}),
+        ):
+            r = await send(env, w.tok(who), method, url, body)
+            assert error(r) == (404, "not_found"), (who, method)
+    after = await task_db(env, tid)
+    assert (after.title, after.assignee_id, after.deleted_at, after.updated_at) == (
+        before.title,
+        before.assignee_id,
+        before.deleted_at,
+        before.updated_at,
+    )
+    mine = await send(env, w.tok("usr"), "GET", "/api/v1/me/tasks")
+    assert tid not in mine.text
+
+
+async def test_t77_ac21_foreign_user_as_assignee_is_user_not_found(api_env: ApiEnv) -> None:
+    from tests.projects_api_support import error, make_api_world, make_foreign, send
+
+    env = api_env
+    w = await make_api_world(env)
+    foreign = await make_foreign(env)
+
+    r = await send(
+        env,
+        w.tok("ba"),
+        "POST",
+        f"/api/v1/projects/{w.project_id}/tasks",
+        {"title": "Т", "assignee_id": str(foreign.usr.id)},
+    )
+
+    assert error(r) == (422, "user_not_found")

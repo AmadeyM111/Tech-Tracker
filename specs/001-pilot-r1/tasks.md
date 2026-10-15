@@ -1804,8 +1804,10 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Заметки ревью T76 (в T77/T78):** (1) `permissions.create_subtask` = «операция пройдёт»: для подзадачи False (plan §11.4 записать); (2) `list_my_tasks`: ТА/без роли → строго 403 (в домене); (3) карточка и TaskFacts для permissions — из одного чтения строки (NotFound при исчезновении); (4) списки: `defer(Task.description)`; `get_task` 5 запросов при любом числе подзадач; списки page_size=100 — 3–4 запроса; (5) нарушение инварианта (id не найден в user_refs) → `RuntimeError("UserRef missing …")` — в R1 недостижимо; (6) EXPLAIN на 50 000 задач: индексы `ix_task_project_id_created_at`, `ix_task_workspace_id_assignee_id_due_date` используются; (7) тесты гонок «исчезновение строки между чтениями» и «снятие исполнителя между чтениями» — перенести в test_tasks_queries.py (образцы `/tmp/t76rev/test_rev.py` — может быть удалён); (8) `list_my_tasks` join с project без `Project.workspace_id` (прикрыт `Task.workspace_id`); (9) plan §10.4 сигнатуры list_project_tasks/list_my_tasks заменены §11.4 — пометить SUPERSEDED.
 - **Попытки:** 2
 
+- **Заметки ревью T77 (в T78/T88):** APPROVE с 1-й попытки (524 целевых теста, 15 мутаций: 13 убиты). (1) выжила M13: нет теста, что `Retry-After` отсутствует у 403/404/422 — добавить assert в тест T78; (2) выжила M11: нет теста на порядок «не-участник + NUL в description → 422 схемы, не 403»; (3) правка `domain/tasks/context.py` вне списка T77 (404 «Задача не найдена» для задачи удалённого проекта, AC-94); (4) `GET/DELETE /tasks/{id}` объявляют 422 (невалидный UUID) сверх таблицы plan §11.4 — учесть в plan; (5) название из одних пробелов проверяет домен (`_validate`), схема — длины и NUL.
+
 ## T77 — API задач: карточка, подзадачи, списки
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** AC-6, AC-7, AC-8, AC-9, AC-11, AC-18 (частично), AC-21, AC-22 (частично), AC-24, AC-42, AC-43 (задачи), AC-46, AC-47, AC-48 (SC-2), AC-49, AC-55 (задачи чужого проекта — 403), AC-56, AC-68 (формат срока), AC-74 (исполнитель), AC-75 (`/me/tasks` без роли — 403), AC-77 (в редакции SC-14), AC-80 (списки), AC-81, AC-94 (несуществующая и мягко удалённая задача — 404), AC-99 (частично), AC-103 (задачи), AC-106 (частично), AC-108 (задача), AC-109; plan §11.4, D-51, D-52, D-65
 - **Файлы:** `backend/app/api/v1/tasks.py`, `backend/app/api/v1/schemas/tasks.py` (+ `__init__`,
   генерация контракта); тесты: `backend/tests/api/test_tasks.py`, `backend/tests/api/test_subtasks.py`,
@@ -1821,10 +1823,10 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   Ответ карточки — `TaskDetail` из `get_task`. Маршрута `move` здесь нет (T78).
 - **Готово, когда:** все перечисленные тест-файлы `pytest -q backend/tests/api/test_tasks.py backend/tests/api/test_subtasks.py backend/tests/api/test_task_permissions.py backend/tests/api/test_reassign_blocked.py backend/tests/api/test_task_recipients.py backend/tests/api/test_personal_tasks.py backend/tests/api/test_project_task_list.py backend/tests/api/test_soft_delete.py backend/tests/api/test_not_found_vs_forbidden.py backend/tests/api/test_workspace_isolation.py backend/tests/api/test_role_change_effect.py`
   и проверки контракта зелёные, линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T78 — Доска: выборка и API переноса
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** AC-25, AC-61 (через API: второй пользователь после перемещения видит тот же порядок), AC-80 (доска: одна карточка при 2 подзадачах, `subtask_count`, `progress`), AC-18 (удалённое не на доске), AC-21, FR-19b (исполнитель переносит свою чужую задачу), FR-28, FR-28a, FR-47 (исключение — SC-15); plan §11.4 (`Board`, `move`), D-61
 - **Файлы:** `backend/app/domain/boards/service.py` (+ `__init__.py`), `backend/app/api/v1/boards.py`,
   `backend/app/api/v1/schemas/boards.py` (+ `app/api/v1/__init__.py`, генерация контракта);
