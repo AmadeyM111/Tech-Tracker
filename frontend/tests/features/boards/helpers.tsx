@@ -1,3 +1,41 @@
+// T91 (доработка доски; тесты BoardCreate/BoardOptimistic/BoardFilter .test.tsx). КОНТРАКТ:
+//
+// Новые ключи ru.ts (значения для проверок точные только там, где указаны):
+//   boards.add_task "Добавить задачу"; boards.create_form_label "Новая задача в колонке «{status}»";
+//   boards.create_title_label (подпись поля названия); boards.create_submit; boards.create_cancel;
+//   boards.filter_label (подпись select); boards.filter_all "Все исполнители";
+//   boards.filter_none "Без исполнителя".
+// Создание. BoardView получает от ProjectPage право permissions.create_task (проп на усмотрение
+//   исполнителя; тесты идут через ProjectPage + GET /projects/{id}). Без права - ни кнопок, ни форм.
+//   В каждой section[data-column] при праве: button[type=button][data-action="add-task"] (текст
+//   ru["boards.add_task"]). Клик -> кнопка заменяется на form[data-form="board-create-task"]
+//   (aria-label = t("boards.create_form_label",{status})) внутри ТОЙ ЖЕ колонки: input[name="title"]
+//   (label = ru["boards.create_title_label"], фокус сразу на нём), button[type=submit]
+//   (ru["boards.create_submit"]), button[type=button][data-action="cancel-create"]
+//   (ru["boards.create_cancel"]). Escape в поле или клик «Отмена» -> форма исчезает, фокус на
+//   кнопке add-task этой колонки, запросов нет. Пустое/пробельное название -> запроса нет, один
+//   role="alert" errorMessage("validation_error"), форма открыта. Двойная отправка -> один POST.
+//   Тело POST /projects/{id}/tasks строго {title: <trim>} (никаких assignee_id/priority/... - для
+//   любой роли). Цель не todo -> после 201 клиент шлёт POST /tasks/{newId}/move {status: цель}
+//   без after/before (или null). Цель todo -> move НЕ вызывается. Ошибка создания -> один alert
+//   errorMessage(code), форма открыта, введённое сохранено, move нет. Ошибка move -> один alert
+//   errorMessage(code), задача остаётся в «К выполнению», доска перечитана. Успех -> форма
+//   закрыта, фокус на кнопке add-task колонки, доска перечитана, карточка видна в целевой колонке.
+// Оптимистичность: после опускания до ответа POST /move карточка уже в новой колонке/позиции;
+//   на ошибку (403/422/503/сеть) - порядок сервера и ровно один alert errorMessage(code); опрос
+//   во время запроса оптимистичное состояние не затирает; после успеха - перечитывание.
+// Фильтр: select[name="board-assignee"] с подписью ru["boards.filter_label"] над колонками (внутри
+//   [data-role="board"]); опции по порядку: value "" (boards.filter_all), value "none"
+//   (boards.filter_none), затем уникальные исполнители, присутствующие на карточках ДОСКИ (без
+//   доп. запроса; value = user id, текст = login, сортировка по login по возрастанию). Фильтрация
+//   клиентская: колонки остаются, чужие карточки не рендерятся (в колонке без совпадений -
+//   [data-role="empty"]); h3 не меняется. Выбор живёт в состоянии компонента (ни URL, ни
+//   localStorage/sessionStorage); опрос его не сбрасывает. Соседи для move считаются по ПОЛНОМУ
+//   порядку колонки: перенос на место перед первой видимой карточкой X -> before = X, after = её
+//   непосредственный предшественник в полном порядке; в колонку, где видимых нет, но скрытые
+//   есть -> в конец полного порядка (after = последняя, before = null).
+//   Счётчиков в заголовках колонок в доске нет - их не вводим.
+//
 // T86: общие помощники тестов канбан-доски.
 //
 // КОНТРАКТ ДЛЯ ИСПОЛНИТЕЛЯ (тесты привязаны к нему; строки интерфейса - только из словаря,
@@ -84,12 +122,14 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect, vi } from "vitest";
 
 import { ru } from "../../../src/shared/i18n";
+import { PROJ_CREATE, USER_CAPS, taskDetail } from "../tasks/helpers";
 import {
   BUSINESS,
   ME,
   MEMBERS,
   M_ME,
   M_OWNER,
+  NO_CONTENT,
   ONE,
   PERM_READ,
   PID,
@@ -264,4 +304,57 @@ export async function openBoard(over: Record<string, Handler> = {}, columns: Rec
   await screen.findByRole("heading", { level: 1, name: "Альфа" });
   await waitFor(() => expect(cardEl(view.container, TA)).toBeTruthy());
   return { f, ...view };
+}
+
+// ---- T91 ----
+
+export { PROJ_CREATE, USER_CAPS, taskDetail };
+
+export const TN = "b6b6b6b6-0000-4000-8000-000000000006";
+export const NEW_TITLE = "Новая задача";
+
+export const addBtn = (c: ParentNode, status: string) =>
+  column(c, status)?.querySelector<HTMLElement>('button[data-action="add-task"]') ?? null;
+export const createForm = (c: ParentNode, status: string) =>
+  column(c, status)?.querySelector<HTMLFormElement>('form[data-form="board-create-task"]') ?? null;
+export const titleInput = (form: HTMLFormElement) => form.querySelector<HTMLInputElement>('input[name="title"]')!;
+export const filterSelect = () =>
+  screen.getByRole("combobox", { name: dict("boards.filter_label") }) as HTMLSelectElement;
+export const pickFilter = (value: string) => fireEvent.change(filterSelect(), { target: { value } });
+
+export function openCreate(c: ParentNode, status: string) {
+  const b = addBtn(c, status);
+  if (!b) throw new Error(`нет кнопки добавления в ${status}`);
+  fireEvent.click(b);
+  const form = createForm(c, status);
+  if (!form) throw new Error("форма не открылась");
+  return form;
+}
+
+/**
+ * Серверная доска с состоянием: POST создания добавляет карточку TN в конец todo,
+ * POST move TN переносит её в конец колонки status. GET board отдаёт текущее состояние.
+ */
+export function liveBoard(base: Record<Status, unknown[]> = INITIAL) {
+  const cols: Record<Status, unknown[]> = {
+    todo: [...base.todo],
+    in_progress: [...base.in_progress],
+    review: [...base.review],
+    done: [...base.done],
+  };
+  const routes: Record<string, Handler> = {
+    [BOARD]: () => j(200, boardBody(cols)),
+    [PROJ_CREATE]: async (r) => {
+      const b = (await r.clone().json()) as { title: string };
+      cols.todo.push(card(TN, b.title, "todo", 1000));
+      return j(201, taskDetail({ id: TN, title: b.title, status: "todo" }));
+    },
+    [MOVE(TN)]: async (r) => {
+      const b = (await r.clone().json()) as { status: Status };
+      for (const s of STATUSES) cols[s] = cols[s].filter((c) => (c as { id: string }).id !== TN);
+      cols[b.status].push(card(TN, NEW_TITLE, b.status, 1000));
+      return NO_CONTENT();
+    },
+  };
+  return { cols, routes };
 }

@@ -328,7 +328,7 @@ function ProjectCard({
 
       <div role="tabpanel" id={panelId} aria-labelledby={tabId(tab)} tabIndex={panelHasFocusable ? undefined : 0}>
         <h2>{t(TAB_LABELS[tab])}</h2>
-        {tab === "board" ? <BoardView projectId={project.id} /> : null}
+        {tab === "board" ? <BoardView projectId={project.id} canCreate={permissions.create_task} /> : null}
         {tab === "tasks" ? (
           <ProjectTaskList
             projectId={project.id}

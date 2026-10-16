@@ -85,3 +85,37 @@ export function nearestCardIndex(
   });
   return best;
 }
+
+/**
+ * Neighbours of a dropped card in the FULL order of the target column when only some of its cards
+ * are shown (the assignee filter, T91). `visibleIndex` is the final index in the visible list
+ * without the card itself. Before the visible card X -> before = X, after = X's predecessor in the
+ * full order (a hidden card may sit between); past the last visible card (or no visible ones) ->
+ * the end of the full order.
+ */
+export function neighborsInFullOrder(
+  fullIds: readonly string[],
+  visibleIds: readonly string[],
+  movedId: string,
+  visibleIndex: number,
+): DropNeighbors {
+  const full = fullIds.filter((id) => id !== movedId);
+  const visible = visibleIds.filter((id) => id !== movedId);
+  const index = Math.min(Math.max(visibleIndex, 0), visible.length);
+  const next = visible[index];
+  const at = next === undefined ? -1 : full.indexOf(next);
+  if (next !== undefined && at >= 0) {
+    return {
+      after_task_id: at > 0 ? (full[at - 1] ?? null) : null,
+      before_task_id: next,
+    };
+  }
+  return { after_task_id: full[full.length - 1] ?? null, before_task_id: null };
+}
+
+/** Index in `othersIds` (the column without the moved card) where the card lands: before `before_task_id`, else the end. */
+export function insertIndexFor(othersIds: readonly string[], neighbors: DropNeighbors): number {
+  if (neighbors.before_task_id === null) return othersIds.length;
+  const at = othersIds.indexOf(neighbors.before_task_id);
+  return at < 0 ? othersIds.length : at;
+}
