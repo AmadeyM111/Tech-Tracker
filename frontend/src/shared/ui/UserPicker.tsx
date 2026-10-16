@@ -20,22 +20,10 @@ export interface UserPickerProps {
 const DEBOUNCE_MS = 300;
 // A fast answer is not announced as "loading": the status would only flicker.
 const LOADING_DELAY_MS = 200;
-// Inline: ui.css is outside the T81 file list. The active option is visibly marked (NFR-7).
-const LIST_STYLE: CSSProperties = {
-  listStyle: "none",
-  margin: 0,
-  padding: 0,
-  border: "1px solid #c4c4c4",
-  maxHeight: "16rem",
-  overflowY: "auto",
-};
-const OPTION_STYLE: CSSProperties = { padding: "6px 8px", cursor: "pointer" };
-// The outline stays visible when forced colors drop the background.
+// Look of the listbox is in ui.css ([role="listbox"]). The active option keeps an inline outline:
+// it stays visible when forced colors drop the background (NFR-7).
 const ACTIVE_STYLE: CSSProperties = {
-  ...OPTION_STYLE,
-  background: "#0b3d91",
-  color: "#ffffff",
-  outline: "2px solid #ffffff",
+  outline: "2px solid var(--focus)",
   outlineOffset: "-4px",
 };
 // Mirrors the backend login length limit; the server stays authoritative.
@@ -173,14 +161,14 @@ export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietE
         onBlur={() => setOpen(false)}
       />
       {expanded ? (
-        <ul id={listId} role="listbox" aria-label={label} style={LIST_STYLE}>
+        <ul id={listId} role="listbox" aria-label={label}>
           {options.map((user, i) => (
             <li
               key={user.id}
               id={optionId(i)}
               role="option"
               aria-selected={i === activeIndex ? "true" : "false"}
-              style={i === activeIndex ? ACTIVE_STYLE : OPTION_STYLE}
+              style={i === activeIndex ? ACTIVE_STYLE : undefined}
               // Keeps the focus in the input, so the click is not lost to blur.
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => choose(user)}

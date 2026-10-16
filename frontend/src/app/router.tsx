@@ -41,8 +41,18 @@ function redirectFor(error: unknown): string | null {
 }
 
 // Inside the App shell the <main> already exists, so a plain wrapper is used.
-function Landmark({ insideMain, children }: { insideMain: boolean; children: ReactNode }) {
-  return insideMain ? <div>{children}</div> : <main>{children}</main>;
+// `shell` adds the two-column layout (left navigation panel, T90); the markup order stays the same.
+function Landmark({
+  insideMain,
+  shell = false,
+  children,
+}: {
+  insideMain: boolean;
+  shell?: boolean;
+  children: ReactNode;
+}) {
+  const className = shell ? "ui-shell" : undefined;
+  return insideMain ? <div className={className}>{children}</div> : <main className={className}>{children}</main>;
 }
 
 /**
@@ -113,15 +123,17 @@ function Home({ profile }: { profile: MeResponse }) {
     <>
       <h1>{t("app.home_title")}</h1>
       <ErrorAlert message={alert.message} seq={alert.seq} />
-      <nav>
-        <MenuItems profile={profile} />
-        <p>
-          <Link to="/change-password">{t("app.change_password_link")}</Link>
-        </p>
-      </nav>
-      <button type="button" disabled={logout.pending} onClick={() => void logout.run()}>
-        {t("auth.logout")}
-      </button>
+      <div className="ui-sidebar">
+        <nav>
+          <MenuItems profile={profile} />
+          <p>
+            <Link to="/change-password">{t("app.change_password_link")}</Link>
+          </p>
+        </nav>
+        <button type="button" disabled={logout.pending} onClick={() => void logout.run()}>
+          {t("auth.logout")}
+        </button>
+      </div>
     </>
   );
 }
@@ -130,7 +142,7 @@ function Root({ insideMain }: { insideMain: boolean }) {
   return (
     <SessionGate insideMain={insideMain}>
       {(profile) => (
-        <Landmark insideMain={insideMain}>
+        <Landmark insideMain={insideMain} shell>
           <Home profile={profile} />
         </Landmark>
       )}
@@ -150,17 +162,19 @@ function HomeLink() {
 function AdminScreen({
   insideMain,
   capability,
+  shell = false,
   children,
 }: {
   insideMain: boolean;
   capability: MeResponse["capabilities"][number];
+  shell?: boolean;
   children: (profile: MeResponse) => ReactNode;
 }) {
   return (
     <SessionGate insideMain={insideMain}>
       {(profile) =>
         profile.capabilities.includes(capability) ? (
-          <Landmark insideMain={insideMain}>
+          <Landmark insideMain={insideMain} shell={shell}>
             <HomeLink />
             {children(profile)}
           </Landmark>
@@ -184,10 +198,10 @@ function BusinessScreen({
   children: (profile: MeResponse) => ReactNode;
 }) {
   return (
-    <AdminScreen insideMain={insideMain} capability="business_access">
+    <AdminScreen insideMain={insideMain} capability="business_access" shell>
       {(profile) => (
         <>
-          <nav>
+          <nav className="ui-sidebar">
             <MenuItems profile={profile} />
           </nav>
           {children(profile)}

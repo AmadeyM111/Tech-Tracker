@@ -125,12 +125,6 @@ function Card({ card }: { card: BoardCard }) {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.6 : 1,
-        border: "1px solid #c4c4c4",
-        borderRadius: 4,
-        padding: 8,
-        marginBottom: 8,
-        background: "#fff",
-        listStyle: "none",
       }}
     >
       <div data-field="title">
@@ -169,9 +163,9 @@ function Column({ status, cards }: { status: TaskStatus; cards: readonly BoardCa
         <ul
           data-role="column-cards"
           aria-label={t("boards.column_label", { status: statusTitle(status) })}
-          style={{ margin: 0, padding: 0, minHeight: "4rem" }}
+          className="ui-column-cards"
         >
-          {cards.length === 0 ? <li data-role="empty" style={{ listStyle: "none" }}>{t("boards.empty_column")}</li> : null}
+          {cards.length === 0 ? <li data-role="empty">{t("boards.empty_column")}</li> : null}
           {cards.map((card) => (
             <Card key={card.id} card={card} />
           ))}
@@ -350,7 +344,7 @@ export function BoardView({ projectId }: { projectId: string }) {
           onDragCancel={() => setFrozen(null)}
           onDragEnd={(event) => void onDragEnd(event)}
         >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
+          <div className="ui-board-grid">
             {columns.map((column) => (
               <Column key={column.status} status={column.status} cards={column.tasks} />
             ))}
