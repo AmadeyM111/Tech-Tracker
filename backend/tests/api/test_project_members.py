@@ -16,6 +16,7 @@ from tests.admin_support import seed
 from tests.conftest import ApiEnv
 from tests.projects_api_support import (
     MEMBER_FIELDS,
+    MEMBERS,
     PAGE_FIELDS,
     SOME_ID,
     USER_REF_FIELDS,
@@ -59,18 +60,16 @@ async def test_ac55_list_members_shape_order_flags(api_env: ApiEnv) -> None:
         assert set(item["user"]) == USER_REF_FIELDS
     assert [i["user"]["login"] for i in items] == sorted(i["user"]["login"] for i in items)
     by_login = {i["user"]["login"]: i for i in items}
+    # участники мира проекта (projects_api_support.MEMBERS) + добавленные выше
     assert set(by_login) == {
         "a.blocked-member",
-        "w.ba",
-        "w.ba2",
-        "w.sm_m",
-        "w.usr",
         "z.norole-member",
+        *(w.login(name) for name in MEMBERS),
     }
     assert by_login["w.ba"]["is_owner"] is True
     assert sum(1 for i in items if i["is_owner"]) == 1
     assert by_login["w.ba"]["role"] == "business_admin"
-    assert by_login["w.sm_m"]["role"] == "mixed"
+    assert by_login["w.ba2"]["role"] == "business_admin"
     assert by_login["w.usr"]["role"] == "user"
     assert by_login["z.norole-member"]["role"] is None
     assert by_login["a.blocked-member"]["is_blocked"] is True
@@ -79,18 +78,22 @@ async def test_ac55_list_members_shape_order_flags(api_env: ApiEnv) -> None:
 
 async def test_fr47_members_pagination(api_env: ApiEnv) -> None:
     env = api_env
-    w = await make_api_world(env)  # 4 участника
+    w = await make_api_world(env)
+    total = len(MEMBERS)  # участники мира проекта
+    size = total - 1
 
-    first = (await send(env, w.tok("ba"), "GET", members_url(w.project_id) + "?page_size=3")).json()
+    first = (
+        await send(env, w.tok("ba"), "GET", members_url(w.project_id) + f"?page_size={size}")
+    ).json()
     second = (
-        await send(env, w.tok("ba"), "GET", members_url(w.project_id) + "?page_size=3&page=2")
+        await send(env, w.tok("ba"), "GET", members_url(w.project_id) + f"?page_size={size}&page=2")
     ).json()
 
-    assert (len(first["items"]), first["has_next"]) == (3, True)
+    assert (len(first["items"]), first["has_next"]) == (size, True)
     assert (len(second["items"]), second["has_next"]) == (1, False)
     logins = [i["user"]["login"] for i in first["items"] + second["items"]]
     assert logins == sorted(logins)
-    assert len(set(logins)) == 4
+    assert len(set(logins)) == total
 
 
 @pytest.mark.parametrize("query", ["page=0", "page_size=0", "page_size=101"])
@@ -100,12 +103,12 @@ async def test_fr47_members_invalid_page_is_422(api_env: ApiEnv, query: str) -> 
     assert error(r) == (422, "validation_error")
 
 
-async def test_d45_members_visible_to_ba_sm_non_members_but_not_to_user_non_member(
+async def test_d45_members_visible_to_ba_non_members_but_not_to_user_non_member(
     api_env: ApiEnv,
 ) -> None:
     env = api_env
     w = await make_api_world(env)
-    for who in ("ba3", "sm"):
+    for who in ("ba2", "ba3"):
         r = await send(env, w.tok(who), "GET", members_url(w.project_id))
         assert r.status_code == 200, who
     r = await send(env, w.tok("usr2"), "GET", members_url(w.project_id))
@@ -153,25 +156,26 @@ async def test_d46_repeated_add_is_204_without_changes(api_env: ApiEnv) -> None:
     assert sorted(map(tuple, before)) == sorted(map(tuple, after))
 
 
-async def test_ac73_mixed_non_member_adds_other_user_and_himself(api_env: ApiEnv) -> None:
+async def test_ac73_ba_non_member_adds_other_user_and_himself(api_env: ApiEnv) -> None:
+    """002/AC-11, AC-19: БА, не участник (ba3; прежде sm), добавляет другого и себя."""
     env = api_env
     w = await make_api_world(env)
 
     other = await send(
-        env, w.tok("sm"), "POST", members_url(w.project_id), {"user_id": str(w.uid("usr2"))}
+        env, w.tok("ba3"), "POST", members_url(w.project_id), {"user_id": str(w.uid("usr2"))}
     )
     itself = await send(
-        env, w.tok("sm"), "POST", members_url(w.project_id), {"user_id": str(w.uid("sm"))}
+        env, w.tok("ba3"), "POST", members_url(w.project_id), {"user_id": str(w.uid("ba3"))}
     )
 
     assert (other.status_code, itself.status_code) == (204, 204)
     members = await member_ids(env, w.project_id)
-    assert {w.uid("usr2"), w.uid("sm")} <= members
-    card = await send(env, w.tok("sm"), "GET", pj(w.project_id))
+    assert {w.uid("usr2"), w.uid("ba3")} <= members
+    card = await send(env, w.tok("ba3"), "GET", pj(w.project_id))
     assert card.json()["is_member"] is True
 
 
-async def test_ac54_ba_non_member_adding_himself_is_403(api_env: ApiEnv) -> None:
+async def test_ac54_ba_non_member_adding_himself_is_204(api_env: ApiEnv) -> None:
     """Ожидание обращено по 002/AC-11 (FR-8): БА не участник добавляет себя - 204, становится
     участником (запрет 001/FR-15 снят)."""
     env = api_env
@@ -339,7 +343,7 @@ async def test_ac53_removing_owner_is_422_owner_cannot_be_removed(api_env: ApiEn
     env = api_env
     w = await make_api_world(env)
 
-    for who in ("ba", "sm"):
+    for who in ("ba", "ba3"):
         r = await send(env, w.tok(who), "DELETE", members_url(w.project_id, w.uid("ba")))
         assert error(r) == (422, "owner_cannot_be_removed"), who
         assert r.json()["detail"]  # пояснение
@@ -393,7 +397,7 @@ async def test_002_ac11_ba_non_owner_removes_others(api_env: ApiEnv, who: str) -
     403 (test_ac73_non_managers_cannot_remove_others)."""
     env = api_env
     w = await make_api_world(env)
-    target = w.uid("sm_m")
+    target = w.uid("usr")
     r = await send(env, w.tok(who), "DELETE", members_url(w.project_id, target))
     assert r.status_code == 204, r.text
     assert target not in await member_ids(env, w.project_id)
@@ -404,16 +408,17 @@ async def test_ac73_non_managers_cannot_remove_others(api_env: ApiEnv, who: str)
     """002/AC-16: П не исключает других."""
     env = api_env
     w = await make_api_world(env)
-    target = w.uid("sm_m")
+    target = w.uid("ba2")
     r = await send(env, w.tok(who), "DELETE", members_url(w.project_id, target))
     assert error(r) == (403, "forbidden")
     assert target in await member_ids(env, w.project_id)
 
 
-async def test_ac73_mixed_non_member_removes_member(api_env: ApiEnv) -> None:
+async def test_ac73_ba_non_member_removes_member(api_env: ApiEnv) -> None:
+    """002/AC-11, AC-19: БА, не участник (ba3; прежде sm), исключает участника-БА (ba2)."""
     env = api_env
     w = await make_api_world(env)
-    r = await send(env, w.tok("sm"), "DELETE", members_url(w.project_id, w.uid("ba2")))
+    r = await send(env, w.tok("ba3"), "DELETE", members_url(w.project_id, w.uid("ba2")))
     assert r.status_code == 204
     assert w.uid("ba2") not in await member_ids(env, w.project_id)
 
@@ -471,7 +476,7 @@ async def test_fr15a_remove_non_member_target_is_404_for_participants_and_manage
 ) -> None:
     env = api_env
     w = await make_api_world(env)
-    for who in ("ba", "ba2", "usr", "sm", "ba3"):
+    for who in ("ba", "ba2", "usr", "ba3"):
         own = await send(env, w.tok(who), "GET", members_url(w.project_id))
         assert own.status_code == 200, own.text  # маршрут существует, проект виден
         r = await send(env, w.tok(who), "DELETE", members_url(w.project_id, w.uid("usr2")))
@@ -500,7 +505,7 @@ async def test_ac53_invalid_user_uuid_in_path_is_422(api_env: ApiEnv) -> None:
 # --- T72 попытка 2: FR-15 / AC-54 (мутант can_add_member -> can_manage_members) --------------
 
 
-async def test_fr15_ac54_ba_owner_adding_himself_is_403(api_env: ApiEnv) -> None:
+async def test_fr15_ac54_ba_owner_adding_himself_is_204(api_env: ApiEnv) -> None:
     """Ожидание обращено по 002/AC-11, AC-19 (FR-8): БА-владелец добавляет себя - 204 без
     изменений (повтор, D-46); не в tasks.md, обращён тем же правилом, что соседние."""
     env = api_env
@@ -515,20 +520,21 @@ async def test_fr15_ac54_ba_owner_adding_himself_is_403(api_env: ApiEnv) -> None
     assert await member_ids(env, w.project_id) == before
 
 
-async def test_fr15_ac54_mixed_non_member_adding_himself_is_204(api_env: ApiEnv) -> None:
+async def test_fr15_ac54_ba_non_member_adding_himself_is_204(api_env: ApiEnv) -> None:
+    """002/AC-11, AC-19: БА, не участник (ba3; прежде sm), добавляет себя - 204."""
     env = api_env
     w = await make_api_world(env)
-    assert w.uid("sm") not in await member_ids(env, w.project_id)
+    assert w.uid("ba3") not in await member_ids(env, w.project_id)
 
     r = await send(
-        env, w.tok("sm"), "POST", members_url(w.project_id), {"user_id": str(w.uid("sm"))}
+        env, w.tok("ba3"), "POST", members_url(w.project_id), {"user_id": str(w.uid("ba3"))}
     )
 
     assert r.status_code == 204, r.text
-    assert w.uid("sm") in await member_ids(env, w.project_id)
+    assert w.uid("ba3") in await member_ids(env, w.project_id)
 
 
-async def test_fr15_ac54_ba_member_not_owner_adding_other_is_403(api_env: ApiEnv) -> None:
+async def test_fr15_ac54_ba_member_not_owner_adding_other_is_204(api_env: ApiEnv) -> None:
     """Ожидание обращено по 002/AC-11 (FR-8): БА-участник не владелец добавляет другого - 204."""
     env = api_env
     w = await make_api_world(env)

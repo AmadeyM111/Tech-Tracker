@@ -78,7 +78,7 @@ async def test_ac55_list_item_shape_owner_and_task_count_without_status(api_env:
     assert item["task_count"] == 2
 
 
-async def test_ac55_fr17_ba_and_sm_see_all_user_sees_only_membership_projects(
+async def test_ac55_fr17_ba_sees_all_user_sees_only_membership_projects(
     api_env: ApiEnv,
 ) -> None:
     env = api_env
@@ -87,7 +87,7 @@ async def test_ac55_fr17_ba_and_sm_see_all_user_sees_only_membership_projects(
     gone = await add_project(env, w.ws, w.people["ba2"].user, name="Удалён", deleted=True)
 
     everything = {str(w.project_id), str(other)}
-    for who in ("ba", "ba2", "ba3", "sm", "sm_m"):
+    for who in ("ba", "ba2", "ba3"):
         r = await send(env, w.tok(who), "GET", PROJECTS)
         assert r.status_code == 200, (who, r.text)
         assert {i["id"] for i in r.json()["items"]} == everything, who
@@ -95,7 +95,7 @@ async def test_ac55_fr17_ba_and_sm_see_all_user_sees_only_membership_projects(
     assert {i["id"] for i in r.json()["items"]} == {str(w.project_id)}
     r = await send(env, w.tok("usr2"), "GET", PROJECTS)
     assert r.json()["items"] == []
-    assert str(gone) not in (await send(env, w.tok("sm"), "GET", PROJECTS)).text
+    assert str(gone) not in (await send(env, w.tok("ba3"), "GET", PROJECTS)).text
 
 
 async def test_fr17_order_is_lower_name_then_id(api_env: ApiEnv) -> None:
@@ -104,7 +104,7 @@ async def test_fr17_order_is_lower_name_then_id(api_env: ApiEnv) -> None:
     for name in ("b-проект", "A-проект", "C-проект"):
         await add_project(env, w.ws, w.people["ba"].user, name=name)
 
-    r = await send(env, w.tok("sm"), "GET", PROJECTS)
+    r = await send(env, w.tok("ba3"), "GET", PROJECTS)
 
     assert [i["name"] for i in r.json()["items"]] == [
         "A-проект",
@@ -152,7 +152,7 @@ async def test_ac21_list_has_no_projects_of_other_workspace(api_env: ApiEnv) -> 
     w = await make_api_world(env)
     foreign = await make_foreign(env)
 
-    r = await send(env, w.tok("sm"), "GET", PROJECTS)
+    r = await send(env, w.tok("ba3"), "GET", PROJECTS)
     own = await send(env, foreign.ba_token, "GET", PROJECTS)
 
     assert str(foreign.project_id) not in r.text
@@ -190,13 +190,18 @@ async def test_ac51_create_with_name_only_owner_and_member_is_creator(api_env: A
     assert got.json() == body  # создание и чтение дают одну и ту же карточку
 
 
-async def test_ac51_mixed_creates_project_as_owner_and_member(api_env: ApiEnv) -> None:
+async def test_ac51_ba_creates_project_with_description_as_owner_and_member(
+    api_env: ApiEnv,
+) -> None:
+    """002/FR-1: проект создаёт БА (ba3; прежде sm), владелец и участник - создатель."""
     env = api_env
     w = await make_api_world(env)
-    r = await send(env, w.tok("sm"), "POST", PROJECTS, {"name": "От СМ", "description": "Описание"})
+    r = await send(
+        env, w.tok("ba3"), "POST", PROJECTS, {"name": "От БА", "description": "Описание"}
+    )
     assert r.status_code == 201, r.text
     body = r.json()
-    assert body["owner"]["id"] == str(w.uid("sm"))
+    assert body["owner"]["id"] == str(w.uid("ba3"))
     assert body["description"] == "Описание"
     assert body["is_member"] is True
 
@@ -299,8 +304,6 @@ CARD_MATRIX = {
     # 002/FR-8, FR-21, AC-11: БА управляет любым проектом; remove_self - только у участника
     "ba2": (True, True, True, True, True),
     "ba3": (False, True, True, False, False),
-    "sm": (False, True, True, False, False),
-    "sm_m": (True, True, True, True, True),
     "usr": (True, False, False, True, True),
 }
 
@@ -388,9 +391,9 @@ async def test_ac110_partial_patch_changes_only_given_field(api_env: ApiEnv) -> 
     w = await make_api_world(env)
     await send(env, w.tok("ba"), "PATCH", pj(w.project_id), {"description": "Описание"})
 
-    r = await send(env, w.tok("sm"), "PATCH", pj(w.project_id), {"name": "Только имя"})
+    r = await send(env, w.tok("ba3"), "PATCH", pj(w.project_id), {"name": "Только имя"})
 
-    assert r.status_code == 200, r.text  # СМ, не участник (AC-110)
+    assert r.status_code == 200, r.text  # БА, не участник (AC-110; 002/AC-11)
     assert (r.json()["name"], r.json()["description"]) == ("Только имя", "Описание")
     assert r.json()["is_member"] is False
 
@@ -481,7 +484,7 @@ def _owner(url_project: Any) -> str:
     return f"{pj(url_project)}/owner"
 
 
-async def test_ac52_owner_transfers_to_member_ba_and_loses_delete_right(api_env: ApiEnv) -> None:
+async def test_ac52_owner_transfers_to_member_ba_and_keeps_delete_right(api_env: ApiEnv) -> None:
     """Ожидание обращено по 002/AC-12 (FR-8): прежний владелец - БА, право управлять не теряет
     (manage=True, удаление проходит); имя теста сохранено для трассировки."""
     env = api_env
@@ -501,14 +504,14 @@ async def test_ac52_owner_transfers_to_member_ba_and_loses_delete_right(api_env:
     assert (await project_db(env, w.project_id)).deleted_at is not None
 
 
-async def test_ac52_ac72_mixed_non_member_transfers_even_if_owner_blocked(
+async def test_ac52_ac72_ba_non_member_transfers_even_if_owner_blocked(
     api_env: ApiEnv,
 ) -> None:
     env = api_env
     w = await make_api_world(env)
     await set_blocked(env, w.uid("ba"))  # владелец заблокирован
 
-    r = await send(env, w.tok("sm"), "PUT", _owner(w.project_id), {"user_id": str(w.uid("ba2"))})
+    r = await send(env, w.tok("ba3"), "PUT", _owner(w.project_id), {"user_id": str(w.uid("ba2"))})
 
     assert r.status_code == 200, r.text
     assert r.json()["owner"]["id"] == str(w.uid("ba2"))
@@ -516,12 +519,13 @@ async def test_ac52_ac72_mixed_non_member_transfers_even_if_owner_blocked(
     assert r.json()["permissions"]["manage"] is True
 
 
-async def test_ac52_transfer_to_mixed_member_is_allowed(api_env: ApiEnv) -> None:
+async def test_ac52_transfer_to_member_ba_is_allowed(api_env: ApiEnv) -> None:
+    """002/AC-12: передача участнику-БА (ba2; прежде участнику-СМ sm_m)."""
     env = api_env
     w = await make_api_world(env)
-    r = await send(env, w.tok("ba"), "PUT", _owner(w.project_id), {"user_id": str(w.uid("sm_m"))})
+    r = await send(env, w.tok("ba"), "PUT", _owner(w.project_id), {"user_id": str(w.uid("ba2"))})
     assert r.status_code == 200, r.text
-    assert r.json()["owner"]["id"] == str(w.uid("sm_m"))
+    assert r.json()["owner"]["id"] == str(w.uid("ba2"))
 
 
 async def test_t71_review_transfer_when_owner_has_no_member_row(api_env: ApiEnv) -> None:
@@ -654,7 +658,7 @@ async def test_ac48_owner_deletes_204_then_404_everywhere_and_cascade(api_env: A
 
     assert r.status_code == 204
     assert r.content == b""
-    for who in ("ba", "sm", "usr"):
+    for who in ("ba", "ba3", "usr"):
         for method, url in (
             ("GET", pj(w.project_id)),
             ("DELETE", pj(w.project_id)),
@@ -680,11 +684,8 @@ async def test_ac48_owner_deletes_204_then_404_everywhere_and_cascade(api_env: A
     assert comments and all(c[0] is not None for c in comments)
 
 
-async def test_ac48_mixed_non_member_can_delete(api_env: ApiEnv) -> None:
-    env = api_env
-    w = await make_api_world(env)
-    r = await send(env, w.tok("sm"), "DELETE", pj(w.project_id))
-    assert r.status_code == 204
+# test_ac48_mixed_non_member_can_delete удалён: заменён
+# test_002_ac12_ba_non_owner_deletes_project[ba3], AC-12 (NFR-3).
 
 
 @pytest.mark.parametrize("who", ["ba2", "ba3"])
@@ -715,14 +716,14 @@ ROUTES = ("card", "patch", "owner", "delete", "members", "add", "remove")
 OK, NO = "ok", "403"
 # 002/FR-8: ba2 и ba3 (БА) управляют проектом - patch/owner/delete/add/remove = OK
 MATRIX: dict[str, dict[str, str]] = {
-    #         ba    ba2   ba3   sm    sm_m  usr   usr2  ta
-    "card": dict(ba=OK, ba2=OK, ba3=OK, sm=OK, sm_m=OK, usr=OK, usr2=NO, ta=NO),
-    "patch": dict(ba=OK, ba2=OK, ba3=OK, sm=OK, sm_m=OK, usr=NO, usr2=NO, ta=NO),
-    "owner": dict(ba=OK, ba2=OK, ba3=OK, sm=OK, sm_m=OK, usr=NO, usr2=NO, ta=NO),
-    "delete": dict(ba=OK, ba2=OK, ba3=OK, sm=OK, sm_m=OK, usr=NO, usr2=NO, ta=NO),
-    "members": dict(ba=OK, ba2=OK, ba3=OK, sm=OK, sm_m=OK, usr=OK, usr2=NO, ta=NO),
-    "add": dict(ba=OK, ba2=OK, ba3=OK, sm=OK, sm_m=OK, usr=NO, usr2=NO, ta=NO),
-    "remove": dict(ba=OK, ba2=OK, ba3=OK, sm=OK, sm_m=OK, usr=OK, usr2=NO, ta=NO),
+    #         ba    ba2   ba3   usr   usr2  ta
+    "card": dict(ba=OK, ba2=OK, ba3=OK, usr=OK, usr2=NO, ta=NO),
+    "patch": dict(ba=OK, ba2=OK, ba3=OK, usr=NO, usr2=NO, ta=NO),
+    "owner": dict(ba=OK, ba2=OK, ba3=OK, usr=NO, usr2=NO, ta=NO),
+    "delete": dict(ba=OK, ba2=OK, ba3=OK, usr=NO, usr2=NO, ta=NO),
+    "members": dict(ba=OK, ba2=OK, ba3=OK, usr=OK, usr2=NO, ta=NO),
+    "add": dict(ba=OK, ba2=OK, ba3=OK, usr=NO, usr2=NO, ta=NO),
+    "remove": dict(ba=OK, ba2=OK, ba3=OK, usr=OK, usr2=NO, ta=NO),
 }
 SUCCESS = {
     "card": 200,
@@ -735,7 +736,7 @@ SUCCESS = {
 }
 
 
-@pytest.mark.parametrize("who", ["ba", "ba2", "ba3", "sm", "sm_m", "usr", "usr2", "ta"])
+@pytest.mark.parametrize("who", ["ba", "ba2", "ba3", "usr", "usr2", "ta"])
 @pytest.mark.parametrize("route", ROUTES)
 async def test_matrix_role_x_route(api_env: ApiEnv, route: str, who: str) -> None:
     """AC-48, AC-52, AC-54, AC-55, AC-73, AC-110, D-45."""

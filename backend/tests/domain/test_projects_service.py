@@ -108,7 +108,7 @@ async def test_fr14_load_project_facts_returns_owner_and_membership(
     assert f == ProjectFacts(project_id=w.project_id, owner_id=w.ba.id, actor_is_member=True)
     f = await queries.load_project_facts(db, actor_of(w.usr), w.project_id)
     assert f == ProjectFacts(project_id=w.project_id, owner_id=w.ba.id, actor_is_member=True)
-    f = await queries.load_project_facts(db, actor_of(w.sm), w.project_id)
+    f = await queries.load_project_facts(db, actor_of(w.ba3), w.project_id)
     assert f.actor_is_member is False
     assert f.owner_id == w.ba.id
 
@@ -228,7 +228,7 @@ async def test_p10_2_load_project_facts_without_lock_does_not_lock(
 # --- create_project --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("role", ["business_admin", "mixed"])
+@pytest.mark.parametrize("role", ["business_admin"])
 async def test_ac51_create_project_owner_and_member_are_actor(
     db: AsyncSession, svc: Any, role: str
 ) -> None:
@@ -338,12 +338,13 @@ async def test_ac110_owner_ba_updates_name_and_description(
     assert await events(db, w.ws.id) == []  # D-55: project.updated не пишется
 
 
-async def test_ac110_sm_not_member_updates_any_project(db: AsyncSession, svc: Any) -> None:
+async def test_ac110_ba_not_member_updates_any_project(db: AsyncSession, svc: Any) -> None:
+    """002/AC-11, AC-12: БА, не участник проекта, правит любой проект (актор ba3; прежде sm)."""
     w = await make_world(db)
     view = await svc.update_project(
-        db, actor_of(w.sm), w.project_id, changes=_patch(svc, name="СМ")
+        db, actor_of(w.ba3), w.project_id, changes=_patch(svc, name="БА")
     )
-    assert view.name == "СМ"
+    assert view.name == "БА"
     assert (await project_row(db, w.project_id)).description == ""  # не переданное не тронуто
 
 
@@ -455,18 +456,18 @@ async def test_ac108_update_boundaries(db: AsyncSession, svc: Any) -> None:
 
 
 async def _transfer_world(db: AsyncSession) -> World:
-    """БА-владелец; участники: ba2 (БА), usr (П), sm2 (СМ); не участник: ba3."""
+    """БА-владелец; участники: ba2 (БА), usr (П), ba4 (БА); не участник: ba3."""
     w = await make_world(db)
-    sm2 = await make_user(db, workspace=w.ws, role="mixed", login="w.sm2")
+    ba4 = await make_user(db, workspace=w.ws, role="business_admin", login="w.ba4")
     await make_project_member(
-        db, project_id=w.project_id, user_id=sm2.id, workspace_id=w.ws.id, created_by=w.ba.id
+        db, project_id=w.project_id, user_id=ba4.id, workspace_id=w.ws.id, created_by=w.ba.id
     )
-    w.sm2 = sm2  # type: ignore[attr-defined]
+    w.ba4 = ba4  # type: ignore[attr-defined]
     await db.commit()
     return w
 
 
-async def test_ac52_owner_transfers_to_ba_member_and_loses_manage(
+async def test_ac52_owner_transfers_to_ba_member_and_keeps_manage(
     db: AsyncSession, svc: Any
 ) -> None:
     w = await _transfer_world(db)
@@ -488,24 +489,26 @@ async def test_ac52_owner_transfers_to_ba_member_and_loses_manage(
     assert (await project_row(db, w.project_id)).deleted_at is not None
 
 
-async def test_ac52_sm_transfers_to_sm_member(db: AsyncSession, svc: Any) -> None:
+async def test_ac52_ba_not_member_transfers_to_ba_member(db: AsyncSession, svc: Any) -> None:
+    """002/AC-12: БА, не участник (ba3), передаёт владение участнику-БА (ba4)."""
     w = await _transfer_world(db)
     view = await svc.transfer_ownership(
         db,
-        actor_of(w.sm),
+        actor_of(w.ba3),
         w.project_id,
-        new_owner_id=w.sm2.id,  # type: ignore[attr-defined]
+        new_owner_id=w.ba4.id,  # type: ignore[attr-defined]
     )
-    assert view.owner.id == w.sm2.id  # type: ignore[attr-defined]
+    assert view.owner.id == w.ba4.id  # type: ignore[attr-defined]
 
 
-async def test_ac72_sm_not_member_transfers_when_owner_blocked(db: AsyncSession, svc: Any) -> None:
+async def test_ac72_ba_not_member_transfers_when_owner_blocked(db: AsyncSession, svc: Any) -> None:
+    """002/AC-12: БА, не участник (ba3), передаёт владение, пока владелец заблокирован."""
     w = await _transfer_world(db)
     await db.execute(
         text("UPDATE app_user SET is_blocked = true WHERE id = :u").bindparams(u=w.ba.id)
     )
     await db.commit()
-    view = await svc.transfer_ownership(db, actor_of(w.sm), w.project_id, new_owner_id=w.ba2.id)
+    view = await svc.transfer_ownership(db, actor_of(w.ba3), w.project_id, new_owner_id=w.ba2.id)
     assert view.owner.id == w.ba2.id
 
 
@@ -654,12 +657,12 @@ async def test_ac65_second_transfer_writes_second_event_only_on_change(
     db: AsyncSession, svc: Any
 ) -> None:
     w = await _transfer_world(db)
-    await svc.transfer_ownership(db, actor_of(w.sm), w.project_id, new_owner_id=w.ba2.id)
-    await svc.transfer_ownership(db, actor_of(w.sm), w.project_id, new_owner_id=w.ba2.id)
-    await svc.transfer_ownership(db, actor_of(w.sm), w.project_id, new_owner_id=w.ba.id)
+    await svc.transfer_ownership(db, actor_of(w.ba3), w.project_id, new_owner_id=w.ba2.id)
+    await svc.transfer_ownership(db, actor_of(w.ba3), w.project_id, new_owner_id=w.ba2.id)
+    await svc.transfer_ownership(db, actor_of(w.ba3), w.project_id, new_owner_id=w.ba.id)
     rows = await events(db, w.ws.id)
     assert [r.action for r in rows] == ["project.ownership_transferred"] * 2
-    assert rows[0].actor_id == w.sm.id
+    assert rows[0].actor_id == w.ba3.id
 
 
 async def test_p10_2_transfer_locks_project_before_recipient(db: AsyncSession, svc: Any) -> None:
@@ -685,7 +688,7 @@ async def test_fr13_transfer_foreign_or_unknown_project_is_404(db: AsyncSession,
     foreign = await make_project(db, workspace_id=other.id, owner_id=other_owner.id)
     await db.commit()
     for pid in (uuid.uuid4(), foreign.id):
-        await not_found(db, svc.transfer_ownership(db, actor_of(w.sm), pid, new_owner_id=w.ba2.id))
+        await not_found(db, svc.transfer_ownership(db, actor_of(w.ba3), pid, new_owner_id=w.ba2.id))
 
 
 # --- delete_project --------------------------------------------------------------------------
@@ -752,8 +755,8 @@ async def _tree(db: AsyncSession, w: World, fixed_clock: FixedClock) -> dict[str
     }
 
 
-@pytest.mark.parametrize("who", ["ba", "sm"])
-async def test_ac48_owner_ba_and_sm_delete_project_softly(
+@pytest.mark.parametrize("who", ["ba", "ba3"])
+async def test_ac48_owner_ba_and_non_member_ba_delete_project_softly(
     db: AsyncSession, svc: Any, fixed_clock: FixedClock, who: str
 ) -> None:
     w = await make_world(db)
@@ -822,9 +825,9 @@ async def test_fr16_delete_twice_is_404_and_project_disappears(
 async def test_fr16_delete_foreign_project_is_404(db: AsyncSession, svc: Any) -> None:
     w = await make_world(db)
     other = await make_workspace(db)
-    sm_other = await make_user(db, workspace=other, role="mixed")
+    ba_other = await make_user(db, workspace=other, role="business_admin")
     await db.commit()
-    await not_found(db, svc.delete_project(db, actor_of(sm_other), w.project_id))
+    await not_found(db, svc.delete_project(db, actor_of(ba_other), w.project_id))
     assert (await project_row(db, w.project_id)).deleted_at is None
 
 
@@ -843,7 +846,7 @@ async def _list_world(db: AsyncSession) -> World:
     ws_id = w.ws.id
     p_alpha = await make_project(db, workspace_id=ws_id, owner_id=w.ba2.id, name="alpha")
     p_beta = await make_project(db, workspace_id=ws_id, owner_id=w.ba.id, name="Beta")
-    p_gamma = await make_project(db, workspace_id=ws_id, owner_id=w.sm.id, name="gamma")
+    p_gamma = await make_project(db, workspace_id=ws_id, owner_id=w.ba3.id, name="gamma")
     await make_project_member(
         db, project_id=p_beta.id, user_id=w.usr.id, workspace_id=ws_id, created_by=w.ba.id
     )
@@ -886,11 +889,11 @@ def t1_deleted() -> Any:
     return datetime(2026, 10, 1, tzinfo=UTC)
 
 
-async def test_ac55_ba_and_sm_see_all_undeleted_projects_ordered_by_lower_name(
+async def test_ac55_ba_sees_all_undeleted_projects_ordered_by_lower_name(
     db: AsyncSession, queries: Any
 ) -> None:
     w = await _list_world(db)
-    for who in (w.ba3, w.sm, w.ba):  # ba3 не участвует ни в одном
+    for who in (w.ba3, w.ba2, w.ba):  # ba3 не участвует ни в одном, кроме владения gamma
         items, has_next = await queries.list_projects(db, actor_of(who), PageParams())
         assert has_next is False
         assert [i.name for i in items] == ["alpha", "Beta", "gamma", "Основной"]
@@ -939,9 +942,11 @@ async def test_ac22_list_projects_ties_broken_by_id_and_paginated(
 # --- get_project -----------------------------------------------------------------------------
 
 
-async def test_d45_get_project_by_ba_sm_member_user(db: AsyncSession, queries: Any) -> None:
+async def test_d45_get_project_by_ba_member_non_member_and_user(
+    db: AsyncSession, queries: Any
+) -> None:
     w = await _list_world(db)
-    for who in (w.ba, w.sm, w.ba3, w.usr):
+    for who in (w.ba, w.ba2, w.ba3, w.usr):
         view = await queries.get_project(db, actor_of(who), w.beta)  # type: ignore[attr-defined]
         assert view.id == w.beta  # type: ignore[attr-defined]
         assert view.name == "Beta"
@@ -973,7 +978,6 @@ async def test_d45_get_project_foreign_workspace_is_404(db: AsyncSession, querie
         # 002/FR-8, FR-21, AC-11: БА управляет любым проектом; remove_self - только у участника
         ("ba2", True, True, True, True, True),
         ("usr", True, False, False, True, True),
-        ("sm", False, True, True, False, False),
         ("ba3", False, True, True, False, False),
     ],
 )
@@ -1125,7 +1129,7 @@ async def test_p10_2_transfer_ownership_serializes_with_member_removal(
             )
         ),
         asyncio.ensure_future(
-            run(lambda s: members.remove_member(s, actor_of(w.sm), w.project_id, w.ba2.id))
+            run(lambda s: members.remove_member(s, actor_of(w.ba3), w.project_id, w.ba2.id))
         ),
     ]
     await asyncio.sleep(0)

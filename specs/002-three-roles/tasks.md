@@ -203,7 +203,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
 - **Попытки:** 0
 
 ## R3-T05 — Тесты без СМ: проекты, участники, изоляция (только тесты)
-- **Статус:** TODO
+- **Статус:** DONE (1 попытка, reviews/R3-T05-1.md; соответствие старых и новых имён тестов — там же)
 - **AC:** AC-11, AC-12, AC-15, AC-17, AC-19 (замена актора СМ → БА); FR-1
 - **Файлы:** тесты: `backend/tests/domain/test_projects_service.py`,
   `backend/tests/domain/test_project_members_service.py`, `backend/tests/api/test_projects.py`,

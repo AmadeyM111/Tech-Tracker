@@ -1,6 +1,6 @@
 """T72: 404 или 403 для объектов проекта (FR-45a, OI-35, D-45, AC-94, AC-21).
 
-- несуществующий, мягко удалённый и чужого пространства проект -> 404 для БА и СМ (тела
+- несуществующий, мягко удалённый и чужого пространства проект -> 404 для БА (тела
   совпадают: не отличить друг от друга);
 - существующий проект, не видимый «Пользователю»-неучастнику -> 403 (карточка, участники,
   исключение участника: ``can_view_project`` проверяется раньше «цель не участник», решение
@@ -59,8 +59,8 @@ async def _foreign_project(env: ApiEnv) -> uuid.UUID:
     return (await make_foreign(env)).project_id
 
 
-@pytest.mark.parametrize("who", ["ba", "ba2", "ba3", "sm", "sm_m"])
-async def test_ac94_unknown_deleted_and_foreign_project_is_404_for_ba_and_sm(
+@pytest.mark.parametrize("who", ["ba", "ba2", "ba3"])
+async def test_ac94_unknown_deleted_and_foreign_project_is_404_for_ba(
     api_env: ApiEnv, who: str
 ) -> None:
     env = api_env
@@ -186,7 +186,7 @@ async def test_ac21_other_workspace_project_is_404_not_403_even_for_user_and_ba(
     missing = uuid.uuid4()
     assert (await send(env, w.tok("usr"), "GET", pj(w.project_id))).status_code == 200
 
-    for who in ("ba", "usr", "usr2", "sm"):
+    for who in ("ba", "usr", "usr2", "ba3"):
         for name, method, url, body in _calls(foreign.project_id, w.uid("usr")):
             r = await send(env, w.tok(who), method, url, body)
             ref = await send(
@@ -226,7 +226,7 @@ async def test_t77_ac94_unknown_deleted_foreign_task_is_404_with_same_body(
         await send(env, foreign.ba_token, "POST", f"{pj(foreign.project_id)}/tasks", {"title": "Ч"})
     ).json()["id"]
 
-    for who in ("ba", "ba2", "ba3", "sm", "sm_m", "usr", "usr2"):
+    for who in ("ba", "ba2", "ba3", "usr", "usr2"):
         reference: Any = None
         for task_id in (uuid.uuid4(), deleted_task, in_dead, foreign_task):
             for name, method, url, body in _task_routes(task_id, w.project_id)[:4]:
@@ -255,7 +255,7 @@ async def test_t77_ac11_non_member_gets_403_for_existing_task_same_body(api_env:
     w = await make_api_world(env)
     real = await mk(env, w, title="Секрет-название")
     bodies = []
-    for who in ("usr2", "ba3", "sm"):
+    for who in ("usr2", "ba3"):
         for name, method, url, body in _task_routes(real, w.project_id):
             r = await send(env, w.tok(who), method, url, body)
             assert error(r) == (403, "forbidden"), (who, name)
@@ -268,7 +268,7 @@ async def test_t77_ac21_foreign_project_tasks_routes_are_404(api_env: ApiEnv) ->
     env = api_env
     w = await make_api_world(env)
     foreign = await make_foreign(env)
-    for who in ("ba", "usr", "sm"):
+    for who in ("ba", "usr", "ba3"):
         for _n, method, url, body in _task_routes(uuid.uuid4(), foreign.project_id)[4:]:
             r = await send(env, w.tok(who), method, url, body)
             assert error(r) == (404, "not_found"), (who, method)

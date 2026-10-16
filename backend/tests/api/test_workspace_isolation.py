@@ -98,8 +98,9 @@ async def test_ac21_admin_of_other_workspace_sees_symmetrically_nothing_of_first
     env = api_env
     ws1, admin1, _, _, _ = await _two_workspaces(env)
     ws2 = await new_workspace(env)
-    mixed, (token2,) = await seed(env, ws2, "mixed")
-    assert (await admin_call(env, token2, "get", mixed.id)).status_code == 200
+    # 002/FR-1: администратор второго пространства - ТА (прежде СМ-администратор)
+    admin2, (token2,) = await seed(env, ws2, "tech_admin")
+    assert (await admin_call(env, token2, "get", admin2.id)).status_code == 200
 
     response = await admin_call(env, token2, "get", admin1.id)
     blocked = await admin_call(env, token2, "block", admin1.id)
@@ -210,7 +211,7 @@ async def test_t72_ac21_foreign_projects_and_members_are_invisible_and_untouched
     before_row = await project_db(env, pid)
 
     # списки
-    for who in ("sm", "ba", "usr"):
+    for who in ("ba3", "ba", "usr"):
         listed = await send(env, w.tok(who), "GET", PROJECTS)
         assert listed.status_code == 200, listed.text
         assert str(pid) not in listed.text
@@ -225,7 +226,7 @@ async def test_t72_ac21_foreign_projects_and_members_are_invisible_and_untouched
         ("POST", members_url(pid), {"user_id": str(w.uid("usr2"))}),
         ("DELETE", members_url(pid, foreign.usr.id), None),
     ]
-    for who in ("sm", "ba", "usr2"):
+    for who in ("ba3", "ba", "usr2"):
         for method, url, body in calls:
             r = await send(env, w.tok(who), method, url, body)
             ref = await send(env, w.tok(who), method, url.replace(str(pid), str(missing)), body)
@@ -266,7 +267,7 @@ async def test_t72_ac21_foreign_user_cannot_be_member_or_owner_of_own_project(
     )
     moved = await send(
         env,
-        w.tok("sm"),
+        w.tok("ba3"),
         "PUT",
         f"{pj(w.project_id)}/owner",
         {"user_id": str(foreign.ba.id)},
@@ -319,7 +320,7 @@ async def test_t77_ac21_foreign_task_is_invisible_and_untouched(api_env: ApiEnv)
     tid = made.json()["id"]
     before = await task_db(env, tid)
 
-    for who in ("ba", "sm_m", "usr"):
+    for who in ("ba", "ba2", "usr"):
         for method, url, body in (
             ("GET", task_url(tid), None),
             ("PATCH", task_url(tid), {"title": "Взлом", "assignee_id": str(w.uid("usr"))}),
@@ -381,7 +382,7 @@ async def test_t80_ac21_foreign_comments_are_invisible_and_untouched(api_env: Ap
     assert created.status_code == 201, created.text
     cid = created.json()["id"]
 
-    for who in ("ba", "sm_m", "usr"):
+    for who in ("ba", "ba2", "usr"):
         for method, url, body in (
             ("GET", f"/api/v1/tasks/{tid}/comments", None),
             ("POST", f"/api/v1/tasks/{tid}/comments", {"body": "взлом"}),
