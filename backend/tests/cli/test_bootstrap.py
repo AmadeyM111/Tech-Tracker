@@ -617,6 +617,123 @@ async def test_remove_file_after_real_bootstrap(
     assert not path.exists()
 
 
+# --- OI-130 а), FR-6, FR-73a (D-66): первый ТА в написании из настройки ----------------------
+
+
+async def _first_admin_login_columns(sm: async_sessionmaker[AsyncSession]) -> list[tuple[str, str]]:
+    async with sm() as session:
+        rows = await session.execute(text("SELECT login, login_display FROM app_user"))
+        return [(r.login, r.login_display) for r in rows]
+
+
+@pytest.mark.committed
+async def test_oi130_first_admin_keeps_spelling_from_setting_key_is_lower(
+    committed: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    settings = settings.model_copy(update={"initial_admin_login": "Admin.Main"})
+    _prepare_secrets_dir(settings)
+
+    await _bootstrap(committed, settings)
+
+    assert await _first_admin_login_columns(committed) == [("admin.main", "Admin.Main")]
+    creds = _parse_credentials(settings.secrets_dir / INITIAL_FILE)
+    assert creds["login"] == "Admin.Main"
+    assert creds["password"] == KNOWN_PASSWORD
+
+
+@pytest.mark.committed
+async def test_oi130_default_login_is_unchanged(
+    committed: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    assert settings.initial_admin_login == "admin"
+    _prepare_secrets_dir(settings)
+
+    await _bootstrap(committed, settings)
+
+    assert await _first_admin_login_columns(committed) == [("admin", "admin")]
+    assert _parse_credentials(settings.secrets_dir / INITIAL_FILE)["login"] == "admin"
+
+
+@pytest.mark.committed
+async def test_oi130_invalid_login_setting_still_fails_without_echoing_the_value(
+    committed: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    settings = settings.model_copy(update={"initial_admin_login": "Bad Login!"})
+    _prepare_secrets_dir(settings)
+
+    with pytest.raises(ValueError) as info:
+        await _bootstrap(committed, settings)
+
+    assert "Bad Login" not in str(info.value)
+    assert await _first_admin_login_columns(committed) == []
+    assert not (settings.secrets_dir / INITIAL_FILE).exists()
+
+
+@pytest.mark.parametrize("asked", ["ADMIN.MAIN", "admin.main", "Admin.Main", " Admin.Main "])
+def test_oi130_remove_file_compares_login_ignoring_case(tmp_path: Path, asked: str) -> None:
+    from app.domain.system.bootstrap import remove_initial_admin_file_if_for
+
+    settings = _settings(tmp_path)
+    path = _write_initial_file(settings, "Admin.Main")
+    remove_initial_admin_file_if_for(settings, asked)
+    assert not path.exists()
+
+
+def test_oi130_remove_file_with_lower_case_owner_and_display_login(tmp_path: Path) -> None:
+    """Файл прежней установки (``login=admin``) удаляется и по отображаемому ``Admin``."""
+    from app.domain.system.bootstrap import remove_initial_admin_file_if_for
+
+    settings = _settings(tmp_path)
+    path = _write_initial_file(settings, "admin")
+    remove_initial_admin_file_if_for(settings, "Admin")
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("asked", ["other", "Admin.Mai", "Admin.Main2", ""])
+def test_oi130_remove_file_keeps_file_of_other_login(tmp_path: Path, asked: str) -> None:
+    from app.domain.system.bootstrap import remove_initial_admin_file_if_for
+
+    settings = _settings(tmp_path)
+    path = _write_initial_file(settings, "Admin.Main")
+    remove_initial_admin_file_if_for(settings, asked)
+    assert path.is_file()
+    assert _parse_credentials(path)["login"] == "Admin.Main"
+
+
+@pytest.mark.committed
+async def test_oi130_password_change_of_first_admin_removes_file_and_login_is_display(
+    committed_api_env: Any,
+) -> None:
+    """FR-6, OI-130: ``INITIAL_ADMIN_LOGIN=Admin.Main`` -> вход ``admin.main`` -> смена пароля.
+
+    В ответе входа логин ``Admin.Main``; после смены пароля файл пароля удалён (сравнение
+    логина файла и актора без учёта регистра).
+    """
+    env = committed_api_env
+    env.settings.initial_admin_login = "Admin.Main"
+    _prepare_secrets_dir(env.settings)
+    await _bootstrap(env.sessionmaker, env.settings)
+    path = env.settings.secrets_dir / INITIAL_FILE
+    assert _parse_credentials(path)["login"] == "Admin.Main"
+
+    response = await env.login("admin.main", KNOWN_PASSWORD)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["user"]["login"] == "Admin.Main"
+    assert response.json()["user"]["must_change_password"] is True
+    token = env.token_from(response)
+    assert token
+    changed = await env.client.post(
+        "/api/v1/auth/password",
+        json={"current_password": KNOWN_PASSWORD, "new_password": "Br4nd-new-Pa55phrase-uvw"},
+        headers=env.auth(token),
+    )
+    assert changed.status_code == 204, changed.text
+    assert not path.exists(), "файл пароля первого ТА не удалён после смены пароля"
+    me = await env.me(token)
+    assert me.json()["login"] == "Admin.Main"
+
+
 # --- CLI: main(argv) -> int (D-29) ---------------------------------------------------------
 
 

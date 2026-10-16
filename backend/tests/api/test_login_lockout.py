@@ -131,6 +131,50 @@ async def test_ac116_fr61_failures_with_upper_case_login_lock_the_normalized_acc
     assert row.login_locked_until is not None
 
 
+_AC127_VARIANTS = ("ivanov.petr", "IVANOV.PETR", "Ivanov.Petr", "ivanov.PETR", "IvAnOv.PeTr")
+
+
+async def test_ac127_five_failures_in_mixed_case_lock_one_account_then_unlock_after_15_minutes(
+    committed_api_env: ApiEnv,
+) -> None:
+    """FR-73a, FR-61: счётчик и блокировка — на учётную запись, в каком бы регистре ни вводили."""
+    env = committed_api_env
+    user = await env.new_user(role="business_admin", login="Ivanov.Petr", password=PW)
+    reference = await env.login("ghost.user", BAD)  # несуществующий логин: эталон отказа
+    assert reference.status_code == 401
+
+    for variant in _AC127_VARIANTS:
+        assert (await env.login(variant, BAD)).status_code == 401
+    row = await env.user_row(user.id)
+    assert row.login_locked_until == FIXED_NOW + timedelta(minutes=15)
+
+    locked = await env.login("Ivanov.Petr", PW)
+    assert locked.status_code == 401
+    assert env.token_from(locked) is None
+    assert _same_failure(locked, reference)
+    assert await env.session_ids(user.id) == []
+
+    env.clock.advance(timedelta(minutes=14, seconds=59))
+    assert (await env.login("Ivanov.Petr", PW)).status_code == 401
+
+    env.clock.advance(timedelta(seconds=1))
+    response = await env.login("Ivanov.Petr", PW)
+    assert response.status_code == 200, response.text
+    assert response.json()["user"]["login"] == "Ivanov.Petr"
+    assert env.token_from(response)
+
+
+async def test_ac127_four_failures_in_mixed_case_do_not_lock(committed_api_env: ApiEnv) -> None:
+    env = committed_api_env
+    user = await env.new_user(role="business_admin", login="Ivanov.Petr", password=PW)
+    for variant in _AC127_VARIANTS[:4]:
+        assert (await env.login(variant, BAD)).status_code == 401
+    row = await env.user_row(user.id)
+    assert row.failed_login_count == 4
+    assert row.login_locked_until is None
+    assert (await env.login("IVANOV.PETR", PW)).status_code == 200
+
+
 async def test_fr61_lock_is_per_login(committed_api_env: ApiEnv) -> None:
     env = committed_api_env
     first = await env.new_user(role="user", password=PW)

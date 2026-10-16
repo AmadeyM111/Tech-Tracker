@@ -62,13 +62,17 @@ class BootstrapResult:
     admin_created: bool
 
 
-def _initial_login(settings: Settings) -> str:
-    """Логин первого ТА: тот же разбор, что при входе и создании (FR-73, ``normalize_login``)."""
+def _initial_login(settings: Settings) -> tuple[str, str]:
+    """Логин первого ТА: ``(ключ, написание из настройки)`` (FR-73, FR-73a, OI-130).
+
+    Ключ — тот же разбор, что при входе и создании (``normalize_login``); показ и файл пароля —
+    в написании, заданном в ``INITIAL_ADMIN_LOGIN``.
+    """
     login = normalize_login(settings.initial_admin_login)
     if login is None:
         # значение не включаем: сообщение должно быть безопасным для логов
         raise ValueError("INITIAL_ADMIN_LOGIN не соответствует шаблону логина (FR-73)")
-    return login
+    return login, settings.initial_admin_login
 
 
 def _discard_file(path: Path) -> None:
@@ -130,7 +134,7 @@ async def _create_first_admin(
             if existing is not None:
                 return BootstrapResult(workspace_id=existing, admin_created=False)
 
-            login = _initial_login(settings)
+            login, login_display = _initial_login(settings)
             password = generate()
             hasher = await asyncio.to_thread(
                 partial(
@@ -147,6 +151,7 @@ async def _create_first_admin(
             await session.flush()
             user = AppUser(
                 login=login,
+                login_display=login_display,
                 password_hash=password_hash,
                 must_change_password=True,
                 is_blocked=False,
@@ -170,7 +175,7 @@ async def _create_first_admin(
             # действует; блокировка не даёт другому запуску создать файл параллельно
             with contextlib.suppress(FileNotFoundError):
                 path.unlink()
-            write_private_file(path, f"login={login}\npassword={password}\n")
+            write_private_file(path, f"login={login_display}\npassword={password}\n")
             file_written = True
         # здесь выполнена фиксация транзакции (выход из session.begin())
     except Exception:
@@ -259,7 +264,9 @@ def remove_initial_admin_file_if_for(settings: Settings, login: str) -> None:
     """Удаляет файл пароля первого ТА, если он выдан этому логину (FR-6, ADR-0004).
 
     Файла нет — ничего не делает. Файл другого логина не трогается. Содержимое файла не
-    попадает в исключения.
+    попадает в исключения. Сравнение без учёта регистра с обеих сторон: вызывающий передаёт
+    ``Actor.login`` (отображаемый логин), а в файле — написание из настройки (в установках до
+    миграции 0005 — строчное), FR-73a.
     """
     path = settings.secrets_dir / INITIAL_ADMIN_FILE
     try:
@@ -271,6 +278,6 @@ def remove_initial_admin_file_if_for(settings: Settings, login: str) -> None:
     except UnicodeDecodeError:
         return  # не наш файл
     owner = next((ln.partition("=")[2].strip() for ln in lines if ln.startswith("login=")), None)
-    if owner is not None and owner == login.strip().lower():
+    if owner is not None and owner.lower() == login.strip().lower():
         with contextlib.suppress(FileNotFoundError):
             path.unlink()

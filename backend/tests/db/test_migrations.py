@@ -742,3 +742,180 @@ async def test_t69_alembic_check_clean_at_head(committed: Any, test_database_url
     tables, _ = await _tables_and_check(committed)
     assert set(MVP_TABLES_0004) <= tables
     await _alembic_ok(test_database_url, "check")
+
+
+# --- T93: миграция 0005 login_display (plan §11.12.3, D-66) --------------------------------
+
+MIGRATION_0005 = BACKEND_DIR / "migrations" / "versions" / "0005_login_display.py"
+DISPLAY_CHECK_0005 = "ck_app_user_login_display_lower"
+LOGIN_CHECK_0001 = "ck_app_user_login_format"
+
+
+def test_t93_migration_0005_file_and_single_head() -> None:
+    """Файл 0005 на месте, цепочка 0004 -> 0005, голова ревизий одна и это 0005."""
+    from alembic.script import ScriptDirectory
+
+    assert MIGRATION_0005.is_file(), "нет backend/migrations/versions/0005_login_display.py"
+    tree = ast.parse(MIGRATION_0005.read_text(encoding="utf-8"))
+    values: dict[str, Any] = {}
+    for n in tree.body:
+        if isinstance(n, ast.Assign):
+            for t in n.targets:
+                if isinstance(t, ast.Name) and isinstance(n.value, ast.Constant):
+                    values[t.id] = n.value.value
+        elif (
+            isinstance(n, ast.AnnAssign)
+            and isinstance(n.target, ast.Name)
+            and isinstance(n.value, ast.Constant)
+        ):
+            values[n.target.id] = n.value.value
+    assert values.get("revision") == "0005"
+    assert values.get("down_revision") == "0004"
+    funcs = {n.name for n in tree.body if isinstance(n, ast.FunctionDef)}
+    assert {"upgrade", "downgrade"} <= funcs
+    script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
+    assert script.get_heads() == ["0005"]
+
+
+async def _display_schema(maker: Any) -> tuple[Any, int, int]:
+    """(строка столбца login_display или None, число CHECK 0005, число CHECK формата логина)."""
+    async with maker() as s:
+        column = (
+            await s.execute(
+                text(
+                    "SELECT data_type, character_maximum_length, is_nullable "
+                    "FROM information_schema.columns WHERE table_schema = 'public' "
+                    "AND table_name = 'app_user' AND column_name = 'login_display'"
+                )
+            )
+        ).one_or_none()
+        checks = (
+            await s.execute(
+                text("SELECT count(*) FROM pg_constraint WHERE conname = :n"),
+                {"n": DISPLAY_CHECK_0005},
+            )
+        ).scalar_one()
+        fmt = (
+            await s.execute(
+                text("SELECT count(*) FROM pg_constraint WHERE conname = :n"),
+                {"n": LOGIN_CHECK_0001},
+            )
+        ).scalar_one()
+    return column, int(checks), int(fmt)
+
+
+@pytest.mark.committed
+async def test_t93_head_has_login_display_column_and_check(committed: Any) -> None:
+    column, checks, fmt = await _display_schema(committed)
+    assert column is not None, "на head нет app_user.login_display"
+    assert (column.data_type, column.character_maximum_length, column.is_nullable) == (
+        "character varying",
+        64,
+        "NO",
+    )
+    assert checks == 1
+    assert fmt == 1, "CHECK формата логина (0001) должен остаться"
+
+
+@pytest.mark.committed
+async def test_t93_downgrade_0004_drops_column_and_check_keeps_rows_then_upgrade_backfills(
+    committed: Any, db_engine: Any, test_database_url: str
+) -> None:
+    """head -> 0004: столбца и CHECK нет, строки целы; -> head: ``login_display = login``.
+
+    Написание, введённое при создании (``Ivanov.Petr``), при откате теряется (R-M10): после
+    повторного upgrade показ равен ключу (строчным).
+    """
+    from tests.factories import make_user
+
+    async with committed() as s, s.begin():
+        mixed = await make_user(s, role="business_admin", login="Ivanov.Petr")
+        plain = await make_user(s, role="user", login="ivan.petrov")
+
+    await _alembic_ok(test_database_url, "downgrade", "0004")
+    await db_engine.dispose()
+    column, checks, fmt = await _display_schema(committed)
+    assert column is None, "downgrade 0005 оставил столбец login_display"
+    assert checks == 0, "downgrade 0005 оставил CHECK"
+    assert fmt == 1
+    async with committed() as s:
+        version = (await s.execute(text("SELECT version_num FROM alembic_version"))).scalars().all()
+        assert version == ["0004"]
+        logins = {
+            r.id: r.login
+            for r in await s.execute(
+                text("SELECT id, login FROM app_user WHERE id IN (:a, :b)"),
+                {"a": mixed.id, "b": plain.id},
+            )
+        }
+    assert logins == {mixed.id: "ivanov.petr", plain.id: "ivan.petrov"}
+
+    await _alembic_ok(test_database_url, "upgrade", "head")
+    await db_engine.dispose()
+    column, checks, fmt = await _display_schema(committed)
+    assert column is not None
+    assert (checks, fmt) == (1, 1)
+    async with committed() as s:
+        bad = (
+            await s.execute(text("SELECT count(*) FROM app_user WHERE login_display <> login"))
+        ).scalar_one()
+        nulls = (
+            await s.execute(text("SELECT count(*) FROM app_user WHERE login_display IS NULL"))
+        ).scalar_one()
+        total = (await s.execute(text("SELECT count(*) FROM app_user"))).scalar_one()
+    assert total == 2
+    assert bad == 0, "backfill: login_display должен равняться login у всех строк"
+    assert nulls == 0
+
+
+@pytest.mark.committed
+async def test_t93_upgrade_backfills_rows_inserted_at_0004_without_the_column(
+    committed: Any, db_engine: Any, test_database_url: str
+) -> None:
+    """Строка, вставленная «сырым» SQL на схеме 0004, получает ``login_display = login``."""
+    await _alembic_ok(test_database_url, "downgrade", "0004")
+    await db_engine.dispose()
+    async with committed() as s, s.begin():
+        await s.execute(
+            text(
+                "INSERT INTO app_user (id, login, password_hash, must_change_password, "
+                "is_blocked, failed_login_count, password_changed_at, created_at, updated_at) "
+                "VALUES (gen_random_uuid(), 'demo.ba1', 'x', false, false, 0, now(), now(), now())"
+            )
+        )
+
+    await _alembic_ok(test_database_url, "upgrade", "head")
+    await db_engine.dispose()
+    async with committed() as s:
+        row = (await s.execute(text("SELECT login, login_display FROM app_user"))).one()
+    assert (row.login, row.login_display) == ("demo.ba1", "demo.ba1")
+
+
+@pytest.mark.committed
+async def test_t93_upgraded_schema_rejects_inconsistent_display(
+    committed: Any, db_engine: Any, test_database_url: str
+) -> None:
+    """После цикла downgrade/upgrade CHECK 0005 действует (а не только объявлен в модели)."""
+    await _alembic_ok(test_database_url, "downgrade", "0004")
+    await _alembic_ok(test_database_url, "upgrade", "head")
+    await db_engine.dispose()
+    with pytest.raises(DBAPIError) as info:
+        async with committed() as s, s.begin():
+            await s.execute(
+                text(
+                    "INSERT INTO app_user (id, login, login_display, password_hash, "
+                    "must_change_password, is_blocked, failed_login_count, password_changed_at, "
+                    "created_at, updated_at) VALUES (gen_random_uuid(), 'ivan.petrov', "
+                    "'Ivan.Petrox', 'x', false, false, 0, now(), now(), now())"
+                )
+            )
+    assert getattr(info.value.orig, "sqlstate", None) == "23514" or "23514" in repr(info.value)
+
+
+@pytest.mark.committed
+async def test_t93_alembic_check_clean_at_head(committed: Any, test_database_url: str) -> None:
+    """Модель (``login_display`` + CHECK без server_default) и миграция 0005 не расходятся."""
+    column, checks, _ = await _display_schema(committed)
+    assert column is not None, "нет login_display: проверять расхождение рано"
+    assert checks == 1
+    await _alembic_ok(test_database_url, "check")

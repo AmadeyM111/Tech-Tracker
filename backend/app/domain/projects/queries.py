@@ -131,7 +131,7 @@ async def project_view(db: AsyncSession, actor: Actor, facts: ProjectFacts) -> P
                 Project.description,
                 Project.created_at,
                 Project.updated_at,
-                AppUser.login.label("owner_login"),
+                AppUser.login_display.label("owner_login"),
                 _task_count_subquery().label("task_count"),
             )
             .join(AppUser, AppUser.id == Project.owner_id)

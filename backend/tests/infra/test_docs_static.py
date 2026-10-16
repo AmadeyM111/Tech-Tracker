@@ -811,3 +811,18 @@ def test_t88_docs_do_not_require_docker() -> None:
         "subprocess"
         not in src.split("# --- T88")[1].split("def test_t88_docs_do_not_require_docker")[0]
     )
+
+
+# --- T93: docs/data-model.md, login_display (D-66, plan §11.12) --------------------------
+
+
+def test_t93_data_model_documents_login_display_and_migration_0005() -> None:
+    text = _text(DATA_MODEL)
+    section = _table_section(text, "app_user")
+    assert section is not None, "нет раздела app_user"
+    assert re.search(r"(?<![\w])login_display(?![\w])", section), "login_display не описан"
+    assert "ck_app_user_login_display_lower" in section, "не описан CHECK login_display"
+    assert _has(section, r"varchar\(64\)"), "не указан тип varchar(64)"
+    assert re.search(r"^\|\s*`0005`\s*\|", text, re.M), "в таблице миграций нет строки 0005"
+    assert "0001`–`0005" in text or "0001–0005" in text, "вступление: миграции 0001–0005"
+    assert "0001`–`0004" not in text, "вступление всё ещё называет миграции 0001–0004"

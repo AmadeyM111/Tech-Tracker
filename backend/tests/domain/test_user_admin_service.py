@@ -296,16 +296,17 @@ async def test_ac121_ac64_create_writes_exactly_one_user_created_event(
     await spy_hash_not_in(db, ONE_TIME, "$argon2")
 
 
-async def test_ac116_login_is_lowercased_on_create(
+async def test_ac116_login_keeps_case_on_create_key_is_lowercase(
     db: AsyncSession, env: SimpleNamespace, svc: Any, mods: SimpleNamespace
 ) -> None:
+    """FR-73a: написание сохраняется, ключ в БД строчный, вход — в любом регистре."""
     w = await world(db)
     created = await svc.create_user(
         db, w.actor, env.hasher, login="Ivan.Petrov", one_time_password=SecretStr(ONE_TIME)
     )
-    assert created.login == "ivan.petrov"
+    assert created.login == "Ivan.Petrov"
     assert await user_by_login(db, "ivan.petrov") is not None
-    assert (await login_as(db, env, mods, "IVAN.PETROV", ONE_TIME)).login == "ivan.petrov"
+    assert (await login_as(db, env, mods, "IVAN.PETROV", ONE_TIME)).login == "Ivan.Petrov"
 
 
 @pytest.mark.parametrize(
@@ -352,7 +353,186 @@ async def test_ac116_boundary_valid_logins_are_accepted(
     created = await svc.create_user(
         db, w.actor, env.hasher, login=good, one_time_password=SecretStr(ONE_TIME)
     )
-    assert created.login == good.lower()
+    assert created.login == good
+    assert await user_by_login(db, good.lower()) is not None
+
+
+# --- AC-125, AC-128, AC-130 (FR-73a, D-66): отображаемый логин ------------------------------
+
+
+async def _stored_logins(db: AsyncSession, user_id: uuid.UUID) -> tuple[str, str]:
+    row = (
+        await db.execute(
+            text("SELECT login, login_display FROM app_user WHERE id = :u"), {"u": user_id}
+        )
+    ).one()
+    return row.login, row.login_display
+
+
+@pytest.mark.parametrize("login", ["Ivanov.Petr", "QA-Team_1"])
+async def test_ac125_create_stores_and_returns_login_as_typed(
+    db: AsyncSession, env: SimpleNamespace, svc: Any, login: str
+) -> None:
+    w = await world(db)
+    created = await svc.create_user(
+        db, w.actor, env.hasher, login=login, one_time_password=SecretStr(ONE_TIME)
+    )
+    assert created.login == login
+    assert await _stored_logins(db, created.id) == (login.lower(), login)
+    assert (await svc.get_account(db, w.actor, created.id)).login == login
+    from app.core.pagination import PageParams
+
+    items, _ = await svc.list_accounts(db, w.actor, PageParams(page=1, page_size=100))
+    assert login in [a.login for a in items]
+    assert login.lower() not in [a.login for a in items]
+
+
+async def test_ac125_login_unchanged_by_block_reset_and_role_operations(
+    db: AsyncSession, env: SimpleNamespace, svc: Any
+) -> None:
+    from app.core.pagination import PageParams
+
+    w = await world(db)
+    created = await svc.create_user(
+        db, w.actor, env.hasher, login="Ivanov.Petr", one_time_password=SecretStr(ONE_TIME)
+    )
+    uid = created.id
+
+    async def shown() -> tuple[str, str]:
+        items, _ = await svc.list_accounts(db, w.actor, PageParams(page=1, page_size=100))
+        listed = next(a.login for a in items if a.id == uid)
+        return (await svc.get_account(db, w.actor, uid)).login, listed
+
+    await svc.block_user(db, w.actor, env.sessions, uid)
+    assert await shown() == ("Ivanov.Petr", "Ivanov.Petr")
+    await svc.unblock_user(db, w.actor, uid)
+    assert await shown() == ("Ivanov.Petr", "Ivanov.Petr")
+    await svc.reset_password(
+        db, w.actor, env.hasher, env.sessions, uid, one_time_password=SecretStr(ONE_TIME_2)
+    )
+    assert await shown() == ("Ivanov.Petr", "Ivanov.Petr")
+    for role in (Role.USER, Role.BUSINESS_ADMIN, None):
+        await svc.set_role(db, w.actor, uid, role)
+        assert await shown() == ("Ivanov.Petr", "Ivanov.Petr")
+    assert await _stored_logins(db, uid) == ("ivanov.petr", "Ivanov.Petr")
+
+
+@pytest.mark.parametrize("attempt", ["ivanov.PETR", "ivanov.petr", "IVANOV.PETR", "Ivanov.Petr"])
+async def test_ac128_case_variant_of_taken_login_is_login_taken_and_changes_nothing(
+    db: AsyncSession, env: SimpleNamespace, svc: Any, attempt: str
+) -> None:
+    w = await world(db)
+    existing = await svc.create_user(
+        db, w.actor, env.hasher, login="Ivanov.Petr", one_time_password=SecretStr(ONE_TIME)
+    )
+    await db.commit()
+    users_before = (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one()
+    events_before = await events(db)
+
+    await fails(
+        db,
+        svc.create_user(
+            db, w.actor, env.hasher, login=attempt, one_time_password=SecretStr(ONE_TIME_2)
+        ),
+        "login_taken",
+    )
+
+    assert (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one() == users_before
+    assert await events(db) == events_before
+    assert (await svc.get_account(db, w.actor, existing.id)).login == "Ivanov.Petr"
+    assert await _stored_logins(db, existing.id) == ("ivanov.petr", "Ivanov.Petr")
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ["Ivanov.Пётр", "\u212aivan", ".Ivan", "Iv", "A" * 65],
+    ids=["cyrillic", "kelvin", "leading-dot", "2-chars", "65-chars"],
+)
+async def test_ac128_invalid_mixed_case_login_is_login_invalid_and_changes_nothing(
+    db: AsyncSession, env: SimpleNamespace, svc: Any, bad: str
+) -> None:
+    w = await world(db)
+    users_before = (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one()
+    events_before = await events(db)
+    await fails(
+        db,
+        svc.create_user(db, w.actor, env.hasher, login=bad, one_time_password=SecretStr(ONE_TIME)),
+        "login_invalid",
+    )
+    assert (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one() == users_before
+    assert await events(db) == events_before
+
+
+async def test_ac128_login_check_order_invalid_then_taken_then_password(
+    db: AsyncSession, env: SimpleNamespace, svc: Any
+) -> None:
+    """Порядок проверок прежний: ``login_invalid`` -> ``login_taken`` -> политика пароля."""
+    w = await world(db)
+    await svc.create_user(
+        db, w.actor, env.hasher, login="Ivanov.Petr", one_time_password=SecretStr(ONE_TIME)
+    )
+    await db.commit()
+    await fails(
+        db,
+        svc.create_user(
+            db, w.actor, env.hasher, login="ivanov.PETR", one_time_password=SecretStr(SHORT_11)
+        ),
+        "login_taken",
+    )
+
+
+@pytest.mark.committed
+@pytest.mark.parametrize("same_workspace", [True, False], ids=["one-workspace", "two-workspaces"])
+async def test_ac128_parallel_create_of_case_variants_has_exactly_one_winner(
+    committed: async_sessionmaker[AsyncSession],
+    env: SimpleNamespace,
+    svc: Any,
+    same_workspace: bool,
+) -> None:
+    from app.core.errors import AppError
+
+    async with committed() as s:
+        ws1 = await make_workspace(s)
+        admin1 = await make_user(s, workspace=ws1, role="tech_admin", login="admin.one")
+        if same_workspace:
+            admin2 = await make_user(s, workspace=ws1, role="tech_admin", login="admin.two")
+        else:
+            admin2 = await make_user(s, role="tech_admin", login="admin.two")
+        await s.commit()
+
+    async def attempt(admin: UserRow, login: str) -> str:
+        async with committed() as s:
+            try:
+                await svc.create_user(
+                    s, actor_of(admin), env.hasher, login=login, one_time_password=SecretStr(OK_12)
+                )
+                await s.commit()
+            except AppError as exc:
+                await s.rollback()
+                assert exc.status_code == 422
+                return str(exc.code)
+            return "ok"
+
+    outcomes = await asyncio.gather(attempt(admin1, "Ivanov.Petr"), attempt(admin2, "ivanov.petr"))
+
+    assert sorted(outcomes) == ["login_taken", "ok"], outcomes
+    async with committed() as s:
+        rows = (
+            await s.execute(
+                text("SELECT login, login_display FROM app_user WHERE login = 'ivanov.petr'")
+            )
+        ).all()
+        created_events = (
+            await s.execute(
+                text(
+                    "SELECT count(*) FROM domain_event WHERE action = 'user.created' "
+                    "AND entity_id IN (SELECT id FROM app_user WHERE login = 'ivanov.petr')"
+                )
+            )
+        ).scalar_one()
+    assert len(rows) == 1
+    assert rows[0].login_display in ("Ivanov.Petr", "ivanov.petr")
+    assert created_events == 1
 
 
 @pytest.mark.parametrize("attempt", ["ivan.petrov", "Ivan.Petrov", "IVAN.PETROV"])
@@ -1229,7 +1409,7 @@ def test_t11_note_bootstrap_and_provider_agree_on_boundary_logins(
         assert (expected is not None) is valid, repr(raw)
         cfg = settings.model_copy(update={"initial_admin_login": raw})
         if valid:
-            assert bootstrap._initial_login(cfg) == expected
+            assert bootstrap._initial_login(cfg) == (expected, raw)
         else:
             with pytest.raises(ValueError):
                 bootstrap._initial_login(cfg)
@@ -1258,11 +1438,12 @@ async def test_t11_note_create_user_and_login_normalize_identically(
         created = await svc.create_user(
             db, w.actor, env.hasher, login=raw, one_time_password=SecretStr(ONE_TIME)
         )
-        assert created.login == expected
+        assert created.login == raw  # FR-73a: ответ — написание при вводе
+        assert (await user_by_login(db, expected)) is not None  # ключ в БД нормализован
         await db.commit()
         result = await login_as(db, env, mods, raw, ONE_TIME)
         assert result.user_id == created.id
-        assert result.login == expected
+        assert result.login == raw
 
 
 # --- заметка ревью T14: две ветки change_own_password ------------------------------------

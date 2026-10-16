@@ -125,14 +125,14 @@ async def _to_records(
     logins: dict[UUID, str] = {}
     if wanted:
         found = await db.execute(
-            select(AppUser.id, AppUser.login)
+            select(AppUser.id, AppUser.login_display)
             .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
             .where(
                 WorkspaceMember.workspace_id == workspace_id,
                 AppUser.id.in_(wanted),
             )
         )
-        logins = {row.id: row.login for row in found}
+        logins = {row.id: row.login_display for row in found}
 
     records: list[AuditRecord] = []
     for event in rows:
