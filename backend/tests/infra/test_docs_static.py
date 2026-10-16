@@ -826,3 +826,90 @@ def test_t93_data_model_documents_login_display_and_migration_0005() -> None:
     assert re.search(r"^\|\s*`0005`\s*\|", text, re.M), "в таблице миграций нет строки 0005"
     assert "0001`–`0005" in text or "0001–0005" in text, "вступление: миграции 0001–0005"
     assert "0001`–`0004" not in text, "вступление всё ещё называет миграции 0001–0004"
+
+
+# --- T99: отображаемый логин в документации (FR-73a, D-66, AC-132, R-M10) -----------------
+
+_T99_RU = {
+    "регистр логина": r"регистр\w*.{0,200}логин|логин.{0,200}регистр",
+    "написание при создании": r"(написани\w+|как\s+(он\s+)?(был\s+)?введ\w+).{0,200}(созда|введ)|"
+    r"(созда|введ).{0,200}(написани\w+)",
+    "вход без учёта регистра": r"(вход|входе|входит).{0,200}(без\s+учёта|без\s+учета|не\s+(различа|учитыва)\w*)"
+    r".{0,80}регистр|регистр.{0,80}(не\s+(различа|учитыва)\w*)",
+    "занят при отличии только регистром": r"(отличающ\w+|отличи\w+|различающ\w+).{0,120}(только|лишь).{0,60}регистр\w*"
+    r".{0,200}(занят|login_taken)|(занят|login_taken).{0,200}(только|лишь).{0,60}регистр",
+    "INITIAL_ADMIN_LOGIN как задан": r"INITIAL_ADMIN_LOGIN.{0,300}(как\s+задан|написани|регистр)",
+    "обновление без действий оператора": r"(без\s+(каких-либо\s+)?действий|ничего\s+делать\s+не\s+нужно|"
+    r"действий\s+оператора\s+не\s+(нужно|требуется)).{0,400}|0005.{0,300}(старт|запуск|bootstrap|автоматическ)",
+    "миграция 0005": r"\b0005\b",
+    "прежние логины не меняются": r"(прежн\w+|существующ\w+|старые)\s+(логин|учётн|учетн)\w*.{0,200}"
+    r"(не\s+меня\w+|без\s+изменен\w+|строчн\w+|как\s+прежде)|(логин\w*).{0,100}(не\s+меня\w+)",
+    "откат теряет написание": r"(откат|downgrade|вернуть\w*\s+на).{0,300}(тер(я|ет)\w*|потер\w+|утрат\w+).{0,100}(написани|регистр)|"
+    r"(тер(я|ет)\w*|потер\w+|утрат\w+).{0,100}(написани|регистр).{0,300}(откат|downgrade)",
+}
+_T99_EN = {
+    "login case": r"\bcase\b.{0,200}login|login.{0,200}\bcase\b",
+    "spelling as created": r"(spelling|as\s+(it\s+was\s+)?(typed|entered)|as\s+created).{0,200}(creat|enter|typ)|"
+    r"(creat|enter|typ).{0,200}(spelling|as\s+(typed|entered))",
+    "sign-in case-insensitive": r"(sign|log)[- ]?in.{0,200}(case[- ]insensitiv|ignor\w+\s+case|regardless\s+of\s+case|"
+    r"not\s+case[- ]sensitiv)",
+    "taken when differs only by case": r"(differ\w*|only).{0,120}\bcase\b.{0,200}(taken|login_taken|already\s+in\s+use)|"
+    r"(taken|login_taken).{0,200}(differ\w*|only).{0,60}\bcase\b",
+    "INITIAL_ADMIN_LOGIN as set": r"INITIAL_ADMIN_LOGIN.{0,300}(as\s+(set|given|configured|specified)|spelling|\bcase\b)",
+    "upgrade without operator action": r"(no\s+(operator\s+)?action|nothing\s+to\s+do|without\s+(any\s+)?(operator\s+)?action)|"
+    r"0005.{0,300}(start|bootstrap|automatic)",
+    "migration 0005": r"\b0005\b",
+    "existing logins unchanged": r"(existing|previous|earlier)\s+(login|account)s?.{0,200}"
+    r"(unchanged|not\s+change|lower[- ]?case|as\s+before)",
+    "downgrade loses spelling": r"(downgrade|roll\s*back|revert).{0,300}(lose|lost|loses|discard)\w*.{0,100}(spelling|case)|"
+    r"(lose|lost|loses|discard)\w*.{0,100}(spelling|case).{0,300}(downgrade|roll\s*back|revert)",
+}
+
+
+@pytest.mark.parametrize("topic", sorted(_T99_RU))
+def test_t99_readme_ru_covers_display_login(topic: str) -> None:
+    ru, _ = _parts()
+    assert _has(ru, _T99_RU[topic]), f"README (ru): нет темы «{topic}» (FR-73a)"
+
+
+@pytest.mark.parametrize("topic", sorted(_T99_EN))
+def test_t99_readme_en_covers_display_login(topic: str) -> None:
+    _, en = _parts()
+    assert _has(en, _T99_EN[topic]), f"README (en): no topic «{topic}» (FR-73a)"
+
+
+def test_t99_readme_keywords_regist_and_case() -> None:
+    ru, en = _parts()
+    assert _has(ru, r"регистр"), "ru-часть README не упоминает регистр логина"
+    assert _has(en, r"\bcase\b"), "en-часть README не упоминает case логина"
+
+
+def test_t99_checklist_has_ac132_item_with_accounts_and_screens() -> None:
+    text = _text(CHECKLIST)
+    m = re.search(r"^\s*[-*]\s+\[ \].*AC-132(?!\d).*$", text, re.M)
+    assert m, "в чек-листе нет пункта `- [ ]` с AC-132"
+    start = m.start()
+    nxt = re.search(r"^\s*[-*]\s+\[ \]|^#{1,3}\s", text[m.end() :], re.M)
+    item = text[start : m.end() + (nxt.start() if nxt else len(text))]
+    assert "Ivanov.Petr" in item
+    assert "Sidorova.Anna" in item
+    assert _has(item, r"нигде\s+не\s+строчн|ни\s+на\s+одном\s+экране.{0,40}строчн|not\s+in\s+lower")
+    screens = {
+        "учётные записи": r"учётн\w+\s+запис|учетн\w+\s+запис|управлени\w+\s+учётн",
+        "профиль": r"профил",
+        "проект": r"карточк\w+\s+проект|список\s+проект",
+        "участники": r"участник",
+        "мои задачи": r"мои\s+задачи",
+        "доска": r"доск",
+        "карточка задачи и комментарии": r"комментар",
+        "выбор участника/исполнителя": r"выбор\w*\s+(участник|исполнител)|исполнител",
+        "журнал аудита": r"журнал",
+    }
+    missing = [name for name, pat in screens.items() if not _has(item, pat)]
+    assert not missing, f"в пункте AC-132 не перечислены экраны: {missing}"
+
+
+def test_t99_docs_referenced_by_ac132_exist() -> None:
+    assert CHECKLIST.is_file()
+    assert README.is_file()
+    assert (ROOT / "specs" / "001-pilot-r1" / "spec.md").is_file()

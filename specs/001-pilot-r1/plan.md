@@ -5,6 +5,8 @@
 - **MVP-пересборка (архитектор, 2026-10-15):** объём сокращён решением владельца продукта —
   см. **§11** (имеет приоритет над §1–§10 при расхождении; заменённые и отложенные решения
   перечислены в §11.3).
+- **Spec v0.17 (архитектор, 2026-10-16):** отображаемый логин (FR-73a, OI-128) — решение
+  **D-66** (§11.2) и детализация **§11.12**; задачи T93–T99 (`tasks.md`, конец раздела MVP).
 - **Охват:** архитектура всего R1 (этапы R1.0–R1.4, ТЗ §9). Детальные задачи — только R1.0
   (`tasks.md`); задачи R1.1–R1.4 детализируются позже по этому плану.
 - **Входы:** `spec.md`, `docs/adr/0001…0011`, `docs/glossary.md`, `AGENTS.md`, текущий код
@@ -1604,12 +1606,14 @@ NFR-2; Playwright-e2e. Реестр с исходными номерами — `
 | D-63 | Демо-данные | `gostracker demo-data [--seed 1]` (§11.8): 12 пользователей (1 ТА, 1 СМ, 3 БА, 7 П) + первый ТА = 13; 2 проекта; 30 задач, из них 6 подзадач; ~20 комментариев; без сделок. Прямые вставки ORM в одной транзакции (не через сервисы с `Actor`), события аудита `user.created`/`user.role_assigned` с `actor_id = NULL` (FR-41: создание учётных записей аудируется; автор — «система», D-6) | Через HTTP API; через сервисы | Одна транзакция, детерминизм по seed, без подделки сессий |
 | D-64 | Приёмка MVP | Ручной чек-лист `docs/acceptance/mvp-demo.md` (AC-1, AC-5, AC-97 в объёме MVP, AC-98, сценарий демо UF-2…UF-6, проверка опроса вместо AC-107) + автотесты; без замеров NFR-2, бэкапа, экспорта, Playwright | Полный R1.4 | Прототип; отложенное — в реестре |
 | D-65 | Невалидный JSON (Д-7, Q-9, решение владельца) | Обработчик `RequestValidationError` (`core/errors.py`): если **все** ошибки имеют `type == "json_invalid"` — **400** `{"detail": "Некорректный JSON в теле запроса", "code": "bad_request"}` без эха тела; иначе — прежний 422 `validation_error`. Действует для всех эндпоинтов с телом, с сессией и без: FastAPI разбирает тело до зависимостей, поэтому 400 приходит раньше 401/403 — это принято владельцем («отбрасывается быстро и дёшево, без бизнес-логики»). Валидный JSON с неверными полями — 401/403 гейтов раньше 422 (как сейчас). Размер тела ограничивает nginx (`client_max_body_size 12m`); приложение тело дополнительно не читает. OpenAPI: у маршрутов с телом объявлен 400 (`error_responses(400, …)`) | Своё `APIRoute`/middleware со строгим порядком 401 → 400; оставить 422 | Решение владельца; обработчик — 10 строк в одном месте. **SUPERSEDES** §4.5 п.5 «битый JSON даёт 422». SPEC_CHANGES SC-21 |
+| D-66 | Отображаемый логин (spec v0.17: FR-73, FR-73a, OI-128 — решение владельца продукта 2026-10-16; OI-129 и OI-130 — ответы владельца через оркестратора 2026-10-16). **SUPERSEDES D-39** в части хранения и показа логина | `app_user.login` остаётся **ключом** (нормализованный вид, строчными) без изменений: вход, `UNIQUE(login)`, поиск `ILIKE`, `ORDER BY login, id` (OI-129 вариант а — «как до v0.17»), счётчик FR-61. Новый столбец `app_user.login_display varchar(64) NOT NULL` — написание при создании, `CHECK (lower(login_display COLLATE "C") = login)`; миграция **0005** с заполнением `login_display = login`. ORM: отдельный атрибут `AppUser.login_display`; все места **показа** логина (10 выборок в 7 файлах, §11.12.4) читают его; поле API `login` (`UserRef`, `DirectoryUser`, `AdminUser`, `SessionUser`, `Me`, `AuditActor`) несёт отображаемое значение — имена полей и **контракт OpenAPI не меняются**. Python-default `login_display = login`, если значение не передано (демо, тестовые фабрики). Занятый логин — 422 `login_taken` (не 409). Первый ТА — в написании из `INITIAL_ADMIN_LOGIN` (OI-130 вариант а). Детали — §11.12 | (1) ORM-перестановка: атрибут `login` → столбец `login_display`, атрибут `login_key` → столбец `login` (8 правок в 5 файлах вместо 10 в 7, но слово `login` в ORM и в SQL/Core — фабрики, `get_table("app_user")`, raw SQL тестов — означало бы разные столбцы: ловушка для исполнителей и ревью); (2) новое поле `login_display` в схемах API (меняет контракт и фронтенд; spec требует, чтобы *поле логина* несло отображаемое значение); (3) хранить как введено + `citext` или уникальный индекс по `lower(login)` (расширение либо переписывание входа, поиска, сортировки и CHECK; ломает инварианты D-39); (4) генерируемый столбец `login GENERATED ALWAYS AS (lower(…))` (в PG16 существующий столбец не превратить в генерируемый без пересоздания); (5) ADR (D-39 — решение plan, изменение требования уже оформлено в spec, OI-128) | Минимум правок: логика входа, уникальности, поиска и сортировки не трогается, контракт не меняется. CHECK держит ключ и показ согласованными на уровне БД; `COLLATE "C"` делает `lower()` ASCII-only и независимым от локали БД — проверено на PG 16 (en_US.utf8): `lower('Kivan')` (знак Кельвина) = `kivan`, с `COLLATE "C"` — без изменений; ICU tr-TR: `lower('I')` = `ı`. Вместе с `ck_app_user_login_format` CHECK гарантирует, что `login_display` — ASCII по шаблону FR-73 без учёта регистра |
 
 ### 11.3. Статус прежних решений и разделов
 
 | Решение / раздел | Статус в MVP |
 |---|---|
 | D-1…D-23, D-25, D-26, D-28, D-29…D-39 | действуют; D-23 (связь со сделкой), D-27, D-35, D-36, D-37 — ОТЛОЖЕНО вместе с функциями |
+| D-39 (формат логина) | действует в части шаблона, `normalize_login`, входа, `UNIQUE(login)` и `ck_app_user_login_format`; хранение и показ — **SUPERSEDED D-66** (spec v0.17): «хранение только в нижнем регистре» заменено парой ключ `login` + `login_display` |
 | D-24 (`pg_trgm`, поиск), §4.9 | ОТЛОЖЕНО |
 | D-40 (503), D-41 (белые списки), D-42 (обслуживание: только сессии), D-43 (каскад), D-45 (видимость проекта), D-46 (повтор без изменений), D-51 (формат срока), D-52 (пустое название) | действуют |
 | D-44, D-50, §4.10, §10.6 (корзина), D-49 и §4.11 (вложения), D-48 (упоминания) | ОТЛОЖЕНО |
@@ -1742,9 +1746,11 @@ IMMEDIATE`; FK на `app_user` — `RESTRICT`; перечисления — `tex
 | AC-1, AC-5, AC-97, AC-98 *ручной*; FR-29 (вместо AC-107 *e2e*) | T81–T86, T88, T89 | `docs/acceptance/mvp-demo.md` |
 | FR-7 / D-65 (невалидный JSON → 400) | T68 | `api/test_route_guards.py`, `api/test_errors.py`, `api/test_auth_login.py`, `cli/test_openapi.py` |
 | D-40 (503) | T29 | `api/test_db_busy_errors.py` |
+| AC-125…AC-132, OI-129, OI-130 (spec v0.17, D-66) | T93–T99 | §11.12.8 |
 
 R1.0-AC (AC-2…AC-4, AC-20, AC-23, AC-26…AC-37, AC-39, AC-40, AC-44, AC-45, AC-64, AC-78, AC-79,
 AC-95, AC-105, AC-113…AC-116 в части R1.0, AC-121) — закрыты R1.0, в MVP прогоняются `check.sh`.
+Тесты AC-116, ждавшие строчного логина в ответе (D-39), приводятся к FR-73a в T94 (§11.12.8).
 
 ### 11.8. Демо-данные (D-63, FR-49, FR-64)
 
@@ -1796,6 +1802,8 @@ AC-95, AC-105, AC-113…AC-116 в части R1.0, AC-121) — закрыты R1
 | SC-19 | Аудит MVP | FR-41: учётные записи, сессии, роли, передача владения проектом (архив, стадии, сделки — следующая версия) |
 | SC-20 | Подзадача «Пользователя» другому исполнителю — 403 | FR-19b/FR-20 уточнение (ср. §11.5 `can_create_subtask`): создание подзадачи подчиняется строке BR-1 «создание задачи другому» |
 | SC-21 | Невалидный JSON → 400 (решение владельца по Д-7) | FR-7 (исключение: синтаксически невалидное тело JSON → 400 `bad_request` раньше 401), FR-45 (код 400), NFR-10; `decisions-for-customer.md` Д-7 закрыт |
+| SC-22 | OI-129 решён (владелец через оркестратора, 2026-10-16): вариант а) — списки по логину упорядочены без учёта регистра, по нормализованному виду, как до v0.17. Уточнение для текста: порядок строк, различающихся знаками `.`, `_`, `-`, задаёт правило сравнения строк БД (как до v0.17; для `en_US.utf8` знаки препинания на первом уровне не учитываются — `ivanov.petr` раньше `ivan.petrov`), поэтому пример в OI-129 а) («`ivan.petrov`, `Ivanov.Petr`») как проверяемый порядок не использовать | FR-73a (пункт о порядке), OI-129 |
+| SC-23 | OI-130 решён (владелец через оркестратора, 2026-10-16): вариант а) — логин первого ТА показывается в написании из настройки (общее правило FR-73a); файл пароля первого ТА содержит это написание; уже существующий первый ТА не меняется | FR-73a (пункт о первом ТА), FR-6, OI-130 |
 
 ### 11.10. Зависимости MVP
 
@@ -1820,3 +1828,186 @@ Backend — новых нет (`python-multipart` отложен). Frontend — 
   последовательно: T68 → T72 → T77 → T78 → T80.
 - **R-M7. D-65 меняет поведение R1.0**: клиенты, ждавшие 422 на битый JSON, получают 400;
   фронтенд кода `bad_request` уже знает.
+- **R-M8. Новое место показа логина читает ключ** (D-66). `AppUser.login` — ключ строчными;
+  код, который в будущем покажет логин через `AppUser.login`, а не `AppUser.login_display`, тихо
+  вернёт строчное написание. Митигация: докстринг модели; AC-125/126/129/130 проверяют все
+  нынешние места показа логинами со смешанным регистром; ревьюер проверяет каждое новое
+  обращение к `AppUser.login`.
+- **R-M9. Снимок логинов в журнале передачи владения** (`domain_event.changes`, `owner_id {id,
+  login}`): записи до 0005 содержат строчное написание, записи после — отображаемое (через
+  `user_refs`). Записи журнала не переписываются (append-only); API журнала поле `changes` не
+  отдаёт, на экранах MVP это не видно. При реализации «кто → кому» (бэклог T88) брать логин по
+  `id`, а не из снимка.
+- **R-M10. `downgrade 0005` теряет написание** (`login_display` удаляется): вход и уникальность
+  не страдают, после повторного `upgrade` логины покажутся строчными. Откат версии — только с
+  этой оговоркой (README, T99).
+- **R-M11. Номер миграции.** 0005 занимает отображаемый логин; отложенная миграция CRM («0005» в
+  §4.3 R1.3 и реестре `tasks.md`) получит следующий свободный номер.
+### 11.12. Отображаемый логин (spec v0.17, FR-73a, D-66)
+
+Входы: spec v0.17 — FR-73 (пересмотрено), FR-73a, AC-125…AC-132, OI-128 (решено владельцем
+2026-10-16). Ответы владельца, переданные оркестратором 2026-10-16: **OI-129 — а)** порядок по
+логину без учёта регистра, по нормализованному виду, как до v0.17; **OI-130 — а)** логин первого
+ТА показывается как задан в настройке. Занятый логин — **422 `login_taken`** (не 409). ADR не
+нужен: D-39 — решение plan; изменение требования оформлено в spec (OI-128). Тексты FR-73a с
+пометками [ВОПРОС ВЛАДЕЛЬЦУ] заменяет spec-writer по SC-22, SC-23 (§11.9); исполнители работают по
+этому разделу.
+
+#### 11.12.1. Подход
+
+- `app_user.login` — **ключ** (нормализованный вид: ASCII, строчные). Вход
+  (`normalize_login` → `reserve_attempt(where=AppUser.login == key)`), уникальность
+  (`uq_app_user_login`, `ON CONFLICT (login)`), поиск `GET /users?q=` (`ILIKE` по ключу),
+  сортировка `ORDER BY login, id` и счётчик FR-61 **не меняются**.
+- Новый столбец `app_user.login_display` — написание, введённое при создании. Его читают **все**
+  выборки, которые отдают логин наружу (§11.12.4).
+- Имена полей API не меняются: `login` в `UserRef`, `DirectoryUser`, `AdminUser`,
+  `SessionUser`/`LoginResponse`, `Me`, `AuditActor` содержит отображаемый логин. `docs/api/openapi.json`
+  и `frontend/src/shared/api/schema.d.ts` **не меняются** (ограничение R-M6 к T93–T99 не
+  применяется; `cli/test_openapi.py` и `infra/test_frontend_api_types.py` должны остаться
+  зелёными без перегенерации).
+- Логин неизменяем, как и раньше: ни один `UPDATE` не трогает `login`/`login_display`.
+
+#### 11.12.2. Схема БД (изменение `app_user`)
+
+| Столбец | Тип | NULL | Ограничения |
+|---|---|---|---|
+| `login` (без изменений) | varchar(64) | нет | `uq_app_user_login` UNIQUE (уже есть, миграция 0001 — проверено); `ck_app_user_login_format`: `login ~ '^[a-z0-9][a-z0-9._-]{2,63}$'` (без изменений) |
+| `login_display` (новый) | varchar(64) | нет | `ck_app_user_login_display_lower`: `lower(login_display COLLATE "C") = login` |
+
+Почему одного CHECK достаточно: `lower(… COLLATE "C")` меняет только `A–Z` → `a–z` и оставляет
+прочие символы как есть. Значит, `login_display` совпадает с `login` с точностью до регистра
+латинских букв; вместе с `ck_app_user_login_format` это гарантирует ASCII и шаблон FR-73 без
+учёта регистра. Знак Кельвина, кириллица, пробелы — нарушение CHECK (U+212A не приводится к `k`).
+Отдельный UNIQUE на `login_display` не нужен: равные `login_display` дают равные `login`.
+Индекс на `login_display` не нужен: по нему не ищут и не сортируют.
+
+#### 11.12.3. Миграция `0005_login_display.py`
+
+```python
+revision = "0005"; down_revision = "0004"
+_CHECK = "ck_app_user_login_display_lower"
+
+def upgrade() -> None:
+    op.add_column("app_user", sa.Column("login_display", sa.String(length=64), nullable=True))
+    op.execute("UPDATE app_user SET login_display = login")          # backfill: как до обновления
+    op.alter_column("app_user", "login_display", existing_type=sa.String(length=64), nullable=False)
+    op.create_check_constraint(op.f(_CHECK), "app_user", 'lower(login_display COLLATE "C") = login')
+
+def downgrade() -> None:
+    op.drop_constraint(op.f(_CHECK), "app_user", type_="check")
+    op.drop_column("app_user", "login_display")                      # написание теряется (R-M10)
+```
+
+Блокировки: `ADD COLUMN` без `DEFAULT` — только каталог; `UPDATE`, `SET NOT NULL` и `ADD
+CONSTRAINT CHECK` сканируют `app_user` под `ACCESS EXCLUSIVE` — единицы–десятки строк
+(пилот: 13 пользователей демо), миллисекунды. Миграции выполняет `gostracker bootstrap` до
+старта API под advisory-блокировкой (§4.7, §4.12), `env.py` ставит `lock_timeout = 0`. Схема
+`NOT VALID` + `VALIDATE` и пакетный backfill отвергнуты: выигрыша на таком объёме нет, а шагов
+и точек отказа больше. Оператору ничего делать не нужно (FR-73a): обновление образа →
+`bootstrap` → `upgrade head`.
+
+#### 11.12.4. Модель и интерфейсы
+
+```python
+# app/domain/users/models.py
+def _login_display_default(context: DefaultExecutionContext) -> str:
+    """Не передан — равен ключу (демо-логины, фабрики тестов): строка как до v0.17 (FR-73a)."""
+    return str(context.get_current_parameters()["login"])
+
+class AppUser(UUIDPkMixin, TimestampMixin, AuthoredMixin, Base):
+    __table_args__ = (
+        CheckConstraint("login ~ '^[a-z0-9][a-z0-9._-]{2,63}$'", name="login_format"),
+        CheckConstraint('lower(login_display COLLATE "C") = login', name="login_display_lower"),
+    )
+    # КЛЮЧ: нормализованный вид (вход, уникальность, поиск, сортировка). НЕ показывать.
+    login: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    # ПОКАЗ: написание при создании (FR-73a). Все ответы API берут логин отсюда.
+    login_display: Mapped[str] = mapped_column(
+        String(64), nullable=False, default=_login_display_default
+    )
+```
+
+Python-default — только на стороне приложения (`server_default` нет, `alembic check` чист);
+срабатывает для ORM-вставок и Core-вставок (`pg_insert(AppUser)`, `get_table("app_user").insert()`),
+если `login_display` не передан. Явно его передают `create_user` и `bootstrap`.
+
+Сигнатуры доменных функций **не меняются**; меняется источник значения `login`:
+
+| Файл | Функция | Было | Стало |
+|---|---|---|---|
+| `domain/users/service.py` | `create_user(db, actor, hasher, *, login, one_time_password) -> UserAccount` | вставка `login=normalized`, ответ `login=normalized` | проверки как были (`normalize_login(login)` → 422 `login_invalid`; занят по ключу → 422 `login_taken`); вставка `login=normalized, login_display=login` (ввод как есть: `normalize_login` уже гарантировал ASCII и шаблон, пробелов нет); ответ `login=login`; `ON CONFLICT (login) DO NOTHING` → 422 `login_taken` (как было) |
+| `domain/users/service.py` | `_load_target` (→ `get_account`, `set_role`) | `AppUser.login` | `AppUser.login_display` |
+| `domain/users/service.py` | `list_accounts` | `load_only(… AppUser.login …)`, `login=user.login` | `load_only(… AppUser.login_display …)`, `login=user.login_display`; `order_by(AppUser.login, AppUser.id)` — без изменений (OI-129 а) |
+| `domain/users/directory.py` | `list_directory` | `select(AppUser.id, AppUser.login, …)` | `select(AppUser.id, AppUser.login_display, …)`; `order_by(AppUser.login, AppUser.id)` и `AppUser.login.ilike(...)` — без изменений |
+| `domain/users/directory.py` | `user_refs` (проекты, задачи, доска, комментарии, «мои задачи», передача владения) | `AppUser.login` | `AppUser.login_display` |
+| `domain/projects/queries.py` | `project_view` | `AppUser.login.label("owner_login")` | `AppUser.login_display.label("owner_login")` |
+| `domain/projects/members.py` | `list_members` | `load_only(… AppUser.login …)`, `UserRef(login=u.login)` | `load_only(… AppUser.login_display …)`, `UserRef(login=u.login_display)`; `order_by(AppUser.login, AppUser.id)` — без изменений |
+| `domain/events/queries.py` | `_to_records` (автор записи журнала) | `select(AppUser.id, AppUser.login)` | `select(AppUser.id, AppUser.login_display)` |
+| `api/deps.py` | `get_actor` → `Actor.login` (`GET /me`) | `AppUser.login` | `AppUser.login_display` |
+| `domain/auth/service.py` | `login` → `LoginResult.login` | `AppUser.login` | `AppUser.login_display` |
+| `domain/system/bootstrap.py` | `_initial_login(settings) -> str` | ключ | **`-> tuple[str, str]`** `(login, login_display)`: ключ — `normalize_login(settings.initial_admin_login)` (нет → `ValueError`, как было), показ — значение настройки как есть (OI-130 а); `AppUser(login=…, login_display=…)`; файл `login=<login_display>\npassword=…` |
+| `domain/system/bootstrap.py` | `remove_initial_admin_file_if_for(settings, login: str) -> None` | `owner == login.strip().lower()` | `owner.lower() == login.strip().lower()` — сравнение без учёта регистра: вызывающий передаёт `Actor.login` (теперь отображаемый), а в файле — написание из настройки (до 0005 — строчное). Иначе при `INITIAL_ADMIN_LOGIN=Admin.Main` файл пароля не удалился бы после смены пароля (FR-6) |
+
+Без изменений: `auth/provider.py` (`normalize_login`, `LOGIN_RE`, `authenticate` — ключ),
+`ops/demo.py` (демо-логины строчные, `login_display` = default; `_demo_committed` ищет по ключу),
+`projects/service.py::transfer_ownership` (снимок `changes` берёт `user_refs` — после изменения
+это отображаемый логин, R-M9), все схемы `api/v1/schemas/*`, CLI `demo-data`, `bootstrap`.
+
+#### 11.12.5. Уникальность и параллельное создание
+
+- Проверка «занят» и вставка идут по ключу: `Ivanov.Petr`, `ivanov.petr`, `IVANOV.PETR` → ключ
+  `ivanov.petr`.
+- Одно пространство: `create_user` после хеширования берёт `pg_advisory_xact_lock` пространства
+  (`_lock_for_account_change`) — создания идут по очереди; второе выполняет
+  `INSERT … ON CONFLICT (login) DO NOTHING` после фиксации первого, видит конфликт по
+  `uq_app_user_login` → `RETURNING` пуст → 422 `login_taken`, события нет.
+- Разные пространства (логин глобален, advisory-ключи разные): второй `INSERT` ждёт фиксации
+  первой транзакции на уникальном индексе; фиксация первой → `DO NOTHING` → 422 `login_taken`;
+  откат первой → вставка проходит. Новые блокировки и индексы не нужны.
+- Предварительная проверка «занят» (до хеширования) — только быстрый путь; источник истины —
+  уникальный индекс.
+
+#### 11.12.6. Фронтенд
+
+Проверено поиском (`toLowerCase`, `localeCompare`, `.sort(`, `login`) по `frontend/src`:
+- `features/projects/ProjectPage.tsx` — фильтр кандидатов в владельцы `login.toLowerCase().includes(needle)`
+  уже без учёта регистра — **без изменений**.
+- `features/boards/BoardView.tsx` — список исполнителей фильтра доски сортируется
+  `a.login < b.login` (с учётом регистра: `Boris` раньше `anna`) — **нарушает OI-129 а)**; код
+  добавлен параллельной работой T91 (на момент планирования не зафиксирован). Исправление —
+  сравнение по `login.toLowerCase()`, при равенстве — по `id` (T98).
+- `features/admin/UsersPage.tsx:227` — комментарий «server-side (normalized) login» устарел
+  (поведение — показать логин из ответа сервера — верное); `shared/i18n/ru.ts`
+  `admin.users.login_hint` «Регистр не учитывается» — уточнить: логин показывается как введён,
+  при входе регистр не учитывается (T98).
+- `UserPicker`, `UsersPage`, `AuditPage`, списки участников и задач — логин показывают как есть
+  из ответа и порядок берут у сервера — без изменений.
+
+#### 11.12.7. Что не делается
+
+Нет операции изменения логина и `login_display`; нет нового поля API; нет перегенерации контракта;
+записи журнала (снимки `changes`) не переписываются (R-M9); демо-логины прежние (`demo.*`);
+упоминания (FR-71) отложены — при возврате разбирать по ключу.
+
+#### 11.12.8. Тест-план и трассировка
+
+Пути — относительно `backend/tests/` (кроме фронтенда и документации). Логины в тестах —
+синтетические (BR-9). «Учётная запись `X`» — фабрика `make_user(login="X", role=…)` (после T93 она
+кладёт ключ `X.lower()` и показ `X`) либо создание через API, если AC требует записи журнала.
+
+| AC / решение | Задача | Тест | Что проверяется |
+|---|---|---|---|
+| D-66 схема: CHECK, backfill, `alembic check` | T93 | `db/test_identity_models.py::test_d66_*`, `db/test_migrations.py::test_t93_*` | `Ivanov.Petr`/`ivanov.petr` принимается; `login_display` ≠ `login` по буквам, знак Кельвина, кириллица в показе, разная длина → `23514`; `login_display` по умолчанию = `login`; цепочка 0004 → 0005, одна голова; `downgrade 0004` → столбца и CHECK нет, строки целы → `upgrade head` → `login_display = login` у всех; `alembic check` чист |
+| AC-125 | T94 | `api/test_admin_users.py::test_ac125_*`, `domain/test_user_admin_service.py::test_ac125_*` | создание `Ivanov.Petr`, `QA-Team_1` → 201 и `login` как введён в ответе, списке, карточке; после блокировки, разблокировки, сброса пароля, назначения/смены/снятия роли — без изменений |
+| AC-128 | T94 | `api/test_admin_users.py::test_ac128_*`, `domain/test_user_admin_service.py::test_ac128_*` | `ivanov.PETR`, `ivanov.petr`, `IVANOV.PETR`, `Ivanov.Petr` при существующем `Ivanov.Petr` → 422 `login_taken`, записей и событий не прибавилось, логин существующего — `Ivanov.Petr`; `Ivanov.Пётр`, `Kivan` (U+212A), `.Ivan`, `Iv`, 65 латинских букв → 422 `login_invalid`; параллельно (`committed`, `asyncio.gather`) `Ivanov.Petr` и `ivanov.petr` — в одном пространстве и в двух разных: ровно один 201/успех, второй `login_taken`, одна строка с ключом `ivanov.petr` |
+| AC-130 | T94 | `api/test_users_directory.py::test_ac130_*` | `q` = `petr`, `PETR`, `Ivanov.P` → есть `Ivanov.Petr` с `login` `Ivanov.Petr`; `ANNA`, `sidorova` → `Sidorova.Anna` |
+| OI-129 а) | T94, T96, T98 | `api/test_users_directory.py::test_oi129_*`, `api/test_admin_users.py::test_oi129_*`, `api/test_login_display.py::test_oi129_members_*`, `frontend/tests/features/boards/BoardFilter.test.tsx` | логины `anna`, `Boris`, `ivan`, `Kirill` (без `.`/`_`/`-`, чтобы порядок не зависел от правил сравнения БД, SC-22) → порядок `anna, Boris, ivan, Kirill` в `GET /users`, списке учётных записей, участниках проекта и фильтре исполнителей доски |
+| AC-116 (обновление к FR-73a) | T94 | `api/test_admin_users.py::test_ac116_login_with_capitals_*`, `domain/test_user_admin_service.py::test_ac116_login_is_lowercased_on_create`, `::test_ac116_boundary_valid_logins_are_accepted` | ожидание `ivan.petrov`/`good.lower()` в ответе заменить на написание при вводе (`Ivan.Petrov`, `IVAN`); проверки «вход в любом регистре», «422 на `Ivan.Petrov` при `ivan.petrov`», «невалидные → 422» не ослабляются; имена тестов привести к смыслу (`…_keeps_case_…`) |
+| AC-126 | T95 | `api/test_auth_login.py::test_ac126_*` | вход `ivanov.petr`, `IVANOV.PETR`, `Ivanov.Petr` → 200, `user.login` и `GET /me` `login` = `Ivanov.Petr`; неверный пароль с `ivanov.petr` — тот же код и тело, что у несуществующего логина |
+| AC-127 | T95 | `api/test_login_lockout.py::test_ac127_*` | 5 неудач с `ivanov.petr`, `IVANOV.PETR`, `Ivanov.Petr`, `ivanov.PETR`, `IvAnOv.PeTr` → верный пароль отклонён тем же ответом, что неверный; часы +15 мин → вход выполнен |
+| AC-129 | T96 | `api/test_login_display.py::test_ac129_*` (новый) | сценарий AC целиком через API: списки и карточка проекта, участники, задачи проекта, доска, карточка задачи, комментарии, «мои задачи», журнал (авторы — `Mixed.Admin`, `Ivanov.Petr`), передача владения → владелец `Kuznetsov.Oleg` |
+| OI-130 а), FR-6 | T97 | `cli/test_bootstrap.py::test_oi130_*` | `INITIAL_ADMIN_LOGIN=Admin.Main` → ключ `admin.main`, показ `Admin.Main`, файл `login=Admin.Main`; вход `admin.main` → `login` `Admin.Main`; после смены пароля (actor `Admin.Main`) файл удалён; `remove_initial_admin_file_if_for` с `ADMIN.MAIN`/`admin.main` при файле `Admin.Main` удаляет, при `other` — нет; по умолчанию (`admin`) — как раньше |
+| AC-131 | T97 | `db/test_login_display_upgrade.py::test_ac131_*` (новый, `committed`) | на head: `run_bootstrap` (первый ТА `admin`), `create_user` `ivan.petrov` от ТА, `load_demo_data(seed=1)`; снимок `app_user` (id, login, password_hash) и `md5` строк `project`, `task`, `comment`, `domain_event`; `alembic downgrade 0004` (≈ v0.16.1) → `upgrade head`; затем `login_display = login` у всех, снимки равны, вход `admin`, `demo.ba1`, `ivan.petrov` прежними паролями — `login` в ответе прежний; список учётных записей и журнал — прежние логины; создание `Demo.BA1` → 422 `login_taken` |
+| AC-132 *ручной* | T99 | `docs/acceptance/mvp-demo.md` (пункт AC-132) | все экраны из AC-132 в браузере |
+| Контракт не меняется | T94 | `cli/test_openapi.py`, `infra/test_frontend_api_types.py` | зелёные без перегенерации; `git diff --exit-code docs/api/openapi.json frontend/src/shared/api/schema.d.ts` |

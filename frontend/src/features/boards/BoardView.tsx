@@ -371,9 +371,13 @@ export function BoardView({ projectId, canCreate = false }: { projectId: string;
     for (const column of columns ?? []) {
       for (const card of column.tasks) if (card.assignee !== null) byId.set(card.assignee.id, card.assignee.login);
     }
-    return Array.from(byId, ([id, login]) => ({ id, login })).sort((a, b) =>
-      a.login < b.login ? -1 : a.login > b.login ? 1 : 0,
-    );
+    // Case-insensitive order by login (FR-73a); equal lowercase logins fall back to the id.
+    return Array.from(byId, ([id, login]) => ({ id, login })).sort((a, b) => {
+      const la = a.login.toLowerCase();
+      const lb = b.login.toLowerCase();
+      if (la !== lb) return la < lb ? -1 : 1;
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
   }, [columns]);
   // A filtered-for user who has no cards any more is not an option: the filter acts as "all".
   const filter =

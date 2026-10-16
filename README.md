@@ -128,6 +128,9 @@ docker compose exec api cat /data/secrets/demo-passwords.txt
 `INITIAL_ADMIN_LOGIN` в `.env` (по умолчанию `admin`); он читается без обрезки, поэтому значение
 не должно содержать пробелов и перевода строки по краям - иначе `api` не запустится.
 
+`INITIAL_ADMIN_LOGIN` показывается как задан: при значении `Admin.Root` логин в интерфейсе и в
+строке `login=` файла пароля - `Admin.Root`, то же написание; вход при этом без учёта регистра.
+
 ### Самоподписанный сертификат и подключение своего
 
 По умолчанию `web` при первом запуске создаёт самоподписанный сертификат (EC prime256v1,
@@ -180,7 +183,8 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
   Смена пароля после первой инициализации БД не меняет пароль внутри БД (том `pgdata`
   уже создан); пароль внутри БД меняется отдельно (`ALTER USER`).
 - `HTTP_PORT`, `HTTPS_PORT`, `TLS_SERVER_NAME` - см. выше.
-- `INITIAL_ADMIN_LOGIN` - логин первого администратора, только при первом запуске.
+- `INITIAL_ADMIN_LOGIN` - логин первого администратора (в заданном написании), только при
+  первом запуске.
 - `ARGON2_TIME_COST`, `ARGON2_MEMORY_COST_KIB`, `ARGON2_PARALLELISM` - параметры хеширования
   паролей (по умолчанию 3, 131072 КиБ, 2).
 - `SECRET_KEY` в `.env.example` нет и из `.env` в `api` не пробрасывается: ключ создаётся один
@@ -194,6 +198,21 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
 
 Удаления учётных записей в интерфейсе и API нет и не предусмотрено: пользователя можно
 заблокировать (и сбросить пароль, завершить сессии, сменить или снять роль), но не удалить.
+
+### Логины и регистр
+
+Логин показывается в написании при создании учётной записи (например, `Ivanov.Petr`) - везде:
+в интерфейсе, ответах API и журнале аудита. Вход выполняется без учёта регистра: `ivanov.petr`
+и `IVANOV.PETR` открывают ту же запись. Логин, отличающийся только регистром от существующего,
+занят: создание такой записи отклоняется с ответом 422 и кодом `login_taken`.
+
+### Обновление с предыдущей версии MVP
+
+Обновление выполняется без действий оператора: миграция `0005` (столбец с написанием логина)
+применяется при старте, до запуска `api`. Прежние логины не меняются: у существующих записей
+написание равно логину как прежде (строчными), вход и пароли те же. Откат ниже `0005`
+(`alembic downgrade 0004` и ниже) теряет написание логинов: остаются строчные ключи; вход и
+уникальность логинов откат не затрагивает. Перед откатом сделайте копию БД.
 
 ### Предупреждения оператору
 
@@ -462,6 +481,9 @@ mode 0600). It never appears in logs or standard output. Read it with
 in `.env` (`admin` by default); it is read without trimming, so the value must not contain
 leading or trailing spaces or a newline - otherwise `api` fails to start.
 
+`INITIAL_ADMIN_LOGIN` is shown as set: with the value `Admin.Root` the login in the UI and on the
+`login=` line of the password file is `Admin.Root`, the same spelling; sign-in ignores case.
+
 ### Self-signed certificate and using your own
 
 By default `web` generates a self-signed certificate on the first start (EC prime256v1,
@@ -516,7 +538,8 @@ The session cookie always carries the `Secure` flag (the shipped configuration h
   password inside the database (the `pgdata` volume already exists); change it separately
   (`ALTER USER`).
 - `HTTP_PORT`, `HTTPS_PORT`, `TLS_SERVER_NAME` - see above.
-- `INITIAL_ADMIN_LOGIN` - the login of the first administrator, used on the first start only.
+- `INITIAL_ADMIN_LOGIN` - the login of the first administrator (shown as set), used on the
+  first start only.
 - `ARGON2_TIME_COST`, `ARGON2_MEMORY_COST_KIB`, `ARGON2_PARALLELISM` - password hashing
   parameters (defaults 3, 131072 KiB, 2).
 - `SECRET_KEY` is not in `.env.example` and is not passed from `.env` to `api`: the key is
@@ -532,6 +555,22 @@ The session cookie always carries the `Secure` flag (the shipped configuration h
 There is no UI and no API endpoint for deleting accounts, and none is planned: a user can be
 blocked (and have the password reset, sessions revoked, role changed or removed) but accounts
 cannot be deleted.
+
+### Logins and case
+
+A login is shown in the spelling used when the account is created (for example, `Ivanov.Petr`)
+everywhere: in the UI, API responses and the audit log. Sign-in is case-insensitive: `ivanov.petr`
+and `IVANOV.PETR` open the same account. A login that differs only in case from an existing one
+is taken: creating it is rejected with a 422 response and the `login_taken` code.
+
+### Upgrading from the previous MVP version
+
+The upgrade needs no operator action: migration `0005` (the column with the login spelling) is
+applied at start, before `api` runs. Existing logins stay unchanged: for existing accounts the
+spelling equals the login as before (lower case), and sign-in and passwords are the same. A
+downgrade below `0005` (`alembic downgrade 0004` and lower) loses the spelling of logins: only
+the lower-case keys remain; sign-in and login uniqueness are not affected. Back up the database
+before a downgrade.
 
 ### Operator warnings
 

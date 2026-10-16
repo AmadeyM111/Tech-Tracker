@@ -245,3 +245,56 @@ describe("T91-R vanished assignee", () => {
     expect(idsIn(container, "done")).toEqual([TE]);
   });
 });
+
+describe("T98 assignee order is case-insensitive", () => {
+  const u = (n: number, login: string) => ({ id: `c${n}c${n}c${n}c${n}-0000-4000-8000-00000000000${n}`, login });
+  const BORIS = u(1, "Boris");
+  const ANNA = u(2, "anna");
+  const KIRILL = u(3, "Kirill");
+  const IVAN = u(4, "ivan");
+  const cols = {
+    todo: [
+      { ...CA, id: TA, assignee: BORIS },
+      { ...CB, id: TB, assignee: ANNA },
+    ],
+    in_progress: [{ ...CD, id: TD, assignee: KIRILL }],
+    review: [{ ...CC, id: TC, assignee: IVAN }],
+    done: [],
+  };
+
+  it("t98_filter_options_sorted_by_lowercase_login", async () => {
+    await openBoard({}, cols);
+    expect(Array.from(filterSelect().options).map((o) => o.textContent)).toEqual([
+      dict("boards.filter_all"),
+      dict("boards.filter_none"),
+      "anna",
+      "Boris",
+      "ivan",
+      "Kirill",
+    ]);
+    expect(Array.from(filterSelect().options).slice(2).map((o) => o.value)).toEqual([
+      ANNA.id,
+      BORIS.id,
+      IVAN.id,
+      KIRILL.id,
+    ]);
+  });
+
+  it("t98_cards_show_logins_as_received", async () => {
+    const { container } = await openBoard({}, cols);
+    const login = (id: string) => cardEl(container, id)!.querySelector('[data-field="assignee"]')!.textContent;
+    expect([login(TA), login(TB), login(TD), login(TC)]).toEqual(["Boris", "anna", "Kirill", "ivan"]);
+  });
+
+  it("t98_equal_lowercase_logins_ordered_by_id", async () => {
+    const hi = { id: "d2d2d2d2-0000-4000-8000-000000000002", login: "Sam" };
+    const lo = { id: "d1d1d1d1-0000-4000-8000-000000000001", login: "sam" };
+    await openBoard(
+      {},
+      { ...cols, todo: [{ ...CA, id: TA, assignee: hi }, { ...CB, id: TB, assignee: lo }], in_progress: [], review: [] },
+    );
+    const opts = Array.from(filterSelect().options).slice(2);
+    expect(opts.map((o) => o.value)).toEqual([lo.id, hi.id]);
+    expect(opts.map((o) => o.textContent)).toEqual(["sam", "Sam"]);
+  });
+});

@@ -2095,6 +2095,221 @@ T69 → T73.
 - **Q-M3:** будет ли заказчик вести в прототипе реальную работу неделями (тогда нужна резервная
   копия FR-50, +1 задача из B1.4-C)? Дефолт: нет, прототип только для показа.
 
+### Spec v0.17: отображаемый логин (FR-73a, D-66, архитектор, 2026-10-16)
+
+Изменение принятого требования R1.0 по решению владельца продукта (OI-128): логин хранится и
+показывается в написании при создании (`Ivanov.Petr`), вход, уникальность, поиск и сортировка —
+без учёта регистра. Решения: **plan D-66** (§11.2) и **plan §11.12** (схема, миграция 0005,
+интерфейсы, тест-план). Ответы владельца, переданные оркестратором 2026-10-16: OI-129 — а)
+(порядок по нормализованному логину, как до v0.17), OI-130 — а) (первый ТА — в написании из
+`INITIAL_ADMIN_LOGIN`). Занятый логин — 422 `login_taken` (не 409). Итого 7 задач (T93–T99).
+
+**Общие условия для T93–T99:**
+- Действуют «Общие условия для задач MVP» выше. Источник интерфейсов — plan §11.12; при
+  расхождении spec v0.17 с plan §11.12 (кроме пометок [ВОПРОС ВЛАДЕЛЬЦУ] у OI-129/OI-130 — они
+  решены, SC-22/SC-23) — `PLAN_ISSUE`, не додумывать.
+- `AppUser.login` — **ключ** (строчные): только вход, проверка «занят», `ON CONFLICT`, поиск
+  `ILIKE`, `ORDER BY`. Всё, что отдаёт логин наружу, читает `AppUser.login_display`.
+- Имена полей API и контракт не меняются: `docs/api/openapi.json` и
+  `frontend/src/shared/api/schema.d.ts` не перегенерируются и не правятся. Если тест контракта
+  краснеет — это ошибка реализации, а не повод перегенерировать.
+- Не трогать файлы параллельной работы над доской (T91/T92): `frontend/src/features/boards/*`,
+  `frontend/src/features/projects/ProjectPage.tsx`, `frontend/src/shared/i18n/ru.ts`,
+  `frontend/src/shared/ui/ui.css`, `frontend/tests/features/boards/*` — кроме T98 после фиксации
+  этой работы. `backend/tests/infra/test_stack_first_run.py` не трогать (изменён другой сессией).
+- Логины в тестах — синтетические (BR-9); примеры AC (`Ivanov.Petr`, `Sidorova.Anna`, `Mixed.Admin`,
+  `Kuznetsov.Oleg`, `QA-Team_1`) допустимы.
+
+## T91 — Доска: создание задачи из колонки, оптимистичный перенос, фильтр по исполнителю
+- **Статус:** DONE (ревью APPROVE + T91-R)
+- **AC:** решение владельца 2026-10-16; FR-18a, FR-19b, FR-20, FR-28/28a, FR-29, NFR-7, AC-98; контракт — шапка `frontend/tests/features/boards/helpers.tsx`
+- **Файлы:** `frontend/src/features/boards/{BoardView.tsx,dnd.ts,api.ts}`, `ProjectPage.tsx`, `ru.ts`, `ui.css`; тесты `frontend/tests/features/boards/{BoardCreate,BoardOptimistic,BoardFilter}.test.tsx`, `dnd.full.test.ts`
+- **Заметки:** создание — POST create (в todo) + move для не-todo колонок (backend не менялся); фильтр клиентский, соседи для move по ПОЛНОМУ порядку колонки; бэклог: задача, созданная под фильтром исполнителя, может быть не видна; `createTask` дублирует `tasks/api.ts`.
+- **Попытки:** 2
+
+## T92 — Стиль ссылки «На главную»
+- **Статус:** DONE
+- **Файлы:** `frontend/src/app/router.tsx` (`ui-home-link`), `ui.css`; тесты `theme.test.ts`, `tests/app/home-link.test.tsx`
+- **Попытки:** 1
+
+## T93 — Столбец `login_display`: модель и миграция 0005
+- **Статус:** DONE
+- **AC:** FR-73a (хранение написания; существующие записи получают `login_display = login`), AC-128 (уровень БД), AC-131 (заполнение при обновлении); plan D-66, §11.12.2–§11.12.4
+- **Файлы:** `backend/app/domain/users/models.py`, `backend/migrations/versions/0005_login_display.py` (новый),
+  `docs/data-model.md` (строка `login_display` в `app_user`, CHECK, строка `0005` в таблице миграций,
+  вступление «миграции 0001–0005»); тесты: `backend/tests/db/test_identity_models.py`,
+  `backend/tests/db/test_migrations.py`, `backend/tests/factories.py`
+- **Зависит от:** —
+- **Описание:** Строго по plan §11.12.2–§11.12.4. Модель: `login_display: Mapped[str] =
+  mapped_column(String(64), nullable=False, default=_login_display_default)`, где
+  `_login_display_default(context: DefaultExecutionContext) -> str` возвращает
+  `context.get_current_parameters()["login"]`; `CheckConstraint('lower(login_display COLLATE "C") =
+  login', name="login_display_lower")` → имя `ck_app_user_login_display_lower`; докстринг модели и
+  комментарии у обоих столбцов: `login` — ключ, не показывать; `login_display` — показ (D-66).
+  Миграция 0005 (`revision = "0005"`, `down_revision = "0004"`): `add_column` (NULL) → `UPDATE
+  app_user SET login_display = login` → `alter_column(nullable=False)` → `create_check_constraint`;
+  `downgrade` — `drop_constraint` и `drop_column`. Код приложения (сервисы, bootstrap, демо) **не
+  менять**: Python-default заполняет `login_display = login`, поведение остаётся прежним до T94.
+  Фабрика `make_user(login=X)`: в столбец `login` — `X.lower()`, в `login_display` — `X`;
+  `UserRow.login` — `X` (так тесты T94–T97 создают учётную запись `Ivanov.Petr` одной строкой).
+  `user_values` в `test_identity_models.py` не обязана передавать `login_display` (default).
+  Тесты (`test_d66_*`): вставка `login='ivanov.petr', login_display='Ivanov.Petr'` принята;
+  `login_display='Ivanov.Pet'` или `'Ivanov.Petr2'` при `login='ivanov.petr'` → `23514`;
+  `login_display` со знаком Кельвина (`'Kivan'`) при `login='kivan'` → `23514`; кириллица в
+  показе → `23514`; без `login_display` → равен `login`; два пользователя с показами `Ivanov.Petr` и
+  `ivanov.petr` → `23505` по `uq_app_user_login`; `UPDATE login_display` в другое написание той же
+  длины, но не совпадающее с ключом → `23514`. `test_t93_*`: файл и цепочка 0004 → 0005, голова одна;
+  `downgrade 0004` при пользователях → столбца и CHECK нет, строки целы; `upgrade head` →
+  `login_display = login` у всех строк, CHECK на месте; `alembic check` чист. Существующие тесты
+  (`test_ac116_*` уровня БД, `test_t69_*`) остаются зелёными без ослабления.
+- **Готово, когда:** `pytest -q backend/tests/db/test_identity_models.py backend/tests/db/test_migrations.py`
+  и `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёные; `alembic -c backend/alembic.ini check`
+  чист; `pytest -q backend/tests` зелёный целиком (поведение API не изменилось); линтер и mypy чистые.
+
+## T94 — Учётные записи и справочник: создание с написанием, показ `login_display`
+- **Статус:** DONE
+- **AC:** AC-125, AC-128, AC-130, OI-129 а) (учётные записи, `GET /users`), AC-116 (тесты приводятся к FR-73a); FR-4, FR-73, FR-73a; plan §11.12.4, §11.12.5
+- **Файлы:** `backend/app/domain/users/service.py`, `backend/app/domain/users/directory.py`; тесты:
+  `backend/tests/domain/test_user_admin_service.py`, `backend/tests/api/test_admin_users.py`,
+  `backend/tests/api/test_users_directory.py`
+- **Зависит от:** T93
+- **Описание:** По таблице plan §11.12.4 (строки `users/service.py`, `users/directory.py`).
+  `create_user`: порядок проверок прежний (`login_invalid` → `login_taken` по ключу → политика
+  пароля); вставка `login=normalized, login_display=login`; ответ `UserAccount(login=login)`.
+  `_load_target`, `list_accounts`, `list_directory`, `user_refs` читают `AppUser.login_display`;
+  `ORDER BY AppUser.login, AppUser.id` и `AppUser.login.ilike(...)` не менять. Докстринг
+  `create_user` — «сохраняется написание при вводе, проверки по нормализованному виду». Тесты — по
+  строкам AC-125, AC-128, AC-130, OI-129 и AC-116 таблицы plan §11.12.8, в том числе параллельное
+  создание `Ivanov.Petr`/`ivanov.petr` (`@pytest.mark.committed`, одно пространство и два разных:
+  ровно один успех, второй — `login_taken`, одна строка с ключом `ivanov.petr`, одно событие
+  `user.created`). Старые тесты, ждавшие строчного логина в ответе, привести к FR-73a:
+  `test_admin_users.py::test_ac116_login_with_capitals_is_normalized_to_lower_case` (ждать
+  `Ivan.Petrov`; переименовать по смыслу), `test_user_admin_service.py::test_ac116_login_is_lowercased_on_create`
+  (`created.login == "Ivan.Petrov"`; ключ `ivan.petrov` в БД; вход `IVAN.PETROV` проходит),
+  `::test_ac116_boundary_valid_logins_are_accepted` (`created.login == good`). Остальные ассерты
+  AC-116 (вход в любом регистре, 422 на регистровый дубль и невалидные логины) не ослаблять.
+  Поиск по коду: других тестов, ждущих строчного логина в ответе для логина, созданного с
+  заглавными, быть не должно — если найдутся вне файлов задачи, перечислить в отчёте.
+- **Готово, когда:** `pytest -q backend/tests/domain/test_user_admin_service.py backend/tests/api/test_admin_users.py backend/tests/api/test_users_directory.py backend/tests/domain/test_directory.py backend/tests/cli/test_openapi.py backend/tests/infra/test_frontend_api_types.py`
+  зелёный; `git diff --exit-code docs/api/openapi.json frontend/src/shared/api/schema.d.ts` — без
+  изменений; линтер и mypy чистые.
+
+## T95 — Вход и профиль: логин в написании при создании
+- **Статус:** DONE
+- **AC:** AC-126, AC-127; FR-1, FR-61, FR-73a; plan §11.12.4
+- **Файлы:** `backend/app/api/deps.py`, `backend/app/domain/auth/service.py`; тесты:
+  `backend/tests/api/test_auth_login.py`, `backend/tests/api/test_login_lockout.py`
+- **Зависит от:** T93 (можно параллельно с T94: файлы не пересекаются)
+- **Описание:** `get_actor` и `service.login` выбирают `AppUser.login_display` (в `Actor.login` и
+  `LoginResult.login`); `normalize_login`, `LocalPasswordProvider`, `reserve_attempt` и
+  `change_own_password` не менять. Докстринг `service.login`: «логин нормализуется для поиска
+  учётной записи; в результате — отображаемый логин (FR-73a)». Тесты — строки AC-126 и AC-127 plan
+  §11.12.8 (учётная запись `make_user(login="Ivanov.Petr", role="business_admin")`; сдвиг часов —
+  как в существующих тестах блокировки). Существующие `test_ac116_*` с логином, созданным строчными,
+  остаются без изменений.
+- **Готово, когда:** `pytest -q backend/tests/api/test_auth_login.py backend/tests/api/test_login_lockout.py backend/tests/domain/test_auth_service.py backend/tests/api/test_password_change.py backend/tests/api/test_deps_gates.py`
+  зелёный; линтер и mypy чистые.
+
+## T96 — Проекты, участники, журнал: логин в написании при создании
+- **Статус:** DONE
+- **AC:** AC-129, OI-129 а) (участники проекта); FR-14, FR-14a, FR-15, FR-20, FR-23, FR-41, FR-73a; plan §11.12.4
+- **Файлы:** `backend/app/domain/projects/queries.py`, `backend/app/domain/projects/members.py`,
+  `backend/app/domain/events/queries.py`; тесты: `backend/tests/api/test_login_display.py` (новый)
+- **Зависит от:** T94
+- **Описание:** `project_view` — `AppUser.login_display.label("owner_login")`; `list_members` —
+  `load_only(AppUser.id, AppUser.login_display, AppUser.is_blocked)` и
+  `UserRef(login=u.login_display)`, `ORDER BY AppUser.login, AppUser.id` не менять; `_to_records` —
+  `select(AppUser.id, AppUser.login_display)`. Задачи, доска, комментарии, список проектов и «мои
+  задачи» берут логин из `user_refs` (исправлено в T94) — здесь только проверяются. Тест
+  `test_ac129_*` — сценарий AC-129 целиком через API: `Mixed.Admin` (СМ, фабрика) создаёт через
+  `POST /admin/users` учётные записи `Ivanov.Petr`, `Kuznetsov.Oleg`, `Sidorova.Anna` и назначает
+  роли через API (нужны записи журнала с автором `Mixed.Admin`); постоянный пароль — сменой
+  одноразового через `POST /auth/password` либо служебным `UPDATE` в тесте (на выбор
+  test-writer); далее проект, участники, задача с исполнителем `Sidorova.Anna`, комментарий,
+  проверки списков и карточек из AC-129, «мои задачи» `Sidorova.Anna`, передача владения
+  `Kuznetsov.Oleg`, журнал от имени `Mixed.Admin` (авторы записей), карточка проекта (владелец).
+  `test_oi129_members_*` — участники `anna`, `Boris`, `ivan`, `Kirill` → порядок `anna, Boris, ivan, Kirill`.
+- **Готово, когда:** `pytest -q backend/tests/api/test_login_display.py backend/tests/api/test_projects.py backend/tests/api/test_project_members.py backend/tests/api/test_audit.py backend/tests/domain/test_projects_service.py backend/tests/domain/test_project_members_service.py`
+  зелёный; линтер и mypy чистые.
+
+## T97 — Первый ТА в написании из настройки; обновление существующей установки
+- **Статус:** DONE
+- **AC:** OI-130 а), FR-6, AC-131; FR-49, FR-64, FR-73a; plan §11.12.3, §11.12.4
+- **Файлы:** `backend/app/domain/system/bootstrap.py`; тесты: `backend/tests/cli/test_bootstrap.py`,
+  `backend/tests/db/test_login_display_upgrade.py` (новый, `@pytest.mark.committed`)
+- **Зависит от:** T94, T95, T96
+- **Описание:** `_initial_login(settings) -> tuple[str, str]` — `(ключ, написание из настройки)`;
+  `ValueError` для логина вне шаблона — как было (текст без значения). `AppUser(login=ключ,
+  login_display=написание, …)`; файл пароля — `login=<написание>\npassword=…`.
+  `remove_initial_admin_file_if_for` сравнивает без учёта регистра (`owner.lower() ==
+  login.strip().lower()`), докстринг — почему (plan §11.12.4). `ops/demo.py` и CLI не менять (демо-
+  логины строчные, `login_display` — default). Тесты: строки OI-130 и AC-131 plan §11.12.8. AC-131:
+  на head — `run_bootstrap`, `create_user("ivan.petrov")` от имени первого ТА (доменная функция с
+  `Actor` ТА), `load_demo_data(seed=1)`; снимок; `run_alembic(url, "downgrade", "0004")` и
+  `"upgrade", "head"` (как `test_t69_*` в `db/test_migrations.py`); после миграций
+  `await db_engine.dispose()` перед запросами приложения (кэш подготовленных выражений asyncpg);
+  проверки через API (`committed_api_env` или своё приложение поверх `committed`): вход прежними
+  паролями (`initial-admin-password.txt`, `demo-passwords.txt`, одноразовый `ivan.petrov`) — `login`
+  в ответе прежний; список учётных записей и журнал — прежние логины и число записей; создание
+  `Demo.BA1` → 422 `login_taken`. Существующие тесты bootstrap (логин по умолчанию `admin`) не
+  менять.
+- **Готово, когда:** `pytest -q backend/tests/cli/test_bootstrap.py backend/tests/cli/test_bootstrap_hardening.py backend/tests/cli/test_demo_data.py backend/tests/db/test_login_display_upgrade.py backend/tests/api/test_password_change.py`
+  зелёный; линтер и mypy чистые.
+
+## T98 — Фронтенд: порядок исполнителей на доске без учёта регистра, тексты о логине
+- **Статус:** DONE
+- **AC:** OI-129 а) (фильтр исполнителей доски), AC-132 (подготовка); FR-73a; plan §11.12.6
+- **Файлы:** `frontend/src/features/boards/BoardView.tsx`, `frontend/src/features/admin/UsersPage.tsx`
+  (только комментарий у строки показа созданного логина), `frontend/src/shared/i18n/ru.ts`
+  (только `admin.users.login_hint`); тесты: `frontend/tests/features/boards/BoardFilter.test.tsx`
+- **Зависит от:** фиксация параллельной работы над доской T91/T92 (вне этого файла задач: она
+  добавила фильтр исполнителей в `BoardView.tsx`, ключи `boards.filter_*` в `ru.ts` и
+  `BoardFilter.test.tsx`). От backend-задач не зависит: контракт не меняется.
+- **Описание:** В `BoardView.tsx` список исполнителей фильтра сортировать по
+  `login.toLowerCase()`, при равенстве — по `id` (сейчас `a.login < b.login` ставит `Boris` раньше
+  `anna`). `UsersPage.tsx`: комментарий «The server-side (normalized) login» → «The login as the
+  server stored it (FR-73a), not the typed one»; поведение не менять. `ru.ts`
+  `admin.users.login_hint`: «От 3 до 64 символов: латинские буквы, цифры, точка, подчёркивание и
+  дефис; первый символ — буква или цифра. Логин показывается так, как введён; при входе регистр
+  не учитывается». Тест: доска с исполнителями `Boris`, `anna`, `Kirill`, `ivan` → варианты фильтра
+  после «Все исполнители» и «Без исполнителя» в порядке `anna, Boris, ivan, Kirill`; карточки
+  показывают логины как пришли. `ProjectPage.tsx` (фильтр владельца уже без учёта регистра),
+  `UserPicker`, `AuditPage` — не менять.
+- **Готово, когда:** `cd frontend && npm run lint && npm run typecheck && npm test` зелёный.
+
+## T99 — Документация: отображаемый логин, обновление, ручная проверка AC-132
+- **Статус:** DONE
+- **AC:** AC-132 *ручной* (пункт чек-листа), NFR-11, FR-73a; plan §11.12, R-M10
+- **Файлы:** `README.md` (ru и en), `docs/acceptance/mvp-demo.md`; тесты:
+  `backend/tests/infra/test_docs_static.py` (дополнение, `infra_static`)
+- **Зависит от:** T97, T98
+- **Описание:** README (ru и en): логин показывается в написании при создании, вход без учёта
+  регистра, логин, отличающийся только регистром, занят; `INITIAL_ADMIN_LOGIN` показывается как
+  задан, в файле пароля — то же написание; обновление с предыдущей версии MVP — без действий
+  оператора (миграция 0005 при старте), логины прежние; откат версии ниже 0005 теряет написание
+  (R-M10). Чек-лист `mvp-demo.md`: новый пункт AC-132 (учётные записи `Ivanov.Petr` — БА,
+  владелец проекта, и `Sidorova.Anna` — участник, исполнитель с комментарием; перечень экранов из
+  AC-132; ожидание — нигде не строчными). Тесты `test_t99_*`: README ru/en упоминают регистр
+  логина (ru «регистр», en «case»), чек-лист содержит `AC-132`.
+- **Готово, когда:** `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёный;
+  `bash scripts/check.sh` зелёный (финальная проверка v0.17); ревьюер подтверждает трассировку plan
+  §11.12.8.
+
+### Порядок v0.17 и критический путь
+
+| Задача | Название | Зависит от |
+|---|---|---|
+| T93 | `login_display`: модель, миграция 0005 | — |
+| T94 | Учётные записи и справочник | T93 |
+| T95 | Вход и профиль | T93 |
+| T96 | Проекты, участники, журнал | T94 |
+| T97 | Первый ТА; обновление установки (AC-131) | T94, T95, T96 |
+| T98 | Фронтенд: порядок на доске, тексты | фиксация T91/T92 |
+| T99 | Документация, AC-132 | T97, T98 |
+
+Критический путь (5 задач): **T93 → T94 → T96 → T97 → T99**. T95 — параллельно с T94; T98 — как
+только зафиксирована работа T91/T92, независимо от backend. Риски — plan §11.11 R-M8…R-M11.
+
 ---
 
 ## Отложено (следующая версия)

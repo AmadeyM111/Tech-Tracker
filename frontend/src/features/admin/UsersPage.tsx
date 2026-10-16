@@ -224,7 +224,7 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
     const password = generateOneTimePassword();
     void run(async () => {
       const created = await createUser({ login: name, one_time_password: password });
-      // The server-side (normalized) login, not the typed one.
+      // The login as the server stored it (FR-73a), not the typed one.
       setShown({ login: created.login, password });
       setLogin("");
     });

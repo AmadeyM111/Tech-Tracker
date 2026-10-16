@@ -220,6 +220,15 @@ describe("create user (FR-4, FR-55, FR-65, FR-73, OI-108)", () => {
     expect(DICT).toContain(hint?.textContent);
   });
 
+  it("t98_fr73a_login_hint_says_shown_as_entered_and_case_ignored_on_login", async () => {
+    const { container } = await open();
+    const hint = document.getElementById(loginInput(container).getAttribute("aria-describedby") ?? "");
+    expect(hint?.textContent).toBe(ru["admin.users.login_hint"]);
+    expect(hint?.textContent).toContain("показывается так, как введён");
+    expect(hint?.textContent).toContain("регистр не учитывается");
+    expect(hint?.textContent).not.toMatch(/\. Регистр не учитывается$/);
+  });
+
   it("fr4_create_without_role_sends_login_and_client_generated_password_only", async () => {
     const spy = fillBytes(3);
     const { container } = await open({ [CREATE]: () => j(201, created) });
