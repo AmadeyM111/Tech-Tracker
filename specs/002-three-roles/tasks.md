@@ -270,7 +270,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
 - **Попытки:** 0
 
 ## R3-T07 — Тесты без СМ: задачи и комментарии (domain), справочник, гарды, отображаемый логин (только тесты)
-- **Статус:** TODO
+- **Статус:** DONE (1 попытка, reviews/R3-T07-1.md; соответствие старых и новых имён тестов — там же)
 - **AC:** AC-13, AC-14, AC-15, AC-25 (справочник без СМ); FR-1, FR-19
 - **Файлы:** тесты: `backend/tests/domain/test_tasks_update_delete.py`,
   `backend/tests/domain/test_tasks_create.py`, `backend/tests/domain/test_tasks_move.py`,

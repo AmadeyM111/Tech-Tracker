@@ -98,11 +98,11 @@ async def test_fr13_get_task_404_unknown_deleted_foreign_deleted_project(
     in_dead = await mk_task(db, w, project_id=dead_project.id)
     await db.commit()
     for tid in (uuid.uuid4(), foreign.id, deleted, in_dead):
-        for who in (w.ba, w.sm, w.ta, w.norole):  # 404 раньше 403
+        for who in (w.ba, w.ba3, w.ta, w.norole):  # 404 раньше 403
             await not_found(db, q.get_task(db, actor_of(who), tid))
 
 
-@pytest.mark.parametrize("who", ["ta", "norole", "usr2", "sm", "ba3"])
+@pytest.mark.parametrize("who", ["ta", "norole", "usr2", "ba3"])
 async def test_fr26_get_task_403_for_non_member_ta_and_no_role(
     db: AsyncSession, q: Any, who: str
 ) -> None:
@@ -284,7 +284,7 @@ async def test_d62_get_task_query_count_independent_of_subtask_count(
     one = await mk_task(db, w)
     many = await mk_task(db, w)
     await _sub(db, w, one, assignee_id=w.usr.id, status="done")
-    users = [w.usr, w.ba2, w.ba, w.sm]
+    users = [w.usr, w.ba2, w.ba, w.ba3]
     for i in range(30):
         await _sub(
             db,
@@ -388,15 +388,6 @@ async def test_fr19_permissions_user_member_not_assignee_nothing(db: AsyncSessio
     assert _perms(v) == (False, False, False, False, False)
 
 
-async def test_fr19_permissions_mixed_member_everything(db: AsyncSession, q: Any) -> None:
-    w = await make_world(db)
-    await add_member_row(db, w, w.project_id, w.sm)
-    await db.commit()
-    tid = await mk_task(db, w, created_by=w.ba.id, assignee_id=w.usr.id)
-    v = await q.get_task(db, actor_of(w.sm), tid)
-    assert _perms(v) == (True, True, True, True, True)
-
-
 async def test_fr19_permissions_ba_non_owner_own_task_edit_no_reassign(
     db: AsyncSession, q: Any
 ) -> None:
@@ -433,7 +424,7 @@ async def test_fr13_list_project_404(db: AsyncSession, q: Any) -> None:
             )
 
 
-@pytest.mark.parametrize("who", ["ta", "norole", "usr2", "sm", "ba3"])
+@pytest.mark.parametrize("who", ["ta", "norole", "usr2", "ba3"])
 async def test_fr26_list_project_403_non_member_ta_no_role(
     db: AsyncSession, q: Any, who: str
 ) -> None:
@@ -796,10 +787,16 @@ async def _passes(db: AsyncSession, awaitable: Any) -> bool:
 async def test_fr19_permission_flags_match_service_outcomes_matrix(
     db: AsyncSession, q: Any
 ) -> None:
+    """Флаги ``permissions`` совпадают с исходами сервиса (002/AC-13, AC-14).
+
+    Заменяет удалённый ``test_fr19_permissions_mixed_member_everything`` (БА-участник на чужой
+    задаче - все пять прав): комбинация ``(ba, usr)`` для ``ba2`` и ``ba3`` проверяется ниже
+    строго как ``(True,) * 5`` (NFR-3 (в)).
+    """
     import app.domain.tasks.service as svc
 
     w = await make_world(db)
-    await add_member_row(db, w, w.project_id, w.sm)
+    await add_member_row(db, w, w.project_id, w.ba3)  # прежде sm: БА, вступивший в проект
     await db.commit()
     combos = [
         (w.ba.id, w.usr.id),
@@ -808,17 +805,20 @@ async def test_fr19_permission_flags_match_service_outcomes_matrix(
         (w.ba2.id, w.ba.id),
         (w.ba.id, w.ba.id),
         (w.ba2.id, w.ba2.id),
-        (w.sm.id, w.sm.id),
+        (w.ba3.id, w.ba3.id),
     ]
     for created_by, assignee in combos:
         tid = await mk_task(db, w, created_by=created_by, assignee_id=assignee)
         target = w.ba.id if assignee == w.ba2.id else w.ba2.id
-        for who in (w.ba, w.ba2, w.usr, w.sm):
+        for who in (w.ba, w.ba2, w.usr, w.ba3):
             actor = actor_of(who)
             perms = (await q.get_task(db, actor, tid)).permissions
             new_sub = svc.TaskCreateData(title="s", assignee=who.id)
             ctx = (created_by, assignee, who.login)
-            if who is w.ba2:  # 002/AC-13, AC-14 (FR-9): БА-участник не владелец - все права
+            if who in (
+                w.ba2,
+                w.ba3,
+            ):  # 002/AC-13, AC-14 (FR-9): БА-участник не владелец - все права
                 assert _perms(await q.get_task(db, actor, tid)) == (True,) * 5, ctx
             assert perms.create_subtask == await _passes(
                 db, svc.create_subtask(db, actor, tid, new_sub)
@@ -844,11 +844,11 @@ async def test_fr21_subtask_card_create_subtask_false_for_every_role(
     import app.domain.tasks.service as svc
 
     w = await make_world(db)
-    await add_member_row(db, w, w.project_id, w.sm)
+    await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
     parent = await mk_task(db, w, created_by=w.ba.id, assignee_id=w.usr.id)
     sub = await _sub(db, w, parent, created_by=w.ba.id, assignee_id=w.usr.id)
-    for who in (w.ba, w.ba2, w.usr, w.sm):
+    for who in (w.ba, w.ba2, w.usr, w.ba3):
         actor = actor_of(who)
         v = await q.get_task(db, actor, sub)
         assert v.permissions.create_subtask is False

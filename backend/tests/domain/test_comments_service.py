@@ -16,7 +16,7 @@ AC-58, AC-103 (комментарии), FR-23 (без упоминаний, SC-6
 Порядок: контекст/комментарий (404, раньше 403) -> участие и права (403) -> очистка и
 проверка пустоты (422 ``validation_error``) -> запись. create/edit/delete берут FOR SHARE на
 строке проекта (§10.2 п.2). Автор может править только свой (``can_edit_comment``) и только
-оставаясь участником; удалять — ``can_delete_comment`` (автор, БА-владелец, СМ-участник).
+оставаясь участником; удалять — ``can_delete_comment`` (автор, БА-участник; 002/AC-13).
 Мягкое удаление: ``deleted_at`` и собственный ``deleted_batch_id``. События и упоминания не
 пишутся (D-55, SC-6). Возвращаемое значение проверяется только в части ``id`` и в ``list``.
 """
@@ -131,12 +131,12 @@ async def test_fr23_create_on_subtask_comments_subtask_only(db: AsyncSession, sv
     assert await _count_comments(db, tid) == 0
 
 
-async def test_ac103_sm_member_without_own_tasks_can_comment(db: AsyncSession, svc: Any) -> None:
+async def test_ac103_ba_member_without_own_tasks_can_comment(db: AsyncSession, svc: Any) -> None:
     w, tid = await _setup(db)
-    await add_member_row(db, w, w.project_id, w.sm)
+    await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
-    view = await svc.create_comment(db, actor_of(w.sm), tid, "СМ пишет")
-    assert (await comment_row(db, view.id)).created_by == w.sm.id
+    view = await svc.create_comment(db, actor_of(w.ba3), tid, "БА пишет")
+    assert (await comment_row(db, view.id)).created_by == w.ba3.id
 
 
 # --- create_comment: 404 -> 403 -> 422 -------------------------------------------------------
@@ -182,19 +182,19 @@ async def test_fr23_create_task_of_other_workspace_404(db: AsyncSession, svc: An
     assert await _count_comments(db, t2.id) == 0
 
 
-@pytest.mark.parametrize("who", ["ta", "sm", "ba3", "usr2", "norole", "blocked"])
+@pytest.mark.parametrize("who", ["ta", "ba3", "usr2", "norole", "blocked"])
 async def test_ac103_create_non_member_403(db: AsyncSession, svc: Any, who: str) -> None:
     w, tid = await _setup(db)
     await forbidden(db, svc.create_comment(db, actor_of(getattr(w, who)), tid, "x"))
     assert await _count_comments(db, tid) == 0
 
 
-async def test_ac103_sm_non_member_403_then_member_ok(db: AsyncSession, svc: Any) -> None:
+async def test_ac103_ba_non_member_403_then_member_ok(db: AsyncSession, svc: Any) -> None:
     w, tid = await _setup(db)
-    await forbidden(db, svc.create_comment(db, actor_of(w.sm), tid, "x"))
-    await add_member_row(db, w, w.project_id, w.sm)
+    await forbidden(db, svc.create_comment(db, actor_of(w.ba3), tid, "x"))
+    await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
-    await svc.create_comment(db, actor_of(w.sm), tid, "x")
+    await svc.create_comment(db, actor_of(w.ba3), tid, "x")
     assert await _count_comments(db, tid) == 1
 
 
@@ -378,13 +378,13 @@ async def test_ac58_edit_foreign_by_user_403(db: AsyncSession, svc: Any) -> None
     assert await _body(db, cid) == "от БА"
 
 
-async def test_ac103_edit_foreign_by_sm_member_403(db: AsyncSession, svc: Any) -> None:
-    """СМ удаляет любые комментарии, но править может только свои."""
+async def test_ac103_edit_foreign_by_ba_member_403(db: AsyncSession, svc: Any) -> None:
+    """БА-участник удаляет любые комментарии, но править может только свои (002/AC-13)."""
     w, tid = await _setup(db)
-    await add_member_row(db, w, w.project_id, w.sm)
+    await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
     cid = await _comment(db, w, tid, w.usr, body="чужой")
-    await forbidden(db, svc.edit_comment(db, actor_of(w.sm), cid, "правка"))
+    await forbidden(db, svc.edit_comment(db, actor_of(w.ba3), cid, "правка"))
     assert await _body(db, cid) == "чужой"
 
 
@@ -401,10 +401,10 @@ async def test_fr23_edit_author_no_longer_member_403(db: AsyncSession, svc: Any)
     assert await _body(db, cid) == "было"
 
 
-async def test_fr23_edit_sm_author_non_member_403(db: AsyncSession, svc: Any) -> None:
+async def test_fr23_edit_ba_author_non_member_403(db: AsyncSession, svc: Any) -> None:
     w, tid = await _setup(db)
-    cid = await _comment(db, w, tid, w.sm, body="было")
-    await forbidden(db, svc.edit_comment(db, actor_of(w.sm), cid, "стало"))
+    cid = await _comment(db, w, tid, w.ba3, body="было")
+    await forbidden(db, svc.edit_comment(db, actor_of(w.ba3), cid, "стало"))
 
 
 async def test_fr23_edit_unknown_comment_404(db: AsyncSession, svc: Any) -> None:
@@ -539,14 +539,16 @@ async def test_ac58_user_cannot_delete_foreign_403(db: AsyncSession, svc: Any) -
     assert (await comment_row(db, cid)).deleted_at is None
 
 
-async def test_ac103_sm_member_deletes_foreign_comment(db: AsyncSession, svc: Any) -> None:
+async def test_ac103_ba_non_member_403_then_member_deletes_foreign_comment(
+    db: AsyncSession, svc: Any
+) -> None:
     w, tid = await _setup(db)
     cid = await _comment(db, w, tid, w.usr)
-    await forbidden(db, svc.delete_comment(db, actor_of(w.sm), cid))  # не участник
+    await forbidden(db, svc.delete_comment(db, actor_of(w.ba3), cid))  # не участник
     assert (await comment_row(db, cid)).deleted_at is None
-    await add_member_row(db, w, w.project_id, w.sm)  # СМ добавляет себя (FR-8, OI-71)
+    await add_member_row(db, w, w.project_id, w.ba3)  # БА добавляет себя (002/AC-15)
     await db.commit()
-    await svc.delete_comment(db, actor_of(w.sm), cid)
+    await svc.delete_comment(db, actor_of(w.ba3), cid)
     assert (await comment_row(db, cid)).deleted_at is not None
 
 
@@ -624,7 +626,7 @@ async def test_fr23_delete_other_workspace_404(db: AsyncSession, svc: Any) -> No
     w, tid = await _setup(db)
     cid = await _comment(db, w, tid, w.usr)
     ws2 = await make_workspace(db)
-    stranger = await make_user(db, workspace=ws2, role="mixed", login="x.sm")
+    stranger = await make_user(db, workspace=ws2, role="business_admin", login="x.ba")
     await db.commit()
     await not_found(db, svc.delete_comment(db, actor_of(stranger), cid))
     assert (await comment_row(db, cid)).deleted_at is None
@@ -740,19 +742,19 @@ async def test_fr23_list_only_this_task_comments(db: AsyncSession, svc: Any) -> 
     assert [i.id for i in items] == [mine]
 
 
-@pytest.mark.parametrize("who", ["ta", "sm", "ba3", "usr2", "norole", "blocked"])
+@pytest.mark.parametrize("who", ["ta", "ba3", "usr2", "norole", "blocked"])
 async def test_ac103_list_non_member_403(db: AsyncSession, svc: Any, who: str) -> None:
     w, tid = await _setup(db)
     await _comment(db, w, tid, w.usr)
     await forbidden(db, svc.list_comments(db, actor_of(getattr(w, who)), tid, _p()))
 
 
-async def test_ac103_list_sm_member_ok(db: AsyncSession, svc: Any) -> None:
+async def test_ac103_list_ba_member_ok(db: AsyncSession, svc: Any) -> None:
     w, tid = await _setup(db)
     cid = await _comment(db, w, tid, w.usr)
-    await add_member_row(db, w, w.project_id, w.sm)
+    await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
-    items, _ = await svc.list_comments(db, actor_of(w.sm), tid, _p())
+    items, _ = await svc.list_comments(db, actor_of(w.ba3), tid, _p())
     assert [i.id for i in items] == [cid]
 
 
@@ -793,7 +795,7 @@ async def test_fr23_list_404_before_403(db: AsyncSession, svc: Any) -> None:
 
 async def test_s11_5_list_permissions_per_actor(db: AsyncSession, svc: Any) -> None:
     w, tid = await _setup(db)
-    await add_member_row(db, w, w.project_id, w.sm)
+    await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
     t0 = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
     by_usr = await _comment(db, w, tid, w.usr, created_at=t0)
@@ -822,8 +824,8 @@ async def test_s11_5_list_permissions_per_actor(db: AsyncSession, svc: Any) -> N
         by_ba: (False, True),
         by_ba2: (True, True),
     }
-    # СМ-участник: удаляет любые (AC-103), правит только свои (своих нет)
-    assert await perms(w.sm) == {
+    # БА-участник ba3 (вступил в проект): удаляет любые (002/AC-13), правит только свои (своих нет)
+    assert await perms(w.ba3) == {
         by_usr: (False, True),
         by_ba: (False, True),
         by_ba2: (False, True),

@@ -1,8 +1,9 @@
 """T96: отображаемый логин в проектах, участниках, задачах, комментариях и журнале (FR-73a, D-66).
 
-AC-129 (сценарий целиком через API: ``Mixed.Admin`` создаёт учётные записи ``Ivanov.Petr``,
+AC-129 (сценарий целиком через API: ТА ``Admin.Main`` создаёт учётные записи ``Ivanov.Petr``,
 ``Kuznetsov.Oleg``, ``Sidorova.Anna`` и назначает роли; ``Ivanov.Petr`` ведёт проект, задачу и
-комментарий; затем передача владения и журнал), OI-129 а) (порядок участников проекта: по
+комментарий; затем передача владения и журнал; по 002 §9 вместо СМ - ТА для учётных записей и
+журнала, БА для проектов, задач и комментариев), OI-129 а) (порядок участников проекта: по
 нормализованному логину без учёта регистра); plan §11.12.4, §11.12.8.
 
 Во всех ответах поле ``login`` несёт написание при создании (``UserRef``, ``AuditActor``); ни
@@ -27,13 +28,13 @@ from tests.projects_api_support import (
     pj,
 )
 
-MIXED = "Mixed.Admin"
+ADMIN = "Admin.Main"
 IVANOV = "Ivanov.Petr"
 KUZNETSOV = "Kuznetsov.Oleg"
 SIDOROVA = "Sidorova.Anna"
-LOWER_VARIANTS = ("mixed.admin", "ivanov.petr", "kuznetsov.oleg", "sidorova.anna")
+LOWER_VARIANTS = ("admin.main", "ivanov.petr", "kuznetsov.oleg", "sidorova.anna")
 
-MIXED_PW = "Mixed-Admin-Pa55phrase-1"
+ADMIN_PW = "Admin-Main-Pa55phrase-1"
 OTP = "Tmp-Pa55phrase-xyz-777"
 FINAL_PW = {
     IVANOV: "Ivanov-final-Pa55phrase-2",
@@ -102,23 +103,23 @@ async def test_ac129_display_login_is_shown_everywhere_in_projects_tasks_comment
 ) -> None:
     env = api_env
 
-    # --- Mixed.Admin (СМ, учётная запись фабрикой) создаёт остальных через API ---
+    # --- Admin.Main (ТА, учётная запись фабрикой) создаёт остальных через API ---
     ws = await new_workspace(env)
-    await seed(env, ws, "mixed", login=MIXED, password=MIXED_PW)
-    mixed_login = await env.login(MIXED.lower(), MIXED_PW)
-    assert mixed_login.status_code == 200, mixed_login.text
-    assert mixed_login.json()["user"]["login"] == MIXED
-    mixed_token = env.token_from(mixed_login)
-    assert mixed_token
+    await seed(env, ws, "tech_admin", login=ADMIN, password=ADMIN_PW)
+    admin_login = await env.login(ADMIN.lower(), ADMIN_PW)
+    assert admin_login.status_code == 200, admin_login.text
+    assert admin_login.json()["user"]["login"] == ADMIN
+    admin_token = env.token_from(admin_login)
+    assert admin_token
 
-    await _create_account(env, mixed_token, IVANOV, "business_admin")
-    kuznetsov_id = await _create_account(env, mixed_token, KUZNETSOV, "business_admin")
-    sidorova_id = await _create_account(env, mixed_token, SIDOROVA, "user")
+    await _create_account(env, admin_token, IVANOV, "business_admin")
+    kuznetsov_id = await _create_account(env, admin_token, KUZNETSOV, "business_admin")
+    sidorova_id = await _create_account(env, admin_token, SIDOROVA, "user")
     ivanov = await _permanent_session(env, IVANOV)
     kuznetsov = await _permanent_session(env, KUZNETSOV)
     sidorova = await _permanent_session(env, SIDOROVA)
 
-    for token, login in ((mixed_token, MIXED), (ivanov, IVANOV), (sidorova, SIDOROVA)):
+    for token, login in ((admin_token, ADMIN), (ivanov, IVANOV), (sidorova, SIDOROVA)):
         assert (await _get(env, token, "/api/v1/me"))["login"] == login
 
     # --- Ivanov.Petr: проект, участники, задача с исполнителем, комментарий ---
@@ -183,13 +184,13 @@ async def test_ac129_display_login_is_shown_everywhere_in_projects_tasks_comment
     listed = await _get(env, sidorova, PROJECTS)
     assert next(i for i in listed["items"] if i["id"] == project_id)["owner"]["login"] == KUZNETSOV
 
-    audit = await _get(env, mixed_token, AUDIT, page_size=100)
+    audit = await _get(env, admin_token, AUDIT, page_size=100)
     actors_by_action: dict[str, set[str]] = {}
     for entry in audit["items"]:
         assert entry["actor"]["kind"] == "user"
         actors_by_action.setdefault(entry["action"], set()).add(entry["actor"]["login"])
-    assert actors_by_action["user.created"] == {MIXED}
-    assert actors_by_action["user.role_assigned"] == {MIXED}
+    assert actors_by_action["user.created"] == {ADMIN}
+    assert actors_by_action["user.role_assigned"] == {ADMIN}
     assert actors_by_action["project.ownership_transferred"] == {IVANOV}
     created = [e for e in audit["items"] if e["action"] == "user.created"]
     assert len(created) == 3

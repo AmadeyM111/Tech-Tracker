@@ -224,13 +224,13 @@ async def test_ac48_owner_ba_moves_any_task(db: AsyncSession, svc: Any) -> None:
     assert (await task_row(db, t)).status == "review"
 
 
-async def test_ac103_sm_member_moves_non_member_403(db: AsyncSession, svc: Any) -> None:
+async def test_ac103_ba_non_member_403_then_member_moves(db: AsyncSession, svc: Any) -> None:
     w = await make_world(db)
     t = await mk_task(db, w, assignee_id=w.usr.id)
-    await forbidden(db, _mv(svc, db, w.sm, t, "done"))
-    await add_member_row(db, w, w.project_id, w.sm)
+    await forbidden(db, _mv(svc, db, w.ba3, t, "done"))
+    await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
-    await _mv(svc, db, w.sm, t, "done")
+    await _mv(svc, db, w.ba3, t, "done")
     assert (await task_row(db, t)).status == "done"
 
 

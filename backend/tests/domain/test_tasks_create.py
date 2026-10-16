@@ -132,8 +132,8 @@ async def test_p10_4_load_task_context_returns_facts(db: AsyncSession, ctx_mod: 
     assert c.task_id == row.id
     assert str(c.status) == "review"
     assert c.position == 4096
-    s = await ctx_mod.load_task_context(db, actor_of(w.sm), sub.id)
-    assert s.project.actor_is_member is False  # СМ не участник: факты — как есть
+    s = await ctx_mod.load_task_context(db, actor_of(w.ba3), sub.id)
+    assert s.project.actor_is_member is False  # БА не участник: факты — как есть
     assert s.task == TaskFacts(created_by=w.ba2.id, assignee_id=None, parent_id=row.id)
     assert s.position is None
 
@@ -240,10 +240,12 @@ async def test_ac9_user_assigns_self_ok_other_403(db: AsyncSession, svc: Any) ->
     assert await _count_tasks(db, w.project_id) == 1
 
 
-@pytest.mark.parametrize("who", ["ba", "sm"])
-async def test_ac56_ba_sm_without_assignee_gets_null(db: AsyncSession, svc: Any, who: str) -> None:
+@pytest.mark.parametrize("who", ["ba", "ba3"])
+async def test_ac56_ba_owner_and_ba_member_without_assignee_gets_null(
+    db: AsyncSession, svc: Any, who: str
+) -> None:
     w = await make_world(db)
-    await add_member_row(db, w, w.project_id, w.sm)
+    await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
     actor = actor_of(getattr(w, who))
     for data in (_data(svc), _data(svc, assignee=None)):
@@ -253,10 +255,10 @@ async def test_ac56_ba_sm_without_assignee_gets_null(db: AsyncSession, svc: Any,
         assert row.created_by == actor.user_id
 
 
-@pytest.mark.parametrize("who", ["ba", "sm", "ba2"])
-async def test_br1_ba_sm_assign_project_member(db: AsyncSession, svc: Any, who: str) -> None:
+@pytest.mark.parametrize("who", ["ba", "ba3", "ba2"])
+async def test_br1_ba_members_assign_project_member(db: AsyncSession, svc: Any, who: str) -> None:
     w = await make_world(db)
-    await add_member_row(db, w, w.project_id, w.sm)
+    await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
     tid = await svc.create_task(
         db, actor_of(getattr(w, who)), w.project_id, _data(svc, assignee=w.usr.id)
@@ -286,7 +288,7 @@ async def _recipient_cases(db: AsyncSession, w: World) -> list[tuple[uuid.UUID, 
     await db.commit()
     return [
         (w.usr2.id, "not_project_member"),
-        (w.sm.id, "not_project_member"),
+        (w.ba3.id, "not_project_member"),
         (w.ta.id, "recipient_wrong_role"),
         (w.norole.id, "recipient_wrong_role"),
         (w.blocked.id, "user_blocked"),
@@ -328,10 +330,12 @@ async def test_ac106_ba_not_member_is_403(db: AsyncSession, svc: Any) -> None:
     assert await _count_tasks(db, w.project_id) == 0
 
 
-@pytest.mark.parametrize("who", ["usr2", "sm", "ta", "norole"])
+@pytest.mark.parametrize("who", ["usr2", "ta", "norole"])
 async def test_ac106_non_member_or_no_business_access_is_403(
     db: AsyncSession, svc: Any, who: str
 ) -> None:
+    """Параметр ``sm`` (прежде СМ-не-участник) удалён: дословно дублировал БА-не-участника
+    ``ba3`` из ``test_ac106_ba_not_member_is_403`` выше (002/AC-15, NFR-3 (в))."""
     w = await make_world(db)
     user = getattr(w, who)
     await forbidden(
@@ -585,14 +589,14 @@ async def test_fr21_subtask_insert(db: AsyncSession, svc: Any) -> None:
 
 async def test_ac109_subtask_defaults_by_role(db: AsyncSession, svc: Any) -> None:
     w = await make_world(db)
-    await add_member_row(db, w, w.project_id, w.sm)
+    await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
     parent = await _parent(db, w, assignee=w.usr.id)
     # исполнитель родителя без исполнителя в данных -> он сам
     sid = await svc.create_subtask(db, actor_of(w.usr), parent, _data(svc))
     assert (await task_row(db, sid)).assignee_id == w.usr.id
-    # БА-владелец и СМ-участник -> None
-    for who in (w.ba, w.sm):
+    # БА-владелец и БА-участник -> None
+    for who in (w.ba, w.ba3):
         sid = await svc.create_subtask(db, actor_of(who), parent, _data(svc))
         assert (await task_row(db, sid)).assignee_id is None
         sid = await svc.create_subtask(db, actor_of(who), parent, _data(svc, assignee=None))
@@ -652,9 +656,10 @@ async def test_t70_ba_member_not_owner_subtask_rules(db: AsyncSession, svc: Any)
 
 
 async def test_ac106_subtask_non_member_is_403(db: AsyncSession, svc: Any) -> None:
+    """Актор ``sm`` (прежде СМ-не-участник) удалён из перечня: дублировал ``ba3`` (002/AC-15)."""
     w = await make_world(db)
     parent = await _parent(db, w, assignee=w.ba3.id)
-    for who in (w.ba3, w.usr2, w.sm, w.ta, w.norole):
+    for who in (w.ba3, w.usr2, w.ta, w.norole):
         await forbidden(
             db, svc.create_subtask(db, actor_of(who), parent, _data(svc, assignee=who.id))
         )

@@ -1,7 +1,8 @@
 """T75: изменение и удаление задач (plan §11.4, §11.5, §10.2, §4.5; D-46, D-55, D-56).
 
 AC-7 (родитель закрывается при незакрытых подзадачах), AC-42, AC-43, AC-46, AC-47, AC-48,
-AC-50, AC-99, AC-103, AC-108 (границы), FR-19, FR-19a, FR-19b, FR-20, FR-28a, OI-127;
+AC-50, AC-99, AC-103, AC-108 (границы), FR-19, FR-19a, FR-19b, FR-20, FR-28a;
+002/AC-13, AC-14, AC-15 (роль СМ упразднена);
 заметки ревью T73/T74 (перечитывание в ``load_task_context``, блокировка строки задачи).
 
 Ожидаемый интерфейс ``app.domain.tasks.service`` (``async``, ``commit()`` не вызывают)::
@@ -110,7 +111,7 @@ async def test_fr13_update_404_unknown_deleted_foreign_deleted_project(
     in_dead = await mk_task(db, w, project_id=dead_project.id)
     await db.commit()
     for tid in (uuid.uuid4(), foreign.id, deleted, in_dead):
-        for who in (w.ba, w.sm, w.ta):  # 404 раньше 403
+        for who in (w.ba, w.ba3, w.ta):  # 404 раньше 403
             await not_found(db, svc.update_task(db, actor_of(who), tid, _patch(svc, title="Х")))
             await not_found(db, svc.delete_task(db, actor_of(who), tid))
 
@@ -206,9 +207,7 @@ async def test_ac47_assignee_changes_status_of_assigned_task(db: AsyncSession, s
     assert r.title == "Задача"
 
 
-async def test_ac47_mixed_patch_with_forbidden_field_changes_nothing(
-    db: AsyncSession, svc: Any
-) -> None:
+async def test_ac47_patch_with_forbidden_field_changes_nothing(db: AsyncSession, svc: Any) -> None:
     """Атомарность: status разрешён, title — нет => 403 и статус тоже не изменился."""
     w = await make_world(db)
     tid = await mk_task(db, w, assignee_id=w.usr.id)
@@ -253,17 +252,18 @@ async def test_ac42_user_cannot_reassign_task_of_blocked_assignee(
     assert r.deleted_at is None
 
 
-async def test_ac43_ba_not_owner_403_sm_member_ok_on_blocked_assignee_task(
+async def test_ac43_user_403_ba_members_ok_on_blocked_assignee_task(
     db: AsyncSession, svc: Any
 ) -> None:
     """Обращён по 002/AC-14 (FR-9, 001/FR-5): БА-участник не владелец переназначает задачу
-    заблокированного исполнителя; СМ-участник - тоже (СМ уйдёт в R3-T07); «Пользователь» - 403."""
+    заблокированного исполнителя; второй БА-участник (``ba3``, вступил в проект) - тоже;
+    «Пользователь» - 403."""
     w = await make_world(db)
     blocked_member = await make_user(
         db, workspace=w.ws, role="user", login="w.blockedm", blocked=True
     )
     await add_member_row(db, w, w.project_id, blocked_member)
-    await add_member_row(db, w, w.project_id, w.sm)
+    await add_member_row(db, w, w.project_id, w.ba3)
     tid = await mk_task(db, w, assignee_id=blocked_member.id)
     await forbidden(
         db, svc.update_task(db, actor_of(w.usr), tid, _patch(svc, assignee_id=w.usr.id))
@@ -271,7 +271,7 @@ async def test_ac43_ba_not_owner_403_sm_member_ok_on_blocked_assignee_task(
     assert (await task_row(db, tid)).assignee_id == blocked_member.id
     await svc.update_task(db, actor_of(w.ba2), tid, _patch(svc, assignee_id=w.usr.id))
     assert (await task_row(db, tid)).assignee_id == w.usr.id
-    await svc.update_task(db, actor_of(w.sm), tid, _patch(svc, assignee_id=w.ba2.id))
+    await svc.update_task(db, actor_of(w.ba3), tid, _patch(svc, assignee_id=w.ba2.id))
     assert (await task_row(db, tid)).assignee_id == w.ba2.id
 
 
@@ -348,22 +348,22 @@ async def test_ac48_owner_ba_changes_any_task_incl_foreign_author(
     assert (r.title, r.status, r.priority) == ("Владелец", "review", "high")
 
 
-async def test_ac103_sm_member_changes_fields_and_assignee_non_member_403(
+async def test_ac103_ba_non_member_403_then_member_changes_fields_and_assignee(
     db: AsyncSession, svc: Any
 ) -> None:
     w = await make_world(db)
     tid = await mk_task(db, w, assignee_id=w.usr.id)
     before = await _snapshot(db, tid)
-    for fields in ({"title": "СМ"}, {"assignee_id": w.ba2.id}, {"status": "done"}):
-        await forbidden(db, svc.update_task(db, actor_of(w.sm), tid, _patch(svc, **fields)))
+    for fields in ({"title": "БА"}, {"assignee_id": w.ba2.id}, {"status": "done"}):
+        await forbidden(db, svc.update_task(db, actor_of(w.ba3), tid, _patch(svc, **fields)))
     assert await _snapshot(db, tid) == before
-    await add_member_row(db, w, w.project_id, w.sm)  # добавил себя в проект и повторил
+    await add_member_row(db, w, w.project_id, w.ba3)  # добавил себя в проект и повторил
     await db.commit()
     await svc.update_task(
-        db, actor_of(w.sm), tid, _patch(svc, title="СМ", assignee_id=w.ba2.id, status="review")
+        db, actor_of(w.ba3), tid, _patch(svc, title="БА", assignee_id=w.ba2.id, status="review")
     )
     r = await task_row(db, tid)
-    assert (r.title, r.assignee_id, r.status) == ("СМ", w.ba2.id, "review")
+    assert (r.title, r.assignee_id, r.status) == ("БА", w.ba2.id, "review")
 
 
 @pytest.mark.parametrize("who", ["ta", "norole", "usr2", "ba3"])
@@ -464,7 +464,7 @@ async def test_ac50_update_assignee_recipient_codes(db: AsyncSession, svc: Any) 
     tid = await mk_task(db, w, assignee_id=w.usr.id)
     cases = [
         (w.usr2.id, "not_project_member"),
-        (w.sm.id, "not_project_member"),
+        (w.ba3.id, "not_project_member"),
         (w.ta.id, "recipient_wrong_role"),
         (w.norole.id, "recipient_wrong_role"),
         (w.blocked.id, "user_blocked"),
@@ -496,10 +496,12 @@ async def test_fr20_422_recipient_rolls_back_other_fields_of_same_patch(
     assert await _snapshot(db, tid) == before
 
 
-@pytest.mark.parametrize("who", ["ba", "sm"])
-async def test_fr20_ba_sm_may_clear_assignee(db: AsyncSession, svc: Any, who: str) -> None:
+@pytest.mark.parametrize("who", ["ba", "ba3"])
+async def test_fr20_ba_owner_and_ba_member_may_clear_assignee(
+    db: AsyncSession, svc: Any, who: str
+) -> None:
     w = await make_world(db)
-    await add_member_row(db, w, w.project_id, w.sm)
+    await add_member_row(db, w, w.project_id, w.ba3)
     tid = await mk_task(db, w, assignee_id=w.usr.id)
     await svc.update_task(db, actor_of(getattr(w, who)), tid, _patch(svc, assignee_id=None))
     assert (await task_row(db, tid)).assignee_id is None
@@ -766,15 +768,15 @@ async def test_ac48_ba_not_owner_deletes_own_task(db: AsyncSession, svc: Any) ->
     await not_found(db, svc.delete_task(db, actor_of(w.ba2), tid))
 
 
-async def test_ac99_sm_member_deletes_foreign_task_non_member_403(
+async def test_ac99_ba_non_member_403_then_member_deletes_foreign_task(
     db: AsyncSession, svc: Any
 ) -> None:
     w = await make_world(db)
     tid = await mk_task(db, w, assignee_id=w.usr.id)
-    await forbidden(db, svc.delete_task(db, actor_of(w.sm), tid))
-    await add_member_row(db, w, w.project_id, w.sm)
+    await forbidden(db, svc.delete_task(db, actor_of(w.ba3), tid))
+    await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
-    await svc.delete_task(db, actor_of(w.sm), tid)
+    await svc.delete_task(db, actor_of(w.ba3), tid)
     assert (await task_row(db, tid)).deleted_at is not None
 
 
@@ -1126,7 +1128,7 @@ async def test_p10_2_update_assignee_waits_for_member_removal_then_422(
 # --- ревью T75, попытка 2 ---------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("who", ["usr2", "ba3", "sm", "ta", "norole"])
+@pytest.mark.parametrize("who", ["usr2", "ba3", "ta", "norole"])
 async def test_d46_non_participant_gets_403_even_for_empty_or_same_value_patch(
     db: AsyncSession, svc: Any, who: str
 ) -> None:
@@ -1494,12 +1496,12 @@ async def test_t75_review_recipient_error_after_concurrent_reassign_is_not_swall
             setup, workspace=w.ws, role="user", login="w.blockedm", blocked=True
         )
         await add_member_row(setup, w, w.project_id, blocked_member)
-        await add_member_row(setup, w, w.project_id, w.sm)
+        await add_member_row(setup, w, w.project_id, w.ba3)
         await setup.commit()
         tid = await mk_task(setup, w, assignee_id=blocked_member.id, title="T")
     holder = committed()
     try:
-        await svc.update_task(holder, actor_of(w.sm), tid, svc.TaskPatch(assignee_id=w.usr.id))
+        await svc.update_task(holder, actor_of(w.ba3), tid, svc.TaskPatch(assignee_id=w.usr.id))
         (outcome,) = await _waiting_job(
             committed,
             holder.commit,
