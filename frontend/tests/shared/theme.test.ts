@@ -232,3 +232,42 @@ describe("T90 shell and component styles", () => {
     expect(d["outline"]).not.toMatch(/\bnone\b|\b0\b/);
   });
 });
+
+describe("T92 .ui-home-link (pill link styled like buttons)", () => {
+  const SEL = ".ui-home-link";
+
+  it("is defined and uses button tokens", () => {
+    const d = declsFor(SEL);
+    expect(Object.keys(d).length, `${SEL} is not defined`).toBeGreaterThan(0);
+    expect(d["background"] ?? d["background-color"]).toContain("var(--button-bg)");
+    expect(d["color"]).toContain("var(--button-text)");
+    expect(contrast(tok("button-text"), tok("button-bg"))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("has pill radius >= 16px, inline box, padding and no underline", () => {
+    const d = declsFor(SEL);
+    expect(Number.parseFloat(d["border-radius"] ?? "0")).toBeGreaterThanOrEqual(16);
+    expect(d["display"]).toMatch(/^inline-(flex|block)$/);
+    expect(d["padding"], "padding").toBeTruthy();
+    expect(d["text-decoration"] ?? d["text-decoration-line"]).toMatch(/^none\b/);
+  });
+
+  it("has a border through a token", () => {
+    usesVar(SEL, ["border"]);
+  });
+
+  it(":hover is styled through tokens", () => {
+    const d = declsFor(`${SEL}:hover`);
+    expect(Object.keys(d).length, `${SEL}:hover is not defined`).toBeGreaterThan(0);
+    const vals = Object.values(d).join(" ");
+    expect(vals).toMatch(/var\(--[\w-]+\)/);
+    expect(d["text-decoration"] ?? "none").toMatch(/^none\b/);
+  });
+
+  it(":focus-visible is styled through the --focus token", () => {
+    const d = declsFor(`${SEL}:focus-visible`);
+    expect(Object.keys(d).length, `${SEL}:focus-visible is not defined`).toBeGreaterThan(0);
+    expect(d["outline"] ?? d["outline-color"] ?? d["box-shadow"]).toContain("var(--focus)");
+    expect(d["outline"] ?? "").not.toMatch(/\bnone\b|\b0\b/);
+  });
+});

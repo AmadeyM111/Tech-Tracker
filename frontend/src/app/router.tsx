@@ -154,7 +154,9 @@ function Root({ insideMain }: { insideMain: boolean }) {
 function HomeLink() {
   return (
     <p>
-      <Link to="/">{t("app.home_link")}</Link>
+      <Link to="/" className="ui-home-link">
+        {t("app.home_link")}
+      </Link>
     </p>
   );
 }

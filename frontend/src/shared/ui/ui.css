@@ -96,6 +96,32 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* T92: the "home" link looks like a pill button. */
+.ui-home-link {
+  display: inline-flex;
+  align-items: center;
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-bg);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.ui-home-link:hover {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.ui-home-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 input,
 textarea,
 select {
