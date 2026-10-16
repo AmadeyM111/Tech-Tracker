@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { AuditPage } from "../features/admin/AuditPage";
@@ -11,7 +11,7 @@ import { MyTasksPage } from "../features/tasks/TaskList";
 import { TaskPage } from "../features/tasks/TaskPage";
 import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
-import { me, type MeResponse } from "../features/auth/api";
+import { me, type MeResponse } from "../features/auth/session";
 import { useLogout } from "../features/auth/useLogout";
 import { ApiError, setNavigationHandlers } from "../shared/api/client";
 import { errorMessage, t } from "../shared/i18n";
@@ -132,9 +132,17 @@ function MenuItems({ profile }: { profile: MeResponse }) {
 function Home({ profile }: { profile: MeResponse }) {
   const alert = useAlertState();
   const logout = useLogout(alert);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const focusHeading = (useLocation().state as { focusHeading?: boolean } | null)?.focusHeading === true;
+  useEffect(() => {
+    // After the forced password change the modal is gone: keep focus in the page, not on <body>.
+    if (focusHeading) headingRef.current?.focus();
+  }, [focusHeading]);
   return (
     <>
-      <h1>{t("app.home_title")}</h1>
+      <h1 ref={headingRef} tabIndex={-1}>
+        {t("app.home_title")}
+      </h1>
       <ErrorAlert message={alert.message} seq={alert.seq} />
       <div className="ui-sidebar">
         <nav>
@@ -145,16 +153,6 @@ function Home({ profile }: { profile: MeResponse }) {
           {t("auth.logout")}
         </button>
       </div>
-      <section data-section="welcome">
-        <h2>{t("app.welcome_title")}</h2>
-        <p>{t("app.welcome_hint")}</p>
-        <p>
-          <Link to="/change-password" className="ui-home-link">
-            <Icon name="password" />
-            {t("app.change_password_link")}
-          </Link>
-        </p>
-      </section>
     </>
   );
 }
@@ -236,8 +234,8 @@ function BusinessScreen({
 }
 
 /**
- * change-password and no-role stay reachable with any session state but 401:
- * the form is shown at once, the check only redirects to the login page.
+ * no-role stays reachable with any session state but 401: the page is shown at
+ * once, the check only redirects to the login page.
  */
 function NeedsSession({ children }: { children: ReactNode }) {
   const session = useSession();
@@ -245,6 +243,36 @@ function NeedsSession({ children }: { children: ReactNode }) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
+}
+
+/**
+ * Forced password change (T103): a modal window over a blank home substrate.
+ * Only a user who must change the password sees it; everybody else goes to "/".
+ */
+function ForcedPasswordChange() {
+  const session = useSession();
+  // A cached answer may be stale (e.g. "no role" from before the redirect here): decide on the fresh one.
+  const [fresh, setFresh] = useState(false);
+  if (!fresh && !session.isFetching) setFresh(true);
+  if (session.isPending || !fresh) return <p role="status">{t("app.loading")}</p>;
+  if (session.isError) {
+    const error = session.error;
+    if (error instanceof ApiError && error.status === 403 && error.code === "password_change_required") {
+      return <PasswordModal />;
+    }
+    return <Navigate to={redirectFor(error) ?? "/"} replace />;
+  }
+  if (!session.data.must_change_password) return <Navigate to="/" replace />;
+  return <PasswordModal />;
+}
+
+function PasswordModal() {
+  return (
+    <>
+      <div className="ui-shell" aria-hidden="true" />
+      <ChangePasswordPage />
+    </>
+  );
 }
 
 function GuestOnly({ children }: { children: ReactNode }) {
@@ -272,9 +300,13 @@ function useClientHandlers(): void {
           queryClient.clear();
           navigate("/login", { replace: true });
         },
-        onPasswordChangeRequired: () => navigate("/change-password", { replace: true }),
+        onPasswordChangeRequired: () => {
+          // Already in the modal: a repeated 403 must not add a history step.
+          if (pathRef.current === "/change-password") return;
+          navigate("/change-password", { replace: true });
+        },
         onNoRole: () => {
-          // A user without a role may still change the password voluntarily (FR-56).
+          // A 403 no_role inside the password modal (a forced user without a role) keeps the modal on screen.
           if (pathRef.current === "/change-password" || pathRef.current === "/no-role") return;
           navigate("/no-role", { replace: true });
         },
@@ -299,9 +331,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
       <Route
         path="/change-password"
         element={
-          <NeedsSession>
-            <ChangePasswordPage />
-          </NeedsSession>
+          <ForcedPasswordChange />
         }
       />
       <Route

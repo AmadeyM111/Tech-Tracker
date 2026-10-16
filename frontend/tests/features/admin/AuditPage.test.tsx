@@ -402,7 +402,7 @@ describe("links from admin screens to home", () => {
   });
 });
 
-describe("home: logout and voluntary password change (FR-56, FR-60)", () => {
+describe("home: logout and no password-change link (FR-55, FR-60; T103: only forced change)", () => {
   const LOGOUT = "POST /api/v1/auth/logout";
 
   it("home_has_typed_logout_button_that_logs_out_clears_cache_and_goes_to_login", async () => {
@@ -426,14 +426,10 @@ describe("home: logout and voluntary password change (FR-56, FR-60)", () => {
     expect(qc.getQueryData(["sentinel"])).toBeUndefined();
   });
 
-  it("home_has_link_to_voluntary_change_password", async () => {
+  it("t103_home_has_no_change_password_link", async () => {
     setup({}, []);
     const { container } = renderApp("/");
     await screen.findByRole("main");
-    const a = container.querySelector<HTMLAnchorElement>('a[href="/change-password"]');
-    expect(a).toBeTruthy();
-    expect(DICT).toContain(a?.textContent);
-    fireEvent.click(a as HTMLAnchorElement);
-    await expectAt("/change-password");
+    expect(container.querySelector('a[href="/change-password"]')).toBeNull();
   });
 });

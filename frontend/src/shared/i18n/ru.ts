@@ -2,6 +2,7 @@
 // Keys are flat dotted identifiers; `{name}` marks a placeholder for t().
 // Error keys follow `error.<code>`, where <code> is a backend error code
 // (backend/app/core/errors.py) or a client-side code from shared/api/client.ts.
+// app.welcome_* texts belong to the forced password-change modal (T103); there is no change-password link.
 export const ru = {
   "error.not_authenticated": "Требуется вход в систему",
   "error.invalid_credentials": "Неверный логин или пароль",
@@ -42,7 +43,6 @@ export const ru = {
   "auth.login_label": "Логин",
   "auth.password_label": "Пароль",
   "auth.login_submit": "Войти",
-  "auth.change_password_title": "Смена пароля",
   "auth.current_password_label": "Текущий пароль",
   "auth.new_password_label": "Новый пароль",
   "auth.confirm_password_label": "Повторите новый пароль",
@@ -139,9 +139,8 @@ export const ru = {
   "app.loading": "Проверка сессии…",
   "app.home_title": "Главная",
   "app.home_link": "На главную",
-  "app.change_password_link": "Сменить пароль",
   "app.welcome_title": "Добро пожаловать",
-  "app.welcome_hint": "Здесь можно сменить пароль учётной записи.",
+  "app.welcome_hint": "Для продолжения задайте новый пароль.",
   "app.retry": "Повторить",
   "nav.projects": "Проекты",
   "nav.my_tasks": "Мои задачи",

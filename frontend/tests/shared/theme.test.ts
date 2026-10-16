@@ -271,3 +271,18 @@ describe("T92 .ui-home-link (pill link styled like buttons)", () => {
     expect(d["outline"] ?? "").not.toMatch(/\bnone\b|\b0\b/);
   });
 });
+
+// T103: the password modal must stay reachable on a low screen (review blocker).
+describe(".ui-overlay on a low viewport (T103)", () => {
+  const o = () => declsFor(".ui-overlay");
+
+  it("scrolls vertically when the dialog is taller than the screen", () => {
+    expect(o()["overflow-y"] ?? o()["overflow"]).toMatch(/^(auto|scroll)$/);
+  });
+
+  it("does not push the top of the dialog off-screen", () => {
+    const safe = /^safe\s+center$/.test(o()["align-items"] ?? "");
+    const marginAuto = (declsFor(".ui-overlay > .ui-dialog")["margin"] ?? "").trim().startsWith("auto");
+    expect(safe || (o()["align-items"] === "center" && marginAuto), "safe center or center + margin:auto").toBe(true);
+  });
+});

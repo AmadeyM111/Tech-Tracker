@@ -26,9 +26,5 @@ export async function changePassword(body: ChangePasswordRequest): Promise<void>
   await getAppClient().POST("/api/v1/auth/password", { body });
 }
 
-/** Current user profile; a flat MeResponse. Rejects with 401/403 when there is no usable session. */
-export async function me(): Promise<MeResponse> {
-  const { data } = await getAppClient().GET("/api/v1/me");
-  if (data === undefined) throw invalidBody(200);
-  return data;
-}
+// The profile request lives in session.ts (the router reads it independently of the form calls above).
+export { me } from "./session";
