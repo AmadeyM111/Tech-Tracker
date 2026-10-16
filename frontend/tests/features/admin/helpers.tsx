@@ -37,7 +37,7 @@
 //   действия строки (type="button"): [data-action="block"] (если не заблокирован) /
 //     [data-action="unblock"] (если заблокирован), [data-action="reset-password"],
 //     [data-action="revoke-sessions"]; роль: select[name="role"] (значения "", tech_admin,
-//     business_admin, mixed, user; "" = без роли) + [data-action="set-role"] - только при
+//     business_admin, user; "" = без роли; 002 FR-21: значения mixed нет) + [data-action="set-role"] - только при
 //     capability assign_roles; select и кнопки имеют доступное имя (label/aria-label);
 //   подтверждение: block, reset-password, revoke-sessions и снятие роли (select = "") открывают
 //     [role="alertdialog"] с логином пользователя, button[data-action="confirm"] и

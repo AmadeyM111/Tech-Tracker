@@ -474,7 +474,9 @@ describe("roles as a separate action (FR-4, FR-12, FR-66, FR-69)", () => {
       Array.from(sel.options)
         .map((o) => o.value)
         .sort(),
-    ).toEqual(["", "business_admin", "mixed", "tech_admin", "user"]);
+    ).toEqual(["", "business_admin", "tech_admin", "user"]);
+    // 002 AC-27, FR-21: "mixed" is not offered; role names are unchanged.
+    expect(Array.from(sel.options).map((o) => o.value)).not.toContain("mixed");
     for (const o of Array.from(sel.options)) expect(DICT).toContain(o.textContent);
     expect(sel.value).toBe("");
     expect(roleSelect(container, ID_PETROV).value).toBe("user");
@@ -493,11 +495,11 @@ describe("roles as a separate action (FR-4, FR-12, FR-66, FR-69)", () => {
 
   it("change_role_puts_new_role", async () => {
     const path = `PUT ${url(ID_PETROV, "role")}`;
-    const { container } = await open({ [path]: () => j(200, { ...U_PETROV, role: "mixed" }) });
-    fireEvent.change(roleSelect(container, ID_PETROV), { target: { value: "mixed" } });
+    const { container } = await open({ [path]: () => j(200, { ...U_PETROV, role: "business_admin" }) });
+    fireEvent.change(roleSelect(container, ID_PETROV), { target: { value: "business_admin" } });
     fireEvent.click(action(row(container, ID_PETROV), "set-role"));
     await waitFor(() => expect(f.count(path)).toBe(1));
-    expect(await f.last(path).clone().json()).toEqual({ role: "mixed" });
+    expect(await f.last(path).clone().json()).toEqual({ role: "business_admin" });
   });
 
   it("remove_role_requires_confirmation_then_puts_null", async () => {

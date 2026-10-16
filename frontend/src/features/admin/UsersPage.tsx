@@ -21,7 +21,7 @@ import {
 import { generateOneTimePassword } from "./password";
 
 const USERS_KEY = ["admin", "users"] as const;
-const ROLES: readonly Role[] = ["tech_admin", "business_admin", "mixed", "user"];
+const ROLES: readonly Role[] = ["tech_admin", "business_admin", "user"];
 
 type Confirmation =
   | { kind: "block" | "reset" | "revoke" | "remove_role"; user: AdminUser };

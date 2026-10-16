@@ -339,7 +339,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
 - **Попытки:** 0
 
 ## R3-T09 — Фронтенд: выбор роли из трёх, «Смешанная роль» только в журнале
-- **Статус:** TODO
+- **Статус:** DONE (1 попытка, reviews/R3-T09-1.md)
 - **AC:** AC-27 (автоматическая часть: выбор роли и журнал); FR-20, FR-21
 - **Файлы:** `frontend/src/features/admin/UsersPage.tsx`;
   тесты: `frontend/tests/features/admin/UsersPage.test.tsx`, `frontend/tests/features/admin/helpers.tsx`,

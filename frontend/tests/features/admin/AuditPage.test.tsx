@@ -343,6 +343,21 @@ describe("action texts, roles, timezone (review T24 attempt 2)", () => {
     expect(cell(entry(container, 200), "action").textContent).toBe("user.mystery_action");
   });
 
+  it("002_fr20_historical_mixed_shows_mixed_role_name_not_code", async () => {
+    const items = [
+      mk(401, "user.role_assigned", { role_from: null, role_to: "mixed" }),
+      mk(402, "user.role_changed", { role_from: "user", role_to: "mixed" }),
+      mk(403, "user.role_removed", { role_from: "mixed", role_to: null }),
+    ];
+    const { container } = await open({ [AUDIT]: () => j(200, page(items)) });
+    for (const id of [401, 402, 403]) {
+      const t = entry(container, id).textContent ?? "";
+      expect(t, String(id)).toContain(ru["admin.role.mixed"]);
+      expect(t, String(id)).not.toMatch(/mixed/i);
+    }
+    expect(entry(container, 402).textContent).toContain(ru["admin.role.user"]);
+  });
+
   it("role_events_show_role_names_from_dictionary", async () => {
     const items = [
       mk(301, "user.role_assigned", { role_from: null, role_to: "tech_admin" }),
