@@ -2,8 +2,8 @@
 
 Подзадача: статус ``todo``, позиции нет, проект родителя, один уровень вложенности.
 Права — plan §11.5: ``can_create_task(assignee)`` и (полная правка родителя или исполнитель
-родителя). БА-участник не владелец не создаёт подзадачу к чужой задаче и к своей задаче,
-созданной другому или без исполнителя (ревью T74 п.6).
+родителя). БА-участник (не владелец) создаёт подзадачу к любой задаче проекта (AC 002: AC-13), не
+участник проекта получает 403 (AC 002: AC-15); отменённое ограничение ревью T74 п.6 не действует.
 """
 
 from __future__ import annotations
@@ -140,9 +140,7 @@ async def test_ac47_assignee_creates_subtask_for_himself_default_is_himself(
         assert r.json()["author"]["id"] == str(w.uid("usr"))
 
 
-@pytest.mark.parametrize(
-    "assignee", ["ba2", "sm_m", None], ids=["other_member", "other_mixed", "explicit_null"]
-)
+@pytest.mark.parametrize("assignee", ["ba2", None], ids=["other_member", "explicit_null"])
 async def test_ac47_assignee_cannot_create_subtask_for_other_or_null_403(
     api_env: ApiEnv, assignee: str | None
 ) -> None:
@@ -241,24 +239,25 @@ async def test_t74_review_6_ba_member_not_owner_subtask_formula(
     assert await _children(env, parent) == (1 if expected == 201 else 0)
 
 
-async def test_owner_and_mixed_member_create_subtask_with_any_assignee(api_env: ApiEnv) -> None:
+async def test_owner_and_ba_member_create_subtask_with_any_assignee(api_env: ApiEnv) -> None:
+    """AC 002 AC-13: владелец и БА-участник ``ba2`` (прежде ``sm_m``) создают подзадачу любому."""
     env = api_env
     w = await make_api_world(env)
     parent = await mk(env, w, by="usr", assignee="usr")
 
-    for who in ("ba", "sm_m"):
+    for who in ("ba", "ba2"):
         r = await send(
             env,
             w.tok(who),
             "POST",
             _sub_url(parent),
-            {"title": f"От {who}", "assignee_id": str(w.uid("ba2"))},
+            {"title": f"От {who}", "assignee_id": str(w.uid("usr"))},
         )
         assert r.status_code == 201, (who, r.text)
-        assert r.json()["assignee"]["id"] == str(w.uid("ba2"))
+        assert r.json()["assignee"]["id"] == str(w.uid("usr"))
 
 
-@pytest.mark.parametrize("who", ["usr2", "ba3", "sm"])
+@pytest.mark.parametrize("who", ["usr2", "ba3"])
 async def test_non_member_cannot_create_subtask_403(api_env: ApiEnv, who: str) -> None:
     env = api_env
     w = await make_api_world(env)

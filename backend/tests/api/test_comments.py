@@ -105,7 +105,7 @@ async def test_fr23_create_returns_201_comment_shape_and_stores(api_env: ApiEnv)
     assert "retry-after" not in r.headers
 
 
-@pytest.mark.parametrize("who", ["ba", "ba2", "sm_m", "usr"])
+@pytest.mark.parametrize("who", ["ba", "ba2", "usr"])
 async def test_ac103_members_of_every_role_can_comment(api_env: ApiEnv, who: str) -> None:
     env = api_env
     w = await make_api_world(env)
@@ -252,7 +252,7 @@ async def test_d65_invalid_json_is_400_bad_request(
 
 @pytest.mark.parametrize(
     "who,expected",
-    [("usr2", (403, "forbidden")), ("ba3", (403, "forbidden")), ("sm", (403, "forbidden"))],
+    [("usr2", (403, "forbidden")), ("ba3", (403, "forbidden"))],
 )
 async def test_ac103_create_non_member_is_403_nothing_stored(
     api_env: ApiEnv, who: str, expected: tuple[int, str]
@@ -267,13 +267,17 @@ async def test_ac103_create_non_member_is_403_nothing_stored(
     assert await _count(env, t) == 0
 
 
-async def test_ac103_sm_becomes_able_after_membership(api_env: ApiEnv) -> None:
+async def test_ac103_ba_becomes_able_after_membership(api_env: ApiEnv) -> None:
+    """AC 002 AC-15: БА-неучастник ``ba3`` (прежде СМ ``sm``) - 403, после вступления - 200."""
+    from tests.tasks_api_support import add_member_row
+
     env = api_env
     w = await make_api_world(env)
     t = await mk(env, w)
 
-    assert error(await send(env, w.tok("sm"), "GET", _list_url(t))) == (403, "forbidden")
-    ok = await send(env, w.tok("sm_m"), "GET", _list_url(t))
+    assert error(await send(env, w.tok("ba3"), "GET", _list_url(t))) == (403, "forbidden")
+    await add_member_row(env, w, w.people["ba3"].user)
+    ok = await send(env, w.tok("ba3"), "GET", _list_url(t))
 
     assert ok.status_code == 200, ok.text
 
@@ -502,7 +506,7 @@ async def test_ac58_edit_by_author_200_sets_body_and_edited_at(api_env: ApiEnv) 
     assert row.created_by == w.uid("usr")
 
 
-@pytest.mark.parametrize("who", ["ba", "ba2", "sm_m"])
+@pytest.mark.parametrize("who", ["ba", "ba2"])
 async def test_ac58_edit_foreign_comment_is_403_even_for_owner(api_env: ApiEnv, who: str) -> None:
     env = api_env
     w = await make_api_world(env)
@@ -605,19 +609,20 @@ async def test_ac58_author_deletes_own_204_soft_and_list_shows_stub(api_env: Api
     assert "удали меня" not in json.dumps(items, ensure_ascii=False)
 
 
-async def test_ac58_owner_ba_and_sm_member_delete_foreign(api_env: ApiEnv) -> None:
+async def test_ac58_owner_and_ba_member_delete_foreign(api_env: ApiEnv) -> None:
+    """AC 002 AC-13: владелец и БА-участник ``ba2`` (прежде СМ ``sm_m``) удаляют чужой."""
     env = api_env
     w = await make_api_world(env)
     t = await mk(env, w)
     by_owner = await _comment(env, w, t, "usr")
-    by_sm = await _comment(env, w, t, "usr")
+    by_ba2 = await _comment(env, w, t, "usr")
 
     r1 = await send(env, w.tok("ba"), "DELETE", _c_url(by_owner))
-    r2 = await send(env, w.tok("sm_m"), "DELETE", _c_url(by_sm))
+    r2 = await send(env, w.tok("ba2"), "DELETE", _c_url(by_ba2))
 
     assert (r1.status_code, r2.status_code) == (204, 204)
     assert (await _db(env, by_owner)).deleted_at is not None
-    assert (await _db(env, by_sm)).deleted_at is not None
+    assert (await _db(env, by_ba2)).deleted_at is not None
 
 
 @pytest.mark.parametrize("who", ["usr2", "ba3"])

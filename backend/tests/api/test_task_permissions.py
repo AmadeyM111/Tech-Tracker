@@ -1,6 +1,6 @@
 """T77: матрица «роль × состояние задачи × операция» (AC-9, AC-11, AC-46, AC-47, AC-99, AC-103).
 
-Состояния (автор -> исполнитель), проект: владелец ``ba``; участники ``ba2``, ``sm_m``, ``usr``:
+Состояния (автор -> исполнитель), проект: владелец ``ba``; участники ``ba2``, ``usr``:
 
 * ``assigned``   ``ba -> usr``   — задача поставлена «Пользователю» владельцем;
 * ``own_usr``    ``usr -> usr``  — своя задача «Пользователя»;
@@ -9,7 +9,7 @@
 * ``to_ba2``     ``ba -> ba2``   — задача БА-участнику, не владельцу.
 
 Операции: ``view`` (GET), ``title`` (PATCH названия), ``status`` (PATCH статуса), ``assignee``
-(PATCH исполнителя на ``sm_m``), ``delete`` (DELETE), ``subtask`` (POST подзадачи без
+(PATCH исполнителя на ``ba``), ``delete`` (DELETE), ``subtask`` (POST подзадачи без
 исполнителя). Ожидания записаны явно по plan §11.5, а не выведены из кода политики.
 Поля ``permissions`` карточки обязаны совпадать с фактическим исходом операций.
 """
@@ -44,7 +44,6 @@ NONE = {op: False for op in OPS}
 # роль -> состояние -> какие операции разрешены (view у участников всегда разрешён)
 EXPECTED: dict[str, dict[str, dict[str, bool]]] = {
     "ba": {s: ALL for s in STATES},
-    "sm_m": {s: ALL for s in STATES},
     # 002/AC-13, AC-14 (FR-9): БА-участник не владелец может всё в любом состоянии
     "ba2": {s: ALL for s in STATES},
     "usr": {
@@ -73,9 +72,7 @@ async def _op(env: ApiEnv, w: Any, who: str, op: str, task_id: Any) -> Any:
     if op == "status":
         return await send(env, token, "PATCH", task_url(task_id), {"status": "in_progress"})
     if op == "assignee":
-        return await send(
-            env, token, "PATCH", task_url(task_id), {"assignee_id": str(w.uid("sm_m"))}
-        )
+        return await send(env, token, "PATCH", task_url(task_id), {"assignee_id": str(w.uid("ba"))})
     if op == "delete":
         return await send(env, token, "DELETE", task_url(task_id))
     assert op == "subtask"
@@ -128,7 +125,7 @@ async def test_matrix_role_x_state_x_operation(api_env: ApiEnv, who: str) -> Non
     assert failures == []
 
 
-@pytest.mark.parametrize("who", ["usr2", "ba3", "sm"])
+@pytest.mark.parametrize("who", ["usr2", "ba3"])
 @pytest.mark.parametrize("state", list(STATES))
 async def test_ac11_ac103_non_member_gets_403_on_every_operation(
     api_env: ApiEnv, who: str, state: str
@@ -145,39 +142,38 @@ async def test_ac11_ac103_non_member_gets_403_on_every_operation(
         assert (row.title, row.status, row.deleted_at) == ("Исходное", "todo", None)
 
 
-async def test_ac103_mixed_non_member_adds_himself_and_then_changes_foreign_task(
+async def test_ac103_ba_non_member_adds_himself_and_then_changes_foreign_task(
     api_env: ApiEnv,
 ) -> None:
+    """AC 002 AC-15 (прежде СМ ``sm``): БА-неучастник ``ba3`` - 403, после вступления - успех."""
     from tests.tasks_api_support import add_member_row
 
     env = api_env
     w = await make_api_world(env)
     t = await mk(env, w, assignee="usr", title="Исходное")
-    assert error(await _op(env, w, "sm", "title", t)) == (403, "forbidden")
+    assert error(await _op(env, w, "ba3", "title", t)) == (403, "forbidden")
 
-    await add_member_row(env, w, w.people["sm"].user)
+    await add_member_row(env, w, w.people["ba3"].user)
 
     for op, want in (("title", 200), ("assignee", 200), ("subtask", 201)):
-        r = await _op(env, w, "sm", op, t)
+        r = await _op(env, w, "ba3", op, t)
         assert r.status_code == want, (op, r.text)
-    deleted = await _op(env, w, "sm", "delete", t)
+    deleted = await _op(env, w, "ba3", "delete", t)
     assert deleted.status_code == 204
 
 
-async def test_ac99_mixed_member_deletes_foreign_task_ba_member_cannot(api_env: ApiEnv) -> None:
+async def test_ac99_ba_member_deletes_foreign_task_non_member_cannot(api_env: ApiEnv) -> None:
     """Обращён по 002/AC-13 (FR-9): чужую задачу удаляет БА-участник не владелец; «Пользователь»
-    (участник, не автор) и не участник ba3 - 403; СМ-участник удаляет, как прежде."""
+    (участник, не автор) и не участник ba3 - 403. Прежняя проверка СМ-участника ``sm_m`` на второй
+    задаче дублировала проверку ``ba2`` (``sm_m`` -> ``ba2``, AC-13) и снята."""
     env = api_env
     w = await make_api_world(env)
     foreign = await mk(env, w, by="usr", assignee="usr")
-    other = await mk(env, w, by="usr", assignee="usr")
 
     assert error(await _op(env, w, "ba3", "delete", foreign)) == (403, "forbidden")
     assert (await task_db(env, foreign)).deleted_at is None
     assert (await _op(env, w, "ba2", "delete", foreign)).status_code == 204
     assert (await task_db(env, foreign)).deleted_at is not None
-    assert (await _op(env, w, "sm_m", "delete", other)).status_code == 204
-    assert (await task_db(env, other)).deleted_at is not None
 
 
 async def test_ac99_assignee_cannot_delete_task_assigned_by_other(api_env: ApiEnv) -> None:

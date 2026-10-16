@@ -189,7 +189,7 @@ async def test_list_has_only_tasks_of_this_project(api_env: ApiEnv) -> None:
     assert [i["id"] for i in r.json()["items"]] == [str(mine)]
 
 
-@pytest.mark.parametrize("who", ["ba", "ba2", "sm_m", "usr"])
+@pytest.mark.parametrize("who", ["ba", "ba2", "usr"])
 async def test_members_see_all_tasks_not_only_own(api_env: ApiEnv, who: str) -> None:
     env = api_env
     w = await make_api_world(env)
@@ -201,7 +201,7 @@ async def test_members_see_all_tasks_not_only_own(api_env: ApiEnv, who: str) -> 
     assert {i["id"] for i in r.json()["items"]} == ids
 
 
-@pytest.mark.parametrize("who", ["usr2", "ba3", "sm"])
+@pytest.mark.parametrize("who", ["usr2", "ba3"])
 async def test_non_member_gets_403_for_list(api_env: ApiEnv, who: str) -> None:
     env = api_env
     w = await make_api_world(env)

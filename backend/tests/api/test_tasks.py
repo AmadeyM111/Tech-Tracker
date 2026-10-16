@@ -201,10 +201,11 @@ async def test_ac9_user_assigning_other_is_403_himself_is_201(api_env: ApiEnv) -
     assert await _count(env, w.project_id) == before + 1
 
 
-@pytest.mark.parametrize("who", ["ba", "ba2", "sm_m"])
-async def test_ac109_ac56_ba_and_sm_without_assignee_or_with_null_get_null(
+@pytest.mark.parametrize("who", ["ba", "ba2"])
+async def test_ac109_ac56_ba_without_assignee_or_with_null_get_null(
     api_env: ApiEnv, who: str
 ) -> None:
+    """AC 002 AC-13: БА-участник (владелец ``ba``, не владелец ``ba2``; прежде и ``sm_m``)."""
     env = api_env
     w = await make_api_world(env)
 
@@ -219,7 +220,7 @@ async def test_ac109_ac56_ba_and_sm_without_assignee_or_with_null_get_null(
     assert other.json()["assignee"]["id"] == str(w.uid("usr"))
 
 
-@pytest.mark.parametrize("who", ["ba3", "sm", "usr2"])
+@pytest.mark.parametrize("who", ["ba3", "usr2"])
 async def test_ac106_non_member_cannot_create_task_403(api_env: ApiEnv, who: str) -> None:
     env = api_env
     w = await make_api_world(env)
@@ -231,16 +232,17 @@ async def test_ac106_non_member_cannot_create_task_403(api_env: ApiEnv, who: str
     assert await _count(env, w.project_id) == before
 
 
-async def test_ac103_sm_non_member_becomes_member_and_creates(api_env: ApiEnv) -> None:
+async def test_ac103_ba_non_member_becomes_member_and_creates(api_env: ApiEnv) -> None:
+    """AC 002 AC-15: БА-неучастник ``ba3`` (прежде СМ ``sm``) - 403, после вступления - 201."""
     from tests.tasks_api_support import add_member_row
 
     env = api_env
     w = await make_api_world(env)
-    assert error(await _create(env, w, "sm", {"title": "x"})) == (403, "forbidden")
+    assert error(await _create(env, w, "ba3", {"title": "x"})) == (403, "forbidden")
 
-    await add_member_row(env, w, w.people["sm"].user)
+    await add_member_row(env, w, w.people["ba3"].user)
 
-    assert (await _create(env, w, "sm", {"title": "x"})).status_code == 201
+    assert (await _create(env, w, "ba3", {"title": "x"})).status_code == 201
 
 
 # --- GET /tasks/{id}: карточка ----------------------------------------------------------------
@@ -595,7 +597,7 @@ async def test_ac46_ba_owner_changes_assignee_of_user_task(api_env: ApiEnv) -> N
     assert r.json()["assignee"]["id"] == str(w.uid("ba2"))
 
 
-@pytest.mark.parametrize("who", ["usr2", "ba3", "sm"])
+@pytest.mark.parametrize("who", ["usr2", "ba3"])
 async def test_d46_membership_is_checked_even_for_empty_and_same_value_patch(
     api_env: ApiEnv, who: str
 ) -> None:

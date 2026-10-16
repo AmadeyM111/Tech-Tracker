@@ -196,15 +196,15 @@ async def test_member_roles_can_read_board(api_env: ApiEnv) -> None:
     env = api_env
     w = await make_api_world(env)
     await mk(env, w)
-    for who in ("ba", "ba2", "sm_m", "usr"):
+    for who in ("ba", "ba2", "usr"):
         body = await _board(env, w.tok(who), w.project_id)
         assert len(_col(body, "todo")) == 1, who
 
 
-async def test_board_non_member_is_403_for_ba_sm_user(api_env: ApiEnv) -> None:
+async def test_board_non_member_is_403_for_ba_user(api_env: ApiEnv) -> None:
     env = api_env
     w = await make_api_world(env)
-    for who in ("ba3", "sm", "usr2"):
+    for who in ("ba3", "usr2"):
         r = await send(env, w.tok(who), "GET", _board_url(w.project_id))
         assert error(r) == (403, "forbidden"), who
         assert "Retry-After" not in r.headers

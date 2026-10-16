@@ -199,24 +199,26 @@ async def test_move_forbidden_for_user_on_task_of_another_assignee(api_env: ApiE
     assert (await task_db(env, t)).status == "todo"
 
 
-async def test_move_allowed_for_owner_and_mixed_member_on_any_task(api_env: ApiEnv) -> None:
+async def test_move_allowed_for_owner_and_ba_member_on_any_task(api_env: ApiEnv) -> None:
+    """AC 002 AC-13: перенос чужой карточки БА-участником ``ba2`` (прежде СМ ``sm_m``)."""
     env = api_env
     w = await make_api_world(env)
     t = await mk(env, w, by="ba", assignee="usr", position=1000)
 
     r1 = await send(env, w.tok("ba"), "POST", _move(t), {"status": "review"})
-    r2 = await send(env, w.tok("sm_m"), "POST", _move(t), {"status": "done"})
+    r2 = await send(env, w.tok("ba2"), "POST", _move(t), {"status": "done"})
 
     assert (r1.status_code, r2.status_code) == (204, 204)
     assert (await task_db(env, t)).status == "done"
 
 
 async def test_move_non_member_is_403_and_task_unchanged(api_env: ApiEnv) -> None:
+    """AC 002 AC-15: неучастники ``ba3``, ``usr2`` - 403 (прежде ``sm`` -> ``ba3``)."""
     env = api_env
     w = await make_api_world(env)
     t = await mk(env, w, assignee="usr", position=1000)
 
-    for who in ("ba3", "sm", "usr2"):
+    for who in ("ba3", "usr2"):
         r = await send(env, w.tok(who), "POST", _move(t), {"status": "done"})
         assert error(r) == (403, "forbidden"), who
         assert "Retry-After" not in r.headers

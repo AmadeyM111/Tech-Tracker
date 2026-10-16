@@ -29,10 +29,11 @@ from tests.tasks_api_support import (
 
 
 async def test_ac6_each_member_sees_exactly_own_assigned_tasks(api_env: ApiEnv) -> None:
+    """001/AC-6 (не поведение СМ): задачи прежнего ``sm_m`` перенесены на ``ba2``."""
     env = api_env
     w = await make_api_world(env)
-    mine: dict[str, set[str]] = {"usr": set(), "ba2": set(), "sm_m": set(), "ba": set()}
-    plan = [("usr", 1), ("usr", 2), ("ba2", 3), ("sm_m", 4), ("sm_m", 5)]
+    mine: dict[str, set[str]] = {"usr": set(), "ba2": set(), "ba": set()}
+    plan = [("usr", 1), ("usr", 2), ("ba2", 3), ("ba2", 4), ("ba2", 5)]
     for who, day in plan:
         t = await mk(env, w, assignee=who, due_date=date(2026, 11, day))
         mine[who].add(str(t))

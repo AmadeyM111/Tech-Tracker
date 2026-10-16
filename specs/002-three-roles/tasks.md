@@ -239,7 +239,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
 - **Попытки:** 0
 
 ## R3-T06 — Тесты без СМ: задачи, доска, комментарии через API (только тесты)
-- **Статус:** TODO
+- **Статус:** DONE (1 попытка, reviews/R3-T06-1.md; соответствие старых и новых имён тестов — там же)
 - **AC:** AC-13, AC-15 (замена актора СМ → БА); FR-1
 - **Файлы:** тесты: `backend/tests/api/test_tasks.py`, `backend/tests/api/test_subtasks.py`,
   `backend/tests/api/test_task_permissions.py`, `backend/tests/api/test_board.py`,
