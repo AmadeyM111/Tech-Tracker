@@ -107,13 +107,13 @@ def can_edit_comment(a: Actor, author_id: UUID) -> bool:
 
 
 def can_delete_comment(a: Actor, p: ProjectFacts, author_id: UUID) -> bool:
+    """Свой или любой комментарий проекта для БА-участника (002/FR-9, AC-13).
+
+    Переходная форма: ``MIXED`` убирается в R3-T11.
+    """
     if not (a.can(Capability.BUSINESS_ACCESS) and p.actor_is_member):
         return False
-    return (
-        author_id == a.user_id
-        or (a.role == Role.BUSINESS_ADMIN and _is_owner(a, p))
-        or a.role == Role.MIXED
-    )
+    return author_id == a.user_id or a.role in (Role.BUSINESS_ADMIN, Role.MIXED)
 
 
 def can_manage_project(a: Actor, p: ProjectFacts) -> bool:

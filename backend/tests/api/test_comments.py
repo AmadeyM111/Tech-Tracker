@@ -620,10 +620,12 @@ async def test_ac58_owner_ba_and_sm_member_delete_foreign(api_env: ApiEnv) -> No
     assert (await _db(env, by_sm)).deleted_at is not None
 
 
-@pytest.mark.parametrize("who", ["ba2", "usr2", "ba3"])
+@pytest.mark.parametrize("who", ["usr2", "ba3"])
 async def test_ac58_delete_foreign_by_non_owner_or_non_member_is_403(
     api_env: ApiEnv, who: str
 ) -> None:
+    """002/AC-13: ba2 (БА-участник не владелец) убран - он удаляет чужой комментарий, см.
+    ``test_002_ac13_ba_non_owner_member_deletes_foreign``; 403 остаётся для не-участников."""
     env = api_env
     w = await make_api_world(env)
     t = await mk(env, w)
@@ -633,6 +635,21 @@ async def test_ac58_delete_foreign_by_non_owner_or_non_member_is_403(
 
     assert error(r) == (403, "forbidden")
     assert (await _db(env, c)).deleted_at is None
+
+
+async def test_002_ac13_ba_non_owner_member_deletes_foreign(api_env: ApiEnv) -> None:
+    """002/AC-13 (FR-9; обращает прежний 403 для ba2 из
+    ``test_ac58_delete_foreign_by_non_owner_or_non_member_is_403``): БА-участник не владелец
+    удаляет чужой комментарий - 204, мягко."""
+    env = api_env
+    w = await make_api_world(env)
+    t = await mk(env, w)
+    c = await _comment(env, w, t, "usr")
+
+    r = await send(env, w.tok("ba2"), "DELETE", _c_url(c))
+
+    assert r.status_code == 204, r.text
+    assert (await _db(env, c)).deleted_at is not None
 
 
 async def test_ac58_user_cannot_delete_foreign_comment_403(api_env: ApiEnv) -> None:

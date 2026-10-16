@@ -515,10 +515,14 @@ async def test_ac58_ba_owner_deletes_foreign_comment(db: AsyncSession, svc: Any)
 async def test_ac58_ba_non_owner_member_cannot_delete_foreign_403(
     db: AsyncSession, svc: Any
 ) -> None:
+    """Обращён по 002/AC-13 (FR-9): БА-участник не владелец удаляет чужой комментарий
+    (было 403); не-участник БА (ba3) по-прежнему 403 (002/AC-15)."""
     w, tid = await _setup(db)
     cid = await _comment(db, w, tid, w.usr)
-    await forbidden(db, svc.delete_comment(db, actor_of(w.ba2), cid))
+    await forbidden(db, svc.delete_comment(db, actor_of(w.ba3), cid))
     assert (await comment_row(db, cid)).deleted_at is None
+    await svc.delete_comment(db, actor_of(w.ba2), cid)
+    assert (await comment_row(db, cid)).deleted_at is not None
 
 
 async def test_ac58_ba_non_owner_deletes_own(db: AsyncSession, svc: Any) -> None:
@@ -812,10 +816,10 @@ async def test_s11_5_list_permissions_per_actor(db: AsyncSession, svc: Any) -> N
         by_ba: (True, True),
         by_ba2: (False, True),
     }
-    # БА-участник не владелец: только свой
+    # БА-участник не владелец: правит только свои, удаляет любые (002/AC-13, FR-9; было False)
     assert await perms(w.ba2) == {
-        by_usr: (False, False),
-        by_ba: (False, False),
+        by_usr: (False, True),
+        by_ba: (False, True),
         by_ba2: (True, True),
     }
     # СМ-участник: удаляет любые (AC-103), правит только свои (своих нет)

@@ -399,7 +399,8 @@ DEL_C = [
     ("BUSINESS_ADMIN", True, True, False, True),  # владелец: чужие можно
     ("BUSINESS_ADMIN", True, True, True, True),
     ("BUSINESS_ADMIN", False, True, True, True),  # свой комментарий
-    ("BUSINESS_ADMIN", False, True, False, False),  # чужой в чужом проекте: нельзя (D-54)
+    # 002/AC-13 (FR-9): БА-участник не владелец удаляет чужой комментарий (было False, D-54)
+    ("BUSINESS_ADMIN", False, True, False, True),
     ("BUSINESS_ADMIN", False, False, False, False),
     ("MIXED", False, True, False, True),
     ("MIXED", False, False, False, False),
@@ -525,9 +526,13 @@ def test_oi127_ba_member_not_owner_foreign_task_denied(pol, roles) -> None:
 
 
 def test_oi127_ba_member_not_owner_foreign_comment_not_deletable(pol, roles) -> None:
+    """Обращён по 002/AC-13 (FR-9): БА-участник не владелец удаляет чужой комментарий;
+    не-участник по-прежнему нет (002/AC-15)."""
     a = _actor(roles, "BUSINESS_ADMIN")
     p = _proj(pol, owner=OWNER, member=True)
-    assert pol.can_delete_comment(a, p, OTHER) is False
+    assert pol.can_delete_comment(a, p, OTHER) is True
+    outside = _proj(pol, owner=OWNER, member=False)
+    assert pol.can_delete_comment(a, outside, OTHER) is False
 
 
 # --- чистота (архитектурные ограничения)
