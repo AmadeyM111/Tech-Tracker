@@ -140,6 +140,8 @@ export const ru = {
   "app.home_title": "Главная",
   "app.home_link": "На главную",
   "app.change_password_link": "Сменить пароль",
+  "app.welcome_title": "Добро пожаловать",
+  "app.welcome_hint": "Здесь можно сменить пароль учётной записи.",
   "app.retry": "Повторить",
   "nav.projects": "Проекты",
   "nav.my_tasks": "Мои задачи",

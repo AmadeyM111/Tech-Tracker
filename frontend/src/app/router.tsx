@@ -139,18 +139,22 @@ function Home({ profile }: { profile: MeResponse }) {
       <div className="ui-sidebar">
         <nav>
           <MenuItems profile={profile} />
-          <p>
-            <Link to="/change-password">
-              <Icon name="password" />
-              {t("app.change_password_link")}
-            </Link>
-          </p>
         </nav>
         <button type="button" disabled={logout.pending} onClick={() => void logout.run()}>
           <Icon name="logout" />
           {t("auth.logout")}
         </button>
       </div>
+      <section data-section="welcome">
+        <h2>{t("app.welcome_title")}</h2>
+        <p>{t("app.welcome_hint")}</p>
+        <p>
+          <Link to="/change-password" className="ui-home-link">
+            <Icon name="password" />
+            {t("app.change_password_link")}
+          </Link>
+        </p>
+      </section>
     </>
   );
 }

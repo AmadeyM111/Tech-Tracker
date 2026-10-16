@@ -46,7 +46,8 @@ describe("T100 sidebar icons", () => {
   it("home: every sidebar link and the logout button start with an icon, names unchanged", async () => {
     installFetch(ROUTES);
     renderApp("/");
-    const names = [...NAV, ru["app.change_password_link"]];
+    // T102: «Сменить пароль» переехала из меню в приветственный блок (см. welcome.test.tsx).
+    const names = NAV;
     const markup: string[] = [];
     for (const name of names) {
       const link = await screen.findByRole("link", { name });
