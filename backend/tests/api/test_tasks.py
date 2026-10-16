@@ -612,14 +612,21 @@ async def test_d46_membership_is_checked_even_for_empty_and_same_value_patch(
 async def test_d46_member_without_rights_gets_200_on_empty_and_same_value_patch(
     api_env: ApiEnv,
 ) -> None:
+    """D-46: участник без прав («Пользователь» usr) на чужой задаче - 200 на пустое и
+    совпадающее значение, 403 на реальную правку. Обращён по 002/AC-13 (FR-9): БА-участник
+    ba2 (не владелец) ту же реальную правку выполняет."""
     env = api_env
     w = await make_api_world(env)
-    t = await mk(env, w, title="Т")  # ba2 — участник, не владелец, чужая задача
+    t = await mk(env, w, title="Т")  # usr — участник без прав на чужую задачу
 
-    assert (await send(env, w.tok("ba2"), "PATCH", task_url(t), {})).status_code == 200
-    assert (await send(env, w.tok("ba2"), "PATCH", task_url(t), {"title": "Т"})).status_code == 200
-    r = await send(env, w.tok("ba2"), "PATCH", task_url(t), {"title": "Чужое"})
+    assert (await send(env, w.tok("usr"), "PATCH", task_url(t), {})).status_code == 200
+    assert (await send(env, w.tok("usr"), "PATCH", task_url(t), {"title": "Т"})).status_code == 200
+    r = await send(env, w.tok("usr"), "PATCH", task_url(t), {"title": "Чужое"})
     assert error(r) == (403, "forbidden")
+    assert (await task_db(env, t)).title == "Т"
+    r = await send(env, w.tok("ba2"), "PATCH", task_url(t), {"title": "Чужое"})
+    assert r.status_code == 200, r.text
+    assert (await task_db(env, t)).title == "Чужое"
 
 
 async def test_patch_is_all_or_nothing_when_one_field_is_forbidden(api_env: ApiEnv) -> None:

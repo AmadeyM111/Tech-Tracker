@@ -46,20 +46,36 @@ async def test_ac43_block_keeps_assignee_and_task_found_by_assignee_filter(
 
 
 async def test_ac43_ba_member_not_owner_gets_403_mixed_member_reassigns(api_env: ApiEnv) -> None:
+    """Обращён по 002/AC-14 (FR-9, 001/FR-5): задачу заблокированного исполнителя переназначает
+    БА-участник не владелец (ba2) -> 200, сохранено (раньше 403)."""
     env = api_env
     w = await make_api_world(env)
     t = await mk(env, w, assignee="usr")
     await _block(env, w, "usr")
     body = {"assignee_id": str(w.uid("ba2"))}
 
-    denied = await send(env, w.tok("ba2"), "PATCH", task_url(t), body)
-    assert error(denied) == (403, "forbidden")
-    assert (await task_db(env, t)).assignee_id == w.uid("usr")
-
-    ok = await send(env, w.tok("sm_m"), "PATCH", task_url(t), body)
+    ok = await send(env, w.tok("ba2"), "PATCH", task_url(t), body)
     assert ok.status_code == 200, ok.text
     assert ok.json()["assignee"]["id"] == str(w.uid("ba2"))
     assert (await task_db(env, t)).assignee_id == w.uid("ba2")
+
+
+async def test_ac43_ba_member_reassigns_blocked_task_user_member_gets_403(
+    api_env: ApiEnv,
+) -> None:
+    """002/AC-14: «Пользователь»-участник (второй П) и не участник (ba3) получают 403 при
+    переназначении задачи заблокированного исполнителя, исполнитель остаётся прежним."""
+    env = api_env
+    w = await make_api_world(env)
+    second = await extra_user(env, w, "user", "w.second.usr")
+    t = await mk(env, w, assignee="usr")
+    await _block(env, w, "usr")
+    body = {"assignee_id": str(w.uid("ba2"))}
+
+    for token in (second.token, w.tok("ba3")):
+        denied = await send(env, token, "PATCH", task_url(t), body)
+        assert error(denied) == (403, "forbidden")
+        assert (await task_db(env, t)).assignee_id == w.uid("usr")
 
 
 async def test_ac42_owner_reassigns_task_of_blocked_user_task_not_deleted(api_env: ApiEnv) -> None:

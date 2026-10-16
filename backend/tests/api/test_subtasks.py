@@ -107,11 +107,14 @@ async def test_ac8_depth_check_comes_after_permission_403(api_env: ApiEnv) -> No
     env = api_env
     w = await make_api_world(env)
     parent = await mk(env, w)
-    sub = await mk(env, w, parent=parent)  # ba2 — участник без прав на чужую задачу
+    sub = await mk(env, w, parent=parent)  # usr — участник без прав на чужую задачу
 
-    r = await send(env, w.tok("ba2"), "POST", _sub_url(sub), {"title": "Второй уровень"})
+    r = await send(env, w.tok("usr"), "POST", _sub_url(sub), {"title": "Второй уровень"})
 
     assert error(r) == (403, "forbidden")
+    # 002/AC-13: у БА-участника права есть, поэтому глубина проверяется и даёт 422
+    r = await send(env, w.tok("ba2"), "POST", _sub_url(sub), {"title": "Второй уровень"})
+    assert error(r) == (422, "subtask_depth_exceeded")
 
 
 async def test_ac47_assignee_creates_subtask_for_himself_default_is_himself(
@@ -212,10 +215,11 @@ async def test_user_without_relation_to_task_cannot_create_subtask(api_env: ApiE
 @pytest.mark.parametrize(
     ("by", "assignee", "expected"),
     [
-        ("ba", "usr", 403),  # чужая задача
-        ("ba", None, 403),  # создана владельцем без исполнителя
-        ("ba2", None, 403),  # своя, но без исполнителя (не «своя» по FR-19)
-        ("ba2", "usr", 403),  # своя, но исполнитель — другой
+        # 002/AC-13 (FR-9): БА-участник не владелец создаёт подзадачу к любой задаче проекта
+        ("ba", "usr", 201),  # чужая задача
+        ("ba", None, 201),  # создана владельцем без исполнителя
+        ("ba2", None, 201),  # своя, без исполнителя
+        ("ba2", "usr", 201),  # своя, исполнитель — другой
         ("ba2", "ba2", 201),  # своя и исполнитель — он сам
         ("ba", "ba2", 201),  # он исполнитель (FR-19b)
     ],
@@ -223,10 +227,14 @@ async def test_user_without_relation_to_task_cannot_create_subtask(api_env: ApiE
 async def test_t74_review_6_ba_member_not_owner_subtask_formula(
     api_env: ApiEnv, by: str, assignee: str | None, expected: int
 ) -> None:
+    """Обращён по 002/AC-13; не участник (ba3) получает 403 на любой родитель (002/AC-15)."""
     env = api_env
     w = await make_api_world(env)
     parent = await mk(env, w, by=by, assignee=assignee)
 
+    denied = await send(env, w.tok("ba3"), "POST", _sub_url(parent), {"title": "Чужой"})
+    assert error(denied) == (403, "forbidden")
+    assert await _children(env, parent) == 0
     r = await send(env, w.tok("ba2"), "POST", _sub_url(parent), {"title": "Подзадача"})
 
     assert r.status_code == expected, r.text

@@ -630,14 +630,19 @@ async def test_fr19_user_own_task_subtask_for_self(db: AsyncSession, svc: Any) -
 
 
 async def test_t70_ba_member_not_owner_subtask_rules(db: AsyncSession, svc: Any) -> None:
-    """БА-участник, не владелец: чужая задача — 403; своя (автор+исполнитель) и где он
-    исполнитель — можно (can_create_subtask по T70, OI-127 а)."""
+    """Обращён по 002/AC-13 (FR-9): БА-участник, не владелец, создаёт подзадачу к чужой задаче
+    (себе, другому, без исполнителя), к своей и к назначенной ему; не участник (002/AC-15) - 403."""
     w = await make_world(db)
     foreign_task = await _parent(db, w, assignee=w.usr.id)  # автор — владелец
     await forbidden(
-        db, svc.create_subtask(db, actor_of(w.ba2), foreign_task, _data(svc, assignee=w.ba2.id))
+        db, svc.create_subtask(db, actor_of(w.ba3), foreign_task, _data(svc, assignee=w.ba3.id))
     )
-    await forbidden(db, svc.create_subtask(db, actor_of(w.ba2), foreign_task, _data(svc)))
+    await forbidden(db, svc.create_subtask(db, actor_of(w.ba3), foreign_task, _data(svc)))
+    sid = await svc.create_subtask(db, actor_of(w.ba2), foreign_task, _data(svc, assignee=w.ba2.id))
+    assert (await task_row(db, sid)).assignee_id == w.ba2.id
+    sid = await svc.create_subtask(db, actor_of(w.ba2), foreign_task, _data(svc))
+    row = await task_row(db, sid)
+    assert (row.parent_id, row.assignee_id) == (foreign_task, None)
     own = await _parent(db, w, assignee=w.ba2.id, created_by=w.ba2.id)
     sid = await svc.create_subtask(db, actor_of(w.ba2), own, _data(svc, assignee=w.usr.id))
     assert (await task_row(db, sid)).assignee_id == w.usr.id

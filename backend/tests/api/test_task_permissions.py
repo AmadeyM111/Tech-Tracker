@@ -45,13 +45,8 @@ NONE = {op: False for op in OPS}
 EXPECTED: dict[str, dict[str, dict[str, bool]]] = {
     "ba": {s: ALL for s in STATES},
     "sm_m": {s: ALL for s in STATES},
-    "ba2": {
-        "assigned": NONE,
-        "own_usr": NONE,
-        "unassigned": NONE,
-        "own_ba2": {**ALL, "assignee": False},
-        "to_ba2": {**NONE, "status": True, "subtask": True},
-    },
+    # 002/AC-13, AC-14 (FR-9): БА-участник не владелец может всё в любом состоянии
+    "ba2": {s: ALL for s in STATES},
     "usr": {
         "assigned": {**NONE, "status": True, "subtask": True},
         "own_usr": {**ALL, "assignee": False},
@@ -170,14 +165,19 @@ async def test_ac103_mixed_non_member_adds_himself_and_then_changes_foreign_task
 
 
 async def test_ac99_mixed_member_deletes_foreign_task_ba_member_cannot(api_env: ApiEnv) -> None:
+    """Обращён по 002/AC-13 (FR-9): чужую задачу удаляет БА-участник не владелец; «Пользователь»
+    (участник, не автор) и не участник ba3 - 403; СМ-участник удаляет, как прежде."""
     env = api_env
     w = await make_api_world(env)
     foreign = await mk(env, w, by="usr", assignee="usr")
+    other = await mk(env, w, by="usr", assignee="usr")
 
-    assert error(await _op(env, w, "ba2", "delete", foreign)) == (403, "forbidden")
+    assert error(await _op(env, w, "ba3", "delete", foreign)) == (403, "forbidden")
     assert (await task_db(env, foreign)).deleted_at is None
-    assert (await _op(env, w, "sm_m", "delete", foreign)).status_code == 204
+    assert (await _op(env, w, "ba2", "delete", foreign)).status_code == 204
     assert (await task_db(env, foreign)).deleted_at is not None
+    assert (await _op(env, w, "sm_m", "delete", other)).status_code == 204
+    assert (await task_db(env, other)).deleted_at is not None
 
 
 async def test_ac99_assignee_cannot_delete_task_assigned_by_other(api_env: ApiEnv) -> None:
@@ -214,11 +214,11 @@ async def test_subtask_card_permissions_follow_the_same_rules(api_env: ApiEnv) -
         "delete": True,
         "create_subtask": False,
     }
-    assert other == {
-        "edit": False,
-        "change_status": False,
-        "change_assignee": False,
-        "delete": False,
+    assert other == {  # 002/AC-13: БА-участник не владелец; подзадач у подзадачи нет
+        "edit": True,
+        "change_status": True,
+        "change_assignee": True,
+        "delete": True,
         "create_subtask": False,
     }
 

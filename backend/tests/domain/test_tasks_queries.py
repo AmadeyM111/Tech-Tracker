@@ -374,10 +374,11 @@ async def test_fr19_permissions_user_own_task_full_but_no_reassign(
 async def test_fr19_permissions_member_ba_not_owner_not_assignee_nothing(
     db: AsyncSession, q: Any
 ) -> None:
+    """Обращён по 002/AC-13, AC-14 (FR-9): БА-участник не владелец на чужой задаче - все права."""
     w = await make_world(db)
     tid = await mk_task(db, w, created_by=w.ba.id, assignee_id=w.usr.id)
     v = await q.get_task(db, actor_of(w.ba2), tid)
-    assert _perms(v) == (False, False, False, False, False)
+    assert _perms(v) == (True, True, True, True, True)
 
 
 async def test_fr19_permissions_user_member_not_assignee_nothing(db: AsyncSession, q: Any) -> None:
@@ -399,11 +400,11 @@ async def test_fr19_permissions_mixed_member_everything(db: AsyncSession, q: Any
 async def test_fr19_permissions_ba_non_owner_own_task_edit_no_reassign(
     db: AsyncSession, q: Any
 ) -> None:
-    """OI-127 (а): БА-участник правит «свою» задачу, исполнителя не меняет."""
+    """Обращён по 002/AC-13, AC-14 (FR-9): БА-участник правит свою задачу и меняет исполнителя."""
     w = await make_world(db)
     tid = await mk_task(db, w, created_by=w.ba2.id, assignee_id=w.ba2.id)
     v = await q.get_task(db, actor_of(w.ba2), tid)
-    assert _perms(v) == (True, True, False, True, True)
+    assert _perms(v) == (True, True, True, True, True)
 
 
 async def test_fr19_permissions_for_subtask_use_subtask_facts(db: AsyncSession, q: Any) -> None:
@@ -817,6 +818,8 @@ async def test_fr19_permission_flags_match_service_outcomes_matrix(
             perms = (await q.get_task(db, actor, tid)).permissions
             new_sub = svc.TaskCreateData(title="s", assignee=who.id)
             ctx = (created_by, assignee, who.login)
+            if who is w.ba2:  # 002/AC-13, AC-14 (FR-9): БА-участник не владелец - все права
+                assert _perms(await q.get_task(db, actor, tid)) == (True,) * 5, ctx
             assert perms.create_subtask == await _passes(
                 db, svc.create_subtask(db, actor, tid, new_sub)
             ), ("create_subtask", ctx)

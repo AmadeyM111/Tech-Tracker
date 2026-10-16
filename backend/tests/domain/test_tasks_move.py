@@ -197,16 +197,21 @@ async def test_ac47_user_cannot_move_foreign_task(db: AsyncSession, svc: Any) ->
 
 
 async def test_ac48_ba_not_owner_moves_only_own_task(db: AsyncSession, svc: Any) -> None:
+    """Обращён по 002/AC-13 (FR-9): БА-участник не владелец переносит любую задачу проекта;
+    не участник (002/AC-15) - 403, статус и позиция не меняются."""
     w = await make_world(db)
     foreign = await mk_task(db, w, assignee_id=w.usr.id)
     for_other = await mk_task(db, w, created_by=w.ba2.id, assignee_id=w.usr.id)
     own = await mk_task(db, w, created_by=w.ba2.id, assignee_id=w.ba2.id)
     for tid in (foreign, for_other):
-        await forbidden(db, _mv(svc, db, w.ba2, tid, "done"))
-        assert (await task_row(db, tid)).status == "todo"
+        await forbidden(db, _mv(svc, db, w.ba3, tid, "done"))
+        r = await task_row(db, tid)
+        assert (r.status, r.position) == ("todo", 1024)
+    for tid in (foreign, for_other):
+        await _mv(svc, db, w.ba2, tid, "done")
+        assert (await task_row(db, tid)).status == "done"
     await _mv(svc, db, w.ba2, own, "done")
     assert (await task_row(db, own)).status == "done"
-    # исполнитель-БА (не владелец) чужой задачи переносит её (FR-19b)
     assigned = await mk_task(db, w, assignee_id=w.ba2.id)
     await _mv(svc, db, w.ba2, assigned, "review")
     assert (await task_row(db, assigned)).status == "review"

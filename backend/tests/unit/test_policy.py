@@ -138,7 +138,8 @@ def test_br1_create_project_capability(roles, role, expected) -> None:
 # --- is_own_project (D-54, Q-6)
 OWN = [
     ("BUSINESS_ADMIN", True, True, True),
-    ("BUSINESS_ADMIN", False, True, False),  # участник, не владелец: НЕ свой проект
+    # 002/AC-13 (FR-9, 002 §5.3 п.3): правило D-54 отменено, БА действует по участию
+    ("BUSINESS_ADMIN", False, True, True),
     ("BUSINESS_ADMIN", False, False, False),
     ("MIXED", False, True, True),
     ("MIXED", False, False, False),
@@ -169,13 +170,13 @@ FULLY = [
     ("BUSINESS_ADMIN", True, True, T_OTH, T_OTH, True),
     ("BUSINESS_ADMIN", True, True, T_ME, T_OTH, True),
     ("BUSINESS_ADMIN", True, True, T_OTH, T_NONE, True),
-    # БА-участник, не владелец (D-54 + OI-127 (а))
-    ("BUSINESS_ADMIN", False, True, T_OTH, T_OTH, False),  # чужая: нельзя
-    ("BUSINESS_ADMIN", False, True, T_OTH, T_ME, False),  # назначена мне, но создал не я: нельзя
-    ("BUSINESS_ADMIN", False, True, T_ME, T_ME, True),  # OI-127 (а): своя
-    ("BUSINESS_ADMIN", False, True, T_ME, T_OTH, False),  # создал я, исполнитель другой: нельзя
-    ("BUSINESS_ADMIN", False, True, T_ME, T_NONE, False),  # создал я, исполнителя нет: нельзя
-    ("BUSINESS_ADMIN", False, True, T_OTH, T_NONE, False),
+    # БА-участник, не владелец: любые задачи проекта (002/AC-13, FR-9; OI-127 (а) и D-54 отменены)
+    ("BUSINESS_ADMIN", False, True, T_OTH, T_OTH, True),  # чужая: можно
+    ("BUSINESS_ADMIN", False, True, T_OTH, T_ME, True),
+    ("BUSINESS_ADMIN", False, True, T_ME, T_ME, True),
+    ("BUSINESS_ADMIN", False, True, T_ME, T_OTH, True),
+    ("BUSINESS_ADMIN", False, True, T_ME, T_NONE, True),
+    ("BUSINESS_ADMIN", False, True, T_OTH, T_NONE, True),
     ("BUSINESS_ADMIN", False, False, T_ME, T_ME, False),  # не участник: нельзя
     # СМ: любые задачи, где участник
     ("MIXED", False, True, T_OTH, T_OTH, True),
@@ -231,8 +232,8 @@ STATUS = [
     ("USER", False, False, T_OTH, T_ME, False),  # не участник
     ("USER", False, True, T_ME, T_ME, True),
     ("BUSINESS_ADMIN", False, True, T_OTH, T_ME, True),  # исполнитель: статус можно
-    ("BUSINESS_ADMIN", False, True, T_OTH, T_OTH, False),  # чужая: нельзя
-    ("BUSINESS_ADMIN", False, True, T_ME, T_OTH, False),  # создал я, исполнитель другой: нельзя
+    ("BUSINESS_ADMIN", False, True, T_OTH, T_OTH, True),  # 002/AC-13: чужая - можно
+    ("BUSINESS_ADMIN", False, True, T_ME, T_OTH, True),  # 002/AC-13
     ("BUSINESS_ADMIN", False, False, T_OTH, T_ME, False),
     ("BUSINESS_ADMIN", True, True, T_OTH, T_OTH, True),  # владелец
     ("MIXED", False, True, T_OTH, T_OTH, True),
@@ -257,12 +258,13 @@ ASSIGNEE = [
     (None, True, True, T_ME, T_ME, False),
     ("USER", False, True, T_ME, T_ME, False),  # BR-1: пользователь не меняет исполнителя
     ("BUSINESS_ADMIN", True, True, T_OTH, T_OTH, True),
-    ("BUSINESS_ADMIN", False, True, T_OTH, T_OTH, False),  # чужая задача: нельзя (D-54)
-    ("BUSINESS_ADMIN", False, True, T_OTH, T_ME, False),  # назначена мне, не автор: нельзя
-    # FR-19a: БА-не владелец не меняет исполнителя даже на своей задаче
-    ("BUSINESS_ADMIN", False, True, T_ME, T_ME, False),
-    ("BUSINESS_ADMIN", False, True, T_ME, T_OTH, False),
-    ("BUSINESS_ADMIN", False, True, T_ME, T_NONE, False),
+    # 002/AC-13, AC-14 (FR-9): БА-участник меняет исполнителя любой задачи проекта
+    ("BUSINESS_ADMIN", False, True, T_OTH, T_OTH, True),
+    ("BUSINESS_ADMIN", False, True, T_OTH, T_ME, True),
+    ("BUSINESS_ADMIN", False, True, T_ME, T_ME, True),
+    ("BUSINESS_ADMIN", False, True, T_ME, T_OTH, True),
+    ("BUSINESS_ADMIN", False, True, T_ME, T_NONE, True),
+    ("BUSINESS_ADMIN", False, False, T_OTH, T_OTH, False),  # 002/AC-15: не участник
     ("BUSINESS_ADMIN", True, True, T_OTH, T_NONE, True),
     ("MIXED", False, True, T_OTH, T_OTH, True),
     ("MIXED", False, True, T_OTH, T_NONE, True),
@@ -327,8 +329,8 @@ SUB = [
     # БА-владелец: любая подзадача любому
     ("BUSINESS_ADMIN", True, T_OTH, T_OTH, "other", True),
     ("BUSINESS_ADMIN", True, T_OTH, T_OTH, None, True),
-    # БА-участник не владелец: чужой родитель - нет; назначенный мне - да (исполнитель)
-    ("BUSINESS_ADMIN", False, T_OTH, T_OTH, "me", False),
+    # БА-участник не владелец (002/AC-13): подзадача к любой задаче проекта, любому исполнителю
+    ("BUSINESS_ADMIN", False, T_OTH, T_OTH, "me", True),
     ("BUSINESS_ADMIN", False, T_OTH, T_ME, "me", True),
     (
         "BUSINESS_ADMIN",
@@ -338,9 +340,9 @@ SUB = [
         "other",
         True,
     ),  # исполнитель родителя + TASK_ASSIGN_OTHERS
-    ("BUSINESS_ADMIN", False, T_ME, T_OTH, "other", False),  # создал я, исполнитель другой
-    ("BUSINESS_ADMIN", False, T_ME, T_ME, "other", True),  # OI-127 (а): своя задача
-    ("BUSINESS_ADMIN", False, T_ME, T_NONE, "me", False),
+    ("BUSINESS_ADMIN", False, T_ME, T_OTH, "other", True),  # 002/AC-13
+    ("BUSINESS_ADMIN", False, T_ME, T_ME, "other", True),
+    ("BUSINESS_ADMIN", False, T_ME, T_NONE, "me", True),  # 002/AC-13
     ("MIXED", False, T_OTH, T_OTH, "other", True),
 ]
 
@@ -487,42 +489,51 @@ def test_ac53_fr15a_can_remove_self(pol, roles, role, is_owner, member, expected
     assert pol.can_remove_self(a, p) is expected
 
 
-# --- явный кейс OI-127 (а)
+# --- бывший кейс OI-127 (а): обращён по 002/AC-13, AC-14 (FR-9); правило D-54 отменено
 def test_oi127_ba_member_not_owner_own_task_allowed(pol, roles) -> None:
+    """002/AC-13: БА-участник правит, удаляет и переназначает свою задачу (исполнителя - тоже)."""
     a = _actor(roles, "BUSINESS_ADMIN")
     p = _proj(pol, owner=OWNER, member=True)
     own = _task(pol, created_by=ME, assignee=ME)
     assert pol.can_edit_task_fully(a, p, own) is True
     assert pol.can_delete_task(a, p, own) is True
-    # FR-19a: исполнителя меняет только владелец-БА, даже на своей задаче
-    assert pol.can_change_assignee(a, p, own) is False
+    assert pol.can_change_assignee(a, p, own) is True
 
 
 @pytest.mark.parametrize("assignee", [OTHER, None])
 def test_oi127_ba_member_not_owner_created_but_not_assignee_denied(pol, roles, assignee) -> None:
+    """Обращён по 002/AC-13, AC-14: созданную им задачу с другим/без исполнителя БА-участник
+    правит, удаляет и переназначает."""
     a = _actor(roles, "BUSINESS_ADMIN")
     p = _proj(pol, owner=OWNER, member=True)
     t = _task(pol, created_by=ME, assignee=assignee)
-    assert pol.can_edit_task_fully(a, p, t) is False
-    assert pol.can_delete_task(a, p, t) is False
-    assert pol.can_change_assignee(a, p, t) is False
+    assert pol.can_edit_task_fully(a, p, t) is True
+    assert pol.can_delete_task(a, p, t) is True
+    assert pol.can_change_assignee(a, p, t) is True
 
 
 def test_oi127_ba_member_not_owner_assigned_but_not_author_denied(pol, roles) -> None:
+    """Обращён по 002/AC-13: назначенную ему чужую задачу БА-участник правит и удаляет."""
     a = _actor(roles, "BUSINESS_ADMIN")
     p = _proj(pol, owner=OWNER, member=True)
     t = _task(pol, created_by=OTHER, assignee=ME)
-    assert pol.can_edit_task_fully(a, p, t) is False
-    assert pol.can_delete_task(a, p, t) is False
+    assert pol.can_edit_task_fully(a, p, t) is True
+    assert pol.can_delete_task(a, p, t) is True
 
 
 def test_oi127_ba_member_not_owner_foreign_task_denied(pol, roles) -> None:
+    """Обращён по 002/AC-13, AC-14: чужую задачу БА-участник правит, переназначает, удаляет;
+    не участник (002/AC-15) - ничего."""
     a = _actor(roles, "BUSINESS_ADMIN")
     p = _proj(pol, owner=OWNER, member=True)
     foreign = _task(pol, created_by=OTHER, assignee=OTHER)
-    assert pol.can_edit_task_fully(a, p, foreign) is False
-    assert pol.can_change_assignee(a, p, foreign) is False
-    assert pol.can_delete_task(a, p, foreign) is False
+    assert pol.can_edit_task_fully(a, p, foreign) is True
+    assert pol.can_change_assignee(a, p, foreign) is True
+    assert pol.can_delete_task(a, p, foreign) is True
+    outside = _proj(pol, owner=OWNER, member=False)
+    assert pol.can_edit_task_fully(a, outside, foreign) is False
+    assert pol.can_change_assignee(a, outside, foreign) is False
+    assert pol.can_delete_task(a, outside, foreign) is False
 
 
 def test_oi127_ba_member_not_owner_foreign_comment_not_deletable(pol, roles) -> None:

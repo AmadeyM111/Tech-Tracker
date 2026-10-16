@@ -256,6 +256,8 @@ async def test_ac42_user_cannot_reassign_task_of_blocked_assignee(
 async def test_ac43_ba_not_owner_403_sm_member_ok_on_blocked_assignee_task(
     db: AsyncSession, svc: Any
 ) -> None:
+    """Обращён по 002/AC-14 (FR-9, 001/FR-5): БА-участник не владелец переназначает задачу
+    заблокированного исполнителя; СМ-участник - тоже (СМ уйдёт в R3-T07); «Пользователь» - 403."""
     w = await make_world(db)
     blocked_member = await make_user(
         db, workspace=w.ws, role="user", login="w.blockedm", blocked=True
@@ -264,33 +266,48 @@ async def test_ac43_ba_not_owner_403_sm_member_ok_on_blocked_assignee_task(
     await add_member_row(db, w, w.project_id, w.sm)
     tid = await mk_task(db, w, assignee_id=blocked_member.id)
     await forbidden(
-        db, svc.update_task(db, actor_of(w.ba2), tid, _patch(svc, assignee_id=w.usr.id))
+        db, svc.update_task(db, actor_of(w.usr), tid, _patch(svc, assignee_id=w.usr.id))
     )
     assert (await task_row(db, tid)).assignee_id == blocked_member.id
-    await svc.update_task(db, actor_of(w.sm), tid, _patch(svc, assignee_id=w.usr.id))
+    await svc.update_task(db, actor_of(w.ba2), tid, _patch(svc, assignee_id=w.usr.id))
     assert (await task_row(db, tid)).assignee_id == w.usr.id
+    await svc.update_task(db, actor_of(w.sm), tid, _patch(svc, assignee_id=w.ba2.id))
+    assert (await task_row(db, tid)).assignee_id == w.ba2.id
 
 
 async def test_ac48_ba_not_owner_cannot_change_foreign_or_assigned_tasks(
     db: AsyncSession, svc: Any
 ) -> None:
+    """Обращён по 002/AC-13 (FR-9): БА-участник не владелец меняет поля чужих задач, задач,
+    созданных им для другого или без исполнителя; не участник (002/AC-15) - 403, без изменений."""
     w = await make_world(db)
     foreign = await mk_task(db, w, assignee_id=w.usr.id)  # автор ba
-    # задачи, созданные самим ba2 для другого/без исполнителя (OI-127, SC-2)
     for_other = await mk_task(db, w, created_by=w.ba2.id, assignee_id=w.usr.id)
     unassigned = await mk_task(db, w, created_by=w.ba2.id, assignee_id=None)
-    # своя, но переназначенная владельцем на другого
     reassigned = await mk_task(db, w, created_by=w.ba2.id, assignee_id=w.usr.id)
+    for i, tid in enumerate((foreign, for_other, unassigned, reassigned)):
+        await svc.update_task(
+            db,
+            actor_of(w.ba2),
+            tid,
+            _patch(svc, title=f"Х{i}", status="done", priority="high"),
+        )
+        r = await task_row(db, tid)
+        assert (r.title, r.status, r.priority) == (f"Х{i}", "done", "high")
+    await db.commit()
+    outsider = await make_user(db, workspace=w.ws, role="business_admin", login="w.ba.outsider")
     for tid in (foreign, for_other, unassigned, reassigned):
         before = await _snapshot(db, tid)
-        for fields in ({"title": "Х"}, {"status": "done"}, {"priority": "high"}):
-            await forbidden(db, svc.update_task(db, actor_of(w.ba2), tid, _patch(svc, **fields)))
+        for fields in ({"title": "Y"}, {"status": "review"}, {"priority": "base"}):
+            await forbidden(db, svc.update_task(db, actor_of(outsider), tid, _patch(svc, **fields)))
         assert await _snapshot(db, tid) == before
 
 
 async def test_ac48_ba_not_owner_edits_own_task_but_not_assignee(
     db: AsyncSession, svc: Any
 ) -> None:
+    """Обращён по 002/AC-13, AC-14 (FR-9): БА-участник не владелец правит поля своей задачи и
+    меняет исполнителя (другой, снятие, владелец)."""
     w = await make_world(db)
     tid = await mk_task(db, w, created_by=w.ba2.id, assignee_id=w.ba2.id)
     await svc.update_task(
@@ -314,13 +331,9 @@ async def test_ac48_ba_not_owner_edits_own_task_but_not_assignee(
         "high",
         "done",
     )
-    await db.commit()  # иначе rollback в forbidden() откатит правку
-    before = await _snapshot(db, tid)
     for target in (w.usr.id, None, w.ba.id):
-        await forbidden(
-            db, svc.update_task(db, actor_of(w.ba2), tid, _patch(svc, assignee_id=target))
-        )
-    assert await _snapshot(db, tid) == before
+        await svc.update_task(db, actor_of(w.ba2), tid, _patch(svc, assignee_id=target))
+        assert (await task_row(db, tid)).assignee_id == target
 
 
 async def test_ac48_owner_ba_changes_any_task_incl_foreign_author(
@@ -730,13 +743,19 @@ async def test_ac99_assignee_of_foreign_task_cannot_delete(db: AsyncSession, svc
 
 
 async def test_ac99_ba_not_owner_cannot_delete_foreign_task(db: AsyncSession, svc: Any) -> None:
+    """Обращён по 002/AC-13 (FR-9): БА-участник не владелец удаляет чужую задачу, задачу, созданную
+    им для другого, и без исполнителя; не участник (002/AC-15) - 403, задача цела."""
     w = await make_world(db)
     foreign = await mk_task(db, w, assignee_id=w.usr.id)
     for_other = await mk_task(db, w, created_by=w.ba2.id, assignee_id=w.usr.id)
     unassigned = await mk_task(db, w, created_by=w.ba2.id)
+    outsider = await make_user(db, workspace=w.ws, role="business_admin", login="w.ba.outsider")
     for tid in (foreign, for_other, unassigned):
-        await forbidden(db, svc.delete_task(db, actor_of(w.ba2), tid))
+        await forbidden(db, svc.delete_task(db, actor_of(outsider), tid))
         assert (await task_row(db, tid)).deleted_at is None
+    for tid in (foreign, for_other, unassigned):
+        await svc.delete_task(db, actor_of(w.ba2), tid)
+        assert (await task_row(db, tid)).deleted_at is not None
 
 
 async def test_ac48_ba_not_owner_deletes_own_task(db: AsyncSession, svc: Any) -> None:

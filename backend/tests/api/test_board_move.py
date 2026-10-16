@@ -172,6 +172,7 @@ async def test_fr19b_assignee_moves_own_foreign_task(api_env: ApiEnv) -> None:
 
 
 async def test_fr19b_ba_member_non_owner_moves_own_assigned_task_only(api_env: ApiEnv) -> None:
+    """Обращён по 002/AC-13 (FR-9): БА-участник не владелец переносит и свою, и чужую задачу."""
     env = api_env
     w = await make_api_world(env)
     mine = await mk(env, w, by="ba", assignee="ba2", position=1000)
@@ -181,8 +182,9 @@ async def test_fr19b_ba_member_non_owner_moves_own_assigned_task_only(api_env: A
     denied = await send(env, w.tok("ba2"), "POST", _move(foreign), {"status": "done"})
 
     assert ok.status_code == 204, ok.text
-    assert error(denied) == (403, "forbidden")
-    assert (await task_db(env, foreign)).status == "todo"
+    assert denied.status_code == 204, denied.text
+    assert (await task_db(env, mine)).status == "done"
+    assert (await task_db(env, foreign)).status == "done"
 
 
 async def test_move_forbidden_for_user_on_task_of_another_assignee(api_env: ApiEnv) -> None:

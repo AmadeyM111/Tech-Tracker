@@ -143,9 +143,29 @@ async def test_ac99_forbidden_delete_changes_nothing(api_env: ApiEnv) -> None:
     t = await mk(env, w, assignee="usr", comment=True)
     sub = await mk(env, w, parent=t)
 
-    for who in ("usr", "ba2"):
+    # 002/AC-13: БА-участник ba2 удаляет чужую задачу, поэтому 403 - только «Пользователю»
+    # и не участнику (ba3, 002/AC-15)
+    for who in ("usr", "ba3"):
         assert error(await send(env, w.tok(who), "DELETE", task_url(t))) == (403, "forbidden")
 
     assert (await task_db(env, t)).deleted_at is None
     assert (await task_db(env, sub)).deleted_at is None
     assert (await comment_rows(env, t))[0].deleted_at is None
+
+
+async def test_ac99_ba_member_not_owner_deletes_foreign_task_with_subtask_and_comment(
+    api_env: ApiEnv,
+) -> None:
+    """002/AC-13 (FR-9): ba2 (участник, не владелец, не автор) удаляет чужую задачу: мягко,
+    вместе с подзадачей и комментарием."""
+    env = api_env
+    w = await make_api_world(env)
+    t = await mk(env, w, assignee="usr", comment=True)
+    sub = await mk(env, w, parent=t)
+
+    r = await send(env, w.tok("ba2"), "DELETE", task_url(t))
+
+    assert r.status_code == 204, r.text
+    assert (await task_db(env, t)).deleted_at is not None
+    assert (await task_db(env, sub)).deleted_at is not None
+    assert (await comment_rows(env, t))[0].deleted_at is not None
