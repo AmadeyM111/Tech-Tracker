@@ -181,7 +181,9 @@ function CreateTask({
   const [title, setTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const addRef = useRef<HTMLButtonElement>(null);
-  const sending = useRef(false);
+  // Bumped when the form is opened or closed: an answer to an older request must not touch a newer form.
+  const epoch = useRef(0);
+  const [busy, setBusy] = useState(false);
   const restoreFocus = useRef(false);
   const inputId = useId();
 
@@ -195,26 +197,34 @@ function CreateTask({
   }, [open]);
 
   function close(focusButton: boolean): void {
+    epoch.current += 1;
     restoreFocus.current = focusButton;
+    setBusy(false);
     setOpen(false);
     setTitle("");
   }
 
+  function openForm(): void {
+    epoch.current += 1;
+    setBusy(false);
+    setOpen(true);
+  }
+
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
-    if (sending.current) return;
+    if (busy) return;
     const trimmed = title.trim();
     if (trimmed === "") {
       onInvalid();
       return;
     }
-    sending.current = true;
-    try {
-      const result = await onCreate(status, trimmed);
-      if (result !== "failed") close(result === "ok");
-    } finally {
-      sending.current = false;
-    }
+    const mine = epoch.current;
+    setBusy(true);
+    const result = await onCreate(status, trimmed);
+    // The form was closed (and maybe re-opened) while the request was in flight: leave it alone.
+    if (epoch.current !== mine) return;
+    if (result === "failed") setBusy(false);
+    else close(result === "ok");
   }
 
   function onKeyDown(event: KeyboardEvent): void {
@@ -226,7 +236,7 @@ function CreateTask({
 
   if (!open) {
     return (
-      <button type="button" data-action="add-task" className="ui-add-task" ref={addRef} onClick={() => setOpen(true)}>
+      <button type="button" data-action="add-task" className="ui-add-task" ref={addRef} onClick={openForm}>
         {t("boards.add_task")}
       </button>
     );
@@ -252,7 +262,9 @@ function CreateTask({
         onChange={(e) => setTitle(e.target.value)}
       />
       <div className="ui-create-form-actions">
-        <button type="submit">{t("boards.create_submit")}</button>
+        <button type="submit" aria-busy={busy ? "true" : undefined}>
+          {t("boards.create_submit")}
+        </button>
         <button type="button" data-action="cancel-create" onClick={() => close(true)}>
           {t("boards.create_cancel")}
         </button>
@@ -368,6 +380,9 @@ export function BoardView({ projectId, canCreate = false }: { projectId: string;
     assigneeFilter === "" || assigneeFilter === "none" || assignees.some((a) => a.id === assigneeFilter)
       ? assigneeFilter
       : "";
+  // The selected user has vanished from the board: the state itself is reset, so that he does not
+  // come back as a filter when his card appears again.
+  if (columns !== undefined && assigneeFilter !== filter) setAssigneeFilter(filter);
   const shown = useMemo(() => {
     if (columns === undefined || filter === "") return columns;
     const keep = (card: BoardCard) => (filter === "none" ? card.assignee === null : card.assignee?.id === filter);
@@ -542,7 +557,13 @@ export function BoardView({ projectId, canCreate = false }: { projectId: string;
       try {
         await moveTask(id, { status });
       } catch (e) {
-        alert.show(errorMessage(codeOf(e)));
+        // The task exists, in the first column: say so, with the reason of the refused move.
+        alert.show(
+          t("boards.create_move_failed", {
+            status: statusTitle("todo"),
+            reason: errorMessage(codeOf(e)),
+          }),
+        );
         result = "created";
       }
     }

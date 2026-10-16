@@ -21,6 +21,7 @@ import {
   dict,
   err,
   idsIn,
+  INITIAL,
   j,
   liveBoard,
   meWith,
@@ -215,10 +216,75 @@ describe("T91 create from column: errors", () => {
     const reads = f.count(BOARD);
     submit(form);
     const a = await screen.findByRole("alert");
-    expect(a.textContent).toBe(errorMessage("forbidden"));
+    expect(a.textContent).toBe(
+      dict("boards.create_move_failed").replace("{status}", "К выполнению").replace("{reason}", errorMessage("forbidden")),
+    );
     await waitFor(() => expect(idsIn(container, "todo")).toContain(TN));
     expect(f.count(BOARD)).toBeGreaterThan(reads);
     expect(idsIn(container, "done")).not.toContain(TN);
     expect(screen.getAllByRole("alert")).toHaveLength(1);
+  });
+});
+
+describe("T91-R create form review fixes", () => {
+  it.each(["escape", "cancel"])("t91r_%s_during_request_then_reopen_keeps_new_form_after_old_response", async (how) => {
+    const live = liveBoard();
+    const d = deferred<Response>();
+    const { container, f } = await openBoard({
+      ...live.routes,
+      [PROJ_CREATE]: async () => {
+        const r = await d.promise;
+        live.cols.todo.push({ ...(INITIAL.todo[0] as object), id: TN, title: NEW_TITLE, assignee: null });
+        return r;
+      },
+    });
+    const form = openCreate(container, "todo");
+    type(form, NEW_TITLE);
+    submit(form);
+    await waitFor(() => expect(f.count(PROJ_CREATE)).toBe(1));
+    if (how === "escape") fireEvent.keyDown(titleInput(form), { key: "Escape", code: "Escape" });
+    else fireEvent.click(within(form).getByRole("button", { name: dict("boards.create_cancel") }));
+    await waitFor(() => expect(createForm(container, "todo")).toBeNull());
+    const second = openCreate(container, "todo");
+    type(second, "Другое название");
+    const reads = f.count(BOARD);
+    d.resolve(j(201, taskDetail({ id: TN, title: NEW_TITLE })));
+    await waitFor(() => expect(f.count(BOARD)).toBeGreaterThan(reads));
+    await new Promise((r) => setTimeout(r, 30));
+    const now = createForm(container, "todo");
+    expect(now).toBeTruthy();
+    expect(titleInput(now!).value).toBe("Другое название");
+  });
+
+  it("t91r_submit_button_is_aria_busy_not_disabled_while_request_in_flight", async () => {
+    const live = liveBoard();
+    const d = deferred<Response>();
+    const { container, f } = await openBoard({ ...live.routes, [PROJ_CREATE]: () => d.promise });
+    const form = openCreate(container, "review");
+    type(form, NEW_TITLE);
+    const btn = within(form).getByRole("button", { name: dict("boards.create_submit") }) as HTMLButtonElement;
+    expect(btn.getAttribute("aria-busy")).not.toBe("true");
+    submit(form);
+    await waitFor(() => expect(f.count(PROJ_CREATE)).toBe(1));
+    await waitFor(() => expect(btn.getAttribute("aria-busy")).toBe("true"));
+    expect(btn.disabled).toBe(false);
+    d.resolve(j(201, taskDetail({ id: TN, title: NEW_TITLE })));
+    await waitFor(() => expect(f.count(MOVE(TN))).toBe(1));
+  });
+
+  it("t91r_move_failure_after_create_has_dedicated_message_with_reason_and_column", async () => {
+    const live = liveBoard();
+    const { container } = await openBoard({ ...live.routes, [MOVE(TN)]: () => err(403, "forbidden") });
+    const form = openCreate(container, "done");
+    type(form, NEW_TITLE);
+    submit(form);
+    const a = await screen.findByRole("alert");
+    const expected = dict("boards.create_move_failed")
+      .replace("{status}", "К выполнению")
+      .replace("{reason}", errorMessage("forbidden"));
+    expect(a.textContent).toBe(expected);
+    expect(expected).toBe(`Задача создана в колонке «К выполнению», но не перенесена: ${errorMessage("forbidden")}`);
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    await waitFor(() => expect(idsIn(container, "todo")).toContain(TN));
   });
 });

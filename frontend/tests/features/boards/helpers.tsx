@@ -118,6 +118,18 @@
 //     ровно один role="alert" с errorMessage(code) (ErrorAlert) и перечитывание доски; на экране -
 //     порядок сервера. После переноса document.activeElement - карточка с тем же data-task-id.
 //   Ошибка загрузки доски: ровно один role="alert" с errorMessage(code), колонок нет.
+// T91-R (замечания ревью; BoardCreate/BoardFilter/dnd.full тесты). КОНТРАКТ:
+//   (1) Escape/«Отмена» допустимы, пока запрос создания в полёте. Ответ на тот запрос не закрывает
+//       заново открытую форму и не стирает введённое в неё; пока запрос идёт, у кнопки отправки
+//       aria-busy="true" (НЕ disabled), после ответа атрибут снят/"false".
+//   (2) Выбранный исполнитель исчез с доски (нет ни одной его карточки) -> фильтр показывает «Все»
+//       (select.value === "") И состояние сброшено: если карточка вернётся по опросу, остаётся «Все».
+//   (4) Ошибка move после успешного create -> ровно один alert с текстом
+//       ru["boards.create_move_failed"] = «Задача создана в колонке «{status}», но не перенесена: {reason}»,
+//       {status} = название колонки «К выполнению», {reason} = errorMessage(code).
+//   (5) dnd.ts: neighborsInFullOrder(fullIds, visibleIds, movedId, visibleIndex) и
+//       insertIndexFor(othersIds, neighbors) - чистые функции (см. dnd.full.test.ts).
+//
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect, vi } from "vitest";
 

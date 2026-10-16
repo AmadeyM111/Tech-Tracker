@@ -218,3 +218,30 @@ describe("T91 filter with move and create", () => {
     void CD;
   });
 });
+
+describe("T91-R vanished assignee", () => {
+  it("t91r_filter_resets_to_all_when_assignee_vanishes_and_stays_all_when_he_returns", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let step = 0;
+    const gone = { ...INITIAL, todo: [CB, CC] };
+    const { container, f } = await openBoard({
+      [BOARD]: () => j(200, boardBody(step === 1 ? gone : INITIAL)),
+    });
+    pickFilter(R_KUZNETSOV.id);
+    await waitFor(() => expect(idsIn(container, "todo")).toEqual([TA]));
+    step = 1;
+    let n = f.count(BOARD);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await waitFor(() => expect(f.count(BOARD)).toBeGreaterThan(n));
+    await waitFor(() => expect(filterSelect().value).toBe(""));
+    expect(idsIn(container, "todo")).toEqual([TB, TC]);
+    expect(idsIn(container, "in_progress")).toEqual([TD]);
+    step = 2; // карточка исполнителя вернулась
+    n = f.count(BOARD);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await waitFor(() => expect(f.count(BOARD)).toBeGreaterThan(n));
+    await waitFor(() => expect(idsIn(container, "todo")).toEqual([TA, TB, TC]));
+    expect(filterSelect().value).toBe("");
+    expect(idsIn(container, "done")).toEqual([TE]);
+  });
+});

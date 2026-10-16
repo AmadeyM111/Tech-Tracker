@@ -261,6 +261,7 @@ export const ru = {
   "boards.create_title_label": "Название задачи",
   "boards.create_submit": "Создать",
   "boards.create_cancel": "Отмена",
+  "boards.create_move_failed": "Задача создана в колонке «{status}», но не перенесена: {reason}",
   "boards.filter_label": "Исполнитель",
   "boards.filter_all": "Все исполнители",
   "boards.filter_none": "Без исполнителя",
