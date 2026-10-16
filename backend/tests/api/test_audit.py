@@ -294,7 +294,7 @@ async def test_t18_invalid_page_params_are_422(api_env: ApiEnv, params: dict[str
 async def test_t18_filter_entity_type_and_actor_id(api_env: ApiEnv) -> None:
     env = api_env
     ws, admin, token = await admin_in_new_workspace(env)
-    other, _ = await seed(env, ws, "mixed", sessions=0)
+    other, _ = await seed(env, ws, "tech_admin", sessions=0)  # 002/AC-3: второй ТА (был СМ)
     u_admin, u_other, p_admin = await _add_events(
         env,
         ws.id,
@@ -385,12 +385,13 @@ async def test_t18_by_id_errors(api_env: ApiEnv) -> None:
     assert (bad.status_code, code_of(bad)) == (422, "validation_error")
 
 
-async def test_t18_roles_tech_admin_and_mixed_can_view(api_env: ApiEnv) -> None:
+async def test_t18_every_tech_admin_can_view(api_env: ApiEnv) -> None:
+    """002/AC-3, AC-5: журнал читает любой активный ТА (прежде ТА и СМ); БА и П - 403 (AC-65)."""
     env = api_env
     ws, admin, ta_token = await admin_in_new_workspace(env)
-    _, (mixed_token,) = await seed(env, ws, "mixed")
+    _, (second_ta_token,) = await seed(env, ws, "tech_admin")
     await _add_events(env, ws.id, [{"actor_id": admin.id}])
-    for token in (ta_token, mixed_token):
+    for token in (ta_token, second_ta_token):
         r = await _get_list(env, token)
         assert r.status_code == 200, r.text
         assert len(r.json()["items"]) == 1
@@ -915,8 +916,12 @@ async def test_t72_ac65_ownership_transfer_entry_via_audit_api(api_env: ApiEnv) 
     )
     assert moved.status_code == 200, moved.text
 
-    for reader in ("ta", "sm"):  # ТА и СМ читают журнал
-        r = await _get_list(env, w.tok(reader), entity_type="project")
+    # 002/AC-3, AC-5: журнал читают только ТА (первый и второй); СМ как администратора УЗ нет
+    from tests.admin_support import seed
+
+    _, (ta2_token,) = await seed(env, w.ws, "tech_admin")
+    for reader_token in (w.tok("ta"), ta2_token):
+        r = await _get_list(env, reader_token, entity_type="project")
         assert r.status_code == 200, r.text
         items = r.json()["items"]
         assert len(items) == 1, items
@@ -936,7 +941,7 @@ async def test_t72_ac65_ownership_transfer_entry_via_audit_api(api_env: ApiEnv) 
         assert w.project_name not in r.text
         assert w.login("ba2") not in r.text
         assert str(w.uid("ba2")) not in r.text
-        by_id = await env.client.get(f"{AUDIT}/{entry['id']}", headers=env.auth(w.tok(reader)))
+        by_id = await env.client.get(f"{AUDIT}/{entry['id']}", headers=env.auth(reader_token))
         assert by_id.status_code == 200
         assert by_id.json() == entry
         assert w.login("ba2") not in by_id.text

@@ -1,6 +1,6 @@
 """T72: смена роли действует со следующего запроса, без повторного входа (AC-76, FR-67, SC-14).
 
-БА с активной сессией создаёт проект (201); ТА или СМ меняет его роль на «Пользователь» —
+БА с активной сессией создаёт проект (201); ТА меняет его роль на «Пользователь» —
 следующий ``POST /projects`` той же сессии даёт 403; роль возвращена — 201. Права на уже
 созданный проект соответствуют новой роли; владелец и членство не меняются (AC-77).
 """
@@ -14,7 +14,8 @@ from tests.conftest import ApiEnv
 from tests.projects_api_support import PROJECTS, error, members_url, pj, send
 
 
-@pytest.mark.parametrize("changer_role", ["tech_admin", "mixed"])
+# 002/FR-3: роль меняет только ТА; прежний вариант ``mixed`` убран (002/AC-5, AC-14)
+@pytest.mark.parametrize("changer_role", ["tech_admin"])
 async def test_ac76_role_change_applies_to_next_request_in_same_session(
     api_env: ApiEnv, changer_role: str
 ) -> None:
@@ -94,9 +95,10 @@ async def test_ac76_role_removed_gives_403_no_role_on_projects_in_same_session(
 # --- T77: задачи (AC-77, SC-14, AC-75, AC-76) -----------------------------------------------
 
 
-async def test_t77_ac77_role_change_keeps_owner_member_assignee_and_mixed_reassigns(
+async def test_t77_ac77_role_change_keeps_owner_member_assignee_and_ba_member_reassigns(
     api_env: ApiEnv,
 ) -> None:
+    """001/AC-76, AC-77 по 002 §9 -> 002/AC-14: роль меняет только ТА, переназначает БА-участник."""
     from tests.tasks_api_support import make_api_world, mk, project_tasks_url, task_db, task_url
 
     env = api_env
@@ -120,12 +122,12 @@ async def test_t77_ac77_role_change_keeps_owner_member_assignee_and_mixed_reassi
     assert error(
         await send(env, w.tok("ba"), "PATCH", task_url(t), {"assignee_id": str(w.uid("usr"))})
     ) == (403, "forbidden")
-    # СМ находит задачу фильтром по исполнителю и переназначает (SC-14)
+    # БА-участник (ba2) находит задачу фильтром по исполнителю и переназначает (SC-14)
     found = await send(
-        env, w.tok("sm_m"), "GET", project_tasks_url(w.project_id, f"?assignee_id={w.uid('ba')}")
+        env, w.tok("ba2"), "GET", project_tasks_url(w.project_id, f"?assignee_id={w.uid('ba')}")
     )
     assert [i["id"] for i in found.json()["items"]] == [str(t)]
-    moved = await send(env, w.tok("sm_m"), "PATCH", task_url(t), {"assignee_id": str(w.uid("usr"))})
+    moved = await send(env, w.tok("ba2"), "PATCH", task_url(t), {"assignee_id": str(w.uid("usr"))})
     assert moved.status_code == 200, moved.text
     assert (await task_db(env, t)).assignee_id == w.uid("usr")
 

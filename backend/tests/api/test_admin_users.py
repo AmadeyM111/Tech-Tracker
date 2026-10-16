@@ -165,9 +165,10 @@ async def test_t15_list_pages_are_stable_for_users_with_equal_created_at(
 
 
 async def test_ac2_get_user_returns_admin_view(api_env: ApiEnv) -> None:
+    """002/AC-3: цель с ролью ``business_admin`` (прежде ``mixed``)."""
     env = api_env
     ws, _, token = await admin_in_new_workspace(env)
-    target, _ = await seed(env, ws, "mixed", must_change_password=True)
+    target, _ = await seed(env, ws, "business_admin", must_change_password=True)
 
     response = await env.client.get(f"{ADMIN_USERS}/{target.id}", headers=env.auth(token))
 
@@ -176,7 +177,7 @@ async def test_ac2_get_user_returns_admin_view(api_env: ApiEnv) -> None:
     assert set(body) == ADMIN_VIEW_FIELDS
     assert body["id"] == str(target.id)
     assert body["login"] == target.login
-    assert body["role"] == "mixed"
+    assert body["role"] == "business_admin"
     assert body["is_blocked"] is False
     assert body["must_change_password"] is True
 
@@ -929,7 +930,7 @@ def _endpoints(target: Any) -> list[tuple[str, str, str, Any]]:
         ("unblock", "POST", f"{base}/unblock", None),
         ("reset", "POST", f"{base}/reset-password", {OTP_FIELD: OTP}),
         ("revoke", "POST", f"{base}/revoke-sessions", None),
-        ("role", "PUT", f"{base}/role", {"role": "mixed"}),
+        ("role", "PUT", f"{base}/role", {"role": "user"}),  # 002/AC-5: 403 не зависит от тела
     ]
 
 
@@ -1043,17 +1044,8 @@ async def test_d16_foreign_origin_on_unsafe_admin_requests_is_403_origin_mismatc
     assert [i for i in await _list_all(env, token) if i["login"] == "gate.check"] == []
 
 
-async def test_fr42_mixed_role_has_access_to_admin_section(api_env: ApiEnv) -> None:
-    env = api_env
-    ws, _, _ = await admin_in_new_workspace(env)
-    _, (token,) = await seed(env, ws, "mixed")
-    target, _ = await seed(env, ws, "user")
-
-    listed = await env.client.get(ADMIN_USERS, headers=env.auth(token))
-    created = await _create(env, token, "by.mixed")
-    blocked = await env.client.post(f"{ADMIN_USERS}/{target.id}/block", headers=env.auth(token))
-
-    assert (listed.status_code, created.status_code, blocked.status_code) == (200, 201, 204)
+# Удалён ``test_fr42_mixed_role_has_access_to_admin_section``: СМ больше не администратор учётных
+# записей (002/FR-3). Заменитель: ``test_002_ac3_*`` в api/test_tech_admins_002.py.
 
 
 async def test_fr12_not_allowed_methods_on_admin_users_are_405(api_env: ApiEnv) -> None:

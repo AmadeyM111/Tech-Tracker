@@ -660,7 +660,9 @@ async def test_ac39_ac44_ac45_non_account_admins_get_403_on_every_account_action
     )
     await forbidden(db, svc.revoke_sessions(db, actor, env.sessions, victim.id))
     await forbidden(db, svc.set_role(db, actor, victim.id, Role.USER))
-    await forbidden(db, svc.set_role(db, actor, outsider.id, Role.MIXED))  # себе — тоже 403
+    await forbidden(
+        db, svc.set_role(db, actor, outsider.id, Role.BUSINESS_ADMIN)
+    )  # себе — тоже 403
 
     assert await user_by_login(db, "new.user") is None
     assert (await state(db, victim.id)).is_blocked is False
@@ -670,12 +672,12 @@ async def test_ac39_ac44_ac45_non_account_admins_get_403_on_every_account_action
     assert await events(db) == before
 
 
-@pytest.mark.parametrize("role", ["tech_admin", "mixed"])
-async def test_ac26_tech_admin_and_mixed_can_run_account_actions(
-    db: AsyncSession, env: SimpleNamespace, svc: Any, role: str
+async def test_ac26_second_tech_admin_can_run_account_actions(
+    db: AsyncSession, env: SimpleNamespace, svc: Any
 ) -> None:
+    """002/AC-3: два ТА (``world`` уже содержит ТА); действия выполняет второй, не СМ."""
     w = await world(db)
-    boss = await make_user(db, workspace=w.ws, role=role, login="boss.x")
+    boss = await make_user(db, workspace=w.ws, role="tech_admin", login="boss.x")
     await db.commit()
     actor = actor_of(boss)
     await svc.set_role(db, actor, w.target.id, Role.BUSINESS_ADMIN)
@@ -757,15 +759,18 @@ async def test_fr66_unknown_role_value_is_422(
 async def test_ac26_self_assignment_is_allowed_and_audited(
     db: AsyncSession, env: SimpleNamespace, svc: Any
 ) -> None:
+    # 002/AC-4, AC-7: при втором активном ТА первый меняет свою роль на БА
     w = await world(db)
-    await svc.set_role(db, w.actor, w.admin.id, Role.MIXED)  # ТА -> СМ себе
-    assert await member_role(db, w.admin.id) == "mixed"
+    await make_user(db, workspace=w.ws, role="tech_admin", login="second.ta")
+    await db.commit()
+    await svc.set_role(db, w.actor, w.admin.id, Role.BUSINESS_ADMIN)
+    assert await member_role(db, w.admin.id) == "business_admin"
     ev = (await events(db, w.ws.id))[0]
     assert ev.action == "user.role_changed"
     assert ev.entity_id == w.admin.id
     assert ev.actor_id == w.admin.id
     assert ev.details["role_from"] == "tech_admin"
-    assert ev.details["role_to"] == "mixed"
+    assert ev.details["role_to"] == "business_admin"
 
 
 async def test_fr67_set_role_does_not_touch_sessions_or_other_users(
@@ -775,7 +780,7 @@ async def test_fr67_set_role_does_not_touch_sessions_or_other_users(
     tokens = await open_sessions(db, env, w.target, 2)
     other = await make_user(db, workspace=w.ws, role="user", login="other.user")
     await db.commit()
-    await svc.set_role(db, w.actor, w.target.id, Role.MIXED)
+    await svc.set_role(db, w.actor, w.target.id, Role.BUSINESS_ADMIN)
     for token in tokens:  # действует со следующего запроса без повторного входа
         assert await env.sessions.resolve(db, token, now=NOW, background=True) is not None
     assert await member_role(db, other.id) == "user"
@@ -785,11 +790,11 @@ async def test_fr67_set_role_does_not_touch_sessions_or_other_users(
 
 
 async def lone_admin_world(db: AsyncSession) -> SimpleNamespace:
-    """Единственный активный ТА; второй ТА и СМ заблокированы; есть БА и «Пользователь»."""
+    """Единственный активный ТА; второй ТА заблокирован; есть БА и «Пользователь»."""
     ws = await make_workspace(db)
     last = await make_user(db, workspace=ws, role="tech_admin", login="last.admin")
     await make_user(db, workspace=ws, role="tech_admin", login="blocked.ta", blocked=True)
-    await make_user(db, workspace=ws, role="mixed", login="blocked.sm", blocked=True)
+    await make_user(db, workspace=ws, role="tech_admin", login="blocked.ta2", blocked=True)
     await make_user(db, workspace=ws, role="business_admin", login="plain.ba")
     await make_user(db, workspace=ws, role="user", login="plain.user")
     await db.commit()
@@ -818,19 +823,16 @@ async def test_ac78_last_admin_cannot_block_self(
     assert await events(db, w.ws.id) == []
 
 
-async def test_ac78_last_admin_may_become_mixed(
-    db: AsyncSession, env: SimpleNamespace, svc: Any
-) -> None:
-    w = await lone_admin_world(db)
-    await svc.set_role(db, w.actor, w.last.id, Role.MIXED)
-    assert await member_role(db, w.last.id) == "mixed"
+# Удалён ``test_ac78_last_admin_may_become_mixed``: по 002/FR-7 единственный ТА не меняет роль
+# на другую. Заменители: ``test_002_ac6_*`` (api/test_tech_admins_002.py), в R3-T11
+# ``test_002_ac24_*``.
 
 
 async def test_ac78_with_second_active_admin_first_may_remove_own_role(
     db: AsyncSession, env: SimpleNamespace, svc: Any
 ) -> None:
     w = await lone_admin_world(db)
-    await make_user(db, workspace=w.ws, role="mixed", login="second.sm")
+    await make_user(db, workspace=w.ws, role="tech_admin", login="second.ta")
     await db.commit()
     await svc.set_role(db, w.actor, w.last.id, None)
     assert await member_role(db, w.last.id) is None
@@ -909,7 +911,7 @@ async def test_ac78_concurrent_mutual_demotion_leaves_one_admin(
             res = await s.execute(
                 text(
                     "SELECT count(*) FROM workspace_member m JOIN app_user u ON u.id = m.user_id "
-                    "WHERE m.workspace_id = :w AND m.role IN ('tech_admin','mixed') "
+                    "WHERE m.workspace_id = :w AND m.role = 'tech_admin' "
                     "AND NOT u.is_blocked"
                 ),
                 {"w": ws.id},
@@ -1172,8 +1174,10 @@ async def test_ac21_foreign_workspace_user_is_404_for_every_action(
         ),
     )
     await not_found(db, svc.revoke_sessions(db, w.actor, env.sessions, stranger.id))
-    await not_found(db, svc.set_role(db, w.actor, stranger.id, Role.MIXED))
-    await not_found(db, svc.set_role(db, w.actor, uuid.uuid4(), Role.MIXED))  # несуществующий
+    await not_found(db, svc.set_role(db, w.actor, stranger.id, Role.BUSINESS_ADMIN))
+    await not_found(
+        db, svc.set_role(db, w.actor, uuid.uuid4(), Role.BUSINESS_ADMIN)
+    )  # несуществующий
 
     assert await events(db) == before
     after_state = await state(db, stranger.id)
@@ -1233,7 +1237,7 @@ async def test_ac67_rollback_removes_event_and_change_together(
     await svc.create_user(
         db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
     )
-    await svc.set_role(db, w.actor, w.target.id, Role.MIXED)
+    await svc.set_role(db, w.actor, w.target.id, Role.BUSINESS_ADMIN)
     await svc.block_user(db, w.actor, env.sessions, w.target.id)
     await db.rollback()
 
@@ -1285,7 +1289,7 @@ async def test_ac67_event_write_failure_aborts_the_action(
             one_time_password=SecretStr(ONE_TIME),
         ),
         "revoke": lambda: svc.revoke_sessions(db, w.actor, env.sessions, w.target.id),
-        "role": lambda: svc.set_role(db, w.actor, w.target.id, Role.MIXED),
+        "role": lambda: svc.set_role(db, w.actor, w.target.id, Role.BUSINESS_ADMIN),
     }
     with pytest.raises(RuntimeError):
         await calls[action]()
@@ -1613,7 +1617,7 @@ async def _pair_setup(
     async with committed() as s:
         ws = await make_workspace(s)
         a = await make_user(s, workspace=ws, role="tech_admin")
-        c = await make_user(s, workspace=ws, role="mixed")
+        c = await make_user(s, workspace=ws, role="tech_admin")
         x = await make_user(s, workspace=ws, role="user", blocked=blocked)
         for _ in range(2):
             await env.sessions.create(s, user_id=x.id, workspace_id=ws.id, now=NOW)
@@ -1682,7 +1686,7 @@ async def _run_pairs(
             res = await s.execute(
                 text(
                     "SELECT count(*) FROM workspace_member m JOIN app_user u ON u.id = m.user_id "
-                    "WHERE m.workspace_id = :w AND m.role IN ('tech_admin','mixed') "
+                    "WHERE m.workspace_id = :w AND m.role = 'tech_admin' "
                     "AND NOT u.is_blocked"
                 ),
                 {"w": w.ws.id},
@@ -1797,7 +1801,7 @@ TRIO_ITERATIONS = 150
 
 
 @pytest.mark.committed
-@pytest.mark.parametrize("variant", ["roles", "mixed"])
+@pytest.mark.parametrize("variant", ["roles", "actions"])
 async def test_t16_review_three_admins_six_concurrent_actions_no_deadlock(
     committed: async_sessionmaker[AsyncSession],
     env: SimpleNamespace,
@@ -1855,7 +1859,7 @@ async def test_t16_review_three_admins_six_concurrent_actions_no_deadlock(
         async with committed() as s:
             ws = await make_workspace(s)
             a = await make_user(s, workspace=ws, role="tech_admin")
-            b = await make_user(s, workspace=ws, role="mixed")
+            b = await make_user(s, workspace=ws, role="tech_admin")
             c = await make_user(s, workspace=ws, role="tech_admin")
             for u in (a, b, c):
                 for _ in range(2):
@@ -1899,7 +1903,7 @@ async def test_t16_review_three_admins_six_concurrent_actions_no_deadlock(
                     text(
                         "SELECT count(*) FROM workspace_member m JOIN app_user u "
                         "ON u.id = m.user_id WHERE m.workspace_id = :w "
-                        "AND m.role IN ('tech_admin','mixed') AND NOT u.is_blocked"
+                        "AND m.role = 'tech_admin' AND NOT u.is_blocked"
                     ),
                     {"w": ws.id},
                 )

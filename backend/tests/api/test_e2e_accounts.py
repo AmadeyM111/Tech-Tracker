@@ -17,7 +17,7 @@ from typing import Any
 
 import httpx
 
-from tests.admin_support import ADMIN_USERS, OTP_FIELD, admin_in_new_workspace
+from tests.admin_support import ADMIN_USERS, OTP_FIELD, admin_in_new_workspace, seed
 from tests.conftest import ApiEnv
 
 AUDIT = "/api/v1/admin/audit"
@@ -101,7 +101,9 @@ async def test_ac64_ta_scenario_one_entry_per_action_without_password_values(
     api_env: ApiEnv,
 ) -> None:
     env = api_env
-    _, admin, ta = await admin_in_new_workspace(env)  # ТА меняет свою роль на mixed (админ)
+    # 002/AC-4 (001/AC-64 по 002 §9): есть второй активный ТА, первый в конце меняет свою роль на БА
+    ws, admin, ta = await admin_in_new_workspace(env)
+    _, (ta2,) = await seed(env, ws, "tech_admin")  # читает журнал после смены роли первым ТА
     responses: list[httpx.Response] = []
     otp1, otp2 = "Otp1-Pa55phrase-first-4711", "Otp2-Pa55phrase-reset-4712"
     new_pw = "New-Pa55phrase-chosen-4713"
@@ -121,7 +123,7 @@ async def test_ac64_ta_scenario_one_entry_per_action_without_password_values(
     async def step(action: str, entity: str, method: str, url: str, **kw: Any) -> None:
         await act(method, url, **kw)
         expected.append((action, entity))
-        entries = await _audit(env, ta)
+        entries = await _audit(env, ta2)
         assert [(e["action"], e["entity_id"]) for e in entries] == expected, action
 
     await step("user.blocked", uid, "POST", f"{base}/block")
@@ -133,7 +135,7 @@ async def test_ac64_ta_scenario_one_entry_per_action_without_password_values(
     await step("user.role_removed", uid, "PUT", f"{base}/role", json={"role": None})
     await step(
         "user.role_changed", str(admin.id), "PUT", f"{ADMIN_USERS}/{admin.id}/role",
-        json={"role": "mixed"},
+        json={"role": "business_admin"},
     )  # fmt: skip
 
     # пользователь входит одноразовым паролем и выбирает свой: действия самого пользователя
@@ -151,7 +153,7 @@ async def test_ac64_ta_scenario_one_entry_per_action_without_password_values(
     responses.append(changed)
     assert changed.status_code == 204, changed.text
 
-    entries = await _audit(env, ta)
+    entries = await _audit(env, ta2)
     assert len(entries) == len(expected) == 9
     for entry in entries:
         assert entry["entity_type"] == "user"
@@ -159,7 +161,7 @@ async def test_ac64_ta_scenario_one_entry_per_action_without_password_values(
         occurred = datetime.fromisoformat(entry["occurred_at"].replace("Z", "+00:00"))
         assert occurred.utcoffset() == timedelta(0)
         assert entry["entity_id"] in {uid, str(admin.id)}
-    listing = await env.client.get(AUDIT, params={"page_size": 100}, headers=env.auth(ta))
+    listing = await env.client.get(AUDIT, params={"page_size": 100}, headers=env.auth(ta2))
     responses.append(listing)
 
     dump = json.dumps(entries, ensure_ascii=False) + "".join(r.text for r in responses)

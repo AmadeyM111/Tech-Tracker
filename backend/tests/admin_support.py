@@ -136,6 +136,18 @@ async def active_admin_count(env: ApiEnv, workspace_id: uuid.UUID) -> int:
     return int(rows[0][0])
 
 
+async def active_ta_count(env: ApiEnv, workspace_id: uuid.UUID) -> int:
+    """Число активных ТА (002/FR-7): роль ``tech_admin`` и не заблокирован."""
+    rows = await env.execute(
+        text(
+            "SELECT count(*) FROM workspace_member m JOIN app_user u ON u.id = m.user_id "
+            "WHERE m.workspace_id = :w AND m.role = 'tech_admin' AND NOT u.is_blocked"
+        ).bindparams(w=workspace_id)
+    )
+    assert rows
+    return int(rows[0][0])
+
+
 def admin_call(
     env: ApiEnv,
     token: str | None,
