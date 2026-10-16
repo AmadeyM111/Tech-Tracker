@@ -46,7 +46,8 @@ _BA = {
 # Таблица записана явно (а не вычислена), чтобы ошибка в реализации не повторялась в тесте.
 EXPECTED: dict[str, frozenset[str]] = {
     "TECH_ADMIN": frozenset(_TA),
-    "BUSINESS_ADMIN": frozenset(_BA),
+    # 002/FR-8 (R3-T01): БА получает PROJECT_MANAGE_ANY
+    "BUSINESS_ADMIN": frozenset(_BA | {"PROJECT_MANAGE_ANY"}),
     "MIXED": frozenset(_TA | _BA | {"PROJECT_MANAGE_ANY"}),
     "USER": frozenset({"BUSINESS_ACCESS"}),
 }
@@ -123,7 +124,8 @@ def test_br1_mixed_is_union_of_admin_roles_plus_manage_any(roles: ModuleType) ->
     ta, ba = caps[roles.Role.TECH_ADMIN], caps[roles.Role.BUSINESS_ADMIN]
     mixed = caps[roles.Role.MIXED]
     assert mixed == ta | ba | {roles.Capability.PROJECT_MANAGE_ANY}
-    assert roles.Capability.PROJECT_MANAGE_ANY not in ba
+    # 002/FR-8: право управлять любым проектом есть у БА, у ТА его нет
+    assert roles.Capability.PROJECT_MANAGE_ANY in ba
     assert roles.Capability.PROJECT_MANAGE_ANY not in ta
 
 
@@ -233,3 +235,12 @@ def test_fr66_actor_without_role_has_no_capabilities(roles: ModuleType, cap: str
     actor = _actor(roles, None)
     assert actor.role is None
     assert actor.can(roles.Capability[cap]) is False
+
+
+def test_002_fr8_only_business_roles_hold_project_manage_any(roles: ModuleType) -> None:
+    """002/FR-8: PROJECT_MANAGE_ANY у БА (и переходно у MIXED), нет у ТА и П."""
+    caps = roles.ROLE_CAPABILITIES
+    cap = roles.Capability.PROJECT_MANAGE_ANY
+    assert cap in caps[roles.Role.BUSINESS_ADMIN]
+    assert cap not in caps[roles.Role.TECH_ADMIN]
+    assert cap not in caps[roles.Role.USER]

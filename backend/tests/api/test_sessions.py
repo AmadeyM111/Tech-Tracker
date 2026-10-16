@@ -32,6 +32,7 @@ EXPECTED_CAPABILITIES: dict[str, list[str]] = {
         "labels_manage",
         "pipeline_manage",
         "project_create",
+        "project_manage_any",  # 002/FR-8, D-1
         "task_assign_others",
     ],
     "mixed": [

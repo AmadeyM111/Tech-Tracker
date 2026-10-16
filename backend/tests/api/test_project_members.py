@@ -172,19 +172,24 @@ async def test_ac73_mixed_non_member_adds_other_user_and_himself(api_env: ApiEnv
 
 
 async def test_ac54_ba_non_member_adding_himself_is_403(api_env: ApiEnv) -> None:
+    """Ожидание обращено по 002/AC-11 (FR-8): БА не участник добавляет себя - 204, становится
+    участником (запрет 001/FR-15 снят)."""
     env = api_env
     w = await make_api_world(env)
     r = await send(
         env, w.tok("ba3"), "POST", members_url(w.project_id), {"user_id": str(w.uid("ba3"))}
     )
-    assert error(r) == (403, "forbidden")
-    assert w.uid("ba3") not in await member_ids(env, w.project_id)
+    assert r.status_code == 204, r.text
+    assert w.uid("ba3") in await member_ids(env, w.project_id)
 
 
-@pytest.mark.parametrize("who", ["ba2", "usr", "ba3", "usr2", "ta"])
+@pytest.mark.parametrize("who", ["usr", "usr2", "ta"])
 async def test_ac73_ac54_non_managers_get_403_even_for_unknown_target(
     api_env: ApiEnv, who: str
 ) -> None:
+    """002/AC-16: 403 до проверки получателя остаётся для П и ТА; БА (ba2/ba3) управляет
+    участниками любого проекта (002/AC-11) и получает 422 user_not_found - см.
+    test_002_ac11_ba_non_owner_unknown_target_is_422."""
     env = api_env
     w = await make_api_world(env)
     before = await member_ids(env, w.project_id)
@@ -198,6 +203,20 @@ async def test_ac73_ac54_non_managers_get_403_even_for_unknown_target(
 
     assert error(ok_target) == (403, "forbidden")
     assert error(bad_target) == (403, "forbidden")  # права раньше получателя
+    assert await member_ids(env, w.project_id) == before
+
+
+@pytest.mark.parametrize("who", ["ba2", "ba3"])
+async def test_002_ac11_ba_non_owner_unknown_target_is_422(api_env: ApiEnv, who: str) -> None:
+    """002/AC-11 (FR-8): БА-не владелец проходит проверку прав; неизвестный получатель -
+    422 user_not_found, а не 403 (раньше 403, см. test_ac73_ac54_*)."""
+    env = api_env
+    w = await make_api_world(env)
+    before = await member_ids(env, w.project_id)
+
+    r = await send(env, w.tok(who), "POST", members_url(w.project_id), {"user_id": SOME_ID})
+
+    assert error(r) == (422, "user_not_found"), r.text
     assert await member_ids(env, w.project_id) == before
 
 
@@ -368,8 +387,21 @@ async def test_ac53_ba_member_self_removal_keeps_ba_card_visibility_not_membersh
     assert card.json()["is_member"] is False
 
 
-@pytest.mark.parametrize("who", ["ba2", "usr", "ba3"])
+@pytest.mark.parametrize("who", ["ba2", "ba3"])
+async def test_002_ac11_ba_non_owner_removes_others(api_env: ApiEnv, who: str) -> None:
+    """002/AC-11 (FR-8): БА (участник не владелец / не участник) исключает участника; раньше
+    403 (test_ac73_non_managers_cannot_remove_others)."""
+    env = api_env
+    w = await make_api_world(env)
+    target = w.uid("sm_m")
+    r = await send(env, w.tok(who), "DELETE", members_url(w.project_id, target))
+    assert r.status_code == 204, r.text
+    assert target not in await member_ids(env, w.project_id)
+
+
+@pytest.mark.parametrize("who", ["usr"])
 async def test_ac73_non_managers_cannot_remove_others(api_env: ApiEnv, who: str) -> None:
+    """002/AC-16: П не исключает других."""
     env = api_env
     w = await make_api_world(env)
     target = w.uid("sm_m")
@@ -469,6 +501,8 @@ async def test_ac53_invalid_user_uuid_in_path_is_422(api_env: ApiEnv) -> None:
 
 
 async def test_fr15_ac54_ba_owner_adding_himself_is_403(api_env: ApiEnv) -> None:
+    """Ожидание обращено по 002/AC-11, AC-19 (FR-8): БА-владелец добавляет себя - 204 без
+    изменений (повтор, D-46); не в tasks.md, обращён тем же правилом, что соседние."""
     env = api_env
     w = await make_api_world(env)
     before = await member_ids(env, w.project_id)
@@ -477,7 +511,7 @@ async def test_fr15_ac54_ba_owner_adding_himself_is_403(api_env: ApiEnv) -> None
         env, w.tok("ba"), "POST", members_url(w.project_id), {"user_id": str(w.uid("ba"))}
     )
 
-    assert error(r) == (403, "forbidden")
+    assert r.status_code == 204, r.text
     assert await member_ids(env, w.project_id) == before
 
 
@@ -495,6 +529,7 @@ async def test_fr15_ac54_mixed_non_member_adding_himself_is_204(api_env: ApiEnv)
 
 
 async def test_fr15_ac54_ba_member_not_owner_adding_other_is_403(api_env: ApiEnv) -> None:
+    """Ожидание обращено по 002/AC-11 (FR-8): БА-участник не владелец добавляет другого - 204."""
     env = api_env
     w = await make_api_world(env)
     assert w.uid("ba2") in await member_ids(env, w.project_id)
@@ -503,5 +538,5 @@ async def test_fr15_ac54_ba_member_not_owner_adding_other_is_403(api_env: ApiEnv
         env, w.tok("ba2"), "POST", members_url(w.project_id), {"user_id": str(w.uid("usr2"))}
     )
 
-    assert error(r) == (403, "forbidden")
-    assert w.uid("usr2") not in await member_ids(env, w.project_id)
+    assert r.status_code == 204, r.text
+    assert w.uid("usr2") in await member_ids(env, w.project_id)

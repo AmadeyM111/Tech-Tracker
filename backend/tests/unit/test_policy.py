@@ -424,8 +424,9 @@ MANAGE = [
     ("USER", True, True, False),
     ("USER", False, True, False),
     ("BUSINESS_ADMIN", True, True, True),
-    ("BUSINESS_ADMIN", False, True, False),  # участник, не владелец (Q-6)
-    ("BUSINESS_ADMIN", False, False, False),
+    # 002/AC-11, AC-12 (FR-8): БА управляет любым проектом, участие и владение не нужны
+    ("BUSINESS_ADMIN", False, True, True),
+    ("BUSINESS_ADMIN", False, False, True),
     ("MIXED", False, False, True),  # участие не требуется (FR-14c)
     ("MIXED", False, True, True),
 ]
@@ -447,8 +448,9 @@ def test_ac48_can_manage_project_and_members(pol, roles, role, is_owner, member,
     ("role", "is_owner", "target_me", "expected"),
     [
         ("BUSINESS_ADMIN", True, False, True),
-        ("BUSINESS_ADMIN", True, True, False),  # БА себя не добавляет (FR-15)
-        ("BUSINESS_ADMIN", False, False, False),
+        ("BUSINESS_ADMIN", True, True, True),  # 002/AC-11 (FR-8): БА добавляет себя
+        ("BUSINESS_ADMIN", False, False, True),  # 002/AC-11: любой проект
+        ("BUSINESS_ADMIN", False, True, True),  # 002/AC-11: себя в любой проект
         ("MIXED", False, True, True),  # СМ может добавить себя
         ("MIXED", False, False, True),
         ("USER", False, False, False),

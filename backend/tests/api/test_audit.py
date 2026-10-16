@@ -954,7 +954,8 @@ async def test_t72_ac65_repeat_and_failed_transfers_write_nothing(api_env: ApiEn
 
     same = await send(env, w.tok("ba"), "PUT", url, {"user_id": str(w.uid("ba"))})  # D-46
     wrong_role = await send(env, w.tok("ba"), "PUT", url, {"user_id": str(w.uid("usr"))})
-    denied = await send(env, w.tok("ba2"), "PUT", url, {"user_id": str(w.uid("ba2"))})
+    # актор ba2 (БА) заменён на usr (П): 002/AC-12, AC-16 - у БА 403 на передачу больше нет
+    denied = await send(env, w.tok("usr"), "PUT", url, {"user_id": str(w.uid("ba2"))})
 
     assert (same.status_code, wrong_role.status_code, denied.status_code) == (200, 422, 403)
     assert await _all_entries(env, w.tok("ta"), entity_type="project") == []

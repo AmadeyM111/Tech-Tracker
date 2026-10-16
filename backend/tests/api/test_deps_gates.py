@@ -53,7 +53,7 @@ HOLDERS: dict[str, frozenset[str]] = {
     "VIEW_AUDIT": frozenset({"tech_admin", "mixed"}),
     "BUSINESS_ACCESS": frozenset({"business_admin", "mixed", "user"}),
     "PROJECT_CREATE": frozenset({"business_admin", "mixed"}),
-    "PROJECT_MANAGE_ANY": frozenset({"mixed"}),
+    "PROJECT_MANAGE_ANY": frozenset({"business_admin", "mixed"}),  # 002/FR-8, D-1
     "TASK_ASSIGN_OTHERS": frozenset({"business_admin", "mixed"}),
     "LABELS_MANAGE": frozenset({"business_admin", "mixed"}),
     "CRM_READ": frozenset({"business_admin", "mixed"}),

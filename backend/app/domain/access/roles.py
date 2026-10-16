@@ -31,7 +31,8 @@ class Capability(StrEnum):
     VIEW_AUDIT = auto()  # FR-41
     BUSINESS_ACCESS = auto()  # раздел проектов и задач
     PROJECT_CREATE = auto()
-    PROJECT_MANAGE_ANY = auto()  # СМ: удаление, архив, владение, участники — в любом проекте
+    # БА: правка, участники (в т.ч. себя), владение, удаление, архив — любой проект (002/FR-8)
+    PROJECT_MANAGE_ANY = auto()
     TASK_ASSIGN_OTHERS = auto()  # «создание задачи другому», смена исполнителя (FR-19a)
     LABELS_MANAGE = auto()  # FR-18b
     CRM_READ = auto()
@@ -46,6 +47,7 @@ _BUSINESS_ADMIN_CAPS: Final = frozenset(
     {
         Capability.BUSINESS_ACCESS,
         Capability.PROJECT_CREATE,
+        Capability.PROJECT_MANAGE_ANY,
         Capability.TASK_ASSIGN_OTHERS,
         Capability.LABELS_MANAGE,
         Capability.CRM_READ,

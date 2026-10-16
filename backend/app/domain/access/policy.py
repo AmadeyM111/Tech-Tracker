@@ -117,10 +117,12 @@ def can_delete_comment(a: Actor, p: ProjectFacts, author_id: UUID) -> bool:
 
 
 def can_manage_project(a: Actor, p: ProjectFacts) -> bool:
-    """Правка, передача владения, удаление: БА-владелец или СМ (участие не требуется)."""
-    return (a.role == Role.BUSINESS_ADMIN and _is_owner(a, p)) or a.can(
-        Capability.PROJECT_MANAGE_ANY
-    )
+    """Правка, передача владения, удаление, архив: БА в любом проекте (002/FR-8, D-1).
+
+    Участие и владение не требуются; ``p`` в правиле не участвует.
+    """
+    del p  # сигнатура по plan §4.2
+    return a.can(Capability.PROJECT_MANAGE_ANY)
 
 
 def can_manage_members(a: Actor, p: ProjectFacts) -> bool:
@@ -128,8 +130,9 @@ def can_manage_members(a: Actor, p: ProjectFacts) -> bool:
 
 
 def can_add_member(a: Actor, p: ProjectFacts, user_id: UUID) -> bool:
-    """FR-15: БА не добавляет себя; СМ может."""
-    return can_manage_members(a, p) and not (a.role == Role.BUSINESS_ADMIN and user_id == a.user_id)
+    """Участники (002/FR-8): БА добавляет любого, в том числе себя; ``user_id`` не участвует."""
+    del user_id  # сигнатура по plan §4.2
+    return can_manage_members(a, p)
 
 
 def can_remove_self(a: Actor, p: ProjectFacts) -> bool:

@@ -347,10 +347,12 @@ async def test_ac110_sm_not_member_updates_any_project(db: AsyncSession, svc: An
     assert (await project_row(db, w.project_id)).description == ""  # не переданное не тронуто
 
 
-@pytest.mark.parametrize("who", ["ba2", "usr", "ba3", "usr2", "ta", "norole"])
+@pytest.mark.parametrize("who", ["usr", "usr2", "ta", "norole"])
 async def test_ac110_other_roles_get_403_and_project_unchanged(
     db: AsyncSession, svc: Any, who: str
 ) -> None:
+    """002/AC-16: 403 остаётся для П, ТА, без роли; БА - см.
+    test_002_ac11_ba_non_owner_updates_project_even_without_membership."""
     w = await make_world(db)
     await forbidden(
         db,
@@ -400,11 +402,27 @@ async def test_d46_update_without_changes_does_nothing(
 
 
 async def test_d46_no_change_still_checks_permissions(db: AsyncSession, svc: Any) -> None:
+    """Актор ba2 (БА) заменён на usr (П): 002/AC-11, AC-16 - БА правит любой проект, П - нет."""
     w = await make_world(db)
     await forbidden(
         db,
-        svc.update_project(db, actor_of(w.ba2), w.project_id, changes=_patch(svc, name="Основной")),
+        svc.update_project(db, actor_of(w.usr), w.project_id, changes=_patch(svc, name="Основной")),
     )
+
+
+async def test_002_ac11_ba_non_owner_updates_project_even_without_membership(
+    db: AsyncSession, svc: Any
+) -> None:
+    """002/AC-11 (FR-8): БА-участник (ba2) и БА-не участник (ba3) правят название и описание."""
+    w = await make_world(db)
+    for who, name in ((w.ba2, "Имя-ba2"), (w.ba3, "Имя-ba3")):
+        view = await svc.update_project(
+            db, actor_of(who), w.project_id, changes=_patch(svc, name=name, description="д-" + name)
+        )
+        assert (view.name, view.description) == (name, "д-" + name)
+        await db.commit()
+        row = await project_row(db, w.project_id)
+        assert (row.name, row.description) == (name, "д-" + name)
 
 
 async def test_ac108_update_boundaries(db: AsyncSession, svc: Any) -> None:
@@ -458,10 +476,16 @@ async def test_ac52_owner_transfers_to_ba_member_and_loses_manage(
     assert (await project_row(db, w.project_id)).owner_id == w.ba2.id
     assert await member_ids(db, w.project_id) >= {w.ba.id, w.ba2.id}  # бывший владелец остаётся
     await db.commit()
-    await forbidden(db, svc.delete_project(db, actor_of(w.ba), w.project_id))
-    await forbidden(
-        db, svc.update_project(db, actor_of(w.ba), w.project_id, changes=_patch(svc, name="x"))
+    # 002/AC-12 (FR-8): прежний владелец - БА, он сохраняет право управлять проектом
+    # (отмена ограничения 001/AC-52 "теряет право"): правит и удаляет.
+    view2 = await svc.update_project(
+        db, actor_of(w.ba), w.project_id, changes=_patch(svc, name="x")
     )
+    assert view2.name == "x"
+    await db.commit()
+    await svc.delete_project(db, actor_of(w.ba), w.project_id)
+    await db.commit()
+    assert (await project_row(db, w.project_id)).deleted_at is not None
 
 
 async def test_ac52_sm_transfers_to_sm_member(db: AsyncSession, svc: Any) -> None:
@@ -485,7 +509,24 @@ async def test_ac72_sm_not_member_transfers_when_owner_blocked(db: AsyncSession,
     assert view.owner.id == w.ba2.id
 
 
-@pytest.mark.parametrize("who", ["ba2", "usr", "ba3", "ta", "norole"])
+@pytest.mark.parametrize("who", ["ba2", "ba3"])
+async def test_002_ac12_ba_non_owner_transfers_ownership(
+    db: AsyncSession, svc: Any, who: str
+) -> None:
+    """002/AC-12 (FR-8, FR-11): БА (участник не владелец и не участник) передаёт владение
+    участнику-БА; прежде это был 403 (test_ac52_ac72_transfer_by_non_manager_is_403)."""
+    w = await _transfer_world(db)
+    actor = getattr(w, who)
+    view = await svc.transfer_ownership(db, actor_of(actor), w.project_id, new_owner_id=w.ba2.id)
+    assert view.owner.id == w.ba2.id
+    await db.commit()
+    assert (await project_row(db, w.project_id)).owner_id == w.ba2.id
+    ev = await events(db, w.ws.id)
+    assert len(ev) == 1
+    assert ev[0].actor_id == actor.id
+
+
+@pytest.mark.parametrize("who", ["usr", "ta", "norole"])
 async def test_ac52_ac72_transfer_by_non_manager_is_403(
     db: AsyncSession, svc: Any, who: str
 ) -> None:
@@ -499,10 +540,26 @@ async def test_ac52_ac72_transfer_by_non_manager_is_403(
 
 
 async def test_p11_5_forbidden_precedes_recipient_check(db: AsyncSession, svc: Any) -> None:
+    """Актор ba2 (БА) заменён на usr (П): 002/AC-12, AC-16/AC-17 - у БА теперь нет 403,
+    проверка получателя идёт после проверки права (usr получает 403, не 422)."""
     w = await _transfer_world(db)
     await forbidden(
-        db, svc.transfer_ownership(db, actor_of(w.ba2), w.project_id, new_owner_id=w.usr.id)
+        db, svc.transfer_ownership(db, actor_of(w.usr), w.project_id, new_owner_id=w.usr.id)
     )
+
+
+async def test_002_ac17_ba_non_owner_gets_recipient_error_not_403(
+    db: AsyncSession, svc: Any
+) -> None:
+    """002/AC-17 (FR-11): БА передаёт владение П - 422 (не 403), владелец не изменился."""
+    w = await _transfer_world(db)
+    await fails(
+        db,
+        svc.transfer_ownership(db, actor_of(w.ba2), w.project_id, new_owner_id=w.usr.id),
+        "recipient_wrong_role",
+    )
+    assert (await project_row(db, w.project_id)).owner_id == w.ba.id
+    assert await events(db, w.ws.id) == []
 
 
 async def test_ac52_transfer_to_user_role_is_422(db: AsyncSession, svc: Any) -> None:
@@ -733,11 +790,21 @@ async def test_ac48_owner_ba_and_sm_delete_project_softly(
     assert await events(db, w.ws.id) == []  # D-55
 
 
-@pytest.mark.parametrize("who", ["ba2", "usr", "ba3", "usr2", "ta", "norole"])
+@pytest.mark.parametrize("who", ["usr", "usr2", "ta", "norole"])
 async def test_ac48_non_owner_cannot_delete(db: AsyncSession, svc: Any, who: str) -> None:
+    """002/AC-16: 403 остаётся для П, ТА и без роли (БА ba2/ba3 - см. test_002_ac12_*)."""
     w = await make_world(db)
     await forbidden(db, svc.delete_project(db, actor_of(getattr(w, who)), w.project_id))
     assert (await project_row(db, w.project_id)).deleted_at is None
+
+
+@pytest.mark.parametrize("who", ["ba2", "ba3"])
+async def test_002_ac12_ba_non_owner_deletes_project(db: AsyncSession, svc: Any, who: str) -> None:
+    """002/AC-12 (FR-8): БА не владелец (участник и не участник) удаляет проект."""
+    w = await make_world(db)
+    await svc.delete_project(db, actor_of(getattr(w, who)), w.project_id)
+    await db.commit()
+    assert (await project_row(db, w.project_id)).deleted_at is not None
 
 
 async def test_fr16_delete_twice_is_404_and_project_disappears(
@@ -903,10 +970,11 @@ async def test_d45_get_project_foreign_workspace_is_404(db: AsyncSession, querie
     ("who", "is_member", "manage", "manage_members", "create_task", "remove_self"),
     [
         ("ba", True, True, True, True, False),
-        ("ba2", True, False, False, True, True),
+        # 002/FR-8, FR-21, AC-11: БА управляет любым проектом; remove_self - только у участника
+        ("ba2", True, True, True, True, True),
         ("usr", True, False, False, True, True),
         ("sm", False, True, True, False, False),
-        ("ba3", False, False, False, False, False),
+        ("ba3", False, True, True, False, False),
     ],
 )
 async def test_p11_4_get_project_permissions_from_policy(
