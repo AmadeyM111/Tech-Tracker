@@ -16,6 +16,7 @@ import { useLogout } from "../features/auth/useLogout";
 import { ApiError, setNavigationHandlers } from "../shared/api/client";
 import { errorMessage, t } from "../shared/i18n";
 import { ErrorAlert, useAlertState } from "../shared/ui/ErrorAlert";
+import { Icon } from "../shared/ui/Icon";
 
 // Session check shared by the guards (not a polled query: key is its own).
 const SESSION_KEY = ["auth", "me"] as const;
@@ -95,21 +96,33 @@ function MenuItems({ profile }: { profile: MeResponse }) {
       {has("business_access") ? (
         <>
           <p>
-            <NavLink to="/projects" end>{t("nav.projects")}</NavLink>
+            <NavLink to="/projects" end>
+              <Icon name="projects" />
+              {t("nav.projects")}
+            </NavLink>
           </p>
           <p>
-            <NavLink to="/my-tasks">{t("nav.my_tasks")}</NavLink>
+            <NavLink to="/my-tasks">
+              <Icon name="tasks" />
+              {t("nav.my_tasks")}
+            </NavLink>
           </p>
         </>
       ) : null}
       {has("manage_accounts") ? (
         <p>
-          <NavLink to="/admin/users">{t("admin.home_users_link")}</NavLink>
+          <NavLink to="/admin/users">
+            <Icon name="users" />
+            {t("admin.home_users_link")}
+          </NavLink>
         </p>
       ) : null}
       {has("view_audit") ? (
         <p>
-          <NavLink to="/admin/audit">{t("admin.home_audit_link")}</NavLink>
+          <NavLink to="/admin/audit">
+            <Icon name="audit" />
+            {t("admin.home_audit_link")}
+          </NavLink>
         </p>
       ) : null}
     </>
@@ -127,10 +140,14 @@ function Home({ profile }: { profile: MeResponse }) {
         <nav>
           <MenuItems profile={profile} />
           <p>
-            <Link to="/change-password">{t("app.change_password_link")}</Link>
+            <Link to="/change-password">
+              <Icon name="password" />
+              {t("app.change_password_link")}
+            </Link>
           </p>
         </nav>
         <button type="button" disabled={logout.pending} onClick={() => void logout.run()}>
+          <Icon name="logout" />
           {t("auth.logout")}
         </button>
       </div>
@@ -155,6 +172,7 @@ function HomeLink() {
   return (
     <p>
       <Link to="/" className="ui-home-link">
+        <Icon name="home" />
         {t("app.home_link")}
       </Link>
     </p>

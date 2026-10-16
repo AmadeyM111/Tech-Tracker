@@ -15,6 +15,8 @@ export interface UserPickerProps {
   busy?: boolean;
   /** The search error is a status line, not a second alert (the page has its own alert). */
   quietError?: boolean;
+  /** Id of an element that already shows the caption (e.g. a <dt>): no own <label>, the input points to it. */
+  labelledBy?: string;
 }
 
 const DEBOUNCE_MS = 300;
@@ -30,7 +32,7 @@ const ACTIVE_STYLE: CSSProperties = {
 const MAX_QUERY_LENGTH = 64;
 
 /** Combobox over the users directory: search by login, keyboard and click selection. */
-export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietError }: UserPickerProps) {
+export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietError, labelledBy }: UserPickerProps) {
   const baseId = useId();
   const inputId = `${baseId}-input`;
   const listId = `${baseId}-list`;
@@ -139,12 +141,13 @@ export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietE
 
   return (
     <div className="ui-field">
-      <label htmlFor={inputId}>{label}</label>
+      {labelledBy === undefined ? <label htmlFor={inputId}>{label}</label> : null}
       <input
         id={inputId}
         ref={inputRef}
         type="text"
         role="combobox"
+        aria-labelledby={labelledBy}
         maxLength={MAX_QUERY_LENGTH}
         autoComplete="off"
         autoCapitalize="off"

@@ -35,7 +35,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 0.9375rem;
+  font-size: 1.1875rem;
   line-height: 1.5;
 }
 
@@ -46,16 +46,16 @@ h3 {
 }
 
 h1 {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   margin: 1rem 0;
 }
 
 h2 {
-  font-size: 1.125rem;
+  font-size: 1.375rem;
 }
 
 h3 {
-  font-size: 1rem;
+  font-size: 1.25rem;
 }
 
 a {
@@ -64,7 +64,7 @@ a {
 
 dt {
   color: var(--text-muted);
-  font-size: 0.8125rem;
+  font-size: 1.0625rem;
   margin-top: 8px;
 }
 
@@ -86,7 +86,7 @@ button {
   border-radius: 999px;
   padding: 4px 14px;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 1.125rem;
   font-weight: 500;
   cursor: pointer;
 }
@@ -105,9 +105,22 @@ button:disabled {
   border: 1px solid var(--button-bg);
   border-radius: 999px;
   padding: 4px 14px;
-  font-size: 0.875rem;
+  font-size: 1.125rem;
   font-weight: 500;
   text-decoration: none;
+}
+
+/* T100: decorative inline SVG icon before a label (sidebar items, "home" link). */
+.ui-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-right: 8px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .ui-home-link:hover {
@@ -164,7 +177,7 @@ select:disabled {
 
 .ui-hint {
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: 1.125rem;
 }
 
 .ui-error {
@@ -211,7 +224,7 @@ h1,
 
 .ui-table th {
   color: var(--text-muted);
-  font-size: 0.8125rem;
+  font-size: 1.0625rem;
   font-weight: 500;
 }
 
@@ -264,7 +277,7 @@ h1,
 }
 
 .ui-secret code {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   user-select: all;
 }
 
@@ -365,7 +378,7 @@ h1,
 
 [data-column] h3 {
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: 1.125rem;
   font-weight: 600;
 }
 
@@ -426,7 +439,7 @@ li[data-task-id] [data-field="title"] {
 
 li[data-task-id] [data-field]:not([data-field="title"]) {
   color: var(--text-muted);
-  font-size: 0.8125rem;
+  font-size: 1.0625rem;
 }
 
 /* User picker (combobox listbox). The active option keeps an inline outline (forced colors). */
@@ -457,6 +470,8 @@ li[data-task-id] [data-field]:not([data-field="title"]) {
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   align-items: start;
   min-height: 100vh;
+  /* Dynamic viewport: the browser's own bars never add scrollable height. */
+  min-height: 100dvh;
 }
 
 .ui-shell > * {
@@ -482,6 +497,7 @@ li[data-task-id] [data-field]:not([data-field="title"]) {
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -500,7 +516,8 @@ li[data-task-id] [data-field]:not([data-field="title"]) {
 }
 
 .ui-sidebar a {
-  display: block;
+  display: flex;
+  align-items: center;
   padding: 6px 10px;
   border-radius: 8px;
   color: var(--text-muted);
@@ -519,6 +536,9 @@ li[data-task-id] [data-field]:not([data-field="title"]) {
 }
 
 .ui-sidebar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-top: auto;
 }
 
@@ -578,4 +598,53 @@ li[data-task-id] [data-field]:not([data-field="title"]) {
   .ui-sidebar a {
     transition: background-color 0.15s ease, color 0.15s ease;
   }
+}
+
+/* T101: task card parameters, rows "caption - value"; a control is the value itself. */
+.ui-props {
+  display: grid;
+  grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr);
+  gap: 12px 16px;
+  align-items: start;
+  margin: 0 0 16px;
+}
+
+.ui-props dt {
+  margin-top: 0;
+  padding-top: 7px;
+}
+
+.ui-props dt label {
+  color: inherit;
+}
+
+.ui-props dd input:not([type="checkbox"]):not([type="radio"]),
+.ui-props dd select,
+.ui-props dd textarea {
+  width: 100%;
+  max-width: 32rem;
+}
+
+.ui-props dd .ui-field {
+  margin-bottom: 0;
+  max-width: 32rem;
+}
+
+.ui-props dd.ui-pre {
+  white-space: pre-wrap;
+}
+
+.ui-props .ui-current {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.ui-props dd [data-action="clear-assignee"] {
+  margin-top: 8px;
+}
+
+/* The title input sits in the h1 and keeps the heading look. */
+h1 input[name="title"] {
+  width: 100%;
+  max-width: 48rem;
 }

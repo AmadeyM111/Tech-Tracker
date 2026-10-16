@@ -11,38 +11,55 @@
 //   Карточка читается через usePolledQuery (FR-29): тики опроса несут X-GT-Background: 1.
 //
 // Страница /tasks/:taskId (TaskPage; под BusinessScreen как остальные):
-//   h1 = название задачи; ошибка загрузки -> ровно один role="alert" c errorMessage(code),
-//     без h1 с названием и без форм. На странице всегда не более одного role="alert".
-//   Чтение: [data-field="status"] / [data-field="priority"] (тексты tasks.status.* / tasks.priority.*),
-//     [data-field="assignee"] (login или ru["tasks.assignee_none"]), [data-field="due_date"]
-//     (ru["tasks.due_none"] или time[datetime="YYYY-MM-DD"] с текстом DD.MM.YYYY),
-//     [data-field="description"] (текст описания), [data-field="project"] c <a href="/projects/<id>">,
-//     [data-slot="comments"] - место под комментарии (T85), присутствует всегда.
-//   Элементы - строго по task.permissions (AC-46, AC-47, NFR-7):
-//     edit            -> form[data-form="edit-task"]: input[name="title"] (label ru["tasks.title_label"]),
-//                        textarea[name="description"] (label tasks.description_label),
-//                        input[type="date"][name="due_date"] (label tasks.due_label),
-//                        select[name="priority"] (label tasks.priority_label; base|high), submit.
-//                        Поля предзаполнены значениями задачи. Submit шлёт PATCH ТОЛЬКО с изменёнными
-//                        полями (title - trim); без изменений запроса нет; очищенный срок -> due_date:null;
-//                        ключа assignee_id/status в этом PATCH нет (UNSET). Пустое название -> запроса
-//                        нет, role="alert" errorMessage("validation_error").
-//     change_status   -> select[name="status"] (label ru["tasks.status_label"]; todo|in_progress|review|done);
-//                        смена значения сразу шлёт PATCH {status} (только это поле).
-//                        Если новый статус "done" и среди task.subtasks есть не "done" (FR-22) -
-//                        сначала ConfirmDialog (role="alertdialog") с message ru["tasks.close_open_subtasks"]:
-//                        confirm -> PATCH, cancel/Escape -> запроса нет, select возвращается к статусу задачи.
-//     change_assignee -> UserPicker (combobox, label ru["tasks.assignee_label"], allowedIds = участники
-//                        проекта из GET /projects/{pid}/members, page_size=100); выбор -> PATCH
-//                        {assignee_id: <id>}; button[data-action="clear-assignee"] (виден, если исполнитель
-//                        есть) -> PATCH {assignee_id: null}. Других ключей в этих PATCH нет.
+//   T101 (backlog п.2, решение владельца): НЕТ ДУБЛЯ полей. Каждое поле показывается ОДИН раз, секция
+//   «Параметры» - dl со строками «подпись - значение»; при праве на правку значение - сам контрол, иначе текст.
+//   Отдельных блоков «Сменить статус» / «Правка задачи» (ключ tasks.edit_title, h2) и повторных подписей нет
+//   (ключи tasks.status_label / edit_title / assignee_label / title_label / due_label / priority_label на
+//   карточке не используются; в словаре могут остаться - ими пользуются другие экраны).
+//   h1 = название задачи (всегда ровно один h1, tabIndex=-1, получает фокус при открытии карточки).
+//     Есть permissions.edit -> внутри h1 лежит input[name="title"] (доступное имя ru["tasks.field_title"],
+//     значение = название; текстом название не дублируется), иначе h1 содержит название текстом.
+//     Хелпер expectTitle(text) читает value input или textContent h1.
+//   Ошибка загрузки -> ровно один role="alert" c errorMessage(code), без h1 с названием и без форм.
+//     На странице всегда не более одного role="alert".
+//   Подписи (dt, каждая ровно ОДИН раз на странице: getAllByText(label).length === 1; для Исполнителя подпись
+//     может быть самим <label> пикера): Статус = ru["tasks.col_status"], Приоритет = ru["tasks.col_priority"],
+//     Исполнитель = ru["tasks.col_assignee"], Срок = ru["tasks.col_due"], Описание = ru["tasks.field_description"],
+//     Название (доступное имя input в h1) = ru["tasks.field_title"]. Новые ключи tasks.field_title = "Название",
+//     tasks.field_description = "Описание" добавляются в ru.ts. Значения col_* остаются "Статус", "Приоритет",
+//     "Исполнитель", "Срок". Контролы имеют доступное имя = эта же подпись (select статуса: combobox "Статус").
+//   Значение строки лежит в [data-field="status|priority|assignee|due_date|description|project"] (dd).
+//     Без права (или для project всегда): текст как раньше - status/priority = tasks.status.* / tasks.priority.*,
+//       assignee = login или ru["tasks.assignee_none"], due_date = ru["tasks.due_none"] или
+//       time[datetime="YYYY-MM-DD"] с DD.MM.YYYY, description = текст (пусто -> ru["tasks.description_none"]);
+//       внутри такого [data-field] НЕТ input/select/textarea/button/combobox.
+//     С правом - в [data-field=...] контрол (текстом значение не дублируется):
+//       change_status   -> select[name="status"] (todo|in_progress|review|done): смена значения сразу шлёт
+//                          PATCH {status} (только это поле). Если новый статус "done" и среди task.subtasks есть
+//                          не "done" (FR-22) - сначала ConfirmDialog (role="alertdialog") с message
+//                          ru["tasks.close_open_subtasks"]: confirm -> PATCH, cancel/Escape -> запроса нет,
+//                          select возвращается к статусу задачи.
+//       change_assignee -> UserPicker (combobox, доступное имя ru["tasks.col_assignee"], allowedIds = участники
+//                          проекта из GET /projects/{pid}/members, page_size=100); в этом же [data-field="assignee"]
+//                          текущий исполнитель текстом (login / ru["tasks.assignee_none"]); выбор -> PATCH
+//                          {assignee_id: <id>}; button[data-action="clear-assignee"] (виден, если исполнитель
+//                          есть) -> PATCH {assignee_id: null}. Других ключей в этих PATCH нет.
+//       edit            -> form[data-form="edit-task"] (ОДНА форма, внутри title input, description, due_date,
+//                          priority и submit ru["tasks.save"]; status/assignee могут быть внутри или снаружи):
+//                          input[name="title"] (в h1), textarea[name="description"], input[type="date"]
+//                          [name="due_date"], select[name="priority"] (base|high), каждый с доступным именем =
+//                          подпись поля. Значения предзаполнены. Submit шлёт PATCH ТОЛЬКО с изменёнными
+//                          полями (title - trim); без изменений запроса нет; очищенный срок -> due_date:null;
+//                          ключа assignee_id/status в этом PATCH нет (UNSET). Пустое название -> запроса
+//                          нет, role="alert" errorMessage("validation_error").
+//       Без edit формы нет вовсе (form[data-form="edit-task"] отсутствует).
 //     delete          -> button[data-action="delete-task"] -> ConfirmDialog (alertdialog, shared/ui);
-//                        confirm -> DELETE /tasks/{id} -> переход на /projects/<project.id>;
-//                        cancel -> запроса нет.
+//                        confirm -> DELETE /tasks/{id} -> переход на /projects/<project.id>; cancel -> запроса нет.
 //     без права соответствующего элемента нет вовсе (не disabled).
+//   [data-field="project"] c <a href="/projects/<id>">, [data-slot="comments"] - место под комментарии (T85).
 //   Фокус (WCAG 2.4.3, T84 ревью): после смены статуса select остаётся в фокусе и НЕ disabled
 //     (aria-busy допустим). После clear-assignee кнопка исчезает - фокус переходит на поле выбора
-//     исполнителя (combobox ru["tasks.assignee_label"]); h1 для этого случая НЕ принимается.
+//     исполнителя (combobox "Исполнитель"); h1 для этого случая НЕ принимается.
 //   Гонка опроса: ответ тика опроса, стартовавшего до PATCH, не откатывает результат PATCH.
 //   Несохранённое название в форме не стирается сменой статуса/исполнителя; PATCH не содержит title,
 //     если название не менялось (в т.ч. отличается лишь пробелами). Участники запрашиваются только
@@ -50,8 +67,8 @@
 //   422 при загрузке карточки (невалидный uuid) - как not_found: один alert errorMessage("not_found").
 //   Успешный PATCH: карточка берёт ответ (h1, поля), форма синхронизируется с ответом.
 //   Ошибка PATCH/DELETE: role="alert" errorMessage(code), введённое в форме сохраняется.
-//   Опрос не затирает несохранённый ввод: поле формы, изменённое пользователем, не перезаписывается
-//     данными опроса; h1 и [data-field] показывают свежие данные сервера.
+//   Опрос не затирает несохранённый ввод: поле, изменённое пользователем, не перезаписывается данными
+//     опроса; нередактируемые значения (текст) и поля без правки показывают свежие данные сервера.
 //
 // Подзадачи (SubtaskList, внутри карточки): section[data-section="subtasks"] c h2 ru["tasks.subtasks_title"];
 //   строки [data-subtask-id="<uuid>"] с [data-field="title"] (<a href="/tasks/<id>">), [data-field="status"],
@@ -163,14 +180,37 @@ export async function openCard(
 ) {
   const f = installFetch(cardRoutes(cardFn, over, role));
   const view = renderApp(`/tasks/${TID1}`);
-  await screen.findByRole("heading", { level: 1, name: "Подготовить отчёт" });
+  await expectTitle("Подготовить отчёт");
   return { f, ...view };
 }
 
+/** Название на карточке: value input[name=title] внутри h1 (есть право edit) или текст h1. */
+export const titleNow = (): string | null => {
+  const h = document.querySelector("h1");
+  if (h === null) return null;
+  const input = h.querySelector<HTMLInputElement>('input[name="title"]');
+  return input !== null ? input.value : h.textContent;
+};
+export const expectTitle = (text: string) => waitFor(() => expect(titleNow()).toBe(text));
+export const titleInput = () => document.querySelector<HTMLInputElement>('h1 input[name="title"]');
+export const descArea = () => document.querySelector<HTMLTextAreaElement>('textarea[name="description"]');
+export const dueInput = () => document.querySelector<HTMLInputElement>('input[name="due_date"]');
+export const prioritySelect = () => document.querySelector<HTMLSelectElement>('select[name="priority"]');
+/** Показанное значение поля: текст, либо значение контрола (для select - текст выбранной опции). */
+export function shown(scope: ParentNode, name: string): string | null {
+  const el = scope.querySelector<HTMLElement>(`[data-field="${name}"]`);
+  if (el === null) return null;
+  const sel = el.querySelector("select");
+  if (sel !== null) return sel.selectedOptions[0]?.textContent ?? "";
+  const ctl = el.querySelector<HTMLInputElement | HTMLTextAreaElement>("input,textarea");
+  if (ctl !== null && name !== "assignee") return ctl.value;
+  return el.textContent;
+}
+export const assigneePicker = () => screen.getByRole("combobox", { name: ru["tasks.col_assignee"] });
 export const editForm = (c: ParentNode) => c.querySelector<HTMLFormElement>('form[data-form="edit-task"]');
 export const subForm = (c: ParentNode) => c.querySelector<HTMLFormElement>('form[data-form="create-subtask"]');
 export const subSection = (c: ParentNode) => c.querySelector<HTMLElement>('section[data-section="subtasks"]');
-export const statusSelect = () => screen.queryByRole("combobox", { name: d("tasks.status_label") }) as HTMLSelectElement | null;
+export const statusSelect = () => screen.queryByRole("combobox", { name: d("tasks.col_status") }) as HTMLSelectElement | null;
 export const deleteBtn = (c: ParentNode) => c.querySelector<HTMLButtonElement>('button[data-action="delete-task"]');
 export const bodyOf = async (r: Request) => (await r.clone().json()) as Record<string, unknown>;
 export const waitCount = (f: { count: (k: string) => number }, key: string, n: number) =>

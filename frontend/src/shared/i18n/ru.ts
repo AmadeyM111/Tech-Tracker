@@ -193,6 +193,8 @@ export const ru = {
   "tasks.col_priority": "Приоритет",
   "tasks.col_assignee": "Исполнитель",
   "tasks.col_due": "Срок",
+  "tasks.field_title": "Название",
+  "tasks.field_description": "Описание",
   "tasks.status.todo": "К выполнению",
   "tasks.status.in_progress": "В работе",
   "tasks.status.review": "На проверке",

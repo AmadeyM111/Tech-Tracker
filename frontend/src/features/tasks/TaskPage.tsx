@@ -206,126 +206,158 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
 
   const membersError = members.isError ? errorMessage(codeOf(members.error)) : null;
 
-  return (
-    <section className="ui-wide">
-      <h1 ref={headingRef} tabIndex={-1}>{task.title}</h1>
+  const field = (name: string) => `${baseId}-${name}`;
+  const label = (name: string, key: "tasks.col_status" | "tasks.col_priority" | "tasks.col_due" | "tasks.field_description") =>
+    permissions.edit || (name === "status" && permissions.change_status) ? (
+      <label htmlFor={field(name)}>{t(key)}</label>
+    ) : (
+      t(key)
+    );
+
+  const head = (
+    <>
+      <h1 ref={headingRef} tabIndex={-1}>
+        {permissions.edit ? (
+          <input
+            type="text"
+            name="title"
+            autoComplete="off"
+            aria-label={t("tasks.field_title")}
+            value={edits.title ?? task.title}
+            onChange={(e) => setEdits((p) => ({ ...p, title: e.target.value }))}
+          />
+        ) : (
+          task.title
+        )}
+      </h1>
       <ErrorAlert message={alert.message ?? pollError ?? membersError} seq={alert.seq} />
 
-      <dl>
-        <dt>{t("tasks.col_status")}</dt>
-        <dd data-field="status">{t(`tasks.status.${task.status}`)}</dd>
-        <dt>{t("tasks.col_priority")}</dt>
-        <dd data-field="priority">{t(`tasks.priority.${task.priority}`)}</dd>
-        <dt>{t("tasks.col_assignee")}</dt>
-        <dd data-field="assignee">{task.assignee === null ? t("tasks.assignee_none") : task.assignee.login}</dd>
-        <dt>{t("tasks.col_due")}</dt>
+      <dl className="ui-props">
+        <dt>{label("status", "tasks.col_status")}</dt>
+        <dd data-field="status">
+          {permissions.change_status ? (
+            <select
+              id={field("status")}
+              name="status"
+              value={task.status}
+              aria-busy={pending ? "true" : undefined}
+              onChange={(e) => onStatus(e.target.value as TaskStatus)}
+            >
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {t(`tasks.status.${s}`)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            t(`tasks.status.${task.status}`)
+          )}
+        </dd>
+
+        <dt>{label("priority", "tasks.col_priority")}</dt>
+        <dd data-field="priority">
+          {permissions.edit ? (
+            <select
+              id={field("priority")}
+              name="priority"
+              value={edits.priority ?? task.priority}
+              onChange={(e) => setEdits((p) => ({ ...p, priority: e.target.value as TaskPriority }))}
+            >
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {t(`tasks.priority.${p}`)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            t(`tasks.priority.${task.priority}`)
+          )}
+        </dd>
+
+        <dt id={field("assignee-caption")}>{t("tasks.col_assignee")}</dt>
+        <dd data-field="assignee">
+          {permissions.change_assignee ? (
+            <div
+              ref={pickerRef}
+              // Enter in the search field must not submit the edit form (the picker handles its own Enter).
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+            >
+              <span className="ui-current">{task.assignee === null ? t("tasks.assignee_none") : task.assignee.login}</span>
+              <UserPicker
+                key={pickerKey}
+                label={t("tasks.col_assignee")}
+                labelledBy={field("assignee-caption")}
+                allowedIds={candidateIds}
+                busy={pending}
+                quietError
+                onSelect={(user) => void patch({ assignee_id: user.id })}
+              />
+              {task.assignee === null ? null : (
+                <button type="button" data-action="clear-assignee" aria-busy={pending ? "true" : undefined} onClick={onClearAssignee}>
+                  {t("tasks.assignee_clear")}
+                </button>
+              )}
+            </div>
+          ) : task.assignee === null ? (
+            t("tasks.assignee_none")
+          ) : (
+            task.assignee.login
+          )}
+        </dd>
+
+        <dt>{label("due_date", "tasks.col_due")}</dt>
         <dd data-field="due_date">
-          {task.due_date === null ? (
+          {permissions.edit ? (
+            <input
+              id={field("due_date")}
+              type="date"
+              name="due_date"
+              value={edits.due_date ?? task.due_date ?? ""}
+              onChange={(e) => setEdits((p) => ({ ...p, due_date: e.target.value }))}
+            />
+          ) : task.due_date === null ? (
             t("tasks.due_none")
           ) : (
             <time dateTime={task.due_date}>{formatDate(task.due_date)}</time>
           )}
         </dd>
+
         <dt>{t("tasks.col_project")}</dt>
         <dd data-field="project">
           <Link to={`/projects/${task.project.id}`}>{task.project.name}</Link>
         </dd>
-        <dt>{t("tasks.description_label")}</dt>
+
+        <dt>{label("description", "tasks.field_description")}</dt>
         <dd data-field="description" className="ui-pre">
-          {task.description === "" ? t("tasks.description_none") : task.description}
+          {permissions.edit ? (
+            <textarea
+              id={field("description")}
+              name="description"
+              value={edits.description ?? task.description}
+              onChange={(e) => setEdits((p) => ({ ...p, description: e.target.value }))}
+            />
+          ) : task.description === "" ? (
+            t("tasks.description_none")
+          ) : (
+            task.description
+          )}
         </dd>
       </dl>
+    </>
+  );
 
-      {permissions.change_status ? (
-        <div className="ui-field">
-          <label htmlFor={`${baseId}-status`}>{t("tasks.status_label")}</label>
-          <select
-            id={`${baseId}-status`}
-            name="status"
-            value={task.status}
-            aria-busy={pending ? "true" : undefined}
-            onChange={(e) => onStatus(e.target.value as TaskStatus)}
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {t(`tasks.status.${s}`)}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
-
-      {permissions.change_assignee ? (
-        <div ref={pickerRef}>
-          <UserPicker
-            key={pickerKey}
-            label={t("tasks.assignee_label")}
-            allowedIds={candidateIds}
-            busy={pending}
-            quietError
-            onSelect={(user) => void patch({ assignee_id: user.id })}
-          />
-          {task.assignee === null ? null : (
-            <button type="button" data-action="clear-assignee" aria-busy={pending ? "true" : undefined} onClick={onClearAssignee}>
-              {t("tasks.assignee_clear")}
-            </button>
-          )}
-        </div>
-      ) : null}
-
+  return (
+    <section className="ui-wide">
       {permissions.edit ? (
-        <section aria-labelledby={`${baseId}-edit`}>
-          <h2 id={`${baseId}-edit`}>{t("tasks.edit_title")}</h2>
-          <form data-form="edit-task" onSubmit={onSave} noValidate aria-busy={pending ? "true" : undefined}>
-            <div className="ui-field">
-              <label htmlFor={`${baseId}-title`}>{t("tasks.title_label")}</label>
-              <input
-                id={`${baseId}-title`}
-                type="text"
-                name="title"
-                autoComplete="off"
-                value={edits.title ?? task.title}
-                onChange={(e) => setEdits((p) => ({ ...p, title: e.target.value }))}
-              />
-            </div>
-            <div className="ui-field">
-              <label htmlFor={`${baseId}-description`}>{t("tasks.description_label")}</label>
-              <textarea
-                id={`${baseId}-description`}
-                name="description"
-                value={edits.description ?? task.description}
-                onChange={(e) => setEdits((p) => ({ ...p, description: e.target.value }))}
-              />
-            </div>
-            <div className="ui-field">
-              <label htmlFor={`${baseId}-due`}>{t("tasks.due_label")}</label>
-              <input
-                id={`${baseId}-due`}
-                type="date"
-                name="due_date"
-                value={edits.due_date ?? task.due_date ?? ""}
-                onChange={(e) => setEdits((p) => ({ ...p, due_date: e.target.value }))}
-              />
-            </div>
-            <div className="ui-field">
-              <label htmlFor={`${baseId}-priority`}>{t("tasks.priority_label")}</label>
-              <select
-                id={`${baseId}-priority`}
-                name="priority"
-                value={edits.priority ?? task.priority}
-                onChange={(e) => setEdits((p) => ({ ...p, priority: e.target.value as TaskPriority }))}
-              >
-                {PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {t(`tasks.priority.${p}`)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button type="submit">{t("tasks.save")}</button>
-          </form>
-        </section>
-      ) : null}
+        <form data-form="edit-task" onSubmit={onSave} noValidate aria-busy={pending ? "true" : undefined}>
+          {head}
+          <button type="submit">{t("tasks.save")}</button>
+        </form>
+      ) : (
+        <div>{head}</div>
+      )}
 
       <SubtaskList
         task={task}

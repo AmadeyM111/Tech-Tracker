@@ -2132,6 +2132,18 @@ T69 → T73.
 - **Файлы:** `frontend/src/app/router.tsx` (`ui-home-link`), `ui.css`; тесты `theme.test.ts`, `tests/app/home-link.test.tsx`
 - **Попытки:** 1
 
+## T100 — Шрифты +4px и иконки в меню (docs/ui/backlog.md п.3; п.1 — не воспроизведён)
+- **Статус:** DONE (по тестам; визуально — владельцем)
+- **Файлы:** `frontend/src/shared/ui/{ui.css,Icon.tsx}`, `frontend/src/app/router.tsx`; тесты `frontend/tests/shared/typography.test.ts`, `frontend/tests/app/icons.test.tsx`; whitelist `backend/tests/infra/test_frontend_scaffold.py`
+- **Заметки:** п.1 бэклога («верхняя панель браузера закрывает шапку», `docs/ui/1.png`) воспроизвести не удалось (документ не выше окна, sticky-панель стоит на top=0, проверено в headless Chrome на 6 размерах); добавлена страховка `100dvh`; вероятная причина — кэш старого бандла или момент до отрисовки React; уточнить у владельца экран, размер окна, масштаб, консоль/Network, Cmd+Shift+R. Заметка владельца `docs/ui/Untitled`: «Сменить пароль лучше вынести в приветственное окно» — не реализовано, ждёт решения.
+- **Попытки:** 1
+
+## T101 — Карточка задачи без дублей полей (docs/ui/backlog.md п.2)
+- **Статус:** DONE
+- **Файлы:** `frontend/src/features/tasks/TaskPage.tsx`, `frontend/src/shared/ui/{UserPicker.tsx,ui.css}`, `ru.ts`; тесты `frontend/tests/features/tasks/{TaskPage.test.tsx,taskpage-helpers.tsx}`
+- **Заметки:** каждое поле один раз: при праве значение строки — сам контрол; статус и исполнитель сохраняются сразу, остальное — кнопкой «Сохранить»; название — input в h1; `UserPicker` получил необязательный проп `labelledBy`. Переписанные тесты T84 сохраняют все прежние проверки поведения (изменён только способ поиска элементов).
+- **Попытки:** 1
+
 ## T93 — Столбец `login_display`: модель и миграция 0005
 - **Статус:** DONE
 - **AC:** FR-73a (хранение написания; существующие записи получают `login_display = login`), AC-128 (уровень БД), AC-131 (заполнение при обновлении); plan D-66, §11.12.2–§11.12.4
