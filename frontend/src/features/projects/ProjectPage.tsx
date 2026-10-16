@@ -49,7 +49,7 @@ const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : "unknow
 const loadCodeOf = (e: unknown): string => (e instanceof ApiError && e.status === 422 ? "not_found" : codeOf(e));
 
 /** Roles that may own a project (FR-14a). */
-const OWNER_ROLES: ReadonlyArray<ProjectMember["role"]> = ["business_admin", "mixed"];
+const OWNER_ROLES: ReadonlyArray<ProjectMember["role"]> = ["business_admin"];
 
 function roleText(role: ProjectMember["role"]): string {
   return t(role === null ? "admin.role.none" : (`admin.role.${role}` as MessageKey));

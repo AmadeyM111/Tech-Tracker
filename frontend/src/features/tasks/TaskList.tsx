@@ -109,7 +109,7 @@ export interface ProjectTaskListProps {
   members: readonly ProjectMember[];
   /** `permissions.create_task` of the project. */
   canCreate: boolean;
-  /** The actor's role from /me: only business_admin / mixed may choose an assignee (FR-20). */
+  /** The actor's role from /me: only a business admin may choose an assignee (FR-9). */
   actorRole: string | null;
 }
 
@@ -134,7 +134,7 @@ export function ProjectTaskList({ projectId, members, canCreate, actorRole }: Pr
       ),
   });
 
-  const canPickAssignee = actorRole === "business_admin" || actorRole === "mixed";
+  const canPickAssignee = actorRole === "business_admin";
   const assigneeIds = members.filter((m) => !m.is_blocked && m.role !== null).map((m) => m.user.id);
 
   return (

@@ -32,7 +32,7 @@ import {
   type Handler,
 } from "./helpers";
 
-type Role = "business_admin" | "mixed" | "user";
+type Role = "business_admin" | "user" | "tech_admin";
 
 async function open(role: Role, over: Record<string, Handler> = {}, opts: { perms?: Record<string, boolean> } = {}) {
   const f = installFetch(
@@ -100,9 +100,24 @@ describe("create task form", () => {
     expect(b.assignee_id ?? null).toBeNull();
   });
 
-  it("fr20_mixed_role_also_gets_picker", async () => {
-    await open("mixed", {}, { perms: PERM_MANAGE });
+  // Тест про смешанную роль (fr20, выбор исполнителя) удалён (002 FR-9, FR-21): такой роли больше нет;
+  // заменён тестом 002_fr9_ba_gets_assignee_picker_user_does_not.
+  it("002_fr9_ba_gets_assignee_picker_user_does_not", async () => {
+    const ba = await open("business_admin", {}, { perms: PERM_MANAGE });
     expect(picker()).toBeTruthy();
+    expect(createForm(ba.container)).toBeTruthy();
+    ba.unmount();
+    document.body.innerHTML = "";
+    window.history.pushState({}, "", "/");
+    const usr = await open("user", {}, { perms: PERM_READ });
+    expect(createForm(usr.container)).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: ru["tasks.assignee_label"] })).toBeNull();
+  });
+
+  it("002_fr9_tech_admin_role_has_no_assignee_picker", async () => {
+    const { container } = await open("tech_admin", {}, { perms: PERM_MANAGE });
+    expect(createForm(container)).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: ru["tasks.assignee_label"] })).toBeNull();
   });
 
   it("fr20_ba_picks_member_and_assignee_id_is_sent_then_clear_removes_it", async () => {

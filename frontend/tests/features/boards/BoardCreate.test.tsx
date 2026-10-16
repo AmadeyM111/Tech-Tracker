@@ -172,7 +172,6 @@ describe("T91 create from column: requests", () => {
 
   it.each([
     ["user", USER_CAPS],
-    ["mixed", BUSINESS],
     ["business_admin", BUSINESS],
   ])("t91_role_%s_never_sends_assignee", async (role, caps) => {
     const { container, f } = await open({ [ME]: () => j(200, meWith(caps, role)) });

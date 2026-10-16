@@ -40,7 +40,7 @@ import { deferred, err, installFetch, j, page } from "../features/admin/helpers"
 const DICT = Object.values(ru) as string[];
 const USERS = "GET /api/v1/users";
 const A = { id: "11111111-1111-4111-8111-111111111111", login: "ivanov", role: "user" };
-const B = { id: "22222222-2222-4222-8222-222222222222", login: "ivanova", role: "mixed" };
+const B = { id: "22222222-2222-4222-8222-222222222222", login: "ivanova", role: "business_admin" };
 const C = { id: "33333333-3333-4333-8333-333333333333", login: "petrov", role: "business_admin" };
 
 function setup(props: Partial<ComponentProps<typeof UserPicker>> = {}) {

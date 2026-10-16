@@ -17,10 +17,14 @@ import {
   ID_IVANOV,
   M_ME,
   M_KUZNETSOV,
-  M_BLOCKED_MIXED,
+  ID_TA_MEMBER,
+  ID_USER_MEMBER,
+  M_BLOCKED_BA,
+  M_TA_ACTIVE,
+  M_USER_ACTIVE,
   M_PETROV,
   M_SIDOROV,
-  PERM_SM_MEMBER,
+  PERM_BA_MEMBER,
   wraps,
   M_OWNER,
   MEMBERS,
@@ -28,6 +32,7 @@ import {
   OWNER,
   PATCH,
   PERM_MEMBER_LEAVE,
+  PERM_MANAGE,
   PERM_READ,
   PID,
   REMOVE,
@@ -255,19 +260,48 @@ describe("delete project with confirmation (FR-14c, NFR-7)", () => {
   });
 });
 
-const OWN_MEMBERS = [M_OWNER, M_ME, M_PETROV, M_SIDOROV, M_KUZNETSOV, M_BLOCKED_MIXED];
+describe("002_fr21_ba_controls_follow_server_permissions (FR-21, AC-27 auto part)", () => {
+  // БА (me), не владелец (owner = ivanov), не меняет видимость: её задаёт permissions.* сервера.
+  it("002_fr21_ba_not_owner_with_manage_sees_edit_members_transfer_delete", async () => {
+    const { container } = await open(BUSINESS, {}, { detail: { permissions: PERM_MANAGE }, members: [M_OWNER, M_ME, M_KUZNETSOV] });
+    expect(field(container, "project-owner")!.textContent).toBe("ivanov");
+    expect(editForm(container)).toBeTruthy();
+    expect(action(container, "delete-project")).toBeTruthy();
+    expect(ownerSection(container)).toBeTruthy();
+    await waitFor(() => expect(candidate(container, ID_KUZNETSOV)).toBeTruthy());
+    await openMembersTab();
+    await waitFor(() => expect(memberRow(container, ID_KUZNETSOV)).toBeTruthy());
+    expect(screen.getByRole("combobox")).toBeTruthy();
+    expect(action(memberRow(container, ID_KUZNETSOV)!, "remove-member")).toBeTruthy();
+  });
+
+  it("002_fr21_ba_without_manage_permissions_sees_none_of_them", async () => {
+    const { container } = await open(BUSINESS, {}, { detail: { permissions: PERM_READ }, members: [M_OWNER, M_ME, M_KUZNETSOV] });
+    expect(editForm(container)).toBeNull();
+    expect(q(container, 'button[data-action="delete-project"]')).toBeNull();
+    expect(ownerSection(container)).toBeNull();
+    await openMembersTab();
+    await waitFor(() => expect(memberRow(container, ID_KUZNETSOV)).toBeTruthy());
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(q(container, 'button[data-action="remove-member"]')).toBeNull();
+  });
+});
+
+const OWN_MEMBERS = [M_OWNER, M_ME, M_PETROV, M_SIDOROV, M_KUZNETSOV, M_BLOCKED_BA, M_TA_ACTIVE, M_USER_ACTIVE];
 const ID_BLOCKED = "99999999-9999-4999-8999-999999999999";
 
 describe("transfer ownership from members (FR-14a, AC-52, AC-72, review T81 p.1)", () => {
-  it("ac52_candidates_are_unblocked_business_admins_and_mixed_from_members_not_users", async () => {
+  it("ac17_candidates_are_unblocked_business_admin_members_not_users", async () => {
     const { container } = await open(BUSINESS, {}, { members: OWN_MEMBERS });
     await waitFor(() => expect(candidate(container, ID_KUZNETSOV)).toBeTruthy());
     const sec = ownerSection(container)!;
-    expect(candidate(sec, ADMIN_ID)).toBeTruthy(); // mixed
+    expect(candidate(sec, ADMIN_ID)).toBeTruthy(); // БА (AC-17)
     expect(candidate(sec, ID_IVANOV)).toBeNull(); // текущий владелец
     expect(candidate(sec, ID_PETROV)).toBeNull(); // user и заблокирован
     expect(candidate(sec, ID_SIDOROV)).toBeNull(); // без роли
-    expect(candidate(sec, ID_BLOCKED)).toBeNull(); // mixed, но заблокирован
+    expect(candidate(sec, ID_BLOCKED)).toBeNull(); // БА, но заблокирован
+    expect(candidate(sec, ID_TA_MEMBER)).toBeNull(); // ТА, не заблокирован (FR-11, FR-16)
+    expect(candidate(sec, ID_USER_MEMBER)).toBeNull(); // user, не заблокирован
     expect(f.count(MEMBERS)).toBeGreaterThanOrEqual(1);
     expect(f.count(USERS)).toBe(0);
   });
@@ -518,7 +552,7 @@ describe("members tab (AC-53, AC-73, FR-15, FR-15a)", () => {
 describe("review T82 attempt 2", () => {
   it("fr15a_remove_button_in_own_row_asks_confirmation", async () => {
     const { container } = await open(BUSINESS, { [REMOVE(ADMIN_ID)]: NO_CONTENT, "GET /api/v1/projects": () => j(200, page([])) }, {
-      detail: { permissions: PERM_SM_MEMBER },
+      detail: { permissions: PERM_BA_MEMBER },
     });
     await openMembersTab();
     await waitFor(() => expect(memberRow(container, ADMIN_ID)).toBeTruthy());
@@ -538,7 +572,7 @@ describe("review T82 attempt 2", () => {
 
   it("fr15a_remove_button_in_foreign_row_has_no_dialog", async () => {
     const { container } = await open(BUSINESS, { [REMOVE(ID_PETROV)]: NO_CONTENT }, {
-      detail: { permissions: PERM_SM_MEMBER },
+      detail: { permissions: PERM_BA_MEMBER },
     });
     await openMembersTab();
     await waitFor(() => expect(memberRow(container, ID_PETROV)).toBeTruthy());
@@ -552,15 +586,15 @@ describe("review T82 attempt 2", () => {
     const { container } = await open(
       BUSINESS,
       {
-        [ONE]: () => j(200, detail({ permissions: joined ? PERM_SM_MEMBER : { ...PERM_SM_MEMBER, remove_self: false }, is_member: joined })),
-        [USERS]: () => j(200, page([{ id: ADMIN_ID, login: "admin", role: "mixed" }])),
+        [ONE]: () => j(200, detail({ permissions: joined ? PERM_BA_MEMBER : { ...PERM_BA_MEMBER, remove_self: false }, is_member: joined })),
+        [USERS]: () => j(200, page([{ id: ADMIN_ID, login: "admin", role: "business_admin" }])),
         [ADD]: () => {
           joined = true;
           return NO_CONTENT();
         },
         [REMOVE(ID_PETROV)]: NO_CONTENT,
       },
-      { detail: { permissions: PERM_SM_MEMBER } },
+      { detail: { permissions: PERM_BA_MEMBER } },
     );
     await openMembersTab();
     expect(q(container, 'button[data-action="leave-project"]')).toBeNull();

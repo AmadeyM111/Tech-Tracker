@@ -12,7 +12,7 @@ const PRIORITIES: readonly TaskPriority[] = ["base", "high"];
 
 export interface CreateTaskFormProps {
   projectId: string;
-  /** Only a business admin / mixed role may choose an assignee (FR-20). */
+  /** Only a business admin may choose an assignee (FR-9). */
   canPickAssignee: boolean;
   /** Ids the assignee may be chosen from (project members). */
   assigneeIds: readonly string[];

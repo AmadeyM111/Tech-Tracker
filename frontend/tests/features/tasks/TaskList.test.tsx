@@ -31,19 +31,50 @@ import {
   USER_CAPS,
 } from "./helpers";
 
+import {
+  ALL_PERMS,
+  NO_PERMS,
+  card,
+  assigneePicker,
+  deleteBtn,
+  editForm,
+  openCard,
+  titleInput,
+  R_IVANOV,
+} from "./taskpage-helpers";
+
 const DICT = Object.values(ru) as string[];
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
-async function openProject(role: "business_admin" | "mixed" | "user" = "business_admin", over = {}, opts = {}) {
+async function openProject(role: "business_admin" | "user" = "business_admin", over = {}, opts = {}) {
   const f = installFetch(taskRoutes(role, over, opts));
   const view = renderApp(`/projects/${PID}`);
   await screen.findByRole("heading", { level: 1, name: "Альфа" });
   await openTasksTab();
   return { f, ...view };
 }
+
+describe("002_fr21_task_controls_follow_server_permissions (FR-21, AC-27 auto part)", () => {
+  // БА (me), не автор и не владелец: видимость задаёт только permissions.* сервера.
+  it("002_fr21_ba_with_edit_change_assignee_delete_sees_full_edit_assignee_and_delete", async () => {
+    const { container } = await openCard(() => card({ author: R_IVANOV, permissions: ALL_PERMS }));
+    expect(editForm(container)).toBeTruthy();
+    expect(titleInput()).toBeTruthy();
+    expect(assigneePicker()).toBeTruthy();
+    expect(deleteBtn(container)).toBeTruthy();
+  });
+
+  it("002_fr21_ba_without_task_permissions_sees_no_edit_assignee_or_delete", async () => {
+    const { container } = await openCard(() => card({ author: R_IVANOV, permissions: NO_PERMS }));
+    expect(editForm(container)).toBeNull();
+    expect(titleInput()).toBeNull();
+    expect(screen.queryByRole("combobox", { name: ru["tasks.col_assignee"] })).toBeNull();
+    expect(deleteBtn(container)).toBeNull();
+  });
+});
 
 describe("project tasks tab", () => {
   it("uf3_lists_rows_with_title_link_status_priority_assignee", async () => {

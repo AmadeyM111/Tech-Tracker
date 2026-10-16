@@ -359,7 +359,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
 - **Попытки:** 0
 
 ## R3-T10 — Фронтенд: владельцы и выбор исполнителя — только БА
-- **Статус:** TODO
+- **Статус:** DONE (2 попытки ревью, reviews/R3-T10-1.md, R3-T10-2.md)
 - **AC:** AC-17 (кандидаты во владельцы), AC-27 (автоматическая часть: элементы управления у БА); FR-9, FR-11, FR-21
 - **Файлы:** `frontend/src/features/projects/ProjectPage.tsx`, `frontend/src/features/tasks/TaskList.tsx`,
   `frontend/src/features/tasks/CreateTaskForm.tsx`;

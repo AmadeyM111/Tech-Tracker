@@ -29,7 +29,7 @@
 //     input[name="title"] (label), textarea[name="description"] (label),
 //     input[type="date"][name="due_date"] (label), select[name="priority"] (base|high, по умолчанию
 //     base), button[type="submit"]; UserPicker (combobox, allowedIds = участники проекта) -
-//     ТОЛЬКО если роль актора business_admin или mixed (me.role); у роли user поля исполнителя
+//     ТОЛЬКО если роль актора business_admin (me.role; 002 FR-9); у роли user поля исполнителя
 //     нет. Выбранный исполнитель показан в [data-field="selected-assignee"] (login) и сбрасывается
 //     button[data-action="clear-assignee"].
 //     Тело POST: title (trim), priority, description (если непусто), due_date ("YYYY-MM-DD" как
@@ -123,11 +123,11 @@ export const USER_CAPS = ["business_access"];
 
 /** Маршруты страницы проекта + список задач; role - роль актора из /me. */
 export function taskRoutes(
-  role: "business_admin" | "mixed" | "user",
+  role: "business_admin" | "user" | "tech_admin",
   over: Record<string, Handler> = {},
   opts: { items?: unknown[]; perms?: Record<string, boolean> } = {},
 ): Record<string, Handler> {
-  const caps = role === "user" ? USER_CAPS : BA_CAPS;
+  const caps = role === "user" ? USER_CAPS : BA_CAPS; // tech_admin: права как у БА, чтобы роль (а не права) определяла выбор исполнителя
   return {
     [ME]: () => j(200, meWith(caps, role)),
     [ONE]: () => j(200, detail({ permissions: opts.perms ?? PERM_READ })),

@@ -49,7 +49,7 @@
 //     input[type="search"][name="owner_search"] (label) и строками-кандидатами
 //     [data-owner-candidate="<user_id>"] (login + button[data-action="transfer-owner"]).
 //     Кандидаты - участники проекта из GET /projects/{id}/members (все страницы, page_size=100
-//     по цепочке has_next) с ролью business_admin или mixed и не is_blocked (FR-14a), кроме
+//     по цепочке has_next) с ролью business_admin и не is_blocked (FR-14a), кроме
 //     текущего владельца; «Пользователь», заблокированные и без роли - не кандидаты. Фильтр
 //     owner_search - на клиенте по подстроке login без учёта регистра. Список кандидатов - с
 //     классом ui-list. Запрос GET /users НЕ используется. Клик по transfer-owner без
@@ -137,13 +137,19 @@ export function member(
 }
 
 export const M_OWNER = member(R_IVANOV, { role: "business_admin", is_owner: true });
-export const M_ME = member(R_ME, { role: "mixed" });
+export const M_ME = member(R_ME, { role: "business_admin" });
 export const M_PETROV = member(R_PETROV, { role: "user", is_blocked: true });
 export const M_SIDOROV = member(R_SIDOROV, { role: null });
 export const M_KUZNETSOV = member(R_KUZNETSOV, { role: "business_admin" });
+export const ID_TA_MEMBER = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+export const ID_USER_MEMBER = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+/** Незаблокированный ТА-участник (бывший СМ, FR-16): не кандидат во владельцы. */
+export const M_TA_ACTIVE = member(ref(ID_TA_MEMBER, "ta-member"), { role: "tech_admin" });
+/** Незаблокированный участник с ролью user: не кандидат во владельцы. */
+export const M_USER_ACTIVE = member(ref(ID_USER_MEMBER, "user-member"), { role: "user" });
 export const R_BLOCKED = ref("99999999-9999-4999-8999-999999999999", "zablokirov");
-export const M_BLOCKED_MIXED = member(R_BLOCKED, { role: "mixed", is_blocked: true });
-export const PERM_SM_MEMBER = { manage: true, manage_members: true, create_task: true, remove_self: true };
+export const M_BLOCKED_BA = member(R_BLOCKED, { role: "business_admin", is_blocked: true });
+export const PERM_BA_MEMBER = { manage: true, manage_members: true, create_task: true, remove_self: true };
 
 /** Содержимое ui.css для проверки CSS-правил (jsdom стили не подключает). */
 export function cssRulesWithWrap(): string[] {

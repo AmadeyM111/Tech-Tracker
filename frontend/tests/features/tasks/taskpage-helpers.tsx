@@ -161,7 +161,7 @@ export function d(key: string): string {
 export function cardRoutes(
   cardFn: () => Record<string, unknown>,
   over: Record<string, Handler> = {},
-  role: "business_admin" | "mixed" | "user" = "business_admin",
+  role: "business_admin" | "user" = "business_admin",
 ): Record<string, Handler> {
   return {
     [ME]: () => j(200, meWith(role === "user" ? USER_CAPS : BA_CAPS, role)),
@@ -176,7 +176,7 @@ export function cardRoutes(
 export async function openCard(
   cardFn: () => Record<string, unknown> = () => card(),
   over: Record<string, Handler> = {},
-  role: "business_admin" | "mixed" | "user" = "business_admin",
+  role: "business_admin" | "user" = "business_admin",
 ) {
   const f = installFetch(cardRoutes(cardFn, over, role));
   const view = renderApp(`/tasks/${TID1}`);
