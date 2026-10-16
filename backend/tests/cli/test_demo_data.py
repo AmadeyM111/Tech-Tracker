@@ -52,7 +52,7 @@ DEMO_FILE = "demo-passwords.txt"
 FIRST_ADMIN_PASSWORD = "Zq7Lm2Vx9FirstAdminPw"
 EXPECTED_LOGINS = {
     "demo.ta",
-    "demo.mixed",
+    "demo.ba4",  # 002/AC-28: вместо demo.mixed
     "demo.ba1",
     "demo.ba2",
     "demo.ba3",
@@ -60,7 +60,7 @@ EXPECTED_LOGINS = {
 }
 EXPECTED_ROLES = {
     "demo.ta": "tech_admin",
-    "demo.mixed": "mixed",
+    "demo.ba4": "business_admin",
     "demo.ba1": "business_admin",
     "demo.ba2": "business_admin",
     "demo.ba3": "business_admin",
@@ -188,7 +188,7 @@ async def loaded(
 async def test_fr49_thirteen_accounts_with_roles(
     loaded: tuple[async_sessionmaker[AsyncSession], Settings, Any],
 ) -> None:
-    """FR-49 (SC-13): первый ТА + 12 демо: 1 ТА, 1 СМ, 3 БА, 7 П; роли по §11.8."""
+    """FR-49 (SC-13), обращён по 002/AC-28: первый ТА + 12 демо: 1 ТА, 4 БА, 7 П; без СМ."""
     sm, _, _ = loaded
     rows = await _rows(
         sm,
@@ -199,10 +199,84 @@ async def test_fr49_thirteen_accounts_with_roles(
     assert roles == EXPECTED_ROLES
     assert Counter(r["role"] for r in rows) == {
         "tech_admin": 2,
-        "mixed": 1,
-        "business_admin": 3,
+        "business_admin": 4,
         "user": 7,
     }
+
+
+@pytest.mark.committed
+async def test_002_ac28_thirteen_accounts_without_mixed(
+    loaded: tuple[async_sessionmaker[AsyncSession], Settings, Any],
+) -> None:
+    """002/AC-28 (FR-22): 13 записей: первый ТА, demo.ta, demo.ba1..4, demo.user1..7; без mixed."""
+    sm, _, _ = loaded
+    rows = await _rows(
+        sm,
+        "SELECT u.login, m.role FROM app_user u JOIN workspace_member m ON m.user_id = u.id",
+    )
+    first_admin = "admin"
+    expected = {
+        first_admin,
+        "demo.ta",
+        *(f"demo.ba{i}" for i in range(1, 5)),
+        *(f"demo.user{i}" for i in range(1, 8)),
+    }
+    assert len(rows) == 13
+    assert {r["login"] for r in rows} == expected
+    assert "demo.mixed" not in {r["login"] for r in rows}
+    assert all(r["role"] != "mixed" for r in rows)
+    assert Counter(r["role"] for r in rows) == {
+        "tech_admin": 2,
+        "business_admin": 4,
+        "user": 7,
+    }
+
+
+@pytest.mark.committed
+async def test_002_ac28_no_mixed_in_role_assigned_events(
+    loaded: tuple[async_sessionmaker[AsyncSession], Settings, Any],
+) -> None:
+    """002/AC-28: в событиях user.role_assigned нет mixed; demo.ba4 назначен business_admin."""
+    sm, _, _ = loaded
+    events = await _rows(
+        sm,
+        "SELECT u.login, e.details->>'role_to' AS role_to FROM domain_event e "
+        "LEFT JOIN app_user u ON u.id = e.entity_id WHERE e.action = 'user.role_assigned'",
+    )
+    assert events, "событий user.role_assigned нет"
+    assert all(e["role_to"] != "mixed" for e in events)
+    assert "demo.mixed" not in {e["login"] for e in events}
+    assert {e["login"]: e["role_to"] for e in events}.get("demo.ba4") == "business_admin"
+    raw = await _rows(sm, "SELECT count(*) AS n FROM domain_event WHERE details::text ~ 'mixed'")
+    assert raw[0]["n"] == 0
+
+
+@pytest.mark.committed
+async def test_002_ac28_ba4_is_ba_member_of_both_projects_not_owner(
+    loaded: tuple[async_sessionmaker[AsyncSession], Settings, Any],
+) -> None:
+    """002/AC-28: demo.ba4 — БА, участник обоих демо-проектов, не владелец."""
+    sm, _, _ = loaded
+    role = await _rows(
+        sm,
+        "SELECT m.role FROM app_user u JOIN workspace_member m ON m.user_id = u.id "
+        "WHERE u.login = 'demo.ba4'",
+    )
+    assert [r["role"] for r in role] == ["business_admin"]
+    projects = await _rows(sm, "SELECT id, owner_id FROM project")
+    assert len(projects) == 2
+    ba4 = await _rows(sm, "SELECT id FROM app_user WHERE login = 'demo.ba4'")
+    assert len(ba4) == 1
+    member_of = {
+        r["project_id"]
+        for r in await _rows(
+            sm,
+            "SELECT pm.project_id FROM project_member pm JOIN app_user u ON u.id = pm.user_id "
+            "WHERE u.login = 'demo.ba4'",
+        )
+    }
+    assert member_of == {p["id"] for p in projects}
+    assert all(p["owner_id"] != ba4[0]["id"] for p in projects)
 
 
 @pytest.mark.committed
@@ -268,7 +342,10 @@ async def test_fr6_passwords_file_mode_0600_owner_and_report(
 async def test_fr49_projects_members_owner_row(
     loaded: tuple[async_sessionmaker[AsyncSession], Settings, Any],
 ) -> None:
-    """FR-49: 2 проекта; владелец — участник (строка project_member, заметка ревью T71)."""
+    """FR-49: 2 проекта; владелец — участник (строка project_member, заметка ревью T71).
+
+    Обращён по 002/AC-28: вместо ``demo.mixed`` участник обоих проектов ``demo.ba4``.
+    """
     sm, _, _ = loaded
     projects = await _rows(
         sm,
@@ -291,7 +368,7 @@ async def test_fr49_projects_members_owner_row(
     for p in projects:
         logins = by_project[p["id"]]
         assert p["owner"] in logins
-        assert {"demo.ba1", "demo.ba2", "demo.mixed"} <= logins
+        assert {"demo.ba1", "demo.ba2", "demo.ba4"} <= logins
         assert sum(1 for x in logins if x.startswith("demo.user")) == 4
         assert "demo.ta" not in logins
     all_members = set().union(*by_project.values())

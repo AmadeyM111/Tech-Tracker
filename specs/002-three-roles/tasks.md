@@ -311,7 +311,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
 - **Попытки:** 0
 
 ## R3-T08 — Демо-данные: `demo.ba4` вместо `demo.mixed`
-- **Статус:** TODO
+- **Статус:** DONE (1 попытка, reviews/R3-T08-1.md)
 - **AC:** AC-28 (*инфра*); FR-22; 001/AC-131 (тест переведён по 002 §9)
 - **Файлы:** `backend/app/domain/ops/demo.py`;
   тесты: `backend/tests/cli/test_demo_data.py`, `backend/tests/db/test_login_display_upgrade.py`

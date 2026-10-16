@@ -171,12 +171,13 @@ async def test_ac131_upgrade_keeps_logins_passwords_data_and_makes_case_variants
     assert upper.json()["user"]["login"] == "demo.ba1"
 
     # --- список учётных записей и журнал: прежние логины и число записей ---
-    mixed_login = await env.login("demo.mixed", passwords["demo.mixed"])
-    token = env.token_from(mixed_login)
+    # актор — первый ТА `admin` (002/AC-28: demo.mixed больше нет; 001/AC-131 по 002 §9)
+    admin_login = await env.login("admin", passwords["admin"])
+    token = env.token_from(admin_login)
     assert token
     changed = await env.client.post(
         "/api/v1/auth/password",
-        json={"current_password": passwords["demo.mixed"], "new_password": NEW_PASSWORD},
+        json={"current_password": passwords["admin"], "new_password": NEW_PASSWORD},
         headers=env.auth(token),
     )
     assert changed.status_code == 204, changed.text

@@ -45,9 +45,13 @@ DEMO_PASSWORDS_FILE: Final = "demo-passwords.txt"
 # bigint-константа блокировки (ASCII «GOST» + номер): два параллельных запуска не вставят дубли
 _DEMO_LOCK_KEY: Final = 0x474F535400000002
 
+# БА - участник обоих демо-проектов, не владелец (002/FR-22, D-13)
+_ALL_PROJECTS_BA: Final = "demo.ba4"
+
+# читается как глобальное имя модуля во время вызова (подмена в тесте AC-30, plan D-13)
 _USERS: Final[tuple[tuple[str, str], ...]] = (
     ("demo.ta", "tech_admin"),
-    ("demo.mixed", "mixed"),
+    (_ALL_PROJECTS_BA, "business_admin"),
     ("demo.ba1", "business_admin"),
     ("demo.ba2", "business_admin"),
     ("demo.ba3", "business_admin"),
@@ -209,7 +213,7 @@ def _build_content(
         number += 1
         plan.projects.append(project)
         # владельцу — строка участника (заметка ревью T71)
-        logins = (owner, other_ba, "demo.mixed", *users)
+        logins = (owner, other_ba, _ALL_PROJECTS_BA, *users)
         members = [ids[login] for login in logins]
         members_by_project[project.id] = members
         plan.project_members.extend(
