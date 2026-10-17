@@ -1149,3 +1149,373 @@ def test_t99_docs_referenced_by_ac132_exist() -> None:
     assert CHECKLIST.is_file()
     assert README.is_file()
     assert (ROOT / "specs" / "001-pilot-r1" / "spec.md").is_file()
+
+
+# --- 002 / R3-T17: README и чек-лист приёмки (AC-27 ручной, FR-22, FR-8, FR-9) -------------
+
+_LIST_START = re.compile(r"^\s*(?:[-*]|\d+\.)\s")
+_HISTORY_RE = re.compile(
+    r"истори|журнал|миграц|упразднен|упразднён|history|histor|journal|audit\s+log|migration"
+    r"|abolish|retired|no\s+longer",
+    re.I,
+)
+_MIXED_RE = re.compile(r"Смешанн|\bmixed\b(?![- ]case)", re.I)
+
+
+def _units(text: str) -> list[str]:
+    """Абзацы и пункты списков, каждый свёрнут в одну строку (не зависит от переносов)."""
+    units: list[str] = []
+    for block in re.split(r"\n\s*\n", text):
+        cur: list[str] = []
+        for ln in block.splitlines():
+            if _LIST_START.match(ln) and not ln.startswith("    "):
+                if cur:
+                    units.append(" ".join(cur))
+                cur = [ln.strip()]
+            else:
+                cur.append(ln.strip())
+        if cur:
+            units.append(" ".join(cur))
+    return [re.sub(r"\s+", " ", u).strip() for u in units if u.strip()]
+
+
+def _checklist_items(text: str) -> list[str]:
+    """Пункты `- [ ]` / `- [x]`: от строки пункта до следующего пункта или заголовка."""
+    starts = [m.start() for m in re.finditer(r"^\s*[-*]\s+\[[ xX]\]", text, re.M)]
+    stops = [m.start() for m in re.finditer(r"^#{1,6}\s", text, re.M)]
+    items: list[str] = []
+    for i, s in enumerate(starts):
+        ends = [x for x in starts[i + 1 :] + stops if x > s]
+        items.append(re.sub(r"\s+", " ", text[s : min(ends) if ends else len(text)]).strip())
+    return items
+
+
+def _ac27_item() -> str:
+    items = [it for it in _checklist_items(_text(CHECKLIST)) if "002/AC-27" in it]
+    assert len(items) == 1, (
+        f"в чек-листе должен быть ровно один пункт `- [ ]` с 002/AC-27: {len(items)}"
+    )
+    assert re.match(r"[-*]\s+\[ \]", items[0]), "пункт 002/AC-27 должен быть незакрытым `- [ ]`"
+    return items[0]
+
+
+def test_002_ac27_checklist_item_names_roles() -> None:
+    item = _ac27_item()
+    assert "Смешанная роль" in item, "в пункте 002/AC-27 нет названия «Смешанная роль»"
+    assert "Без роли" in item, "в пункте 002/AC-27 нет названия «Без роли»"
+    assert re.search(r"истори", item, re.I), (
+        "«Смешанная роль» в пункте 002/AC-27 должна быть названа исторической записью журнала"
+    )
+    assert re.search(r"журнал", item, re.I)
+    for role in ("Техадминистратор", "Бизнес-администратор", "Пользователь"):
+        assert role in item, f"в пункте 002/AC-27 не названа роль «{role}» из выбора роли"
+    assert not re.search(r"`mixed`", item), "код `mixed` не должен быть виден как значение"
+
+
+def test_002_ac27_checklist_item_demo_accounts() -> None:
+    item = _ac27_item()
+    for login in ("demo.ba4", "demo.ba2", "demo.ba3"):
+        assert login in item, f"в пункте 002/AC-27 нет {login}"
+    assert "Внедрение трекера" in item
+    assert re.search(
+        r"demo\.ba3.{0,120}не\s+участник|не\s+участник\w*.{0,120}demo\.ba3", item, re.I
+    ), "demo.ba3 должен быть назван не участником проекта «Внедрение трекера»"
+    assert re.search(r"demo\.ba[24].{0,160}участник|участник\w*.{0,160}demo\.ba[24]", item, re.I), (
+        "demo.ba4/demo.ba2 должны быть названы участниками проекта"
+    )
+    assert re.search(r"добав\w+\s+себя|самодобавл", item, re.I), (
+        "нет шага: БА-не участник добавляет себя в участники"
+    )
+
+
+def test_002_ac27_checklist_item_ba_member_controls() -> None:
+    item = _ac27_item()
+    needed = {
+        "правка проекта": r"правк\w+\s+проект|редактир\w+\s+проект|название\s+и\s+описание",
+        "участники (не участник добавляется и исключается)": (
+            r"добав\w+\s+не\s+участника.{0,60}demo\.user5.{0,60}исключ\w+\s+(именно\s+)?его"
+        ),
+        "действующих участников не исключать": r"действующих\s+участников\s+не\s+исключ",
+        "передача владения": r"передач\w+\s+владени|передаёт\s+владени|передает\s+владени",
+        "удаление проекта": r"удален\w+\s+проект|удал\w+\s+проект",
+        "полная правка задачи": r"полн\w+\s+правк|правк\w+\s+задач|правит\s+задач",
+        "смена исполнителя": r"смен\w+\s+исполнител|сменить\s+исполнител",
+        "удаление задачи": r"удален\w+\s+задач|удал\w+\s+задач",
+        "удаление комментария": r"удален\w+\s+(чужого\s+)?комментар|удал\w+\s+(чужой\s+)?комментар",
+    }
+    missing = [k for k, p in needed.items() if not re.search(p, item, re.I)]
+    assert not missing, f"в пункте 002/AC-27 не хватает шагов: {missing}"
+    # смена исполнителя чужой задачи T - отдельный шаг, а не только часть фрагмента про подзадачу
+    clauses = [c for c in item.split(";") if "подзадач" not in c.lower()]
+    assert any(re.search(r"смен\w+\s+исполнител", c, re.I) for c in clauses), (
+        "в пункте 002/AC-27 нет шага «смена исполнителя» у чужой задачи T вне фрагмента про подзадачу"
+    )
+
+
+def test_002_ac27_subtask_for_other_member_is_two_steps() -> None:
+    """Форма подзадачи не имеет выбора исполнителя: создать, затем сменить исполнителя в карточке."""
+    item = _ac27_item()
+    assert re.search(
+        r"создат\w*\s+подзадач\w*.{0,120}(затем|потом|после\s+этого|далее).{0,120}смен\w+\s+исполнител",
+        item,
+        re.I,
+    ), "нет двухшагового сценария: создать подзадачу, затем сменить исполнителя"
+    assert re.search(r"карточк", item, re.I), "смена исполнителя должна быть в карточке подзадачи"
+
+
+_D54_RE = re.compile(
+    r"недоступн|unavailable"
+    r"|после\s+передачи\s+владени\w*.{0,150}доступн"
+    r"|after\s+(?:the\s+|an?\s+)?(?:transfer\s+of\s+)?ownership(?:\s+transfer)?.{0,150}available",
+    re.I,
+)
+
+
+def _assert_no_d54(unit: str) -> None:
+    """D-54 отменён: права БА не зависят от владения, «после передачи владения» не возвращать."""
+    m = _D54_RE.search(unit)
+    assert not m, f"возврат к отменённому правилу D-54 (права после передачи владения): {m[0]!r}"
+
+
+def test_002_ac27_uf3_rights_item_rewritten() -> None:
+    text = _text(CHECKLIST)
+    items = [
+        it
+        for it in _checklist_items(text)
+        if "UF-3" in it and "demo.ba2" in it and "002/AC-27" not in it
+    ]
+    assert items, "в чек-листе нет пункта UF-3 о правах БА с demo.ba2"
+    for it in items:
+        assert not _MIXED_RE.search(it), f"в пункте UF-3 осталась смешанная роль: {it[:120]}"
+        assert re.search(r"участник", it, re.I)
+        assert re.search(r"владени", it, re.I)
+        assert re.search(r"Бизнес-администратор", it)
+        assert re.search(r"правк\w+", it, re.I) and re.search(r"удален\w+", it, re.I)
+        _assert_no_d54(it)
+
+
+def test_002_ac27_checklist_mixed_only_in_ac27_item() -> None:
+    text = re.sub(r"\s+", " ", _text(CHECKLIST))
+    ac27 = _ac27_item()
+    rest = text.replace(ac27, "")
+    assert ac27 in text, "пункт 002/AC-27 не найден в тексте после свёртки пробелов"
+    found = _MIXED_RE.findall(rest)
+    assert not found, f"смешанная роль вне пункта 002/AC-27: {found}"
+    assert "demo.mixed" not in text
+
+
+@pytest.mark.parametrize("which", _LANGS, ids=_LANG_IDS)
+def test_002_fr22_readme_demo_accounts(which: int) -> None:
+    part = _parts()[which]
+    assert "demo.ba4" in part, "в README нет demo.ba4"
+    assert "demo.mixed" not in part, "в README остался demo.mixed"
+    for login in ("demo.ta", "demo.ba1", "demo.user1", "demo.user7"):
+        assert login in part, f"в списке демо-учётных записей README нет {login}"
+    ba_explicit = all(f"demo.ba{i}" in part for i in (2, 3, 4))
+    ba_range = re.search(r"demo\.ba1`?\s*(…|\.\.\.|–|-)\s*`?demo\.ba4", part)
+    assert ba_explicit or ba_range, "demo.ba1…demo.ba4 не перечислены полностью"
+    assert not re.search(r"demo\.ba1`?\s*(…|\.\.\.|–|-)\s*`?demo\.ba3", part), (
+        "диапазон demo.ba1…demo.ba3 устарел"
+    )
+    created = [u for u in _units(part) if "demo.ta" in u and "demo.user7" in u and "demo.ba" in u]
+    assert created, "нет абзаца со списком демо-учётных записей"
+    assert any(re.search(r"\b12\b", u) for u in created), "в списке записей нет счёта 12"
+
+
+@pytest.mark.parametrize("which", _LANGS, ids=_LANG_IDS)
+def test_002_fr22_readme_no_mixed_role_as_active(which: int) -> None:
+    part = _parts()[which]
+    bad = []
+    for u in _units(part):
+        if _MIXED_RE.search(u) and not _HISTORY_RE.search(u):
+            bad.append(u[:120])
+    assert not bad, f"смешанная роль как действующая в README: {bad}"
+
+
+@pytest.mark.parametrize("which", _LANGS, ids=_LANG_IDS)
+def test_002_fr8_fr9_readme_ba_rights_in_demo_scenario(which: int) -> None:
+    part = _parts()[which]
+    heading = r"Сценарий демо" if which == 0 else r"Demo scenario"
+    sections = _sections(part, heading)
+    assert sections, "в README нет раздела сценария демо"
+    units = [u for u in _units(sections) if "demo.ba2" in u]
+    assert units, "в сценарии демо нет абзаца о правах БА на demo.ba2"
+    u = units[0]
+    assert not _MIXED_RE.search(u), f"в абзаце о правах БА осталась смешанная роль: {u[:120]}"
+    for unit in units:
+        _assert_no_d54(unit)
+    flat = re.sub(r"\s+", " ", sections)
+    if which == 0:
+        assert re.search(r"демо-проекты\s+удалять\s+не\s+нужно", flat, re.I), (
+            "в README нет указания, что демо-проекты удалять не нужно"
+        )
+    else:
+        assert re.search(r"demo\s+projects\s+need\s+not\s+be\s+deleted", flat, re.I), (
+            "README: no statement that the demo projects need not be deleted"
+        )
+    if which == 0:
+        assert re.search(r"участник", u, re.I)
+        assert re.search(r"владени", u, re.I)
+        assert re.search(r"удален|удал", u, re.I)
+    else:
+        assert re.search(r"member", u, re.I)
+        assert re.search(r"owner|ownership", u, re.I)
+        assert re.search(r"delet", u, re.I)
+
+
+def _sections(text: str, title_pattern: str) -> str:
+    """Тексты всех разделов, чей заголовок подходит под шаблон (до заголовка того же уровня)."""
+    out: list[str] = []
+    for m in re.finditer(r"^(#{1,6})\s+(.*)$", text, re.M):
+        if re.search(title_pattern, m.group(2), re.I):
+            level = len(m.group(1))
+            rest = text[m.end() :]
+            nxt = re.search(rf"^#{{1,{level}}}\s", rest, re.M)
+            out.append(rest[: nxt.start()] if nxt else rest)
+    return "\n\n".join(out)
+
+
+_DC_UP = r"(?:docker\s+compose(?:\s+-p\s+\S+)?|dc)\s+up\s+-d\s+--build\s+--wait"
+
+
+@pytest.mark.parametrize("which", _LANGS, ids=_LANG_IDS)
+def test_002_fr22_readme_upgrade_section(which: int) -> None:
+    """R-9: обновление только через `up -d --build --wait`, миграции до API, ссылка на ADR-0013."""
+    part = _parts()[which]
+    section = _sections(part, r"^Обновлени" if which == 0 else r"^Upgrad")
+    assert section.strip(), "в README нет раздела обновления"
+    flat = re.sub(r"\s+", " ", section)
+    assert re.search(_DC_UP, flat), "в разделе обновления нет `docker compose up -d --build --wait`"
+    if which == 0:
+        assert re.search(r"только\s+(через|командой|с\s+помощью)", flat, re.I), (
+            "нет правила «обновляться только через ...»"
+        )
+        assert re.search(r"entrypoint", flat, re.I), "не упомянут entrypoint"
+        assert re.search(
+            r"миграц\w+.{0,120}до\s+(старта|запуска)\s+(API|`api`)|до\s+(старта|запуска)\s+(API|`api`).{0,120}миграц",
+            flat,
+            re.I,
+        ), "нет правила: миграции выполняются до старта API"
+        assert re.search(r"не\s+запуска\w+.{0,80}uvicorn", flat, re.I), (
+            "нет запрета запускать uvicorn на немигрированной БД"
+        )
+        assert re.search(
+            r"немигрирован|не\s+мигрирован|без\s+миграци|до\s+миграци|схем\w*\s+(≤|<=)\s*0005",
+            flat,
+            re.I,
+        ), "запрет uvicorn не привязан к немигрированной БД"
+        assert re.search(r"Порядок\s+обновления", flat), (
+            "нет отсылки к ADR-0013 «Порядок обновления»"
+        )
+        assert re.search(r"-p\s*<имя>|Быстр\w+\s+старт", flat), (
+            "нет правила `-p <имя>` или отсылки к «Быстрому старту»"
+        )
+    else:
+        assert re.search(r"\bonly\b", flat, re.I), "нет правила «only via ...»"
+        assert re.search(r"entrypoint", flat, re.I), "entrypoint not mentioned"
+        assert re.search(
+            r"migrat\w+.{0,120}before\s+(the\s+)?(API|`api`)(\s+starts?)?|before\s+(the\s+)?(API|`api`).{0,120}migrat",
+            flat,
+            re.I,
+        ), "no rule: migrations run before the API starts"
+        assert re.search(
+            r"(do\s+not|don't|never)\s+(run|start|launch)\w*.{0,80}uvicorn", flat, re.I
+        ), "no ban on starting uvicorn"
+        assert re.search(
+            r"unmigrated|not\s+(yet\s+)?migrated|without\s+(a\s+)?migrat|before\s+(the\s+)?migrat|schema\s+(≤|<=)\s*0005",
+            flat,
+            re.I,
+        ), "uvicorn ban not tied to an unmigrated database"
+        assert re.search(r"Порядок\s+обновления|Upgrade\s+order", flat, re.I), (
+            "no reference to ADR-0013 «Порядок обновления»"
+        )
+        assert re.search(r"-p\s*<(name|имя)>|Quick\s+start", flat, re.I), (
+            "no `-p <name>` rule or reference to Quick start"
+        )
+    assert "0013-three-roles" in section, "нет ссылки на docs/adr/0013-three-roles.md"
+    _assert_manual_start_order(flat, which)
+    _assert_no_operator_action_only_for_0005(section, which)
+
+
+def _assert_manual_start_order(flat: str, which: int) -> None:
+    if which == 0:
+        ok = re.search(r"сначала\s+`?gostracker\s+bootstrap`?,?\s+потом\s+API", flat, re.I)
+    else:
+        ok = re.search(r"`?gostracker\s+bootstrap`?\s+first,?\s+then\s+the\s+API", flat, re.I)
+    assert ok, "нет правила ручного запуска: сначала `gostracker bootstrap`, потом API (ADR-0013)"
+
+
+def _assert_no_operator_action_only_for_0005(section: str, which: int) -> None:
+    """«Без действий оператора» верно только для миграции 0005, но не для всего обновления."""
+    phrase = (
+        r"без\s+действий\s+оператора"
+        if which == 0
+        else r"(?:no|without(?:\s+any)?)\s+operator\s+actions?"
+    )
+    hits = [u for u in _units(section) if re.search(phrase, u, re.I)]
+    assert hits, "в разделе обновления нет «без действий оператора» для миграции 0005"
+    for u in hits:
+        assert "`0005`" in u and "`0006`" not in u, (
+            f"«без действий оператора» отнесено не к миграции 0005: {u[:140]}"
+        )
+
+
+def test_002_ac27_steps_on_foreign_task_fixture() -> None:
+    """Б-2: шаги AC-27 идут над ЧУЖОЙ задачей T; фикстуру задаёт текст пункта."""
+    item = _ac27_item()
+    assert re.search(
+        r"demo\.ba1.{0,60}заводит.{0,80}задач\w*\s+T.{0,80}исполнител\w*\s*-\s*`?demo\.user1",
+        item,
+    ), "не задана фикстура: demo.ba1 заводит задачу T с исполнителем demo.user1"
+    assert re.search(r"demo\.user1`?\s+оставляет\s+к\s+T\s+комментар", item), (
+        "не задана фикстура: demo.user1 оставляет комментарий к T"
+    )
+    assert re.search(r"demo\.ba4.{0,80}не\s+автор\s+и\s+не\s+исполнител", item), (
+        "demo.ba4 должен быть назван не автором и не исполнителем T"
+    )
+    m = re.search(r"Чуж\w+\s+задача\s+T\s*:", item)
+    assert m, "нет шагов над «Чужая задача T:»"
+    tail = item[m.end() :]
+    for name, pat in {
+        "полная правка": r"полн\w+\s+правк",
+        "смена исполнителя": r"смен\w+\s+исполнител",
+        "подзадача в два шага": r"создани\w+\s+подзадач\w*.{0,60}в\s+два\s+шага",
+        "удаление комментария demo.user1": r"удален\w+\s+чужого\s+комментар\w+\s+`?demo\.user1",
+        "удаление задачи T": r"удален\w+\s+задач\w*\s+T",
+    }.items():
+        assert re.search(pat, tail, re.I), f"над чужой задачей T нет шага: {name}"
+
+
+def test_002_ac27_leaves_demo_data_intact() -> None:
+    """Б-1: пункт не портит демо (его нельзя перезагрузить)."""
+    item = _ac27_item()
+    assert re.search(r"название\s+и\s+описание;\s+после\s+проверки\s+верну\w+\s+прежн", item), (
+        "после правки проекта нужно вернуть прежние название и описание"
+    )
+    assert re.search(
+        r"удален\w+\s+проекта\s*-\s*только\s+на\s+(заведённом\s+для\s+проверки\s+|)проекте\s+для\s+проверки",
+        item,
+        re.I,
+    ), "удаление проекта должно идти только на проекте для проверки"
+    assert re.search(r"демо-проекты\s+не\s+удалять", item), "нет запрета удалять демо-проекты"
+    assert re.search(r"demo\.ba3.{0,40}исключает\s+себя\s+из\s+участников", item), (
+        "demo.ba3 после самодобавления должен исключить себя из участников"
+    )
+    assert re.search(r"отдельный\s+проект\s+для\s+проверки\s+с\s+участником\s+`?demo\.ba4", item), (
+        "не задан проект для проверки с участником demo.ba4"
+    )
+
+
+def test_002_ac27_audit_step_mandatory_on_upgraded_stack() -> None:
+    """Шаг журнала («Смешанная роль») обязателен на обновлённом с демо 001 стеке."""
+    item = _ac27_item()
+    assert re.search(r"Шаг\s+1\s+обязателен\s+для\s+приёмки", item), (
+        "не сказано, что шаг 1 (журнал) обязателен для приёмки"
+    )
+    assert re.search(r"обновлённом\s+с\s+демо\s+версии\s+001", item), (
+        "шаг 1 должен выполняться на стеке, обновлённом с демо версии 001"
+    )
+    assert re.search(r"чистая\s+установка\s+шаг\s+1\s+не\s+заменяет", item), (
+        "не сказано, что чистая установка шаг 1 не заменяет"
+    )
+    assert not re.search(r"не\s+применим", item), "шаг 1 не может быть «не применим»"

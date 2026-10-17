@@ -76,10 +76,11 @@ docker compose exec api gostracker demo-data
 docker compose exec api cat /data/secrets/demo-passwords.txt
 ```
 
-- Команда создаёт 12 учётных записей (`demo.ta`, `demo.mixed`, `demo.ba1`…`demo.ba3`,
-  `demo.user1`…`demo.user7`), 2 проекта («Внедрение трекера» и «Подготовка пилота»), 30 задач
-  (из них 6 подзадач) и около 20 комментариев; сделок нет. Выполняется одной транзакцией;
-  `--seed` задаёт seed генератора (по умолчанию 1).
+- Команда создаёт 12 учётных записей (`demo.ta`, `demo.ba1`…`demo.ba4`,
+  `demo.user1`…`demo.user7`; вместе с первым техническим администратором в системе 13 записей),
+  2 проекта («Внедрение трекера» и «Подготовка пилота»), 30 задач (из них 6 подзадач) и около
+  20 комментариев; сделок нет. `demo.ba4` - бизнес-администратор, участник обоих проектов, не
+  владелец. Выполняется одной транзакцией; `--seed` задаёт seed генератора (по умолчанию 1).
 - Пароли пишутся в `/data/secrets/demo-passwords.txt` внутри контейнера `api` (том `appdata`,
   права 0600): по строке `login=...` и `password=...` через табуляцию. В stdout, stderr и логи
   пароли не попадают, команда печатает только путь к файлу и счётчики. При первом входе каждый
@@ -111,12 +112,16 @@ docker compose exec api cat /data/secrets/demo-passwords.txt
   (до 15 с) видит новый статус;
 - UF-6: участник фильтрует список задач проекта по исполнителю и статусу, открывает карточку и
   оставляет комментарий;
-- права бизнес-администратора (D-54): `demo.ba2` - участник, но не владелец проекта «Внедрение
-  трекера» (владелец - `demo.ba1`) - открывает чужую задачу, и правка и удаление ему
-  недоступны (элементов нет или 403 с русским сообщением); после передачи владения (получатель -
-  участник с ролью «Бизнес-администратор» или «Смешанная роль») они доступны. Это осознанное
-  правило. Перенос карточки на доске без прав (403) воспроизводится так: `demo.userN` переносит
-  карточку, где он и не исполнитель, и не автор.
+- права бизнес-администратора (FR-8, FR-9 фичи 002): `demo.ba2` - участник, но не владелец
+  проекта «Внедрение трекера» (владелец - `demo.ba1`) - правит и удаляет любые задачи проекта
+  (в том числе чужие), меняет исполнителя и удаляет любые комментарии; владение не требуется.
+  Бизнес-администратор, даже не участник проекта, правит его название и описание, ведёт
+  участников (в том числе добавляет себя), передаёт владение (получатель - участник проекта с
+  ролью «Бизнес-администратор») и удаляет проект; задачи проекта, где он не участник, он видит
+  только после того, как добавит себя в участники. Перенос карточки на доске без прав (403)
+  воспроизводится так: `demo.userN` переносит карточку, где он и не исполнитель, и не автор.
+  Удаление проверяйте на проекте и задаче, заведённых для проверки: демо-проекты удалять не
+  нужно (демо-данные заново не загрузить).
 
 ### Где взять пароль первого технического администратора
 
@@ -208,9 +213,25 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
 
 ### Обновление с предыдущей версии MVP
 
-Обновление выполняется без действий оператора: миграция `0005` (столбец с написанием логина)
-применяется при старте, до запуска `api`. Прежние логины не меняются: у существующих записей
-написание равно логину как прежде (строчными), вход и пароли те же. Откат ниже `0005`
+Обновляйтесь только командой `docker compose up -d --build --wait` (стек под другим именем
+Compose - `docker compose -p <имя> up -d --build --wait`; правило имени - в «Быстром старте»).
+Entrypoint контейнера `api` выполняет миграции до старта API; если миграция падает, API не
+запускается. При ручном запуске (без Docker) сначала `gostracker bootstrap`, потом API. Не
+запускайте `uvicorn` вручную на немигрированной БД: код 002 на схеме ≤ 0005 с пользователем, у
+которого упразднённая роль `mixed`, отвечает 500.
+
+Миграция `0006` (три роли) снимает упразднённую роль `mixed` у всех пользователей и пишет это в
+журнал от имени «системы»: бывшие пользователи с этой ролью остаются без роли (если после этого
+не остаётся активного технического администратора, роль технического администратора получают
+активные бывшие пользователи с этой ролью). Поэтому при
+обновлении с версии 001 оператору нужно сделать резервную копию БД, выписать пользователей с
+упразднённой ролью `mixed` и проверить результат. Порядок, чек-лист владельца и команды - в
+`docs/adr/0013-three-roles.md`, раздел «Порядок обновления» (команды - в его блоке «Команды
+чек-листа»). Откат роль `mixed` не возвращает.
+
+Миграция `0005` (столбец с написанием логина) применяется при старте, до запуска `api`, без
+действий оператора. Прежние логины не меняются: у существующих записей написание равно
+логину как прежде (строчными), вход и пароли те же. Откат ниже `0005`
 (`alembic downgrade 0004` и ниже) теряет написание логинов: остаются строчные ключи; вход и
 уникальность логинов откат не затрагивает. Перед откатом сделайте копию БД.
 
@@ -429,10 +450,12 @@ docker compose exec api gostracker demo-data
 docker compose exec api cat /data/secrets/demo-passwords.txt
 ```
 
-- The command creates 12 accounts (`demo.ta`, `demo.mixed`, `demo.ba1`…`demo.ba3`,
-  `demo.user1`…`demo.user7`), 2 projects ("Внедрение трекера" and "Подготовка пилота"), 30
-  tasks (6 of them subtasks) and about 20 comments; there are no deals. It runs in a single
-  transaction; `--seed` sets the generator seed (1 by default).
+- The command creates 12 accounts (`demo.ta`, `demo.ba1`…`demo.ba4`,
+  `demo.user1`…`demo.user7`; together with the first technical administrator the system has 13
+  accounts), 2 projects ("Внедрение трекера" and "Подготовка пилота"), 30 tasks (6 of them
+  subtasks) and about 20 comments; there are no deals. `demo.ba4` is a business administrator,
+  a member of both projects and not an owner. It runs in a single transaction; `--seed` sets the
+  generator seed (1 by default).
 - The passwords are written to `/data/secrets/demo-passwords.txt` inside the `api` container
   (the `appdata` volume, mode 0600): one `login=...` and `password=...` pair per line, separated
   by a tab. They never appear in stdout, stderr or logs; the command prints only the file path
@@ -464,12 +487,16 @@ scenario UF-2…UF-6:
   after polling (within 15 s);
 - UF-6: a member filters the project task list by assignee and status, opens a card and leaves a
   comment;
-- business administrator rights (D-54): `demo.ba2` - a member but not the owner of the project
-  "Внедрение трекера" (the owner is `demo.ba1`) - opens someone else's task, and editing and
-  deleting are unavailable (no controls, or 403 with a Russian message); after ownership is
-  transferred (the recipient is a member with the business administrator or mixed role) they
-  become available. This is a deliberate rule. A board move without rights (403) is reproduced
-  like this: `demo.userN` moves a card where he is neither the assignee nor the author.
+- business administrator rights (FR-8, FR-9 of feature 002): `demo.ba2` - a member but not the
+  owner of the project "Внедрение трекера" (the owner is `demo.ba1`) - edits and deletes any
+  task of the project (including other people's), changes the assignee and deletes any comment;
+  ownership is not required. A business administrator, even a non-member, edits the project name
+  and description, manages members (including adding himself), transfers ownership (the
+  recipient is a project member with the business administrator role) and deletes the project;
+  he sees the tasks of a project he is not a member of only after adding himself as a member. A
+  board move without rights (403) is reproduced like this: `demo.userN` moves a card where he is
+  neither the assignee nor the author. Check deletion on a project and a task created for the
+  check: the demo projects need not be deleted (the demo data cannot be reloaded).
 
 ### Where to find the first technical administrator password
 
@@ -565,8 +592,25 @@ is taken: creating it is rejected with a 422 response and the `login_taken` code
 
 ### Upgrading from the previous MVP version
 
-The upgrade needs no operator action: migration `0005` (the column with the login spelling) is
-applied at start, before `api` runs. Existing logins stay unchanged: for existing accounts the
+Upgrade only with `docker compose up -d --build --wait` (a stack under another Compose name:
+`docker compose -p <name> up -d --build --wait`; the name rule is in "Quick start"). The `api`
+container entrypoint runs the migrations before the API starts; if a migration fails, the API
+does not start. When starting by hand (without Docker), run `gostracker bootstrap` first, then
+the API. Do not run `uvicorn` by hand on an unmigrated database: on a schema ≤ 0005 with a
+user who has the retired `mixed` role, the 002 code answers 500.
+
+Migration `0006` (three roles) removes the retired `mixed` role from all users and records it in
+the audit log on behalf of "system": former holders of that role are left without a role (if no
+active technical administrator would remain, the active former holders get the technical
+administrator role). So when
+upgrading from version 001 the operator must back up the database, list the users with the
+retired `mixed` role and check the result afterwards. The order, the owner checklist and the
+commands are in `docs/adr/0013-three-roles.md`, section "Порядок обновления" (Upgrade order;
+the commands are in its "Команды чек-листа" block). A downgrade does not bring the `mixed` role
+back.
+
+Migration `0005` (the column with the login spelling) is applied at start, before `api` runs,
+with no operator action. Existing logins stay unchanged: for existing accounts the
 spelling equals the login as before (lower case), and sign-in and passwords are the same. A
 downgrade below `0005` (`alembic downgrade 0004` and lower) loses the spelling of logins: only
 the lower-case keys remain; sign-in and login uniqueness are not affected. Back up the database
