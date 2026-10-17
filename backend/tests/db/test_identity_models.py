@@ -187,6 +187,25 @@ def test_t06_metadata_declares_login_and_role_checks() -> None:
     assert any(all(role in c for role in ROLES) for c in member_checks), (
         f"нет CHECK по ролям: {member_checks}"
     )
+    # 002/AC-2: роли `mixed` в CHECK нет
+    assert not any("mixed" in c for c in member_checks), (
+        f"CHECK по ролям содержит mixed: {member_checks}"
+    )
+
+
+def test_002_ac2_metadata_check_lists_exactly_the_role_values() -> None:
+    """002/AC-2 (FR-2, plan §4.6): значения в тексте CHECK ``role_valid`` в метаданных модели =
+    ``{r.value for r in Role}`` (autogenerate CHECK не сравнивает, поэтому проверка здесь)."""
+    from app.domain.access.roles import Role
+
+    texts = [
+        str(c.sqltext)
+        for c in get_table("workspace_member").constraints
+        if isinstance(c, CheckConstraint) and "role" in str(c.sqltext)
+    ]
+    assert len(texts) == 1, texts
+    assert set(re.findall(r"'([^']+)'", texts[0])) == {r.value for r in Role}
+    assert {r.value for r in Role} == {"tech_admin", "business_admin", "user"}
 
 
 # --- структура схемы в БД (миграция 0001 применена фикстурой) -----------------------------
@@ -413,7 +432,8 @@ async def test_ac116_update_to_invalid_login_is_rejected(db: AsyncSession) -> No
 
 
 @pytest.mark.parametrize("role", ROLES)
-async def test_fr66_four_roles_are_accepted(db: AsyncSession, role: str) -> None:
+async def test_fr66_three_roles_are_accepted(db: AsyncSession, role: str) -> None:
+    """001/FR-66, обращён по 002/AC-2: принимаются три роли (было четыре)."""
     user = await make_user(db, role=role)
     stored = (
         await db.execute(
@@ -425,8 +445,11 @@ async def test_fr66_four_roles_are_accepted(db: AsyncSession, role: str) -> None
     assert stored == role
 
 
-@pytest.mark.parametrize("role", ["admin", "ADMIN", "Tech_Admin", "", "superuser", "owner"])
+@pytest.mark.parametrize(
+    "role", ["admin", "ADMIN", "Tech_Admin", "", "superuser", "owner", "mixed", "MIXED"]
+)
 async def test_fr66_unknown_role_is_rejected(db: AsyncSession, role: str) -> None:
+    """001/FR-66, расширен по 002/AC-2: `mixed` - тоже значение вне CHECK (23514)."""
     ws = await make_workspace(db)
     other = user_values()
     await db.execute(get_table("app_user").insert().values(other))
@@ -435,6 +458,56 @@ async def test_fr66_unknown_role_is_rejected(db: AsyncSession, role: str) -> Non
         get_table("workspace_member").insert().values(member_values(ws.id, other["id"], role=role)),
         CHECK_VIOLATION,
     )
+
+
+@pytest.mark.parametrize("role", ["mixed", "admin"])
+async def test_002_ac2_database_rejects_mixed_and_admin(db: AsyncSession, role: str) -> None:
+    """002/AC-2 (FR-2): БД после обновления отклоняет `mixed` и `admin` (23514), и при вставке
+    нового членства, и при смене роли существующего."""
+    user = await make_user(db, role="user")
+    other = user_values()
+    await db.execute(get_table("app_user").insert().values(other))
+    ws = await make_workspace(db)
+    await assert_rejected(
+        db,
+        get_table("workspace_member").insert().values(member_values(ws.id, other["id"], role=role)),
+        CHECK_VIOLATION,
+    )
+    table = get_table("workspace_member")
+    await assert_rejected(
+        db,
+        table.update().where(table.c.user_id == user.id).values(role=role),
+        CHECK_VIOLATION,
+    )
+
+
+@pytest.mark.parametrize("role", [*ROLES, None])
+async def test_002_ac2_database_accepts_three_roles_and_no_role(
+    db: AsyncSession, role: str | None
+) -> None:
+    """002/AC-2 (FR-2): каждое из трёх значений и «без роли» (NULL) принимаются, в том числе
+    при смене роли существующей строки."""
+    user = await make_user(db, role="user")
+    table = get_table("workspace_member")
+    await db.execute(table.update().where(table.c.user_id == user.id).values(role=role))
+    stored = (await db.execute(select(table.c.role).where(table.c.user_id == user.id))).scalar_one()
+    assert stored == role
+
+
+async def test_002_ac2_database_check_matches_role_enum(db: AsyncSession) -> None:
+    """002/AC-2, NON-BLOCKING 3 ревью R3-T11-1: определение CHECK `role_valid` в БД = значения
+    ``Role`` (docstring ``roles.py`` про CHECK верен)."""
+    from app.domain.access.roles import Role
+
+    definition = (
+        await db.execute(
+            text(
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                "WHERE conname = 'ck_workspace_member_role_valid'"
+            )
+        )
+    ).scalar_one()
+    assert set(re.findall(r"'([^']+)'", definition)) == {r.value for r in Role}, definition
 
 
 async def test_fr66_user_without_role_is_allowed(db: AsyncSession) -> None:
@@ -458,7 +531,7 @@ async def test_fr66_second_role_in_same_workspace_is_rejected(db: AsyncSession) 
         db,
         get_table("workspace_member")
         .insert()
-        .values(member_values(user.workspace_id, user.id, role="mixed")),
+        .values(member_values(user.workspace_id, user.id, role="business_admin")),
         UNIQUE_VIOLATION,
     )
 
@@ -470,7 +543,7 @@ async def test_d5_same_global_user_may_belong_to_another_workspace(db: AsyncSess
     await db.execute(
         get_table("workspace_member")
         .insert()
-        .values(member_values(second.id, user.id, role="mixed"))
+        .values(member_values(second.id, user.id, role="business_admin"))
     )
     count = (
         await db.execute(

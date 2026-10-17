@@ -479,7 +479,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
 - **Попытки:** 0
 
 ## R3-T13 — Миграция 0006: снятие роли «Смешанная», журнал от «системы», CHECK
-- **Статус:** TODO
+- **Статус:** DONE (2 попытки ревью, reviews/R3-T13-1.md, R3-T13-2.md)
 - **AC:** AC-2, AC-20 (роли, данные, журнал), AC-21, AC-22 (роли и журнал, обе ветки), AC-29; FR-2, FR-13, FR-14, FR-15, FR-16, FR-17
 - **Файлы:** `backend/migrations/versions/0006_three_roles.py` (новый), `backend/app/domain/workspaces/models.py`;
   тесты: `backend/tests/upgrade002_support.py` (новый), `backend/tests/db/test_three_roles_upgrade.py` (новый),

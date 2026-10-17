@@ -752,7 +752,10 @@ LOGIN_CHECK_0001 = "ck_app_user_login_format"
 
 
 def test_t93_migration_0005_file_and_single_head() -> None:
-    """Файл 0005 на месте, цепочка 0004 -> 0005, голова ревизий одна и это 0005."""
+    """Файл 0005 на месте, цепочка 0004 -> 0005, голова ревизий одна.
+
+    Обращён по 002/AC-21: голова теперь 0006 (проверка в ``test_002_migration_0006_*``), здесь
+    остаётся проверка файла 0005 и единственности головы."""
     from alembic.script import ScriptDirectory
 
     assert MIGRATION_0005.is_file(), "нет backend/migrations/versions/0005_login_display.py"
@@ -774,7 +777,8 @@ def test_t93_migration_0005_file_and_single_head() -> None:
     funcs = {n.name for n in tree.body if isinstance(n, ast.FunctionDef)}
     assert {"upgrade", "downgrade"} <= funcs
     script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
-    assert script.get_heads() == ["0005"]
+    assert len(script.get_heads()) == 1
+    assert "0005" in {r.revision for r in script.walk_revisions()}
 
 
 async def _display_schema(maker: Any) -> tuple[Any, int, int]:
@@ -829,7 +833,7 @@ async def test_t93_downgrade_0004_drops_column_and_check_keeps_rows_then_upgrade
     from tests.factories import make_user
 
     async with committed() as s, s.begin():
-        mixed = await make_user(s, role="business_admin", login="Ivanov.Petr")
+        cased = await make_user(s, role="business_admin", login="Ivanov.Petr")
         plain = await make_user(s, role="user", login="ivan.petrov")
 
     await _alembic_ok(test_database_url, "downgrade", "0004")
@@ -845,10 +849,10 @@ async def test_t93_downgrade_0004_drops_column_and_check_keeps_rows_then_upgrade
             r.id: r.login
             for r in await s.execute(
                 text("SELECT id, login FROM app_user WHERE id IN (:a, :b)"),
-                {"a": mixed.id, "b": plain.id},
+                {"a": cased.id, "b": plain.id},
             )
         }
-    assert logins == {mixed.id: "ivanov.petr", plain.id: "ivan.petrov"}
+    assert logins == {cased.id: "ivanov.petr", plain.id: "ivan.petrov"}
 
     await _alembic_ok(test_database_url, "upgrade", "head")
     await db_engine.dispose()
@@ -918,4 +922,142 @@ async def test_t93_alembic_check_clean_at_head(committed: Any, test_database_url
     column, checks, _ = await _display_schema(committed)
     assert column is not None, "нет login_display: проверять расхождение рано"
     assert checks == 1
+    await _alembic_ok(test_database_url, "check")
+
+
+# --- R3-T13: миграция 0006 «три роли» (spec 002 FR-2, FR-17; plan 002 §4.5, D-5, D-10) ----------
+
+MIGRATION_0006 = BACKEND_DIR / "migrations" / "versions" / "0006_three_roles.py"
+ROLE_CHECK_0006 = "ck_workspace_member_role_valid"
+ENV_PY = BACKEND_DIR / "migrations" / "env.py"
+
+
+def test_002_migration_0006_file_chain_and_single_head() -> None:
+    """002/AC-21: файл 0006 на месте, цепочка 0005 -> 0006, голова одна и это 0006; миграция
+    не импортирует код приложения (D-6)."""
+    from alembic.script import ScriptDirectory
+
+    assert MIGRATION_0006.is_file(), "нет backend/migrations/versions/0006_three_roles.py"
+    tree = ast.parse(MIGRATION_0006.read_text(encoding="utf-8"))
+    values: dict[str, Any] = {}
+    for n in tree.body:
+        if (
+            isinstance(n, ast.AnnAssign)
+            and isinstance(n.target, ast.Name)
+            and isinstance(n.value, ast.Constant)
+        ):
+            values[n.target.id] = n.value.value
+        elif isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant):
+            for t in n.targets:
+                if isinstance(t, ast.Name):
+                    values[t.id] = n.value.value
+    assert values.get("revision") == "0006"
+    assert values.get("down_revision") == "0005"
+    funcs = {n.name for n in tree.body if isinstance(n, ast.FunctionDef)}
+    assert {"upgrade", "downgrade"} <= funcs
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            assert not (node.module or "").startswith("app"), "миграция импортирует app.*"
+    script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
+    assert script.get_heads() == ["0006"]
+    revision = script.get_revision("0006")
+    assert revision is not None and revision.down_revision == "0005"
+
+
+def test_002_env_py_runs_the_whole_upgrade_in_one_transaction() -> None:
+    """002/AC-29, FR-17, D-5: ``env.py`` не включает ``transaction_per_migration`` - версия
+    схемы, роли, журнал и CHECK фиксируются одной транзакцией."""
+    source = ENV_PY.read_text(encoding="utf-8")
+    assert "transaction_per_migration" not in source
+    assert "begin_transaction()" in source
+
+
+async def _role_check_def(maker: Any) -> str:
+    async with maker() as s:
+        return str(
+            (
+                await s.execute(
+                    text("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = :n"),
+                    {"n": ROLE_CHECK_0006},
+                )
+            ).scalar_one()
+        )
+
+
+async def _version(maker: Any) -> list[str]:
+    async with maker() as s:
+        return list((await s.execute(text("SELECT version_num FROM alembic_version"))).scalars())
+
+
+@pytest.mark.committed
+async def test_002_alembic_check_clean_at_head(committed: Any, test_database_url: str) -> None:
+    """002/AC-2, plan §4.5 («alembic check чист»): на head=0006 модель (CHECK из трёх значений)
+    и миграция не расходятся; CHECK в БД - без `mixed`."""
+    assert await _version(committed) == ["0006"], "голова БД должна быть 0006"
+    assert "mixed" not in await _role_check_def(committed)
+    await _alembic_ok(test_database_url, "check")
+
+
+@pytest.mark.committed
+async def test_002_downgrade_0005_restores_four_value_check_and_keeps_data_then_upgrade(
+    committed: Any, db_engine: Any, test_database_url: str
+) -> None:
+    """002/AC-29, D-10: ``downgrade 0005`` возвращает CHECK с четырьмя значениями (БД снова
+    принимает `mixed`), не трогает ни роли, ни журнал; повторный ``upgrade head`` снова
+    ставит CHECK из трёх значений, версия 0006, ``alembic check`` чист."""
+    from tests.factories import make_domain_event, make_user
+
+    assert await _version(committed) == ["0006"]
+    async with committed() as s, s.begin():
+        ta = await make_user(s, role="tech_admin")
+        ba = await make_user(s, role="business_admin", workspace=None)
+        norole = await make_user(s, role=None)
+        await make_domain_event(
+            s,
+            workspace_id=ta.workspace_id,
+            entity_id=norole.id,
+            action="user.role_removed",
+            details={"role_from": "mixed", "role_to": None},
+        )
+
+    async def snapshot() -> tuple[list[Any], list[Any]]:
+        async with committed() as s:
+            roles = (
+                await s.execute(
+                    text("SELECT user_id::text, role FROM workspace_member ORDER BY user_id")
+                )
+            ).all()
+            events = (await s.execute(text("SELECT t::text FROM domain_event t ORDER BY id"))).all()
+        return [tuple(r) for r in roles], [tuple(r) for r in events]
+
+    before = await snapshot()
+    assert len(before[0]) == 3 and len(before[1]) == 1
+    assert {ta.id, ba.id, norole.id} == {uuid.UUID(r[0]) for r in before[0]}
+
+    await _alembic_ok(test_database_url, "downgrade", "0005")
+    await db_engine.dispose()
+    assert await _version(committed) == ["0005"]
+    assert "mixed" in await _role_check_def(committed)
+    assert await snapshot() == before
+    async with committed() as s:
+        trans = await s.begin()
+        try:
+            stored = (
+                await s.execute(
+                    text(
+                        "UPDATE workspace_member SET role = 'mixed' WHERE user_id = :u "
+                        "RETURNING role"
+                    ),
+                    {"u": ba.id},
+                )
+            ).scalar_one()
+            assert stored == "mixed"
+        finally:
+            await trans.rollback()
+
+    await _alembic_ok(test_database_url, "upgrade", "head")
+    await db_engine.dispose()
+    assert await _version(committed) == ["0006"]
+    assert "mixed" not in await _role_check_def(committed)
+    assert await snapshot() == before
     await _alembic_ok(test_database_url, "check")
