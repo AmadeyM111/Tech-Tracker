@@ -824,8 +824,244 @@ def test_t93_data_model_documents_login_display_and_migration_0005() -> None:
     assert "ck_app_user_login_display_lower" in section, "не описан CHECK login_display"
     assert _has(section, r"varchar\(64\)"), "не указан тип varchar(64)"
     assert re.search(r"^\|\s*`0005`\s*\|", text, re.M), "в таблице миграций нет строки 0005"
-    assert "0001`–`0005" in text or "0001–0005" in text, "вступление: миграции 0001–0005"
+    assert "0001`–`0006" in text or "0001–0006" in text, "вступление: миграции 0001–0006"
+    assert "0001`–`0005" not in text, "вступление всё ещё называет миграции 0001–0005"
     assert "0001`–`0004" not in text, "вступление всё ещё называет миграции 0001–0004"
+
+
+# --- 002 / R3-T16: ADR-0013 и модель данных (NFR-5, FR-2, FR-15) --------------------------
+
+ADR_DIR = ROOT / "docs" / "adr"
+ADR_0013 = ADR_DIR / "0013-three-roles.md"
+
+
+def _heading_section(text: str, title_pattern: str) -> str | None:
+    """Текст от заголовка, чей текст подходит под шаблон, до заголовка того же или старшего уровня."""
+    for m in re.finditer(r"^(#{1,6})\s+(.*)$", text, re.M):
+        if re.search(title_pattern, m.group(2), re.I):
+            level = len(m.group(1))
+            rest = text[m.end() :]
+            nxt = re.search(rf"^#{{1,{level}}}\s", rest, re.M)
+            return rest[: nxt.start()] if nxt else rest
+    return None
+
+
+def test_002_nfr5_adr_0013_exists() -> None:
+    assert ADR_0013.is_file(), "нет docs/adr/0013-three-roles.md"
+
+
+def test_002_nfr5_adr_0013_references_and_audit_risk() -> None:
+    text = _text(ADR_0013)
+    for key in ("ADR-0003", "ТЗ §4", "0006"):
+        assert key in text, f"в ADR-0013 нет «{key}»"
+    assert "Q-5" in text or _has(
+        text, r"аудит\w*.{0,120}(состав\w*|участник\w*)|(состав\w*|участник\w*).{0,120}аудит"
+    ), "в ADR-0013 нет риска Q-5 (изменение состава участников не аудируется)"
+
+
+_ADR_0013_DIFFS = {
+    "1: колонка «Смешанная» удалена": r"колонк\w*.{0,40}(Смешанн|СМ).{0,40}удал|(Смешанн|СМ).{0,60}колонк\w*.{0,40}удал|упраздн\w*.{0,40}Смешанн",
+    "2: БА удаляет любой проект": r"(БА|бизнес-администратор\w*)\s+удаля\w+\s+любой\s+проект|удал\w+\s+любой\s+проект",
+    "3: «свой проект» — где участвует": r"свой\s+проект.{0,300}участник|участник.{0,300}свой\s+проект",
+    "3: участники в любом проекте, включая себя": r"участник\w*\s+в\s+любом\s+проекте,?\s+включая\s+себя",
+    "3: отменяет OI-120/OI-127": r"OI-120.{0,40}OI-127|OI-127.{0,40}OI-120",
+    "3: сужение ADR-0009 / OI-13 / OI-57 снято": r"OI-13\b.{0,60}OI-57|OI-57.{0,60}OI-13\b",
+}
+
+
+@pytest.mark.parametrize("key", sorted(_ADR_0013_DIFFS))
+def test_002_nfr5_adr_0013_documents_difference_from_tz4(key: str) -> None:
+    text = _text(ADR_0013)
+    assert _has(text, _ADR_0013_DIFFS[key]), f"в ADR-0013 нет отличия от ТЗ §4 — {key} (spec §5.3)"
+
+
+def test_002_nfr5_adr_0013_mentions_refined_adrs() -> None:
+    text = _text(ADR_0013)
+    for n in ("0003", "0004", "0005", "0006", "0009", "0012"):
+        assert f"ADR-{n}" in text, f"в ADR-0013 нет ссылки на ADR-{n}"
+
+
+_ADR_0013_UPGRADE_ORDER = {
+    "gostracker bootstrap": r"gostracker\s+bootstrap",
+    "docker-entrypoint": r"docker-entrypoint",
+    "перед запуском API": r"(перед|до|сначала).{0,80}(запуск\w*|старт\w*)?.{0,40}API|API.{0,60}не\s+стартует",
+    "схема 0006": r"схем\w*\s+`?0006`?",
+    "mixed на схеме ≤ 0005 даёт 500": r"mixed.{0,200}500|500.{0,200}mixed",
+    "схема ≤ 0005": r"(≤|<=|до)\s*`?0005`?",
+    "после восстановления из резервной копии 001 перезапустить api": r"(восстановлени\w+|резервн\w+\s+копи\w+).{0,300}перезапус\w+.{0,60}`?api`?",
+}
+
+
+@pytest.mark.parametrize("key", sorted(_ADR_0013_UPGRADE_ORDER))
+def test_002_nfr5_adr_0013_upgrade_order_section(key: str) -> None:
+    text = _text(ADR_0013)
+    section = _heading_section(text, r"Порядок\s+обновления")
+    assert section is not None, "в ADR-0013 нет раздела «Порядок обновления»"
+    assert _has(section, _ADR_0013_UPGRADE_ORDER[key]), (
+        f"«Порядок обновления» ADR-0013: нет факта «{key}»"
+    )
+
+
+def _adr_flat_section(title_pattern: str) -> str:
+    """Раздел ADR-0013 с пробельными символами, сжатыми в один пробел (устойчиво к переносам)."""
+    section = _heading_section(_text(ADR_0013), title_pattern)
+    assert section is not None, f"в ADR-0013 нет раздела /{title_pattern}/"
+    return re.sub(r"\s+", " ", section)
+
+
+def test_002_spec10_adr_0013_risks_section_has_q5_audit() -> None:
+    """spec §10: в «Рисках» (не в «Альтернативах») есть Q-5 и аудит добавления БА себя."""
+    section = _adr_flat_section(r"^Риски$")
+    assert "Q-5" in section, "в разделе «Риски» нет Q-5"
+    assert _has(section, r"не\s+аудируется"), "в «Рисках» не сказано, что добавление не аудируется"
+    assert _has(section, r"аудит"), "в «Рисках» нет «аудит»"
+
+
+def test_002_spec10_adr_0013_first_upgrade_writing_to_journal() -> None:
+    section = _adr_flat_section(r"^Обновление\s+существующих\s+данных")
+    assert _has(section, r"первое\s+обновлени\w*.{0,80}журнал"), (
+        "нет «первое обновление … журнал» (миграция 0006 впервые пишет в журнал)"
+    )
+
+
+def test_002_spec10_adr_0013_q1_several_ta_no_primary() -> None:
+    section = _adr_flat_section(r"Несколько\s+ТА")
+    assert _has(section, r"первичн"), "Q-1: нет «первичный»"
+    assert _has(section, r"любой\s+(активный\s+)?ТА"), "Q-1: роль ТА назначает любой активный ТА"
+    assert _has(section, r"(особого|признака).{0,60}нет|нет.{0,40}(особого\s+)?статуса"), (
+        "Q-1: не сказано, что особого статуса/признака первичного ТА нет"
+    )
+
+
+def test_002_spec10_adr_0013_fr7_last_admin_and_concurrency() -> None:
+    section = _adr_flat_section(r"Последний\s+администратор")
+    assert "last_account_admin" in section, "FR-7: нет кода last_account_admin"
+    assert _has(section, r"422"), "FR-7: нет 422"
+    assert _has(section, r"параллельн"), "FR-7: нет параллельных действий"
+    assert _has(section, r"403"), "FR-7: нет 403 для лишённого роли инициатора"
+    assert _has(section, r"503.{0,20}service_busy"), "FR-7: нет 503 service_busy"
+    assert _has(section, r"последовательн"), "FR-7: нет эквивалента последовательному порядку"
+
+
+def test_002_spec10_adr_0013_owner_replacement_by_any_ba() -> None:
+    section = _adr_flat_section(r"Замена\s+владельца")
+    assert _has(section, r"любой\s+(активный\s+)?БА"), "нет «любой БА»"
+    assert _has(section, r"даже\s+если.{0,40}не\s+участвует"), "нет «даже если сам не участвует»"
+    assert _has(section, r"заблокирован"), "нет случая заблокированного владельца"
+
+
+def test_002_spec10_adr_0013_fr16_all_active_former_sm_get_ta() -> None:
+    section = _adr_flat_section(r"FR-16")
+    assert _has(section, r"все\s+активные.{0,60}бывш\w*\s+СМ"), "FR-16: все активные бывшие СМ"
+    assert _has(section, r"роль\s+ТА\s+получают"), "FR-16: нет «роль ТА получают»"
+    assert _has(section, r"теря\w+\s+доступ.{0,60}проект.{0,40}задач"), "FR-16: потеря доступа"
+    assert _has(section, r"остаются\s+владельцами.{0,40}участниками"), "FR-16: остаются владельцами"
+    assert _has(section, r"заблокированные.{0,60}без\s+роли"), "FR-16: заблокированные без роли"
+
+
+def test_002_spec10_adr_0013_rollback_section() -> None:
+    section = _adr_flat_section(r"^Откат$")
+    assert _has(section, r"downgrade\s+0005"), "Откат: нет downgrade 0005"
+    assert _has(section, r"роль\s+`?mixed`?\s+не\s+возвращает"), (
+        "Откат: не сказано, что downgrade 0005 роль mixed не возвращает"
+    )
+    assert _has(section, r"образом\s+002"), "Откат: downgrade выполняется образом 002"
+    assert _has(section, r"по\s+записям\s+журнала"), "Откат: роли возвращает ТА по журналу"
+    assert _has(section, r"восстановлени\w*\s+резервной\s+копии\s+001\s+возвращает\s+роли"), (
+        "Откат: восстановление копии 001 возвращает роли"
+    )
+    assert not _has(
+        section,
+        r"восстановлени\w*[^.]{0,80}не\s+возвращает|не\s+возвраща\w*[^.]{0,80}восстановлени",
+    ), "Откат: ошибочно сказано, что восстановление копии роли не возвращает"
+    assert _has(section, r"запускать.{0,80}образ\s+001"), "Откат: после восстановления образ 001"
+    assert _has(section, r"образ\s+002.{0,80}(?:снова\s+выполнит\s+`?0006`?|снимет\s+роли)"), (
+        "Откат: образ 002 повторно выполнит 0006"
+    )
+
+
+def _data_model_system_paragraph() -> str:
+    text = _text(DATA_MODEL)
+    m = re.search(r"\*\*Записи\s+от\s+«системы»", text)
+    assert m, "в модели данных нет абзаца «Записи от «системы» при обновлении 0006» (FR-15)"
+    end = re.search(r"\n\s*\n", text[m.end() :])
+    para = text[m.start() : m.end() + (end.start() if end else len(text))]
+    return re.sub(r"\s+", " ", para)
+
+
+def test_002_fr15_data_model_system_records_paragraph() -> None:
+    para = _data_model_system_paragraph()
+    assert _has(para, r"actor_id\s*=\s*NULL.{0,60}систем|систем.{0,60}actor_id\s*=\s*NULL"), (
+        "FR-15: нет `actor_id = NULL` рядом с «системой»"
+    )
+    assert _has(para, r"0006"), "FR-15: абзац не про миграцию 0006"
+    assert _has(para, r"первое\s+обновлени\w*.{0,80}журнал"), (
+        "FR-15: нет «первое обновление … журнал»"
+    )
+    assert _has(para, r"чистой\s+установке.{0,40}журнал\s+пуст"), (
+        "FR-15: нет «на чистой установке журнал пуст»"
+    )
+    assert _has(para, r"in_audit\s*=\s*true"), "FR-15: нет in_audit = true"
+
+
+def test_002_nfr5_adr_0003_status_replaced() -> None:
+    text = _text(ADR_DIR / "0003-mixed-role.md")
+    line = next((ln for ln in text.splitlines() if "заменено ADR-0013" in ln), None)
+    assert line is not None, "в ADR-0003 нет статуса «заменено ADR-0013»"
+    assert "2026-10-16" in line, "в строке статуса ADR-0003 нет даты 2026-10-16"
+    assert "Статус" in line, "«заменено ADR-0013» должно стоять в строке «Статус»"
+
+
+@pytest.mark.parametrize(
+    "name", ["0004-auth-pilot.md", "0006-audit-r1.md", "0012-mvp-task-tracker-first.md"]
+)
+def test_002_nfr5_older_adrs_refined_by_adr_0013(name: str) -> None:
+    text = _text(ADR_DIR / name)
+    assert re.search(r"^.*Уточнено ADR-0013.*$", text, re.M), (
+        f"в {name} нет строки «Уточнено ADR-0013»"
+    )
+
+
+def test_002_nfr5_data_model_role_has_no_mixed() -> None:
+    text = _text(DATA_MODEL)
+    role_rows = [ln for ln in text.splitlines() if re.match(r"^\|\s*`role`\s*\|", ln)]
+    assert role_rows, "в модели данных нет строки столбца `role`"
+    for row in role_rows:
+        assert "mixed" not in row, f"в описании роли остался `mixed`: {row[:80]}"
+        if "tech_admin" in row:
+            assert "business_admin" in row and re.search(r"`user`", row), (
+                "роль: нет business_admin/user"
+            )
+    # `mixed` допустим только в абзаце или строке таблицы, где речь о миграции 0006 или журнале
+    # («система»). Абзацы (разбиение по пустым строкам) сжимаются в одну строку, поэтому
+    # проверка не зависит от переноса строк; строки таблиц проверяются по отдельности.
+    units: list[str] = []
+    for block in re.split(r"\n\s*\n", text):
+        lines = block.splitlines()
+        prose: list[str] = []
+        for ln in lines:
+            if ln.lstrip().startswith("|"):
+                units.append(ln)
+            else:
+                prose.append(ln)
+        if prose:
+            units.append(re.sub(r"\s+", " ", " ".join(prose)).strip())
+    for unit in units:
+        if re.search(r"(?<![\w])mixed(?![\w])", unit):
+            assert re.search(r"0006|журнал|domain_event|систем", unit, re.I), (
+                f"`mixed` вне описания 0006/журнала: {unit[:100]}"
+            )
+
+
+def test_002_nfr5_data_model_documents_migration_0006_and_upgrade_order() -> None:
+    text = _text(DATA_MODEL)
+    assert re.search(r"^\|\s*`0006`\s*\|", text, re.M), "в таблице миграций нет строки 0006"
+    assert _has(text, r"Порядок\s+обновления"), (
+        "в модели данных нет упоминания «Порядок обновления»"
+    )
+    assert _has(text, r"gostracker\s+bootstrap"), (
+        "в модели данных нет `gostracker bootstrap` в порядке обновления"
+    )
 
 
 # --- T99: отображаемый логин в документации (FR-73a, D-66, AC-132, R-M10) -----------------

@@ -570,7 +570,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
 - **Попытки:** 0
 
 ## R3-T16 — ADR-0013 и модель данных
-- **Статус:** TODO
+- **Статус:** DONE (4 раунда ревью, reviews/R3-T16-1.md … R3-T16-3.md; нефатальные замечания — в финальную уборку)
 - **AC:** NFR-5; FR-2, FR-15 (описание в модели данных)
 - **Файлы:** `docs/adr/0013-three-roles.md` (новый), `docs/adr/0003-mixed-role.md`,
   `docs/adr/0004-auth-pilot.md`, `docs/adr/0006-audit-r1.md`, `docs/adr/0012-mvp-task-tracker-first.md`,
