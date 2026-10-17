@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
-# Роли, которые могут быть исполнителем, участником и владельцем: БА, СМ, «Пользователь».
+# Роли, которые могут быть исполнителем, участником и владельцем: БА, «Пользователь».
 _DIRECTORY_ROLES = sorted(
     role.value for role, caps in ROLE_CAPABILITIES.items() if Capability.BUSINESS_ACCESS in caps
 )
@@ -51,7 +51,7 @@ def _like_pattern(q: str) -> str:
 async def list_directory(
     db: AsyncSession, actor: Actor, params: PageParams, *, q: str | None
 ) -> tuple[list[DirectoryUser], bool]:
-    """Страница незаблокированных пользователей пространства с ролью БА/СМ/П (``login, id``).
+    """Страница незаблокированных пользователей пространства с ролью БА/П (``login, id``).
 
     Список и роль читаются одним SELECT (JOIN ``workspace_member``): нет гонки между ними.
     ``paginate`` работает с одной сущностью, поэтому ``LIMIT page_size + 1`` применён здесь.

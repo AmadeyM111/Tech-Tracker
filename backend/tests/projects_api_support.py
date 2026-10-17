@@ -72,7 +72,7 @@ class Person:
 
 @dataclass
 class ApiWorld:
-    """Роли: ``ta``, ``sm`` (СМ, не участник), ``sm_m`` (СМ, участник), ``ba`` (владелец),
+    """Роли: ``ta``, ``ba`` (владелец),
     ``ba2`` (БА, участник), ``ba3`` (БА, не участник), ``usr`` (П, участник), ``usr2`` (П, не
     участник), ``norole`` (без роли), ``otp`` (П с одноразовым паролем, не участник),
     ``blocked`` (П, заблокирован, не участник)."""
@@ -95,8 +95,6 @@ class ApiWorld:
 
 _SPEC: list[tuple[str, str | None, dict[str, Any]]] = [
     ("ta", "tech_admin", {}),
-    ("sm", "mixed", {}),
-    ("sm_m", "mixed", {}),
     ("ba", "business_admin", {}),
     ("ba2", "business_admin", {}),
     ("ba3", "business_admin", {}),
@@ -106,7 +104,7 @@ _SPEC: list[tuple[str, str | None, dict[str, Any]]] = [
     ("otp", "user", {"must_change_password": True}),
     ("blocked", "user", {"blocked": True}),
 ]
-MEMBERS = ("ba", "ba2", "sm_m", "usr")
+MEMBERS = ("ba", "ba2", "usr")
 
 
 async def make_api_world(env: ApiEnv) -> ApiWorld:

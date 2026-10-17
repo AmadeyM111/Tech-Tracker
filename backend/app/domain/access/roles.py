@@ -19,7 +19,6 @@ class Role(StrEnum):
 
     TECH_ADMIN = "tech_admin"
     BUSINESS_ADMIN = "business_admin"
-    MIXED = "mixed"
     USER = "user"
 
 
@@ -60,13 +59,12 @@ ROLE_CAPABILITIES: Final[Mapping[Role, frozenset[Capability]]] = MappingProxyTyp
     {
         Role.TECH_ADMIN: _TECH_ADMIN_CAPS,
         Role.BUSINESS_ADMIN: _BUSINESS_ADMIN_CAPS,
-        Role.MIXED: _TECH_ADMIN_CAPS | _BUSINESS_ADMIN_CAPS | {Capability.PROJECT_MANAGE_ANY},
         Role.USER: frozenset({Capability.BUSINESS_ACCESS}),
     }
 )
 
 # Обладатели MANAGE_ACCOUNTS; для инварианта «всегда есть активный администратор» (FR-69).
-ACCOUNT_ADMIN_ROLES: Final = frozenset({Role.TECH_ADMIN, Role.MIXED})
+ACCOUNT_ADMIN_ROLES: Final = frozenset({Role.TECH_ADMIN})
 
 
 @dataclass(frozen=True, slots=True)

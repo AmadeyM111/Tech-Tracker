@@ -5,7 +5,7 @@
 
 Права БА определяются участием в проекте, а не владением (002 §5.3 п.3, FR-9, D-2):
 БА-участник правит, переназначает и удаляет любые задачи проекта. Правило OI-127 (а) и
-D-54 («свой проект» БА = владелец) отменены. Исполнителя меняет БА-участник или СМ-участник
+D-54 («свой проект» БА = владелец) отменены. Исполнителя меняет БА-участник
 (FR-19a). Правило полной правки живёт в одной функции ``can_edit_task_fully``;
 ``can_delete_task`` считается через неё.
 """
@@ -37,18 +37,15 @@ def _is_owner(a: Actor, p: ProjectFacts) -> bool:
 
 
 def is_own_project(a: Actor, p: ProjectFacts) -> bool:
-    """БА — участник проекта (002/FR-9, D-2); СМ — участник; остальные — нет.
-
-    Переходная форма: ``MIXED`` убирается в R3-T11.
-    """
-    if a.role in (Role.BUSINESS_ADMIN, Role.MIXED):
+    """БА — участник проекта (002/FR-9, D-2); остальные — нет."""
+    if a.role is Role.BUSINESS_ADMIN:
         return p.actor_is_member
     return False
 
 
 def can_view_project(a: Actor, p: ProjectFacts) -> bool:
-    """Карточка проекта: БА и СМ — любой проект пространства, «Пользователь» — свой."""
-    if a.role in (Role.BUSINESS_ADMIN, Role.MIXED):
+    """Карточка проекта: БА — любой проект пространства, «Пользователь» — свой."""
+    if a.role is Role.BUSINESS_ADMIN:
         return True
     return a.role == Role.USER and p.actor_is_member
 
@@ -58,13 +55,10 @@ def can_read_project_content(a: Actor, p: ProjectFacts) -> bool:
 
 
 def can_edit_task_fully(a: Actor, p: ProjectFacts, t: TaskFacts) -> bool:
-    """Полная правка (FR-19): П — только свою задачу, БА-участник — любую (002/FR-9).
-
-    Переходная форма: ``MIXED`` убирается в R3-T11.
-    """
+    """Полная правка (FR-19): П — только свою задачу, БА-участник — любую (002/FR-9)."""
     if a.role == Role.USER:
         return p.actor_is_member and t.created_by == a.user_id and t.assignee_id == a.user_id
-    if a.role in (Role.BUSINESS_ADMIN, Role.MIXED):
+    if a.role is Role.BUSINESS_ADMIN:
         return p.actor_is_member
     return False
 
@@ -77,7 +71,7 @@ def can_change_task_status(a: Actor, p: ProjectFacts, t: TaskFacts) -> bool:
 
 
 def can_create_task(a: Actor, p: ProjectFacts, assignee_id: UUID | None) -> bool:
-    """Создание задачи (BR-1): себе — любой участник, другому/без исполнителя — БА и СМ."""
+    """Создание задачи (BR-1): себе — любой участник, другому/без исполнителя — БА."""
     if not (a.can(Capability.BUSINESS_ACCESS) and p.actor_is_member):
         return False
     return assignee_id == a.user_id or a.can(Capability.TASK_ASSIGN_OTHERS)
@@ -93,7 +87,7 @@ def can_create_subtask(
 
 
 def can_change_assignee(a: Actor, p: ProjectFacts, t: TaskFacts) -> bool:
-    """FR-19a: БА и СМ — участник проекта; ``t`` в правиле не участвует."""
+    """FR-19a: БА — участник проекта; ``t`` в правиле не участвует."""
     del t  # сигнатура по plan §11.5
     return a.can(Capability.TASK_ASSIGN_OTHERS) and is_own_project(a, p)
 
@@ -108,13 +102,10 @@ def can_edit_comment(a: Actor, author_id: UUID) -> bool:
 
 
 def can_delete_comment(a: Actor, p: ProjectFacts, author_id: UUID) -> bool:
-    """Свой или любой комментарий проекта для БА-участника (002/FR-9, AC-13).
-
-    Переходная форма: ``MIXED`` убирается в R3-T11.
-    """
+    """Свой или любой комментарий проекта для БА-участника (002/FR-9, AC-13)."""
     if not (a.can(Capability.BUSINESS_ACCESS) and p.actor_is_member):
         return False
-    return author_id == a.user_id or a.role in (Role.BUSINESS_ADMIN, Role.MIXED)
+    return author_id == a.user_id or a.role is Role.BUSINESS_ADMIN
 
 
 def can_manage_project(a: Actor, p: ProjectFacts) -> bool:

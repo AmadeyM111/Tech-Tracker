@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 DEFAULT_PASSWORD = "correct-horse-battery-staple"
 PLACEHOLDER_HASH = "$argon2id$v=19$m=1024,t=1,p=1$c3ludGhldGljc2FsdA$c3ludGhldGljaGFzaC1ub3QtcmVhbA"
-ROLES = ("tech_admin", "business_admin", "mixed", "user")
+ROLES = ("tech_admin", "business_admin", "user")
 
 _login_counter = itertools.count(1)
 

@@ -32,7 +32,7 @@ async def test_ac99_user_deletes_own_task_204_then_404_everywhere(api_env: ApiEn
     assert r.content == b""
     row = await task_db(env, t)
     assert row.deleted_at is not None and row.deleted_batch_id is not None  # AC-18: запись есть
-    for who in ("usr", "ba", "sm_m"):
+    for who in ("usr", "ba", "ba2"):
         for method, url, body in (
             ("GET", task_url(t), None),
             ("PATCH", task_url(t), {"title": "x"}),

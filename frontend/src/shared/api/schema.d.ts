@@ -1082,7 +1082,7 @@ export interface components {
          * @description Роль в пространстве; значения совпадают с ``workspace_member.role`` (CHECK role_valid).
          * @enum {string}
          */
-        Role: "tech_admin" | "business_admin" | "mixed" | "user";
+        Role: "tech_admin" | "business_admin" | "user";
         /**
          * SessionUser
          * @description Профиль в ответе на вход: ровно эти четыре поля.

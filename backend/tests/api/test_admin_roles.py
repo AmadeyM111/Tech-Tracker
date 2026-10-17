@@ -99,14 +99,29 @@ async def test_ac75_change_and_remove_role_with_events(api_env: ApiEnv) -> None:
     assert log[1].details["role_from"] == "business_admin"
 
 
-@pytest.mark.parametrize("role", ["tech_admin", "business_admin", "mixed", "user"])
+@pytest.mark.parametrize("role", ["tech_admin", "business_admin", "user"])
 async def test_fr12_every_role_value_can_be_assigned(api_env: ApiEnv, role: str) -> None:
+    """001/FR-12, обращён по 002/FR-1: три значения роли назначаются (200); `mixed` - ниже."""
     env = api_env
     ws, _, token = await admin_in_new_workspace(env)
     target, _ = await seed(env, ws, None)
     response = await _put_role(env, token, target.id, role)
     assert response.status_code == 200, response.text
     assert response.json()["role"] == role
+
+
+async def test_002_ac24_fr1_mixed_role_is_422_and_role_unchanged(api_env: ApiEnv) -> None:
+    """002/AC-24, FR-1, FR-18: `mixed` от ТА отклоняется, роль цели не меняется."""
+    env = api_env
+    ws, _, token = await admin_in_new_workspace(env)
+    target, _ = await seed(env, ws, "user")
+
+    response = await _put_role(env, token, target.id, "mixed")
+
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "validation_error"
+    assert await member_role(env, target.id) == "user"
+    assert await events(env, entity_id=target.id) == []
 
 
 async def test_ac75_same_role_returns_200_without_new_event(api_env: ApiEnv) -> None:

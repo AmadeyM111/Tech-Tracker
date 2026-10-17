@@ -166,7 +166,7 @@ async def get_project(db: AsyncSession, actor: Actor, project_id: UUID) -> Proje
 async def list_projects(
     db: AsyncSession, actor: Actor, params: PageParams
 ) -> tuple[list[ProjectListRow], bool]:
-    """БА и СМ — все неудалённые проекты пространства, «Пользователь» — где участник."""
+    """БА — все неудалённые проекты пространства, «Пользователь» — где участник."""
     if not actor.can(Capability.BUSINESS_ACCESS):
         raise Forbidden()
     stmt = (
@@ -175,7 +175,7 @@ async def list_projects(
         .order_by(func.lower(Project.name), Project.id)
         .execution_options(populate_existing=True)
     )
-    if actor.role not in (Role.BUSINESS_ADMIN, Role.MIXED):
+    if actor.role is not Role.BUSINESS_ADMIN:
         stmt = stmt.where(_is_member_of(actor.user_id))
     projects, has_next = await paginate(db, stmt, params)
     if not projects:

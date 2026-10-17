@@ -391,7 +391,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
 - **Попытки:** 0
 
 ## R3-T11 — Удалить роль `mixed` из домена и контракта API
-- **Статус:** TODO
+- **Статус:** DONE (1 попытка, reviews/R3-T11-1.md)
 - **AC:** AC-1, AC-24; FR-1, FR-7 (обладатель права — только ТА), FR-18, FR-19, NFR-1
 - **Файлы:** `backend/app/domain/access/roles.py`, `backend/app/domain/access/policy.py`,
   `backend/app/domain/projects/queries.py` (+ `backend/app/domain/access/recipients.py`, `backend/app/domain/users/directory.py` — только комментарии «БА, СМ» → «БА»);
@@ -402,6 +402,9 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
   `backend/tests/api/test_sessions.py`, `backend/tests/api/test_admin_roles.py`,
   `backend/tests/api/test_e2e_accounts.py`, `backend/tests/api/test_role_values_002.py` (новый),
   `backend/tests/cli/test_openapi_roles.py` (новый);
+  дописаны по ревью R3-T11-1 (замена/удаление ключей мира `sm`/`sm_m` по NFR-3 и docstring):
+  `backend/tests/api/test_soft_delete.py`, `backend/tests/api/test_task_recipients.py`,
+  `backend/tests/tasks_api_support.py`;
   генерируемые: `docs/api/openapi.json`, `frontend/src/shared/api/schema.d.ts`
 - **Зависит от:** R3-T04, R3-T05, R3-T06, R3-T07, R3-T08, R3-T09, R3-T10
 - **Описание:** По plan §4.1, §4.2: удалить `Role.MIXED` и его строку в `ROLE_CAPABILITIES`;
@@ -435,7 +438,13 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
   (`ROLES` с `"mixed"`, `ROLES[i % 4]`, `Counter == {r: 3}`) → переименовать в
   `test_ac2_ta_creates_12_users_with_3_roles_…`, 12 пользователей по составу демо (1 ТА, 4 БА —
   как `demo.ba1`…`demo.ba4`, 7 П), `Counter == {"tech_admin": 1, "business_admin": 4, "user": 7}`,
-  остальные шаги (вход, роль в ответе, журнал) без изменений → AC-24, FR-1, AC-28.
+  остальные шаги (вход, роль в ответе, журнал) без изменений → AC-24, FR-1, AC-28;
+  `api/test_soft_delete.py::test_ac99_user_deletes_own_task_204_then_404_everywhere` (`sm_m` →
+  `ba2`) → AC-13, FR-9;
+  `api/test_task_recipients.py::test_ac56_ac74_invalid_recipients_give_422_with_distinct_codes`
+  (случай `mixed_non_member` удалён как дубль `ba_non_member`) → AC-17, FR-11;
+  `api/test_task_recipients.py::test_ac56_members_with_business_roles_are_accepted` (параметр
+  `sm_m` удалён) → AC-13, FR-9.
 - **Готово, когда:** `pytest -q backend/tests` зелёный; `bash scripts/gen-api.sh` повторно не
   меняет файлы (`git diff --exit-code docs/api/openapi.json frontend/src/shared/api/schema.d.ts`
   после второго запуска); `cd frontend && npm run typecheck && npm test` зелёный;
@@ -490,6 +499,12 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
   `test_002_ac22_*` — обе ветки FR-16. `test_002_ac29_*` — сбой `on="version"` и `on="event"`:
   alembic завершается с ошибкой, `alembic_version` = `0005`, роли `mixed`, журнал N, вставка
   `mixed` проходит; после `remove_failure` повтор даёт результат AC-20.
+  **Предупреждение (ревью R3-T11-1, «Окно до миграции»):** R3-T11…R3-T13 выпускать вместе:
+  образы с промежуточных коммитов не собирать и не разворачивать на БД с данными 001 (роль
+  `mixed` в БД даёт 500 до миграции 0006).
+  Подтвердить, что docstring в `backend/app/domain/access/roles.py:18` про CHECK `role_valid`
+  снова верен после миграции (значения `Role` совпадают с CHECK; NON-BLOCKING 3 ревью R3-T11-1);
+  `roles.py` в этой задаче не править — при расхождении сообщить в отчёте.
   `test_identity_models.py::test_002_ac2_*`: `mixed`, `admin` → `23514`; три значения и `NULL` —
   приняты; текст CHECK в метаданных = `{r.value for r in Role}`. `test_migrations.py`: голова —
   `0006`, цепочка `0005 → 0006`; статическая проверка, что `env.py` не включает
@@ -568,7 +583,14 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
   ролей; риск Q-5). «Заменяет ADR-0003; уточняет ADR-0004, ADR-0005, ADR-0006, ADR-0009,
   ADR-0012». В ADR-0003 меняется только статус: «заменено ADR-0013 (2026-10-16)». В ADR-0004,
   0006, 0012 добавляется строка «Уточнено ADR-0013 …», исторический текст не меняется.
-  ADR-0005 и ADR-0009 **не трогать** (plan §11). `docs/data-model.md` — по plan §4.10. Тесты
+  ADR-0005 и ADR-0009 **не трогать** (plan §11). `docs/data-model.md` — по plan §4.10.
+  В ADR-0013 (и кратко в `docs/data-model.md` рядом со строкой миграции 0006) — раздел
+  «Порядок обновления» (ревью R3-T11-1, «Окно до миграции»; plan §8): код 002 требует схему
+  0006 и не должен работать на схеме ≤ 0005 с ролью `mixed` (такой пользователь даёт 500);
+  порядок обеспечивает `backend/docker-entrypoint.sh`: `gostracker bootstrap` (advisory-блокировка,
+  `alembic upgrade head`, `run_bootstrap`) → `exec uvicorn`, при ошибке миграции API не стартует;
+  при ручном запуске сначала `gostracker bootstrap`, потом API; после восстановления БД из
+  резервной копии 001 перезапустить сервис `api` (миграция 0006 выполнится при старте). Тесты
   `test_002_nfr5_*`: файл ADR-0013 есть, в нём «ADR-0003», «ТЗ §4», три отличия, «Q-5» или
   «аудит» состава участников, «0006»; в ADR-0003 статус «заменено ADR-0013»; в модели данных у
   роли нет `mixed`, есть строка миграции `0006`.
@@ -590,6 +612,14 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
   `mvp-demo.md`: пункт UF-3 о правах БА переписать так же (на `demo.ba2` — участник, не владелец);
   добавить пункт `- [ ] 002/AC-27: …` со всеми шагами AC-27 на демо-учётных записях
   (`demo.ba4` или `demo.ba2` — участник, `demo.ba3` — не участник «Внедрение трекера»).
+  Решение по подзадаче для пункта 002/AC-27: форма подзадачи не имеет выбора исполнителя
+  (`frontend/src/features/tasks/SubtaskList.tsx`), поэтому сценарий «создание подзадачи другому
+  участнику» в чек-листе выполняется в два шага — создать подзадачу, затем сменить исполнителя в
+  её карточке (см. `reviews/R3-T10-2.md`, п. 4; если владелец выберет иное — отдельная задача,
+  не в R3-T17).
+  README (обе части), раздел обновления: обновляться только через `docker compose up -d --build`
+  (entrypoint выполняет миграции до старта API); не запускать `uvicorn` на немигрированной БД
+  (ревью R3-T11-1, «Окно до миграции»; plan §8).
   Тесты: `test_002_ac27_*` — в чек-листе есть `- [ ]`-пункт с `002/AC-27` и названиями
   «Смешанная роль», «Без роли»; `test_002_fr22_*` — в README обеих частей есть `demo.ba4` и нет
   `demo.mixed`. Существующие проверки T88 и T99 остаются зелёными.

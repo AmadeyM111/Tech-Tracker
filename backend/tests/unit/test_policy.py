@@ -26,7 +26,7 @@ from typing import Any
 
 import pytest
 
-ROLES = ("TECH_ADMIN", "BUSINESS_ADMIN", "MIXED", "USER", None)
+ROLES = ("TECH_ADMIN", "BUSINESS_ADMIN", "USER", None)
 WS = uuid.UUID(int=1)
 ME = uuid.UUID(int=100)
 OTHER = uuid.UUID(int=200)
@@ -82,8 +82,6 @@ VIEW = [
     (None, False, False),
     ("BUSINESS_ADMIN", True, True),
     ("BUSINESS_ADMIN", False, True),
-    ("MIXED", True, True),
-    ("MIXED", False, True),
     ("USER", True, True),
     ("USER", False, False),
 ]
@@ -103,8 +101,6 @@ READ = [
     (None, True, False),
     ("BUSINESS_ADMIN", True, True),
     ("BUSINESS_ADMIN", False, False),
-    ("MIXED", True, True),
-    ("MIXED", False, False),
     ("USER", True, True),
     ("USER", False, False),
 ]
@@ -126,7 +122,6 @@ def test_fr17_ac55_can_read_project_content(pol, roles, role, member, expected) 
         ("TECH_ADMIN", False),
         (None, False),
         ("BUSINESS_ADMIN", True),
-        ("MIXED", True),
         ("USER", False),
     ],
     ids=lambda v: str(v),
@@ -141,8 +136,6 @@ OWN = [
     # 002/AC-13 (FR-9, 002 §5.3 п.3): правило D-54 отменено, БА действует по участию
     ("BUSINESS_ADMIN", False, True, True),
     ("BUSINESS_ADMIN", False, False, False),
-    ("MIXED", False, True, True),
-    ("MIXED", False, False, False),
     ("USER", True, True, False),
     ("USER", False, True, False),
     ("TECH_ADMIN", True, True, False),
@@ -178,10 +171,8 @@ FULLY = [
     ("BUSINESS_ADMIN", False, True, T_ME, T_NONE, True),
     ("BUSINESS_ADMIN", False, True, T_OTH, T_NONE, True),
     ("BUSINESS_ADMIN", False, False, T_ME, T_ME, False),  # не участник: нельзя
+    ("BUSINESS_ADMIN", False, False, T_OTH, T_NONE, False),  # не участник (прежде строка СМ)
     # СМ: любые задачи, где участник
-    ("MIXED", False, True, T_OTH, T_OTH, True),
-    ("MIXED", False, True, T_OTH, T_NONE, True),
-    ("MIXED", False, False, T_ME, T_ME, False),
     # Пользователь: только своя (автор == исполнитель == я) и участник
     ("USER", False, True, T_ME, T_ME, True),
     ("USER", False, True, T_OTH, T_ME, False),  # назначили мне: только статус
@@ -236,8 +227,14 @@ STATUS = [
     ("BUSINESS_ADMIN", False, True, T_ME, T_OTH, True),  # 002/AC-13
     ("BUSINESS_ADMIN", False, False, T_OTH, T_ME, False),
     ("BUSINESS_ADMIN", True, True, T_OTH, T_OTH, True),  # владелец
-    ("MIXED", False, True, T_OTH, T_OTH, True),
-    ("MIXED", False, False, T_OTH, T_OTH, False),
+    (
+        "BUSINESS_ADMIN",
+        False,
+        False,
+        T_OTH,
+        T_OTH,
+        False,
+    ),  # не участник (прежде строка СМ, 002/AC-15)
 ]
 
 
@@ -266,9 +263,6 @@ ASSIGNEE = [
     ("BUSINESS_ADMIN", False, True, T_ME, T_NONE, True),
     ("BUSINESS_ADMIN", False, False, T_OTH, T_OTH, False),  # 002/AC-15: не участник
     ("BUSINESS_ADMIN", True, True, T_OTH, T_NONE, True),
-    ("MIXED", False, True, T_OTH, T_OTH, True),
-    ("MIXED", False, True, T_OTH, T_NONE, True),
-    ("MIXED", False, False, T_OTH, T_OTH, False),
 ]
 
 
@@ -296,9 +290,6 @@ CREATE = [
     ("BUSINESS_ADMIN", True, "other", True),
     ("BUSINESS_ADMIN", True, None, True),
     ("BUSINESS_ADMIN", False, "me", False),
-    ("MIXED", True, "other", True),
-    ("MIXED", True, None, True),
-    ("MIXED", False, "me", False),
 ]
 
 
@@ -343,7 +334,7 @@ SUB = [
     ("BUSINESS_ADMIN", False, T_ME, T_OTH, "other", True),  # 002/AC-13
     ("BUSINESS_ADMIN", False, T_ME, T_ME, "other", True),
     ("BUSINESS_ADMIN", False, T_ME, T_NONE, "me", True),  # 002/AC-13
-    ("MIXED", False, T_OTH, T_OTH, "other", True),
+    ("BUSINESS_ADMIN", False, T_OTH, T_OTH, "other", True),  # прежде строка СМ (002/AC-13)
 ]
 
 
@@ -365,7 +356,8 @@ def test_sc20_can_create_subtask(pol, roles, role, is_owner, pcb, pasg, sub_asg,
 
 
 def test_sc20_subtask_requires_membership(pol, roles) -> None:
-    a = _actor(roles, "MIXED")
+    """001/SC-20, обращён по 002/AC-13, AC-15: БА, не участник проекта, подзадачу не создаёт."""
+    a = _actor(roles, "BUSINESS_ADMIN")
     p = _proj(pol, member=False)
     parent = _task(pol, created_by=ME, assignee=ME)
     assert pol.can_create_subtask(a, p, parent, ME) is False
@@ -381,8 +373,6 @@ def test_sc20_subtask_requires_membership(pol, roles) -> None:
         ("USER", False, False),
         ("BUSINESS_ADMIN", True, True),
         ("BUSINESS_ADMIN", False, False),
-        ("MIXED", True, True),
-        ("MIXED", False, False),  # править чужой комментарий нельзя никому
     ],
     ids=lambda v: str(v),
 )
@@ -404,8 +394,6 @@ DEL_C = [
     # 002/AC-13 (FR-9): БА-участник не владелец удаляет чужой комментарий (было False, D-54)
     ("BUSINESS_ADMIN", False, True, False, True),
     ("BUSINESS_ADMIN", False, False, False, False),
-    ("MIXED", False, True, False, True),
-    ("MIXED", False, False, False, False),
 ]
 
 
@@ -430,8 +418,6 @@ MANAGE = [
     # 002/AC-11, AC-12 (FR-8): БА управляет любым проектом, участие и владение не нужны
     ("BUSINESS_ADMIN", False, True, True),
     ("BUSINESS_ADMIN", False, False, True),
-    ("MIXED", False, False, True),  # участие не требуется (FR-14c)
-    ("MIXED", False, True, True),
 ]
 
 
@@ -454,8 +440,6 @@ def test_ac48_can_manage_project_and_members(pol, roles, role, is_owner, member,
         ("BUSINESS_ADMIN", True, True, True),  # 002/AC-11 (FR-8): БА добавляет себя
         ("BUSINESS_ADMIN", False, False, True),  # 002/AC-11: любой проект
         ("BUSINESS_ADMIN", False, True, True),  # 002/AC-11: себя в любой проект
-        ("MIXED", False, True, True),  # СМ может добавить себя
-        ("MIXED", False, False, True),
         ("USER", False, False, False),
         ("TECH_ADMIN", False, False, False),
         (None, False, False, False),
@@ -475,9 +459,7 @@ def test_ac73_can_add_member(pol, roles, role, is_owner, target_me, expected) ->
         ("USER", False, False, False),
         ("BUSINESS_ADMIN", True, True, False),  # владелец не выходит (FR-15a)
         ("BUSINESS_ADMIN", False, True, True),
-        ("MIXED", False, True, True),
-        ("MIXED", True, True, False),
-        ("MIXED", False, False, False),
+        ("BUSINESS_ADMIN", False, False, False),  # не участник (прежде строка СМ)
         ("TECH_ADMIN", False, True, False),
         (None, False, True, False),
     ],
@@ -521,7 +503,7 @@ def test_oi127_ba_member_not_owner_assigned_but_not_author_denied(pol, roles) ->
     assert pol.can_delete_task(a, p, t) is True
 
 
-def test_oi127_ba_member_not_owner_foreign_task_denied(pol, roles) -> None:
+def test_oi127_ba_member_not_owner_foreign_task_allowed(pol, roles) -> None:
     """Обращён по 002/AC-13, AC-14: чужую задачу БА-участник правит, переназначает, удаляет;
     не участник (002/AC-15) - ничего."""
     a = _actor(roles, "BUSINESS_ADMIN")
@@ -536,7 +518,7 @@ def test_oi127_ba_member_not_owner_foreign_task_denied(pol, roles) -> None:
     assert pol.can_delete_task(a, outside, foreign) is False
 
 
-def test_oi127_ba_member_not_owner_foreign_comment_not_deletable(pol, roles) -> None:
+def test_oi127_ba_member_not_owner_foreign_comment_deletable(pol, roles) -> None:
     """Обращён по 002/AC-13 (FR-9): БА-участник не владелец удаляет чужой комментарий;
     не-участник по-прежнему нет (002/AC-15)."""
     a = _actor(roles, "BUSINESS_ADMIN")

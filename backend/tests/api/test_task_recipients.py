@@ -50,7 +50,6 @@ async def _bad_targets(env: ApiEnv, w: ApiWorld) -> dict[str, tuple[Any, str]]:
         "user_non_member": (w.uid("usr2"), "not_project_member"),
         "otp_non_member": (w.uid("otp"), "not_project_member"),
         "ba_non_member": (w.uid("ba3"), "not_project_member"),
-        "mixed_non_member": (w.uid("sm"), "not_project_member"),
     }
 
 
@@ -109,7 +108,7 @@ async def test_ac56_ac74_invalid_recipients_give_422_with_distinct_codes(
 
 
 @pytest.mark.parametrize("entry", ENTRIES)
-@pytest.mark.parametrize("who", ["ba", "ba2", "sm_m", "usr"])
+@pytest.mark.parametrize("who", ["ba", "ba2", "usr"])
 async def test_ac56_members_with_business_roles_are_accepted(
     api_env: ApiEnv, entry: str, who: str
 ) -> None:

@@ -1,7 +1,9 @@
 """T12: матрица Role x Capability (plan §4.5, BR-1, BR-2, BR-11, ADR-0009).
 
-AC-26 (ASSIGN_ROLES: ТА и СМ), AC-39 (MANAGE_ACCOUNTS: ТА и СМ), AC-74/AC-75 (ТА и роль
-NULL без бизнес-доступа), AC-11 (BUSINESS_ACCESS у БА/СМ/П); FR-8, FR-9, FR-66, BR-2.
+AC-26 (ASSIGN_ROLES: только ТА), AC-39 (MANAGE_ACCOUNTS: только ТА), AC-74/AC-75 (ТА и роль
+NULL без бизнес-доступа), AC-11 (BUSINESS_ACCESS у БА/П); FR-8, FR-9, FR-66, BR-2.
+002 (R3-T11): роли `mixed` нет, остаются три роли (FR-1); права администрирования учётных
+записей - только у ТА (FR-7, AC-3, AC-5).
 
 Модуль ``app.domain.access.roles`` импортируется внутри фикстуры: пока его нет, каждый тест
 падает отдельно с ImportError, а не ошибкой сбора.
@@ -19,7 +21,7 @@ from typing import Any
 
 import pytest
 
-ALL_ROLES = ("TECH_ADMIN", "BUSINESS_ADMIN", "MIXED", "USER")
+ALL_ROLES = ("TECH_ADMIN", "BUSINESS_ADMIN", "USER")
 ALL_CAPS = (
     "MANAGE_ACCOUNTS",
     "ASSIGN_ROLES",
@@ -48,7 +50,6 @@ EXPECTED: dict[str, frozenset[str]] = {
     "TECH_ADMIN": frozenset(_TA),
     # 002/FR-8 (R3-T01): БА получает PROJECT_MANAGE_ANY
     "BUSINESS_ADMIN": frozenset(_BA | {"PROJECT_MANAGE_ANY"}),
-    "MIXED": frozenset(_TA | _BA | {"PROJECT_MANAGE_ANY"}),
     "USER": frozenset({"BUSINESS_ACCESS"}),
 }
 BUSINESS_CAPS = frozenset(_BA | {"PROJECT_MANAGE_ANY"})
@@ -66,15 +67,25 @@ def roles() -> ModuleType:
 
 
 def test_fr8_role_values_are_db_strings(roles: ModuleType) -> None:
+    """001/FR-8, обращён по 002/FR-1: ровно три значения; `mixed` не принимается."""
     assert {r.name: r.value for r in roles.Role} == {
         "TECH_ADMIN": "tech_admin",
         "BUSINESS_ADMIN": "business_admin",
-        "MIXED": "mixed",
         "USER": "user",
     }
     # StrEnum: сравнение со строкой из БД работает напрямую
-    assert roles.Role("mixed") is roles.Role.MIXED
     assert roles.Role.USER == "user"
+    assert roles.Role.TECH_ADMIN == "tech_admin"
+    assert roles.Role.BUSINESS_ADMIN == "business_admin"
+
+
+def test_002_ac1_role_enum_has_exactly_three_values(roles: ModuleType) -> None:
+    """002/AC-1, FR-1: перечень Role - ровно `tech_admin`, `business_admin`, `user`."""
+    assert [r.value for r in roles.Role] == ["tech_admin", "business_admin", "user"]
+    assert len(roles.Role) == 3
+    assert not hasattr(roles.Role, "MIXED")
+    with pytest.raises(ValueError):
+        roles.Role("mixed")
 
 
 def test_fr9_capability_set_is_exactly_plan_list(roles: ModuleType) -> None:
@@ -119,14 +130,9 @@ def test_br2_tech_admin_has_only_administrative_capabilities(roles: ModuleType) 
     assert "BUSINESS_ACCESS" not in got
 
 
-def test_br1_mixed_is_union_of_admin_roles_plus_manage_any(roles: ModuleType) -> None:
-    caps = roles.ROLE_CAPABILITIES
-    ta, ba = caps[roles.Role.TECH_ADMIN], caps[roles.Role.BUSINESS_ADMIN]
-    mixed = caps[roles.Role.MIXED]
-    assert mixed == ta | ba | {roles.Capability.PROJECT_MANAGE_ANY}
-    # 002/FR-8: право управлять любым проектом есть у БА, у ТА его нет
-    assert roles.Capability.PROJECT_MANAGE_ANY in ba
-    assert roles.Capability.PROJECT_MANAGE_ANY not in ta
+# Удалён ``test_br1_mixed_is_union_of_admin_roles_plus_manage_any`` (роли `mixed` нет, 002/FR-1).
+# Заменители: ``test_002_ac1_role_enum_has_exactly_three_values`` (три роли) и
+# ``test_002_fr8_only_business_roles_hold_project_manage_any`` (PROJECT_MANAGE_ANY у БА, не у ТА).
 
 
 def test_br1_user_only_business_access(roles: ModuleType) -> None:
@@ -140,19 +146,21 @@ def test_br11_user_cannot_assign_others_manage_labels_or_crm(roles: ModuleType) 
         assert roles.Capability[name] not in user
 
 
-def test_ac26_ac39_account_capabilities_only_ta_and_mixed(roles: ModuleType) -> None:
+def test_ac26_ac39_account_capabilities_only_ta(roles: ModuleType) -> None:
+    """001/AC-26, AC-39, обращён по 002/AC-3, AC-5, FR-7: права на учётные записи только у ТА."""
     for cap in ("MANAGE_ACCOUNTS", "ASSIGN_ROLES", "VIEW_AUDIT"):
         holders = {
             r.name for r in roles.Role if roles.Capability[cap] in roles.ROLE_CAPABILITIES[r]
         }
-        assert holders == {"TECH_ADMIN", "MIXED"}, cap
+        assert holders == {"TECH_ADMIN"}, cap
 
 
 # --- ACCOUNT_ADMIN_ROLES -----------------------------------------------------------------
 
 
-def test_fr69_account_admin_roles_is_tech_admin_and_mixed(roles: ModuleType) -> None:
-    expected = frozenset({roles.Role.TECH_ADMIN, roles.Role.MIXED})
+def test_fr69_account_admin_roles_is_tech_admin_only(roles: ModuleType) -> None:
+    """001/FR-69, обращён по 002/FR-7, AC-5: администраторы учётных записей - только ТА."""
+    expected = frozenset({roles.Role.TECH_ADMIN})
     assert expected == roles.ACCOUNT_ADMIN_ROLES
     assert isinstance(roles.ACCOUNT_ADMIN_ROLES, frozenset)
 
@@ -214,14 +222,14 @@ def test_actor_is_frozen_dataclass_with_plan_fields(roles: ModuleType) -> None:
     ]
     actor = _actor(roles)
     with pytest.raises(dataclasses.FrozenInstanceError):
-        actor.role = roles.Role.MIXED
+        actor.role = roles.Role.BUSINESS_ADMIN
     with pytest.raises(dataclasses.FrozenInstanceError):
         actor.must_change_password = True
 
 
 def test_actor_equality_by_value(roles: ModuleType) -> None:
     assert _actor(roles) == _actor(roles)
-    assert _actor(roles) != _actor(roles, role="MIXED")
+    assert _actor(roles) != _actor(roles, role="BUSINESS_ADMIN")
 
 
 @pytest.mark.parametrize(("role", "cap"), CELLS)
@@ -238,7 +246,7 @@ def test_fr66_actor_without_role_has_no_capabilities(roles: ModuleType, cap: str
 
 
 def test_002_fr8_only_business_roles_hold_project_manage_any(roles: ModuleType) -> None:
-    """002/FR-8: PROJECT_MANAGE_ANY у БА (и переходно у MIXED), нет у ТА и П."""
+    """002/FR-8: PROJECT_MANAGE_ANY у БА, нет у ТА и П."""
     caps = roles.ROLE_CAPABILITIES
     cap = roles.Capability.PROJECT_MANAGE_ANY
     assert cap in caps[roles.Role.BUSINESS_ADMIN]
