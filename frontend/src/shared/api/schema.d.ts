@@ -272,7 +272,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Comment
-         * @description Мягко удаляет комментарий; автор, владелец проекта или СМ-участник (AC-58).
+         * @description Мягко удаляет комментарий; автор, владелец проекта или БА-участник (AC-58).
          */
         delete: operations["delete_comment"];
         options?: never;
@@ -356,7 +356,7 @@ export interface paths {
         };
         /**
          * List Projects
-         * @description БА и СМ — все проекты пространства, «Пользователь» — где участник; по названию.
+         * @description БА — все проекты пространства, «Пользователь» — где участник; по названию.
          */
         get: operations["list_projects"];
         put?: never;
@@ -473,7 +473,7 @@ export interface paths {
         get?: never;
         /**
          * Change Owner
-         * @description Передаёт владение участнику-БА/СМ (FR-14a); пишет событие аудита.
+         * @description Передаёт владение участнику-БА (FR-14a); пишет событие аудита.
          */
         put: operations["change_owner"];
         post?: never;
@@ -608,7 +608,7 @@ export interface paths {
         };
         /**
          * List Directory
-         * @description Незаблокированные пользователи пространства с ролью БА/СМ/П; ``q`` — подстрока логина.
+         * @description Незаблокированные пользователи пространства с ролью БА/П; ``q`` — подстрока логина.
          */
         get: operations["list_directory"];
         put?: never;
@@ -801,7 +801,7 @@ export interface components {
         };
         /**
          * DirectoryUser
-         * @description Элемент ``GET /users``: ровно ``{id, login, role}`` (роль БА, СМ или П).
+         * @description Элемент ``GET /users``: ровно ``{id, login, role}`` (роль БА или П).
          */
         DirectoryUser: {
             /**
@@ -1125,7 +1125,7 @@ export interface components {
          * TaskCreate
          * @description Создание задачи и подзадачи.
          *
-         *     ``assignee_id``: не передан — «Пользователь» назначается сам, БА и СМ — без исполнителя;
+         *     ``assignee_id``: не передан — «Пользователь» назначается сам, БА — без исполнителя;
          *     ``null`` — явно без исполнителя (различаются по ``model_fields_set``, FR-20).
          */
         TaskCreate: {

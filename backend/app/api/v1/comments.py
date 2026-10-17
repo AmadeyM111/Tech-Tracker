@@ -79,6 +79,6 @@ async def edit_comment(
     responses=error_responses(404, 422),
 )
 async def delete_comment(comment_id: UUID, db: DbSession, actor: CurrentActor) -> Response:
-    """Мягко удаляет комментарий; автор, владелец проекта или СМ-участник (AC-58)."""
+    """Мягко удаляет комментарий; автор, владелец проекта или БА-участник (AC-58)."""
     await service.delete_comment(db, actor, comment_id)
     return Response(status_code=204)

@@ -91,7 +91,7 @@ def _validate(data: TaskCreateData) -> TaskPriority:
 
 
 def _effective_assignee(actor: Actor, data: TaskCreateData) -> UUID | None:
-    """Не передан: «Пользователь» — сам, БА и СМ — без исполнителя (AC-109)."""
+    """Не передан: «Пользователь» — сам, БА — без исполнителя (AC-109)."""
     if data.assignee is UNSET:
         return actor.user_id if actor.role == Role.USER else None
     assert not isinstance(data.assignee, Unset)

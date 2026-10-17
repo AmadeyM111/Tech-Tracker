@@ -43,7 +43,7 @@ CurrentActor = Annotated[Actor, Depends(get_active_actor)]
 async def list_projects(
     db: DbSession, actor: CurrentActor, params: Annotated[PageParams, Query()]
 ) -> Page[ProjectListItem]:
-    """БА и СМ — все проекты пространства, «Пользователь» — где участник; по названию."""
+    """БА — все проекты пространства, «Пользователь» — где участник; по названию."""
     rows, has_next = await queries.list_projects(db, actor, params)
     return Page[ProjectListItem](
         items=[ProjectListItem.model_validate(row) for row in rows],
@@ -97,7 +97,7 @@ async def update_project(
 async def change_owner(
     project_id: UUID, body: OwnerChange, db: DbSession, actor: CurrentActor
 ) -> ProjectDetail:
-    """Передаёт владение участнику-БА/СМ (FR-14a); пишет событие аудита."""
+    """Передаёт владение участнику-БА (FR-14a); пишет событие аудита."""
     view = await service.transfer_ownership(db, actor, project_id, new_owner_id=body.user_id)
     return ProjectDetail.model_validate(view)
 

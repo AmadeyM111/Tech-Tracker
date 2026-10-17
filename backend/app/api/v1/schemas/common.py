@@ -25,7 +25,7 @@ class ProjectRef(BaseModel):
 
 
 class DirectoryUser(BaseModel):
-    """Элемент ``GET /users``: ровно ``{id, login, role}`` (роль БА, СМ или П)."""
+    """Элемент ``GET /users``: ровно ``{id, login, role}`` (роль БА или П)."""
 
     model_config = ConfigDict(from_attributes=True)
 

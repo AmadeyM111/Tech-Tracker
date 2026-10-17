@@ -457,7 +457,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
 - **Попытки:** 0
 
 ## R3-T12 — Тексты API и домена без «СМ»; охранный тест
-- **Статус:** TODO
+- **Статус:** DONE (1 попытка, reviews/R3-T12-1.md)
 - **AC:** FR-1, FR-21 (название «Смешанная роль» только в журнале), NFR-1
 - **Файлы:** `backend/app/api/v1/users.py`, `backend/app/api/v1/projects.py`,
   `backend/app/api/v1/comments.py`, `backend/app/api/v1/schemas/common.py`,
