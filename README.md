@@ -220,12 +220,23 @@ Entrypoint контейнера `api` выполняет миграции до �
 запускайте `uvicorn` вручную на немигрированной БД: код 002 на схеме ≤ 0005 с пользователем, у
 которого упразднённая роль `mixed`, отвечает 500.
 
+Если порт 80 занят другим стеком (например, `gostracker` при работающем `gostracker-web`),
+контейнер `web` нового стека не стартует из-за конфликта порта, и команда
+`docker compose up -d --build --wait` вернёт ненулевой код. Такой стек обновляйте только API:
+`docker compose up -d --build --wait api` (с `-p <имя>`, если стек запущен под другим именем
+Compose). Веб-часть (frontend внутри образа `web`) при этом остаётся старой: пересоберите её,
+когда порт свободен (`docker compose up -d --build --wait web`), иначе старый интерфейс может
+предлагать упразднённую роль, а API ответит 422. `docker compose restart api` образ не
+пересобирает: если на стеке перед этим поднимали образ версии 001, выполните
+`docker compose up -d --build --wait` из клона на коде 002, а не `restart`.
+
 Миграция `0006` (три роли) снимает упразднённую роль `mixed` у всех пользователей и пишет это в
 журнал от имени «системы»: бывшие пользователи с этой ролью остаются без роли (если после этого
 не остаётся активного технического администратора, роль технического администратора получают
 активные бывшие пользователи с этой ролью). Поэтому при
-обновлении с версии 001 оператору нужно сделать резервную копию БД, выписать пользователей с
-упразднённой ролью `mixed` и проверить результат. Порядок, чек-лист владельца и команды - в
+обновлении с версии 001 оператору нужно сделать резервную копию БД (отдельным файлом на каждый
+стек, например `~/<имя-стека>-001.dump`, и проверить размер файла командой `ls -l`), выписать
+пользователей с упразднённой ролью `mixed` и проверить результат. Порядок, чек-лист владельца и команды - в
 `docs/adr/0013-three-roles.md`, раздел «Порядок обновления» (команды - в его блоке «Команды
 чек-листа»). Откат роль `mixed` не возвращает.
 
@@ -599,12 +610,23 @@ does not start. When starting by hand (without Docker), run `gostracker bootstra
 the API. Do not run `uvicorn` by hand on an unmigrated database: on a schema ≤ 0005 with a
 user who has the retired `mixed` role, the 002 code answers 500.
 
+If port 80 is taken by another stack (for example `gostracker` while `gostracker-web` is
+running), the `web` container of the new stack does not start because of the port conflict, and
+`docker compose up -d --build --wait` returns a non-zero exit code. Upgrade such a stack with the
+API only: `docker compose up -d --build --wait api` (with `-p <name>` if the stack runs under
+another Compose name). The web part (the frontend inside the `web` image) then stays old:
+rebuild it when the port is free (`docker compose up -d --build --wait web`), otherwise the old
+interface may offer the retired role and the API answers 422. `docker compose restart api` does
+not rebuild the image: if the 001 image was brought up on the stack before, run
+`docker compose up -d --build --wait` from a clone on the 002 code, not `restart`.
+
 Migration `0006` (three roles) removes the retired `mixed` role from all users and records it in
 the audit log on behalf of "system": former holders of that role are left without a role (if no
 active technical administrator would remain, the active former holders get the technical
 administrator role). So when
-upgrading from version 001 the operator must back up the database, list the users with the
-retired `mixed` role and check the result afterwards. The order, the owner checklist and the
+upgrading from version 001 the operator must back up the database (a separate file for each
+stack, for example `~/<stack-name>-001.dump`, and check the file size with `ls -l`), list the
+users with the retired `mixed` role and check the result afterwards. The order, the owner checklist and the
 commands are in `docs/adr/0013-three-roles.md`, section "Порядок обновления" (Upgrade order;
 the commands are in its "Команды чек-листа" block). A downgrade does not bring the `mixed` role
 back.

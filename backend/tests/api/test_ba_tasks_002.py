@@ -316,7 +316,7 @@ async def test_002_ac13_ba_member_moves_foreign_task_on_board(api_env: ApiEnv) -
     assert (await _task(env, w, "T1")).status == "review"
 
 
-async def test_002_ac13_user_u1_still_cannot_edit_foreign_t1_fields(api_env: ApiEnv) -> None:
+async def test_002_ac13_user_u2_still_cannot_edit_foreign_t1_fields(api_env: ApiEnv) -> None:
     """AC-13 (регресс границы): u2 (П, не автор T1) не правит T1 -> 403, данные не изменены."""
     env = api_env
     w = await make_world_002(env)

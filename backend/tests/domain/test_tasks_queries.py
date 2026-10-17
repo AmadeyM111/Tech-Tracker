@@ -371,7 +371,7 @@ async def test_fr19_permissions_user_own_task_full_but_no_reassign(
     assert _perms(v) == (True, True, False, True, True)
 
 
-async def test_fr19_permissions_member_ba_not_owner_not_assignee_nothing(
+async def test_fr19_permissions_member_ba_not_owner_not_assignee_everything(
     db: AsyncSession, q: Any
 ) -> None:
     """Обращён по 002/AC-13, AC-14 (FR-9): БА-участник не владелец на чужой задаче - все права."""

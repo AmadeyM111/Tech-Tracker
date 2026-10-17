@@ -512,7 +512,7 @@ async def test_ac58_ba_owner_deletes_foreign_comment(db: AsyncSession, svc: Any)
     assert (await comment_row(db, cid)).deleted_at is not None
 
 
-async def test_ac58_ba_non_owner_member_cannot_delete_foreign_403(
+async def test_ac58_ba_member_deletes_foreign_and_non_member_gets_403(
     db: AsyncSession, svc: Any
 ) -> None:
     """Обращён по 002/AC-13 (FR-9): БА-участник не владелец удаляет чужой комментарий
