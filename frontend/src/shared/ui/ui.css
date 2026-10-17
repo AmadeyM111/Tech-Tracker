@@ -196,7 +196,7 @@ select:disabled {
 }
 
 .ui-wide {
-  max-width: 72rem;
+  max-width: 100rem;
   margin: 1rem auto 2rem;
 }
 
@@ -220,6 +220,17 @@ h1,
   padding: 8px 10px;
   text-align: left;
   vertical-align: top;
+}
+
+/* Short fields keep their words on one line; only long free text wraps (NFR-6 still applies to it). */
+.ui-table th,
+.ui-table td[data-field="role"],
+.ui-table td[data-field="status"] {
+  white-space: nowrap;
+}
+
+.ui-table td[data-field="login"] {
+  min-width: 12rem;
 }
 
 .ui-table th {
