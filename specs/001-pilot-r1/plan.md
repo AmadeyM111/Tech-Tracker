@@ -7,13 +7,23 @@
   перечислены в §11.3).
 - **Spec v0.17 (архитектор, 2026-10-16):** отображаемый логин (FR-73a, OI-128) — решение
   **D-66** (§11.2) и детализация **§11.12**; задачи T93–T99 (`tasks.md`, конец раздела MVP).
+- **Фича 002 «Три роли» (архитектор, 2026-10-17):** Роль «Смешанная» упразднена фичей 002
+  (ADR-0013, миграция 0006); см. `specs/002-three-roles/`. План синхронизирован с 002 (spec v0.2
+  утверждена, plan, задачи R3-T01…R3-T17 выполнены) по перечню 002 plan §10: §4.3 (CHECK роли),
+  §4.5 (`Role`, `ROLE_CAPABILITIES`, `ACCOUNT_ADMIN_ROLES`, получатели), §4.6 (SQL FR-69), §11.5
+  (формулы прав и получатели), D-45, D-54, D-63 и §11.8 (демо: `demo.ba4`), §11.7 и §11.12.8
+  (AC-129, AC-131), а также прочие действующие места со «СМ» (§4.9, §4.13, §10.3, §10.4, §10.6,
+  §11.4). Отменённые решения не удалены, а помечены «заменено фичей 002 (ADR-0013)»: D-54, SC-2,
+  Q-6 §10.8, P-3, R-M3, OI-127 (а). При расхождении действуют 002 spec и 002 plan.
 - **Охват:** архитектура всего R1 (этапы R1.0–R1.4, ТЗ §9). Детальные задачи — только R1.0
   (`tasks.md`); задачи R1.1–R1.4 детализируются позже по этому плану.
 - **Входы:** `spec.md`, `docs/adr/0001…0011`, `docs/glossary.md`, `AGENTS.md`, текущий код
   (`backend/app/main.py`, `backend/pyproject.toml`, `docker-compose.yml`, `.env.example`,
   `scripts/check.sh`, `.github/`).
 
-Обозначения ролей: **ТА** — tech_admin, **БА** — business_admin, **СМ** — mixed, **П** — user.
+Обозначения ролей: **ТА** — tech_admin, **БА** — business_admin, **П** — user. **СМ** — mixed:
+роль упразднена фичей 002 (ADR-0013, миграция 0006); обозначение осталось только в истории
+решений и в пометках «заменено фичей 002».
 
 ---
 
@@ -53,7 +63,7 @@
 | D-12 | Список частых паролей | Первые 10 000 строк `Passwords/Common-Credentials/10k-most-common.txt` из SecLists (MIT), коммит `913b327317496d062bcc7cace524aaad8a693be2`; файл в репозитории, сверка sha256 тестом; сравнение точное, с учётом регистра (FR-53, OI-111) | NCSC Top100k; списки zxcvbn; HIBP API | См. §7.3. HIBP — внешний вызов (NFR-4) |
 | D-13 | Сессии | Таблица `user_session`; cookie `gt_session` = 32 случайных байта (base64url); в БД хранится `HMAC-SHA256(secret_key, token)`; права не кешируются — роль читается из БД на каждый запрос | JWT; Redis | ADR-0004 (мгновенный отзыв), FR-67; секретный ключ FR-6 получает смысл: утечка БД не даёт рабочих токенов |
 | D-14 | Фоновый опрос | Клиент ставит заголовок `X-GT-Background: 1` на повторные (не первые) загрузки запросов опроса; сервер для `GET` с этим заголовком не обновляет `last_activity_at`; для изменяющих методов заголовок игнорируется | Отдельный префикс `/poll/*`; учёт по типу эндпоинта | FR-59/AC-79: сервер не знает намерения пользователя, клиент знает. Злоупотребление заголовком только сокращает собственную сессию |
-| D-15 | Одноразовый пароль | ТА/СМ передаёт одноразовый пароль в **запросе** создания/сброса (интерфейс генерирует его в браузере через `crypto.getRandomValues` и показывает администратору); API паролей не возвращает | Сервер генерирует и возвращает пароль в ответе | FR-57 запрещает пароли в ответах API без исключений. Закреплено spec FR-55, FR-65 (OI-108): одноразовый пароль подчиняется FR-52/FR-53 |
+| D-15 | Одноразовый пароль | ТА передаёт одноразовый пароль в **запросе** создания/сброса (интерфейс генерирует его в браузере через `crypto.getRandomValues` и показывает администратору); API паролей не возвращает | Сервер генерирует и возвращает пароль в ответе | FR-57 запрещает пароли в ответах API без исключений. Закреплено spec FR-55, FR-65 (OI-108): одноразовый пароль подчиняется FR-52/FR-53 |
 | D-16 | CSRF | Cookie `SameSite=Lax` + проверка заголовка `Origin` для POST/PUT/PATCH/DELETE: если `Origin` есть и его хост:порт не совпадает с `Host` — 403 `origin_mismatch`; тела запросов — только JSON (кроме загрузки вложений) | CSRF-токен; без проверки | Lax не защищает от запросов с других портов того же сайта (`localhost:*`); проверка Origin — 10 строк кода; **ревью T12:** nginx обязан передавать `Host` с портом (`proxy_set_header Host $http_host`, не `$host`) — иначе при `HTTPS_PORT≠443` любой POST получит 403 `origin_mismatch`; сверять также схему Origin с `request.url.scheme` (T13) |
 | D-17 | TLS и статика | Контейнер `web` = nginx (stable-alpine): TLS 1.2+1.3, редирект 80→443, раздача собранного фронтенда, прокси `/api/` → `api:8000`; самоподписанный сертификат генерируется `openssl` скриптом entrypoint при отсутствии сертификата оператора | Caddy (`tls internal`); TLS в uvicorn; Traefik | nginx: явная конфигурация протоколов (AC-40), без внутреннего CA и попыток установки доверия; один контейнер вместо двух (фронт + прокси) |
 | D-18 | Поставляемый compose и dev | `docker-compose.yml` (поставка): порты публикует только `web`; `db` и `api` без `ports`; `COOKIE_SECURE: "true"` задан литералом в `environment` api (не из `.env`). Dev: `deploy/compose.dev.yml`, подключается только явно: `docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db` → `127.0.0.1:5432` | Профиль compose (профиль не может менять `ports` существующего сервиса); `docker-compose.override.yml` | FR-6a, FR-58, N-7. Тест запрещает файлы `docker-compose.override.y*ml` и `compose.override.y*ml` (оба автоподхватываются Compose) |
@@ -342,7 +352,7 @@ COMMON_PASSWORDS_SHA256: Final = "fa1ea0cf2f673458b58be3a7171d2b7fc6f2e704b4691e
 |---|---|---|
 | `workspace` | id, created_at, updated_at | — |
 | `app_user` | id, login varchar(64), password_hash text, must_change_password bool, is_blocked bool, blocked_at timestamptz NULL, failed_login_count int default 0, login_locked_until timestamptz NULL, password_changed_at timestamptz, created_at, updated_at, created_by NULL | UNIQUE(login); CHECK (login ~ '^[a-z0-9][a-z0-9._-]{2,63}$') — заодно гарантирует нижний регистр (FR-73) |
-| `workspace_member` | workspace_id, user_id, role text NULL, created_at, updated_at, created_by NULL | PK(workspace_id, user_id); CHECK role IN ('tech_admin','business_admin','mixed','user'); индекс (workspace_id, role) |
+| `workspace_member` | workspace_id, user_id, role text NULL, created_at, updated_at, created_by NULL | PK(workspace_id, user_id); CHECK role IN ('tech_admin','business_admin','user') (миграция 0006, фича 002; в ревизиях 0001–0005 допускалось и `'mixed'`); индекс (workspace_id, role) |
 | `user_session` | id bytea(32) — HMAC токена, user_id, workspace_id, created_at, last_activity_at, absolute_expires_at | PK id; FK user_id ON DELETE CASCADE; индекс user_id |
 | `domain_event` | id bigint identity, workspace_id, occurred_at, actor_id NULL, entity_type text, entity_id uuid, action text, changed_fields text[] default '{}', project_id uuid NULL, deal_id uuid NULL, in_audit bool, changes jsonb NULL, details jsonb NULL | FK только workspace, app_user; индексы (workspace_id, project_id, id DESC) WHERE project_id IS NOT NULL; (workspace_id, deal_id, id DESC) WHERE deal_id IS NOT NULL; (workspace_id, id DESC) WHERE in_audit; (entity_type, entity_id); триггеры append-only |
 
@@ -446,18 +456,18 @@ async def record_event(
 - Каждая строка вставляется вызовом `record_event` в транзакции изменения; отклонённое
   изменение (исключение) откатывает и событие (AC-67).
 
-### 4.5. Модуль прав (BR-1, BR-11, ADR-0009)
+### 4.5. Модуль прав (BR-1, BR-11, ADR-0009, ADR-0013)
 
 ```python
-# app/domain/access/roles.py
-class Role(StrEnum): TECH_ADMIN="tech_admin"; BUSINESS_ADMIN="business_admin"; MIXED="mixed"; USER="user"
+# app/domain/access/roles.py  (в редакции фичи 002, 002 plan §4.1)
+class Role(StrEnum): TECH_ADMIN="tech_admin"; BUSINESS_ADMIN="business_admin"; USER="user"
 class Capability(StrEnum):
     MANAGE_ACCOUNTS     # создание/блокировка/разблокировка, сброс пароля, завершение сессий (FR-4, 5, 5a, 62, 65)
     ASSIGN_ROLES        # FR-12
     VIEW_AUDIT          # FR-41
     BUSINESS_ACCESS     # раздел проектов и задач
     PROJECT_CREATE
-    PROJECT_MANAGE_ANY  # СМ: удаление, архив, передача владения, состав участников — в любом проекте
+    PROJECT_MANAGE_ANY  # БА: правка, участники (в т.ч. себя), владение, удаление, архив — в любом проекте (002/FR-8)
     TASK_ASSIGN_OTHERS  # «создание задачи другому», смена исполнителя (FR-19a)
     LABELS_MANAGE       # FR-18b
     CRM_READ
@@ -465,14 +475,13 @@ class Capability(StrEnum):
     PIPELINE_MANAGE     # FR-34
 ROLE_CAPABILITIES: Final[Mapping[Role, frozenset[Capability]]] = {
     TECH_ADMIN:     {MANAGE_ACCOUNTS, ASSIGN_ROLES, VIEW_AUDIT},
-    BUSINESS_ADMIN: {BUSINESS_ACCESS, PROJECT_CREATE, TASK_ASSIGN_OTHERS, LABELS_MANAGE, CRM_READ, CRM_WRITE, PIPELINE_MANAGE},
-    MIXED:          TECH_ADMIN ∪ BUSINESS_ADMIN ∪ {PROJECT_MANAGE_ANY},
+    BUSINESS_ADMIN: {BUSINESS_ACCESS, PROJECT_CREATE, PROJECT_MANAGE_ANY, TASK_ASSIGN_OTHERS, LABELS_MANAGE, CRM_READ, CRM_WRITE, PIPELINE_MANAGE},
     USER:           {BUSINESS_ACCESS},
 }
 # Разделы закрываются router-level зависимостью require_capability(...):
 #   /admin/users* — MANAGE_ACCOUNTS (PUT /role — ASSIGN_ROLES), /admin/audit* — VIEW_AUDIT,
 #   проекты/задачи/метки/комментарии/вложения/упоминания/поиск — BUSINESS_ACCESS, /crm/* — CRM_READ (запись — CRM_WRITE)
-ACCOUNT_ADMIN_ROLES: Final = frozenset({TECH_ADMIN, MIXED})   # обладатели MANAGE_ACCOUNTS, для FR-69
+ACCOUNT_ADMIN_ROLES: Final = frozenset({TECH_ADMIN})   # обладатели MANAGE_ACCOUNTS, для FR-69 (002/FR-7: только ТА; ТА может быть несколько)
 
 @dataclass(frozen=True, slots=True)
 class Actor:
@@ -485,9 +494,16 @@ class Actor:
     def can(self, cap: Capability) -> bool: ...
 ```
 
+> **Заменено фичей 002 (ADR-0013):** до 002 в `Role` было значение `MIXED="mixed"` (СМ) со
+> строкой матрицы `MIXED: TECH_ADMIN ∪ BUSINESS_ADMIN ∪ {PROJECT_MANAGE_ANY}`;
+> `PROJECT_MANAGE_ANY` была только у СМ; `ACCOUNT_ADMIN_ROLES = {TECH_ADMIN, MIXED}`. Перечень
+> `Capability` не менялся (002/NFR-1); у БА в `GET /me` появилась `project_manage_any` (002 plan D-1).
+
 > **SUPERSEDED (MVP-пересборка, 2026-10-15):** объектные проверки MVP — §11.5 (D-54: «свой
 > проект» БА = владелец; без `actor_has_task`, архива, вложений, `DEAL_RESPONSIBLE`); п.5 порядка
 > проверок ниже (битый JSON) — D-65 (400 `bad_request`), п.8 (409) в MVP не применяется.
+> **Фича 002 (ADR-0013):** ветки `MIXED` в формулах блока ниже — история R1.1; действующие формулы —
+> §11.5 в редакции 002 (002 plan §4.2).
 
 Объектные проверки (R1.1, `domain/access/policy.py`) — чистые функции над фактами,
 которые сервис загружает одним запросом:
@@ -526,7 +542,7 @@ def can_remove_self(a, p) -> bool                            # member and not ow
 class RecipientPurpose(StrEnum): PROJECT_MEMBER; TASK_ASSIGNEE; PROJECT_OWNER; DEAL_RESPONSIBLE
 def check_recipient(target: RecipientFacts, purpose: RecipientPurpose, *, project_member_ids: frozenset[UUID] | None) -> None
 # порядок: нет в пространстве → 422 user_not_found; заблокирован → 422 user_blocked;
-# роль NULL/ТА/не та для цели → 422 recipient_wrong_role (OWNER и DEAL_RESPONSIBLE: только BA/MIXED);
+# роль NULL/ТА/не та для цели → 422 recipient_wrong_role (OWNER и DEAL_RESPONSIBLE: только BA — 002/FR-11; до фичи 002 — BA/MIXED);
 # не участник (TASK_ASSIGNEE, PROJECT_OWNER) → 422 not_project_member
 ```
 
@@ -655,7 +671,8 @@ async def revoke_sessions(db, actor, sessions, user_id) -> int    # event user.s
 async def set_role(db, actor, user_id, role: Role | None) -> UserRow
     # та же роль → без изменений и без события; иначе role_assigned/changed/removed; инвариант FR-69
 async def ensure_account_admin_remains(db, workspace_id) -> None
-    # SELECT … FROM workspace_member JOIN app_user WHERE role IN ('tech_admin','mixed') AND NOT is_blocked ORDER BY user_id FOR NO KEY UPDATE;  -- не FOR UPDATE (ревью T16): FOR UPDATE конфликтует с FOR KEY SHARE от FK на app_user → deadlock в парах block/revoke, unblock/set_role
+    # SELECT … FROM workspace_member JOIN app_user WHERE role IN (ACCOUNT_ADMIN_ROLES) AND NOT is_blocked ORDER BY user_id FOR NO KEY UPDATE;  -- фича 002: только 'tech_admin' (до 002 — IN ('tech_admin','mixed')); `users/service.py` не менялся, 002 plan §4.4
+    # не FOR UPDATE (ревью T16): FOR UPDATE конфликтует с FOR KEY SHARE от FK на app_user → deadlock в парах block/revoke, unblock/set_role
     # ПРОТОКОЛ БЛОКИРОВОК (ревью T16, попытка 3): все действия над учётными записями (create_user, block, unblock, reset_password,
     # revoke_sessions, set_role) начинают с `_lock_for_account_change`: (1) `pg_advisory_xact_lock(0x75736572, hashtext(workspace_id))` —
     # сериализация админ-действий пространства; (2) одним запросом «активные админы ∪ цель» ORDER BY user_id FOR NO KEY UPDATE;
@@ -720,7 +737,7 @@ OI-66). Новая задача — `append_position(project, todo)`. Подза
 `search_query_too_short`. Шаблон `'%' || escape(q) || '%'`, оператор `ILIKE … ESCAPE '\'`,
 индексы GIN `gin_trgm_ops`. Ответ: `{"tasks": [...≤20], "projects": [...≤20], "accounts": [...]?,
 "deals": [...]?}` — ключи CRM присутствуют только при `CRM_READ`. Права: задачи — только
-неудалённые в неудалённых проектах, где actor участник; проекты — БА/СМ все неудалённые,
+неудалённые в неудалённых проектах, где actor участник; проекты — БА все неудалённые (фича 002),
 П — где участник; архивные входят. Сортировка: `similarity(name, q) DESC, id`.
 Кодировка БД UTF-8 с локалью образа postgres (`en_US.utf8`) — регистронезависимость для
 кириллицы проверяется тестом AC-92 («КП»/«кп»).
@@ -867,7 +884,7 @@ HSTS не включается (самоподписанный сертифик�
 | `gostracker hash-bench [--iterations 20]` | 0 (замер — 4) | p50/p95 времени Argon2id с текущими параметрами (AC-38) | `docker compose exec api` на стенде |
 | `gostracker maintenance [--dry-run]` | 1, 3 | автоочистка корзины (FR-25b) | `docker compose exec api` / cron оператора |
 | `gostracker restore-crm {deal\|account\|contact} ID` | 3 | FR-25c | `docker compose exec api` |
-| `gostracker demo-data [--seed 1]` | 4 | FR-49, FR-64; роли: 1 ТА, 1 СМ, 3 БА, 7 П; пароли → `/data/secrets/demo-passwords.txt` (0600), в stdout — только путь | `docker compose exec api` |
+| `gostracker demo-data [--seed 1]` | 4 | FR-49, FR-64; роли: 1 ТА, 4 БА, 7 П (фича 002, 002/FR-22: `demo.ba4` вместо `demo.mixed`; до 002 — 1 ТА, 1 СМ, 3 БА, 7 П); пароли → `/data/secrets/demo-passwords.txt` (0600), в stdout — только путь | `docker compose exec api` |
 | `gostracker export [--out PATH]`, `gostracker import PATH` | 4 | FR-40 | `docker compose exec api`; `docker compose cp` |
 | `gostracker loadgen --seed N [--tasks 50000 --deals 10000 --accounts 5000]` | 4 | FR-72 | `docker compose exec api` |
 | `scripts/backup.sh [DIR]`, `scripts/restore.sh FILE` | 4 | FR-50: `docker compose --profile ops run --rm ops backup|restore` (`pg_dump -Fc` + tar `appdata/attachments` в один `.tar`) | хост |
@@ -953,7 +970,8 @@ HSTS не включается (самоподписанный сертифик�
 ~30 % — подзадачи; 10 000 сделок; 5 000 клиентов; 15 000 контактов; события: создание каждой
 задачи и сделки + 2–3 изменения → ~250 000 строк `domain_event`; 12 пользователей, пароли в
 `/data/secrets/loadgen-passwords.txt`) → `VACUUM ANALYZE`. Параметры: 5 параллельных
-клиентов (разные пользователи — 2 БА, 1 СМ, 2 П), прогрев 20 запросов на тип запроса без учёта,
+клиентов (разные пользователи — 2 БА, 1 СМ, 2 П; СМ упразднена фичей 002 (ADR-0013) — состав
+клиентов уточнить при возврате замера NFR-2), прогрев 20 запросов на тип запроса без учёта,
 затем ≥ 100 замеров на тип запроса; p95 — по ближайшему рангу; время = от отправки до
 получения полного тела. Каждая операция NFR-2 = набор запросов; норматив применяется к
 каждому запросу набора:
@@ -1213,7 +1231,7 @@ ruff (MIT), mypy (MIT). `psycopg` (LGPL) **не** добавляется. Все
 |---|---|---|
 | P-1 | Пределы длины названия и описания проекта и задачи | решено, spec OI-103 (FR-14, FR-18, AC-108): 1–255 / ≤ 10 000 — §4.3 |
 | P-2 | «Пользователь» создаёт задачу без исполнителя | решено, spec OI-104 (FR-20, AC-109): не передан → сам, явный null → 403 — §4.5 |
-| P-3 | Кто меняет название и описание проекта | решено, spec OI-105 (FR-14c, AC-110): владелец-БА и СМ в любом проекте — §4.5 |
+| P-3 | Кто меняет название и описание проекта | решено, spec OI-105 (FR-14c, AC-110): владелец-БА и СМ в любом проекте — §4.5; **заменено фичей 002 (ADR-0013): любой БА в любом проекте (002/FR-8)** |
 | P-4 | «Ближайшие 7 дней» и статус «Готово» в фильтрах | решено, spec OI-106 (FR-27a, AC-111): `[сегодня; сегодня+6]`, «Готово» исключается только из «просрочено» |
 | P-5 | Право окончательного удаления из корзины | решено, spec OI-107 (FR-25b, AC-112): = право восстановления, иначе 403 — §4.10 |
 | P-6 | Одноразовый пароль и FR-57 | решено, spec OI-108 (FR-55, FR-65, AC-113) — D-15 |
@@ -1257,7 +1275,7 @@ ruff (MIT), mypy (MIT). `psycopg` (LGPL) **не** добавляется. Все
 | D-42 | Команда обслуживания | `domain/ops/maintenance.py::run_maintenance` — шаги: истёкшие сессии (R1.0), корзина (T54), файлы-сироты (T54); `--dry-run` считает, ничего не меняя; stdout — строки `ключ=число`; регулярный запуск — cron оператора на хосте (`docker compose exec -T api gostracker maintenance`, README) | сервис compose с циклом или запуск из lifespan api | FR-25b и Scope: «фонового планировщика в R1 нет» (OI-12) — сервис с циклом им и был бы |
 | D-43 | Каскад мягкого удаления | Все неудалённые зависимые строки получают те же `deleted_at` и `deleted_batch_id`: проект → его задачи и подзадачи → их комментарии и вложения; задача → подзадачи → комментарии и вложения задачи и подзадач | помечать только корень, зависимые скрывать join-ами | восстановление и автоочистка работают по одному batch (D-25); одинаковое `deleted_at` у пакета |
 | D-44 | Корзина проекта | `GET /trash?project_id=` — корзина пространства с фильтром по проекту | отдельный эндпоинт | FR-25a; вопрос 14 `open-questions.md` — **Q-3 (аналитику)** |
-| D-45 | Видимость проекта | Карточка проекта и состав участников видны тем, кто видит проект в списке (БА, СМ — все неудалённые проекты; П — где участник); содержимое (задачи, комментарии, вложения, лента) — только участникам, иначе 403 | карточка только участникам | СМ-неучастник архивирует, передаёт владение, правит название и состав (FR-14a/b/c, FR-15) — ему нужны данные проекта; FR-17 относит к содержимому только задачи, комментарии, вложения |
+| D-45 | Видимость проекта | Карточка проекта и состав участников видны тем, кто видит проект в списке (БА — все неудалённые проекты; П — где участник; до фичи 002 — «БА, СМ»); содержимое (задачи, комментарии, вложения, лента) — только участникам, иначе 403 | карточка только участникам | БА-неучастник (до фичи 002 — СМ-неучастник; 002/FR-8) архивирует, передаёт владение, правит название и состав (FR-14a/b/c, FR-15) — ему нужны данные проекта; FR-17 относит к содержимому только задачи, комментарии, вложения |
 | D-46 | Повтор того же действия | Повторное добавление участника, передача владения текущему владельцу, архивирование архивного (разархивирование активного), то же значение поля задачи и тот же набор меток — 200/204 без изменений и без события; права (403) и 404 проверяются как обычно | 409/422 | как `set_role` (T16): событие пишется только при изменении |
 | D-47 | Исключение участника (FR-15a) | Исполнитель снимается у всех задач проекта, где исключённый — исполнитель, включая подзадачи и мягко удалённые; событие `task.unassigned_member_removed` — на каждую неудалённую, затем `member.removed` | только неудалённые | иначе восстановление задачи вернёт исполнителя-неучастника (нарушение FR-20); **Q-7** |
 | D-48 | Разбор упоминаний | `MENTION_RE = (?<![A-Za-z0-9._@-])@([A-Za-z0-9][A-Za-z0-9._-]{2,63})` (ASCII); кандидат → `lower()`; если такого участника нет, с конца по одному отрезаются `.`, `_`, `-` (пока длина ≥ 3). Уведомление — участнику проекта на момент создания или правки, включая автора (буквально FR-71). Правка добавляет только новых (`UNIQUE(comment_id, user_id)`, `ON CONFLICT DO NOTHING`); упоминание, убранное правкой, не снимается (**Q-4**) | без отрезания хвостовой пунктуации (`@ivan.` не сработает); снятие при правке | FR-71, FR-73, D-39 |
@@ -1295,8 +1313,8 @@ ruff (MIT), mypy (MIT). `psycopg` (LGPL) **не** добавляется. Все
 
 | Метод и путь | Доступ (объектный) | Тело / параметры → ответ | Ошибки |
 |---|---|---|---|
-| `GET /users` | — | `?q&page&page_size` → `Page[DirectoryUser {id, login, role}]`: незаблокированные с ролью БА/СМ/П, `ORDER BY login, id`; `q` — подстрока логина | 422 |
-| `GET /projects` | БА/СМ — все, П — где участник | `?status=active\|archived\|all` (по умолчанию `active`) → `Page[ProjectListItem {id, name, status, owner: UserRef, task_count}]`, `ORDER BY lower(name), id`; `task_count` — неудалённые задачи верхнего уровня | 422 |
+| `GET /users` | — | `?q&page&page_size` → `Page[DirectoryUser {id, login, role}]`: незаблокированные с ролью БА/П (фича 002; до неё — БА/СМ/П), `ORDER BY login, id`; `q` — подстрока логина | 422 |
+| `GET /projects` | БА — все (фича 002; до неё — БА/СМ), П — где участник | `?status=active\|archived\|all` (по умолчанию `active`) → `Page[ProjectListItem {id, name, status, owner: UserRef, task_count}]`, `ORDER BY lower(name), id`; `task_count` — неудалённые задачи верхнего уровня | 422 |
 | `POST /projects` | `PROJECT_CREATE` | `{name, description?}` → 201 `ProjectDetail`; создатель — владелец и участник | 422 |
 | `GET /projects/{id}` | `can_view_project` (D-45) | → `ProjectDetail {id, name, description, status, owner: UserRef, task_count, is_member, created_at, updated_at, permissions {manage, manage_members, create_task, remove_self}}` (R1.3 добавит `deal_link`, §4.15) | 403, 404 |
 | `PATCH /projects/{id}` | `can_manage_project` (FR-14c) | `{name?, description?}` → `ProjectDetail`; событие `project.updated` | 403, 404, 409, 422 |
@@ -1353,7 +1371,7 @@ ruff (MIT), mypy (MIT). `psycopg` (LGPL) **не** добавляется. Все
 
 ```python
 # domain/access/policy.py — функции §4.5 плюс:
-def can_view_project(a: Actor, p: ProjectFacts) -> bool          # D-45: BA/MIXED — да; USER — участник
+def can_view_project(a: Actor, p: ProjectFacts) -> bool          # D-45: BA — да (фича 002; до неё BA/MIXED); USER — участник
 # domain/access/recipients.py — §4.5
 @dataclass(frozen=True)
 class RecipientFacts:
@@ -1469,7 +1487,7 @@ async def search(db, actor, q: str) -> SearchResult
 
 | Тип | Право удалить = восстановить = окончательно удалить | 422 при восстановлении | 409 (архив, D-50) |
 |---|---|---|---|
-| project | `can_manage_project` (БА-владелец или СМ) | — | нет |
+| project | `can_manage_project` (любой БА — фича 002, 002/FR-8; до неё — БА-владелец или СМ) | — | нет |
 | task (и подзадача) | `can_delete_task` | проект удалён → `project_deleted`; родитель удалён → `parent_task_deleted` | да |
 | comment | `can_delete_comment` (и участник) | задача удалена → `parent_task_deleted`; проект удалён → `project_deleted` | да |
 | attachment | `can_delete_attachment` (и участник) | то же | да |
@@ -1539,7 +1557,7 @@ async def search(db, actor, q: str) -> SearchResult
 | Q-5 | аналитик | AC-90 «событие без старого и нового значения»: допустимо ли показывать в ленте текущее название объекта | да: `entity.title` = текущее название, `changes` никогда не содержит `title`/`description` | `activity/service.py` (убрать `title`) |
 - **Дефолт:** Да; в changes названий и описаний нет
 
-| Q-6 | заказчик (вопрос 13 `open-questions.md`) | БА-участник получает права «своего проекта», создав себе задачу | реализуется по spec (FR-19, З-8) | `policy.is_own_project` **— РЕШЕНО владельцем 2026-10-15: нет; «свой проект» БА = проект, где он владелец (D-54, §11), SPEC_CHANGES SC-2** |
+| Q-6 | заказчик (вопрос 13 `open-questions.md`) | БА-участник получает права «своего проекта», создав себе задачу | реализуется по spec (FR-19, З-8) | `policy.is_own_project` **— РЕШЕНО владельцем 2026-10-15: нет; «свой проект» БА = проект, где он владелец (D-54, §11), SPEC_CHANGES SC-2**; **заменено фичей 002 (ADR-0013): права БА определяются участием в проекте, владение роли не играет (002/FR-9, 002 §5.3 п.3)** |
 - нет, права на проект надо задавать вручную, по умолчанию проект принадлежит его создателю (Владельцу)
 
 | Q-7 | аналитик | FR-15a: снимать ли исполнителя у мягко удалённых задач исключённого | D-47: да, без события | `projects/members.py` |
@@ -1594,7 +1612,7 @@ NFR-2; Playwright-e2e. Реестр с исходными номерами — `
 | # | Решение | Выбрано | Отвергнутые альтернативы | Почему |
 |---|---|---|---|---|
 | D-53 | CRM и задел R1.0 | R1.3 не делается. Задел R1.0 **остаётся как есть, без правок**: `Capability.CRM_READ/CRM_WRITE/PIPELINE_MANAGE` и `LABELS_MANAGE` в матрице (их отдаёт `/me.capabilities`, фронтенд MVP их не использует), `EntityType.STAGE/DEAL`, `EventSpec.feed="deal"`/`deal_history`, столбец и индекс `domain_event.deal_id` (миграция 0002), коды `ErrorCode` [3], подписи «Этап»/«Сделка» в фильтре журнала. `RecipientPurpose.DEAL_RESPONSIBLE`, поле `deal_link` проекта (§4.15), воронка в `bootstrap` — не реализуются | Вычистить CRM-задел из R1.0 | Задел покрыт тестами R1.0 и OpenAPI-контрактом; удаление — переделка готового без пользы; применённые миграции менять нельзя (AGENTS.md); при возврате CRM он нужен в том же виде. Код R1.0/R1.1 (готовые T29–T32a) от CRM-таблиц не зависит — проверено поиском по коду |
-| D-54 | «Свой проект» (Q-6, решение владельца) | БА: «свой проект» = проект, где он **владелец**; задача, созданная БА в чужом проекте, прав «своего проекта» не даёт. СМ — по-прежнему проект, где участвует. `ProjectFacts.actor_has_task` удаляется. Права на проект «задаются вручную» = передача владения (FR-14a) и роль СМ | Реализовать по spec v0.15 (FR-19, З-8) | Решение владельца 2026-10-15; упрощает политику и выборки (нет подзапроса по задачам актора). SPEC_CHANGES SC-2 |
+| D-54 | «Свой проект» (Q-6, решение владельца) — **заменено фичей 002 (ADR-0013)** | **Действует (002/FR-8, FR-9, 002 plan D-2):** права БА на задачи и комментарии определяются участием в проекте, владение роли не играет; управление любым проектом — у любого БА. **Прежний текст (история):** БА: «свой проект» = проект, где он **владелец**; задача, созданная БА в чужом проекте, прав «своего проекта» не даёт. СМ — по-прежнему проект, где участвует. `ProjectFacts.actor_has_task` удаляется. Права на проект «задаются вручную» = передача владения (FR-14a) и роль СМ | Реализовать по spec v0.15 (FR-19, З-8) | Решение владельца 2026-10-15; упрощает политику и выборки (нет подзапроса по задачам актора). SPEC_CHANGES SC-2 |
 | D-55 | События в MVP | Пишутся **только события аудита**: `user.*` (R1.0) и `project.ownership_transferred`. События ленты (`project.updated`, `member.*`, `task.*`, `comment.*`) **не пишутся** — лента отложена. Каталог T30 не меняется | Писать все события ленты «впрок» | Каждое событие = вызов + тесты состава; без читателя это работа впустую. Цена: лента следующей версии начнётся пустой для данных MVP (риск R-M2) |
 | D-56 | Удаление | Мягкое (BR-7, ТЗ §3): `deleted_at` + `deleted_batch_id` с каскадом D-43 (проект → задачи → подзадачи → комментарии; задача → подзадачи → комментарии; подзадача → её комментарии). Восстановления, корзины, окончательного удаления и автоочистки нет; удалённое — 404 и не видно в списках, на доске и в счётчиках. Комментарий удаляется мягко с заглушкой (FR-23) | Жёсткое удаление; мягкое без `deleted_batch_id` | Мягкое удаление требует ТЗ §3 и стоит столько же, сколько жёсткое; `deleted_batch_id` уже в `SoftDeleteMixin` (R1.0) и позволит корзине следующей версии восстанавливать данные, удалённые в MVP |
 | D-57 | Архив проекта | Не делается: столбца `project.status` в 0004 **нет**, проверок 409 `project_archived` нет. Возврат — аддитивной миграцией `ADD COLUMN status text NOT NULL DEFAULT 'active'` + CHECK | Столбец «впрок» без функции | Архив не нужен для прав (D-54); без него из всех изменяющих операций уходит шаг 409 |
@@ -1603,7 +1621,7 @@ NFR-2; Playwright-e2e. Реестр с исходными номерами — `
 | D-60 | Комментарии | Сервер вырезает HTML (`strip_html`, D-28) — AC-58 сохраняется; фронтенд показывает текст как простой текст (`white-space: pre-wrap`, React экранирует), **без** `react-markdown`; упоминаний нет; правка с `edited_at` и мягкое удаление с заглушкой — как FR-23 | `react-markdown`; хранить HTML как есть | Без новой зависимости; XSS исключён экранированием React; markdown хранится и будет отрисован позже. SPEC_CHANGES SC-11 |
 | D-61 | Доска | Оставить минимальную доску: `GET /projects/{id}/board` (4 колонки, задачи верхнего уровня, порядок FR-28a, без пагинации — исключение из FR-47, как поиск) и `POST /tasks/{id}/move` по соседям (§4.8, D-22). Фронтенд — `@dnd-kit` с клавиатурной заменой (NFR-7) и опросом (FR-29) | Отложить доску; доска без ручного порядка (сортировка по времени создания) | Доска — визуальный центр таск-трекера и пункт ТЗ §6 п.5; без неё демо не продаётся. Ручной порядок просил владелец; позиции всё равно нужны для FR-28a |
 | D-62 | Фильтры | `GET /projects/{id}/tasks?assignee_id=&status=` (И), пагинация 50. Фильтров по сроку (FR-27a), общего списка `GET /tasks` и фильтра архива нет | Полный B1.2-B | Исполнитель нужен для FR-5/AC-43 (найти задачи заблокированного), статус — для демо; часовые пояса FR-27a — отдельная работа |
-| D-63 | Демо-данные | `gostracker demo-data [--seed 1]` (§11.8): 12 пользователей (1 ТА, 1 СМ, 3 БА, 7 П) + первый ТА = 13; 2 проекта; 30 задач, из них 6 подзадач; ~20 комментариев; без сделок. Прямые вставки ORM в одной транзакции (не через сервисы с `Actor`), события аудита `user.created`/`user.role_assigned` с `actor_id = NULL` (FR-41: создание учётных записей аудируется; автор — «система», D-6) | Через HTTP API; через сервисы | Одна транзакция, детерминизм по seed, без подделки сессий |
+| D-63 | Демо-данные | `gostracker demo-data [--seed 1]` (§11.8): 12 пользователей (1 ТА, 4 БА, 7 П — фича 002, 002/FR-22: `demo.ba4` вместо `demo.mixed`; до 002 — 1 ТА, 1 СМ, 3 БА, 7 П) + первый ТА = 13; 2 проекта; 30 задач, из них 6 подзадач; ~20 комментариев; без сделок. Прямые вставки ORM в одной транзакции (не через сервисы с `Actor`), события аудита `user.created`/`user.role_assigned` с `actor_id = NULL` (FR-41: создание учётных записей аудируется; автор — «система», D-6) | Через HTTP API; через сервисы | Одна транзакция, детерминизм по seed, без подделки сессий |
 | D-64 | Приёмка MVP | Ручной чек-лист `docs/acceptance/mvp-demo.md` (AC-1, AC-5, AC-97 в объёме MVP, AC-98, сценарий демо UF-2…UF-6, проверка опроса вместо AC-107) + автотесты; без замеров NFR-2, бэкапа, экспорта, Playwright | Полный R1.4 | Прототип; отложенное — в реестре |
 | D-65 | Невалидный JSON (Д-7, Q-9, решение владельца) | Обработчик `RequestValidationError` (`core/errors.py`): если **все** ошибки имеют `type == "json_invalid"` — **400** `{"detail": "Некорректный JSON в теле запроса", "code": "bad_request"}` без эха тела; иначе — прежний 422 `validation_error`. Действует для всех эндпоинтов с телом, с сессией и без: FastAPI разбирает тело до зависимостей, поэтому 400 приходит раньше 401/403 — это принято владельцем («отбрасывается быстро и дёшево, без бизнес-логики»). Валидный JSON с неверными полями — 401/403 гейтов раньше 422 (как сейчас). Размер тела ограничивает nginx (`client_max_body_size 12m`); приложение тело дополнительно не читает. OpenAPI: у маршрутов с телом объявлен 400 (`error_responses(400, …)`) | Своё `APIRoute`/middleware со строгим порядком 401 → 400; оставить 422 | Решение владельца; обработчик — 10 строк в одном месте. **SUPERSEDES** §4.5 п.5 «битый JSON даёт 422». SPEC_CHANGES SC-21 |
 | D-66 | Отображаемый логин (spec v0.17: FR-73, FR-73a, OI-128 — решение владельца продукта 2026-10-16; OI-129 и OI-130 — ответы владельца через оркестратора 2026-10-16). **SUPERSEDES D-39** в части хранения и показа логина | `app_user.login` остаётся **ключом** (нормализованный вид, строчными) без изменений: вход, `UNIQUE(login)`, поиск `ILIKE`, `ORDER BY login, id` (OI-129 вариант а — «как до v0.17»), счётчик FR-61. Новый столбец `app_user.login_display varchar(64) NOT NULL` — написание при создании, `CHECK (lower(login_display COLLATE "C") = login)`; миграция **0005** с заполнением `login_display = login`. ORM: отдельный атрибут `AppUser.login_display`; все места **показа** логина (10 выборок в 7 файлах, §11.12.4) читают его; поле API `login` (`UserRef`, `DirectoryUser`, `AdminUser`, `SessionUser`, `Me`, `AuditActor`) несёт отображаемое значение — имена полей и **контракт OpenAPI не меняются**. Python-default `login_display = login`, если значение не передано (демо, тестовые фабрики). Занятый логин — 422 `login_taken` (не 409). Первый ТА — в написании из `INITIAL_ADMIN_LOGIN` (OI-130 вариант а). Детали — §11.12 | (1) ORM-перестановка: атрибут `login` → столбец `login_display`, атрибут `login_key` → столбец `login` (8 правок в 5 файлах вместо 10 в 7, но слово `login` в ORM и в SQL/Core — фабрики, `get_table("app_user")`, raw SQL тестов — означало бы разные столбцы: ловушка для исполнителей и ревью); (2) новое поле `login_display` в схемах API (меняет контракт и фронтенд; spec требует, чтобы *поле логина* несло отображаемое значение); (3) хранить как введено + `citext` или уникальный индекс по `lower(login)` (расширение либо переписывание входа, поиска, сортировки и CHECK; ломает инварианты D-39); (4) генерируемый столбец `login GENERATED ALWAYS AS (lower(…))` (в PG16 существующий столбец не превратить в генерируемый без пересоздания); (5) ADR (D-39 — решение plan, изменение требования уже оформлено в spec, OI-128) | Минимум правок: логика входа, уникальности, поиска и сортировки не трогается, контракт не меняется. CHECK держит ключ и показ согласованными на уровне БД; `COLLATE "C"` делает `lower()` ASCII-only и независимым от локали БД — проверено на PG 16 (en_US.utf8): `lower('Kivan')` (знак Кельвина) = `kivan`, с `COLLATE "C"` — без изменений; ICU tr-TR: `lower('I')` = `ı`. Вместе с `ck_app_user_login_format` CHECK гарантирует, что `login_display` — ASCII по шаблону FR-73 без учёта регистра |
@@ -1615,7 +1633,8 @@ NFR-2; Playwright-e2e. Реестр с исходными номерами — `
 | D-1…D-23, D-25, D-26, D-28, D-29…D-39 | действуют; D-23 (связь со сделкой), D-27, D-35, D-36, D-37 — ОТЛОЖЕНО вместе с функциями |
 | D-39 (формат логина) | действует в части шаблона, `normalize_login`, входа, `UNIQUE(login)` и `ck_app_user_login_format`; хранение и показ — **SUPERSEDED D-66** (spec v0.17): «хранение только в нижнем регистре» заменено парой ключ `login` + `login_display` |
 | D-24 (`pg_trgm`, поиск), §4.9 | ОТЛОЖЕНО |
-| D-40 (503), D-41 (белые списки), D-42 (обслуживание: только сессии), D-43 (каскад), D-45 (видимость проекта), D-46 (повтор без изменений), D-51 (формат срока), D-52 (пустое название) | действуют |
+| D-40 (503), D-41 (белые списки), D-42 (обслуживание: только сессии), D-43 (каскад), D-45 (видимость проекта), D-46 (повтор без изменений), D-51 (формат срока), D-52 (пустое название) | действуют; D-45 — в редакции фичи 002 (без СМ) |
+| D-54, OI-127 (а), SC-2 («свой проект» БА = владелец), §11.5 в редакции до 2026-10-16 | **SUPERSEDED фичей 002 (ADR-0013)**: права БА — по участию, управление любым проектом (002/FR-8, FR-9; 002 plan §4.2) |
 | D-44, D-50, §4.10, §10.6 (корзина), D-49 и §4.11 (вложения), D-48 (упоминания) | ОТЛОЖЕНО |
 | D-47 (исключение участника) | действует частично: исполнитель снимается у всех задач исключённого, включая мягко удалённые (Q-7); событий нет (D-55) |
 | §4.3 R1.1 (0004) | SUPERSEDED §11.6; §4.3 R1.3 (0005) — ОТЛОЖЕНО |
@@ -1639,7 +1658,7 @@ NFR-2; Playwright-e2e. Реестр с исходными номерами — `
 | Метод и путь | Доступ (объектный) | Тело / параметры → ответ | Ошибки |
 |---|---|---|---|
 | `GET /users` | — (T35, §10.3 без изменений) | `?q&page&page_size` → `Page[DirectoryUser]` | 422 |
-| `GET /projects` | БА/СМ — все неудалённые, П — где участник | `?page&page_size` → `Page[ProjectListItem {id, name, owner: UserRef, task_count}]`, `ORDER BY lower(name), id`; `task_count` — неудалённые задачи верхнего уровня | 422 |
+| `GET /projects` | БА — все неудалённые (фича 002; до неё — БА/СМ), П — где участник | `?page&page_size` → `Page[ProjectListItem {id, name, owner: UserRef, task_count}]`, `ORDER BY lower(name), id`; `task_count` — неудалённые задачи верхнего уровня | 422 |
 | `POST /projects` | `PROJECT_CREATE` | `{name, description?}` → 201 `ProjectDetail`; создатель — владелец и участник | 422 |
 | `GET /projects/{id}` | `can_view_project` (D-45) | → `ProjectDetail {id, name, description, owner: UserRef, task_count, is_member, created_at, updated_at, permissions {manage, manage_members, create_task, remove_self}}` | 403, 404 |
 | `PATCH /projects/{id}` | `can_manage_project` | `{name?, description?}` → `ProjectDetail`; событий нет | 403, 404, 422 |
@@ -1669,7 +1688,10 @@ NFR-2; Playwright-e2e. Реестр с исходными номерами — `
 - `Board {project: ProjectRef, columns: list[BoardColumn]}`, `BoardColumn {status, tasks: list[BoardCard]}` — всегда 4 колонки в порядке FR-18a; `BoardCard {id, title, status, priority, due_date, assignee: UserRef | null, position, subtask_count, progress}`; карточки — неудалённые задачи верхнего уровня, `ORDER BY position, created_at, id`; `subtask_count`/`progress` — по неудалённым подзадачам; число SQL-запросов не зависит от числа карточек.
 - `Comment {id, task_id, author: UserRef, body: str | null, is_deleted, created_at, edited_at, permissions {edit, delete}}`.
 
-### 11.5. Права MVP (SUPERSEDES §4.5 в части объектных проверок)
+### 11.5. Права MVP (SUPERSEDES §4.5 в части объектных проверок; в редакции фичи 002)
+
+Формулы ниже приведены к 002 plan §4.2 (столбец «Итог 002»); сигнатуры, `ProjectFacts` и
+`TaskFacts` не менялись. Прежние формулы — в примечании после блока.
 
 ```python
 @dataclass(frozen=True)
@@ -1678,28 +1700,38 @@ class ProjectFacts:
 @dataclass(frozen=True)
 class TaskFacts:
     created_by: UUID; assignee_id: UUID | None; parent_id: UUID | None
-def is_own_project(a, p) -> bool          # BA: p.owner_id == a.user_id (владелец всегда участник); MIXED: member; иначе False
-def can_view_project(a, p) -> bool        # BA/MIXED: True; USER: member; иначе False
+def is_own_project(a, p) -> bool          # BA: p.actor_is_member; иначе False  (002/FR-9)
+def can_view_project(a, p) -> bool        # BA: True; USER: member; иначе False
 def can_read_project_content(a, p) -> bool  # BUSINESS_ACCESS and member
-def can_edit_task_fully(a, p, t) -> bool  # USER: member and created_by == assignee_id == actor; BA: is_own_project OR (member and created_by == assignee_id == actor) [OI-127 вариант (а), подтверждено владельцем 2026-10-15]; MIXED: member
+def can_edit_task_fully(a, p, t) -> bool  # USER: member and created_by == assignee_id == actor; BA: member (002/FR-9); иначе False
 def can_change_task_status(a, p, t) -> bool  # fully or (member and assignee_id == actor)  (FR-19b; и перенос на доске)
 def can_create_task(a, p, assignee_id) -> bool  # member and (assignee_id == actor or TASK_ASSIGN_OTHERS)
 def can_create_subtask(a, p, parent, assignee_id) -> bool
     # can_create_task(a, p, assignee_id) and (can_edit_task_fully(a, p, parent) or parent.assignee_id == actor)
     # ИСПРАВЛЕНИЕ §4.5: прежняя формула «fully(parent) or …» позволяла «Пользователю» создать
     # подзадачу своей задачи другому исполнителю — нарушение BR-1 «создание задачи другому — нет»
-def can_change_assignee(a, p, t) -> bool  # TASK_ASSIGN_OTHERS and is_own_project (FR-19a; ревью T70: БА — только владелец, СМ — участник); SUPERSEDES «can_edit_task_fully»
+def can_change_assignee(a, p, t) -> bool  # TASK_ASSIGN_OTHERS and is_own_project (FR-19a; с фичи 002 — БА-участник); SUPERSEDES «can_edit_task_fully»
 def can_delete_task(a, p, t) -> bool      # == can_edit_task_fully
 def can_edit_comment(a, author_id) -> bool        # author == actor (участие проверяет сервис)
-def can_delete_comment(a, p, author_id) -> bool   # member and (author == actor or (BA and owner) or MIXED)
-def can_manage_project(a, p) -> bool      # (BA and owner) or MIXED (участие не требуется): правка, владение, удаление
+def can_delete_comment(a, p, author_id) -> bool   # BUSINESS_ACCESS and member and (author == actor or a.role == BA)  (002/FR-9)
+def can_manage_project(a, p) -> bool      # a.can(PROJECT_MANAGE_ANY) — любой БА, участие и владение не требуются (002/FR-8): правка, владение, удаление
 def can_manage_members(a, p) -> bool      # == can_manage_project
-def can_add_member(a, p, user_id) -> bool # can_manage_members and not (BA and user_id == actor)  (FR-15)
+def can_add_member(a, p, user_id) -> bool # == can_manage_members (002/FR-8: БА добавляет и себя; запрет OI-13 снят; user_id остаётся в сигнатуре)
 def can_remove_self(a, p) -> bool         # member and owner_id != actor
 ```
 ТА и пользователь без роли — везде `False`. `recipients.check_recipient` — §4.5 без
-`DEAL_RESPONSIBLE`: цели `PROJECT_MEMBER` (БА/СМ/П), `TASK_ASSIGNEE` (БА/СМ/П + участник),
-`PROJECT_OWNER` (БА/СМ + участник); порядок и коды — §4.5.
+`DEAL_RESPONSIBLE`: цели `PROJECT_MEMBER` (БА/П), `TASK_ASSIGNEE` (БА/П + участник),
+`PROJECT_OWNER` (БА + участник; 002/FR-11); порядок и коды — §4.5. До фичи 002 в каждой цели
+допускалась и СМ.
+
+> **Заменено фичей 002 (ADR-0013), формулы до 2026-10-16 (история):** `is_own_project` — БА:
+> `p.owner_id == a.user_id` (D-54), СМ: участник; `can_view_project` — БА/СМ: `True`;
+> `can_edit_task_fully` — БА: `is_own_project` или своя задача (`member and created_by ==
+> assignee_id == actor`, OI-127 вариант (а), подтверждено владельцем 2026-10-15), СМ: участник;
+> `can_change_assignee` — ревью T70: БА — только владелец, СМ — участник; `can_delete_comment` —
+> участник и (автор, или (БА и владелец), или СМ); `can_manage_project` — (БА и владелец) или СМ;
+> `can_add_member` — `can_manage_members and not (BA and user_id == actor)` (FR-15, OI-13).
+> Решения D-54 и OI-127 (а) отменены ответом владельца на 002/Q-2.
 
 ### 11.6. Модель данных MVP (миграция 0004, SUPERSEDES §4.3 R1.1)
 
@@ -1732,14 +1764,14 @@ IMMEDIATE`; FK на `app_user` — `RESTRICT`; перечисления — `tex
 | AC-24, AC-49, AC-56, AC-68 (формат срока), AC-81, AC-106 (частично: не участник — 403), AC-108 (задача) | T73, T74, T75, T77 | `api/test_tasks.py` |
 | AC-25, AC-61, AC-80 | T73, T76, T78 | `api/test_board.py`, `api/test_board_move.py`, `api/test_personal_tasks.py::test_ac80_*` |
 | AC-42, AC-43 (частично: задачи) | T75, T76, T77 | `api/test_reassign_blocked.py` |
-| AC-46, AC-47 (без меток), AC-48 (в редакции SC-2), AC-103, AC-109 | T70, T74, T75, T77, T79, T80 | `api/test_task_permissions.py`, `api/test_comments.py::test_ac103_*` |
+| AC-46, AC-47 (без меток), AC-48 (в редакции SC-2; с фичи 002 — по 002 spec §9), AC-103 (с фичи 002 — заменён 002/AC-13, AC-15), AC-109 | T70, T74, T75, T77, T79, T80 | `api/test_task_permissions.py`, `api/test_comments.py::test_ac103_*` |
 | AC-50, AC-53, AC-54, AC-73 | T71, T72 | `api/test_project_members.py` |
 | AC-51, AC-52, AC-55, AC-72 (без «архивного»), AC-108 (проект), AC-110 (без 409) | T71, T72 | `api/test_projects.py` |
 | AC-58 | T79, T80 | `api/test_comments.py`, `unit/test_sanitize.py` |
 | AC-65 (частично: передача владения; вход не аудируется — R1.0) | T71, T72 | `api/test_audit.py::test_ac65_*` |
 | AC-74 (частично: участник, исполнитель, владелец) | T70, T71, T72, T74, T77 | `api/test_recipients.py` |
 | AC-75 (проекты, свои задачи) | T72, T77 | `api/test_route_guards.py` |
-| AC-76, AC-77 (в редакции SC-14) | T72, T77 | `api/test_role_change_effect.py` |
+| AC-76, AC-77 (в редакции SC-14; с фичи 002 — роль меняет ТА, переназначает БА-участник) | T72, T77 | `api/test_role_change_effect.py` |
 | AC-94 (частично: ТА → проект 403; задача 404; мягко удалённая — 404) | T72, T77 | `api/test_not_found_vs_forbidden.py` |
 | AC-99 (частично: права удаления и каскад) | T70, T75, T77 | `api/test_task_permissions.py::test_ac99_*` |
 | AC-41, AC-104 *инфра* | T87 | `cli/test_demo_data.py` |
@@ -1752,20 +1784,30 @@ R1.0-AC (AC-2…AC-4, AC-20, AC-23, AC-26…AC-37, AC-39, AC-40, AC-44, AC-45, A
 AC-95, AC-105, AC-113…AC-116 в части R1.0, AC-121) — закрыты R1.0, в MVP прогоняются `check.sh`.
 Тесты AC-116, ждавшие строчного логина в ответе (D-39), приводятся к FR-73a в T94 (§11.12.8).
 
+> **Фича 002 (ADR-0013):** строки AC-43, AC-48, AC-52, AC-54, AC-72, AC-73, AC-99, AC-103, AC-109,
+> AC-110 (а также R1.0-AC AC-26, AC-44, AC-45, AC-64, AC-78 и AC-65, AC-76, AC-77, AC-113, AC-129,
+> AC-130, AC-131) проверяются в редакции 002 spec §9: ветки «БА-участник, не владелец → 403»
+> обращены, действия СМ перенесены на ТА или БА; 001/AC-103 целиком заменён 002/AC-13 и AC-15.
+> Тесты переписаны задачами R3-T01…R3-T08 по таблице 002 plan §6.2 (тест не удалялся без
+> замены); трассировка AC 002 — 002 plan §6.1.
+
 ### 11.8. Демо-данные (D-63, FR-49, FR-64)
 
 `domain/ops/demo.py::load_demo_data(sessionmaker, settings, *, clock: Clock, seed: int) -> DemoReport`
 и `cli/commands/demo_data.py` (`gostracker demo-data [--seed 1]`, ожидание БД как у `maintenance`).
 - Отказ с кодом 2 и без изменений, если в пространстве есть хоть одна строка `project` или `task`
   (включая мягко удалённые) или любой не-системный пользователь сверх первого ТА.
-- Пользователи: 1 ТА, 1 СМ, 3 БА, 7 П; логины синтетические по шаблону FR-73 (`demo.ta`,
-  `demo.mixed`, `demo.ba1`…`demo.ba3`, `demo.user1`…`demo.user7`); пароль каждому —
+- Пользователи (в редакции фичи 002, 002/FR-22, 002 plan §4.7): 1 ТА, 4 БА, 7 П; логины
+  синтетические по шаблону FR-73 (`demo.ta`, `demo.ba4`, `demo.ba1`…`demo.ba3`,
+  `demo.user1`…`demo.user7`; `demo.ba4` — второй в `_USERS`, на месте прежнего СМ `demo.mixed`,
+  002 plan D-13; до 002 — 1 ТА, 1 СМ, 3 БА, 7 П); пароль каждому —
   `generate_password()`, `must_change_password = true`; файл `secrets/demo-passwords.txt`
   (`login=…\tpassword=…` по строке, `write_private_file`, 0600); stdout — только путь и счётчики;
   события аудита `user.created` и `user.role_assigned` с `actor_id = NULL`.
 - Проекты: «Внедрение трекера» (владелец `demo.ba1`) и «Подготовка пилота» (владелец `demo.ba2`);
-  участники — владелец, второй БА, СМ и 4 П (П распределены так, чтобы каждый был хотя бы в одном
-  проекте).
+  участники — владелец, второй БА, `demo.ba4` (константа `_ALL_PROJECTS_BA`: БА — участник обоих
+  проектов, не владелец; до фичи 002 — СМ) и 4 П (П распределены так, чтобы каждый был хотя бы в
+  одном проекте).
 - Задачи: 30 = по 12 задач верхнего уровня на проект + 3 родителя × 2 подзадачи; статусы по всем
   4 колонкам, позиции `STEP, 2·STEP, …` в каждой колонке; сроки от `today_msk(clock.now()) − 3` до
   `+ 14` дней, часть без срока; приоритет «Высокий» у ~ 1/4; исполнители — участники проекта (не
@@ -1782,7 +1824,7 @@ AC-95, AC-105, AC-113…AC-116 в части R1.0, AC-121) — закрыты R1
 | # | Что | Затронуто в spec |
 |---|---|---|
 | SC-1 | CRM целиком — следующая версия | Purpose/Scope (таблица «Входит»), FR-30…FR-37, FR-25c, CRM-части FR-5 (сделки), FR-16 (связь со сделкой), FR-25/FR-25b (сделки, клиенты, контакты), FR-34 и FR-6 (стадии при первом запуске), FR-38 (лента сделки), FR-39 (клиенты, сделки), FR-41 (стадии, сделки), FR-49 («10 сделок»), FR-68/FR-70 (ответственный), FR-72; UF-7, UF-8; AC-10, AC-13, AC-14, AC-15, AC-67, AC-82…AC-89, AC-91, AC-101, AC-119, AC-120, AC-122; CRM-части AC-18, AC-42, AC-43, AC-65, AC-74, AC-94; AC-114 («стадии по умолчанию» убрать из условия); Data Model: account, contact, pipeline, stage, deal, история; BR-1 строки CRM, BR-6, BR-8, BR-11 строки CRM |
-| SC-2 | «Свой проект» = владелец (решение владельца по Q-6) | FR-19: «свой проект» в строке BR-1 «Изменение чужой задачи в своём проекте» — проект, где сотрудник **владелец**; «БА, создавший себе задачу в чужом проекте, прав управления проектом и чужими задачами не получает; права задаются вручную — передачей владения (FR-14a)». FR-14c — формулировка без изменений по сути (владелец-БА, СМ). З-8 и ADR-0009 п.2 — заменить (новый ADR или ADR-0012). AC-48: «When он создал в проекте задачу и снова меняет чужую задачу Then 403». Глоссарий «Свой проект» |
+| SC-2 | «Свой проект» = владелец (решение владельца по Q-6) — **заменено фичей 002 (ADR-0013): права БА по участию (002/FR-9); тексты 001 правятся по 002 spec §9** | FR-19: «свой проект» в строке BR-1 «Изменение чужой задачи в своём проекте» — проект, где сотрудник **владелец**; «БА, создавший себе задачу в чужом проекте, прав управления проектом и чужими задачами не получает; права задаются вручную — передачей владения (FR-14a)». FR-14c — формулировка без изменений по сути (владелец-БА, СМ). З-8 и ADR-0009 п.2 — заменить (новый ADR или ADR-0012). AC-48: «When он создал в проекте задачу и снова меняет чужую задачу Then 403». Глоссарий «Свой проект» |
 | SC-3 | Архив проекта — следующая версия | FR-14b, BR-13, FR-9/FR-45 (409), 409-оговорки FR-14a, FR-14c, FR-15a, FR-18, FR-23, FR-24; FR-17 (поле «статус», фильтр), FR-26 (фильтр архива); AC-70, AC-71; AC-106 (часть 409), AC-110 (часть 409), AC-72 (убрать «архивного»), AC-65 (архивирование); Data Model `project.status` |
 | SC-4 | Корзина — следующая версия; в MVP удаление мягкое без восстановления | FR-25a, FR-25b, FR-16 (восстановление проекта); FR-25 сохраняется; AC-18 («доступна в корзине» — отложено), AC-62, AC-63, AC-66 (часть окончательного удаления), AC-99 (части про восстановление и корзину), AC-112, AC-118; BR-7 («через 30 дней») |
 | SC-5 | Вложения — следующая версия | FR-24, C-7, BR-5, FR-9/FR-45 (413), UF-6 («прикрепляет файл»), AC-16, AC-59, AC-100, AC-117; Data Model attachment |
@@ -1794,7 +1836,7 @@ AC-95, AC-105, AC-113…AC-116 в части R1.0, AC-121) — закрыты R1
 | SC-11 | Комментарий показывается простым текстом (markdown не отрисовывается), HTML вырезается | FR-23 |
 | SC-12 | Экспорт/импорт, резервная копия, генератор нагрузки и замеры, e2e — следующая версия | FR-40, FR-50, FR-72, FR-43 (перечень команд), NFR-2 (замер), NFR-10 (таблица категорий), UF-11, UF-12, AC-12, AC-17, AC-19, AC-38 (замер), AC-93, AC-96, AC-107 (в MVP — ручная проверка опроса) |
 | SC-13 | Демо-данные MVP | FR-49: 12 пользователей, 2 проекта, 30 задач (в т.ч. 6 подзадач), без сделок; «бизнес-данные» = проекты и задачи |
-| SC-14 | FR-67/FR-68 проверяются без CRM | AC-76: «Given у БА активная сессия When СМ меняет его роль на „Пользователь“ Then следующий `POST /projects` в той же сессии — 403; When роль возвращена Then — 201». AC-77: без сделки — «его запрос на создание проекта — 403; When СМ находит задачу фильтром по исполнителю и переназначает её Then сохранено» |
+| SC-14 | FR-67/FR-68 проверяются без CRM | AC-76: «Given у БА активная сессия When СМ меняет его роль на „Пользователь“ Then следующий `POST /projects` в той же сессии — 403; When роль возвращена Then — 201». AC-77: без сделки — «его запрос на создание проекта — 403; When СМ находит задачу фильтром по исполнителю и переназначает её Then сохранено». **В редакции фичи 002 (002 spec §9): «СМ меняет роль» → «ТА меняет роль», «СМ переназначает» → «БА-участник переназначает»** |
 | SC-15 | Доска не пагинируется | FR-47: исключение — доска (FR-28) |
 | SC-16 | FR-15a: исполнитель снимается и у мягко удалённых задач (Q-7), событие ленты не пишется (SC-8) | FR-15a |
 | SC-17 | Экраны опроса MVP | FR-29: доска, список задач проекта, «мои задачи», карточка задачи с комментариями |
@@ -1820,7 +1862,8 @@ Backend — новых нет (`python-multipart` отложен). Frontend — 
   сервисах; корзина работает с данными MVP благодаря `deleted_batch_id`; лента начнётся пустой
   для данных MVP (D-55); метки, вложения, упоминания — новые таблицы без правок существующих.
 - **R-M3. Сужение прав БА (D-54)** меняет сценарий демо: БА-не владелец не правит чужие задачи —
-  это нужно показать заказчику как осознанное правило.
+  это нужно показать заказчику как осознанное правило. **Снят фичей 002 (ADR-0013):** БА-участник
+  правит любые задачи проекта, сценарий демо — по README (R3-T17).
 - **R-M4. Доска без пагинации** — на прототипном объёме безопасна; при тысячах задач в проекте
   потребует лимита (следующая версия, NFR-2).
 - **R-M5. Приёмка ТЗ §6 не полная** (п.8, 9, 11, 12) — коммерческий риск, фиксируется ADR-0012.
@@ -2006,8 +2049,8 @@ Python-default — только на стороне приложения (`serve
 | AC-116 (обновление к FR-73a) | T94 | `api/test_admin_users.py::test_ac116_login_with_capitals_*`, `domain/test_user_admin_service.py::test_ac116_login_is_lowercased_on_create`, `::test_ac116_boundary_valid_logins_are_accepted` | ожидание `ivan.petrov`/`good.lower()` в ответе заменить на написание при вводе (`Ivan.Petrov`, `IVAN`); проверки «вход в любом регистре», «422 на `Ivan.Petrov` при `ivan.petrov`», «невалидные → 422» не ослабляются; имена тестов привести к смыслу (`…_keeps_case_…`) |
 | AC-126 | T95 | `api/test_auth_login.py::test_ac126_*` | вход `ivanov.petr`, `IVANOV.PETR`, `Ivanov.Petr` → 200, `user.login` и `GET /me` `login` = `Ivanov.Petr`; неверный пароль с `ivanov.petr` — тот же код и тело, что у несуществующего логина |
 | AC-127 | T95 | `api/test_login_lockout.py::test_ac127_*` | 5 неудач с `ivanov.petr`, `IVANOV.PETR`, `Ivanov.Petr`, `ivanov.PETR`, `IvAnOv.PeTr` → верный пароль отклонён тем же ответом, что неверный; часы +15 мин → вход выполнен |
-| AC-129 | T96 | `api/test_login_display.py::test_ac129_*` (новый) | сценарий AC целиком через API: списки и карточка проекта, участники, задачи проекта, доска, карточка задачи, комментарии, «мои задачи», журнал (авторы — `Mixed.Admin`, `Ivanov.Petr`), передача владения → владелец `Kuznetsov.Oleg` |
+| AC-129 | T96 | `api/test_login_display.py::test_ac129_*` (новый) | сценарий AC целиком через API: списки и карточка проекта, участники, задачи проекта, доска, карточка задачи, комментарии, «мои задачи», журнал (авторы — ТА `Admin.Main`, `Ivanov.Petr`), передача владения → владелец `Kuznetsov.Oleg`. Фича 002 (001/AC-129 по 002 spec §9, R3-T07): учётные записи и журнал — от ТА `Admin.Main` (до 002 — СМ `Mixed.Admin`), проекты — от БА |
 | OI-130 а), FR-6 | T97 | `cli/test_bootstrap.py::test_oi130_*` | `INITIAL_ADMIN_LOGIN=Admin.Main` → ключ `admin.main`, показ `Admin.Main`, файл `login=Admin.Main`; вход `admin.main` → `login` `Admin.Main`; после смены пароля (actor `Admin.Main`) файл удалён; `remove_initial_admin_file_if_for` с `ADMIN.MAIN`/`admin.main` при файле `Admin.Main` удаляет, при `other` — нет; по умолчанию (`admin`) — как раньше |
-| AC-131 | T97 | `db/test_login_display_upgrade.py::test_ac131_*` (новый, `committed`) | на head: `run_bootstrap` (первый ТА `admin`), `create_user` `ivan.petrov` от ТА, `load_demo_data(seed=1)`; снимок `app_user` (id, login, password_hash) и `md5` строк `project`, `task`, `comment`, `domain_event`; `alembic downgrade 0004` (≈ v0.16.1) → `upgrade head`; затем `login_display = login` у всех, снимки равны, вход `admin`, `demo.ba1`, `ivan.petrov` прежними паролями — `login` в ответе прежний; список учётных записей и журнал — прежние логины; создание `Demo.BA1` → 422 `login_taken` |
+| AC-131 | T97 | `db/test_login_display_upgrade.py::test_ac131_*` (новый, `committed`) | на head: `run_bootstrap` (первый ТА `admin`), `create_user` `ivan.petrov` от ТА, `load_demo_data(seed=1)`; снимок `app_user` (id, login, password_hash) и `md5` строк `project`, `task`, `comment`, `domain_event`; `alembic downgrade 0004` (≈ v0.16.1) → `upgrade head`; затем `login_display = login` у всех, снимки равны, вход `admin`, `demo.ba1`, `ivan.petrov` прежними паролями — `login` в ответе прежний; список учётных записей и журнал — прежние логины; создание `Demo.BA1` → 422 `login_taken`. Фича 002 (001/AC-131 по 002 spec §9, R3-T08): демо без СМ, актор — первый ТА `admin`; `upgrade head` включает 0006, «журнал не изменился» остаётся в силе (бывших СМ нет); обновление с ролью СМ в данных — 002/AC-20, AC-21, AC-30 |
 | AC-132 *ручной* | T99 | `docs/acceptance/mvp-demo.md` (пункт AC-132) | все экраны из AC-132 в браузере |
 | Контракт не меняется | T94 | `cli/test_openapi.py`, `infra/test_frontend_api_types.py` | зелёные без перегенерации; `git diff --exit-code docs/api/openapi.json frontend/src/shared/api/schema.d.ts` |
