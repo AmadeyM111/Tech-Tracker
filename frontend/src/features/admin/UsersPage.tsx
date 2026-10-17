@@ -21,7 +21,7 @@ import {
 import { generateOneTimePassword } from "./password";
 
 const USERS_KEY = ["admin", "users"] as const;
-const ROLES: readonly Role[] = ["tech_admin", "business_admin", "mixed", "user"];
+const ROLES: readonly Role[] = ["tech_admin", "business_admin", "user"];
 
 type Confirmation =
   | { kind: "block" | "reset" | "revoke" | "remove_role"; user: AdminUser };
@@ -224,7 +224,7 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
     const password = generateOneTimePassword();
     void run(async () => {
       const created = await createUser({ login: name, one_time_password: password });
-      // The server-side (normalized) login, not the typed one.
+      // The login as the server stored it (FR-73a), not the typed one.
       setShown({ login: created.login, password });
       setLogin("");
     });

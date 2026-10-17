@@ -294,7 +294,7 @@ async def test_t18_invalid_page_params_are_422(api_env: ApiEnv, params: dict[str
 async def test_t18_filter_entity_type_and_actor_id(api_env: ApiEnv) -> None:
     env = api_env
     ws, admin, token = await admin_in_new_workspace(env)
-    other, _ = await seed(env, ws, "mixed", sessions=0)
+    other, _ = await seed(env, ws, "tech_admin", sessions=0)  # 002/AC-3: второй ТА (был СМ)
     u_admin, u_other, p_admin = await _add_events(
         env,
         ws.id,
@@ -385,12 +385,13 @@ async def test_t18_by_id_errors(api_env: ApiEnv) -> None:
     assert (bad.status_code, code_of(bad)) == (422, "validation_error")
 
 
-async def test_t18_roles_tech_admin_and_mixed_can_view(api_env: ApiEnv) -> None:
+async def test_t18_every_tech_admin_can_view(api_env: ApiEnv) -> None:
+    """002/AC-3, AC-5: журнал читает любой активный ТА (прежде ТА и СМ); БА и П - 403 (AC-65)."""
     env = api_env
     ws, admin, ta_token = await admin_in_new_workspace(env)
-    _, (mixed_token,) = await seed(env, ws, "mixed")
+    _, (second_ta_token,) = await seed(env, ws, "tech_admin")
     await _add_events(env, ws.id, [{"actor_id": admin.id}])
-    for token in (ta_token, mixed_token):
+    for token in (ta_token, second_ta_token):
         r = await _get_list(env, token)
         assert r.status_code == 200, r.text
         assert len(r.json()["items"]) == 1
@@ -894,3 +895,96 @@ async def test_t30_unknown_entity_type_by_id_is_404_not_500(api_env: ApiEnv) -> 
     assert ok.status_code == 200, ok.text
     r = await env.client.get(f"{AUDIT}/{ids[1]}", headers=env.auth(token))
     assert (r.status_code, code_of(r)) == (404, "not_found")
+
+
+# --- T72: передача владения проектом в журнале (AC-65, FR-41, BR-2) --------------------------
+
+
+async def _project_world(env: ApiEnv) -> Any:
+    from tests.projects_api_support import make_api_world
+
+    return await make_api_world(env)
+
+
+async def test_t72_ac65_ownership_transfer_entry_via_audit_api(api_env: ApiEnv) -> None:
+    from tests.projects_api_support import error, pj, send
+
+    env = api_env
+    w = await _project_world(env)
+    moved = await send(
+        env, w.tok("ba"), "PUT", f"{pj(w.project_id)}/owner", {"user_id": str(w.uid("ba2"))}
+    )
+    assert moved.status_code == 200, moved.text
+
+    # 002/AC-3, AC-5: журнал читают только ТА (первый и второй); СМ как администратора УЗ нет
+    from tests.admin_support import seed
+
+    _, (ta2_token,) = await seed(env, w.ws, "tech_admin")
+    for reader_token in (w.tok("ta"), ta2_token):
+        r = await _get_list(env, reader_token, entity_type="project")
+        assert r.status_code == 200, r.text
+        items = r.json()["items"]
+        assert len(items) == 1, items
+        entry = items[0]
+        assert set(entry) == ENTRY_FIELDS
+        assert "changes" not in entry
+        assert entry["action"] == "project.ownership_transferred"
+        assert entry["entity_type"] == "project"
+        assert entry["entity_id"] == str(w.project_id)
+        assert entry["entity_deleted"] is False
+        assert entry["changed_fields"] == ["owner_id"]
+        assert entry["actor"] == {"kind": "user", "id": str(w.uid("ba")), "login": w.login("ba")}
+        occurred = datetime.fromisoformat(entry["occurred_at"].replace("Z", "+00:00"))
+        assert occurred.utcoffset() == timedelta(0)  # UTC
+        assert entry.get("details") is None  # ни названий, ни логинов
+        # BR-2: ни названия проекта, ни логина нового владельца, ни значений полей
+        assert w.project_name not in r.text
+        assert w.login("ba2") not in r.text
+        assert str(w.uid("ba2")) not in r.text
+        by_id = await env.client.get(f"{AUDIT}/{entry['id']}", headers=env.auth(reader_token))
+        assert by_id.status_code == 200
+        assert by_id.json() == entry
+        assert w.login("ba2") not in by_id.text
+    for denied in ("ba", "usr"):
+        r = await _get_list(env, w.tok(denied), entity_type="project")
+        assert error(r) == (403, "forbidden")
+
+
+async def test_t72_ac65_repeat_and_failed_transfers_write_nothing(api_env: ApiEnv) -> None:
+    from tests.projects_api_support import pj, send
+
+    env = api_env
+    w = await _project_world(env)
+    url = f"{pj(w.project_id)}/owner"
+
+    same = await send(env, w.tok("ba"), "PUT", url, {"user_id": str(w.uid("ba"))})  # D-46
+    wrong_role = await send(env, w.tok("ba"), "PUT", url, {"user_id": str(w.uid("usr"))})
+    # актор ba2 (БА) заменён на usr (П): 002/AC-12, AC-16 - у БА 403 на передачу больше нет
+    denied = await send(env, w.tok("usr"), "PUT", url, {"user_id": str(w.uid("ba2"))})
+
+    assert (same.status_code, wrong_role.status_code, denied.status_code) == (200, 422, 403)
+    assert await _all_entries(env, w.tok("ta"), entity_type="project") == []
+
+
+async def test_t72_d55_other_project_operations_do_not_write_audit(api_env: ApiEnv) -> None:
+    from tests.projects_api_support import PROJECTS, members_url, pj, send
+
+    env = api_env
+    w = await _project_world(env)
+    before = await _all_entries(env, w.tok("ta"))
+
+    created = await send(env, w.tok("ba"), "POST", PROJECTS, {"name": "Журнал-проект"})
+    assert created.status_code == 201
+    new_id = created.json()["id"]
+    assert (
+        await send(env, w.tok("ba"), "PATCH", pj(new_id), {"name": "Другое"})
+    ).status_code == 200
+    add = await send(env, w.tok("ba"), "POST", members_url(new_id), {"user_id": str(w.uid("usr"))})
+    assert add.status_code == 204
+    rem = await send(env, w.tok("ba"), "DELETE", members_url(new_id, w.uid("usr")))
+    assert rem.status_code == 204
+    assert (await send(env, w.tok("ba"), "DELETE", pj(new_id))).status_code == 204
+
+    after = await _all_entries(env, w.tok("ta"))
+    assert after == before
+    assert await _all_entries(env, w.tok("ta"), entity_type="project") == []

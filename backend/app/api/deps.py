@@ -77,7 +77,7 @@ async def get_actor(request: Request, db: DbSession) -> Actor:
     row = (
         await db.execute(
             select(
-                AppUser.login,
+                AppUser.login_display,
                 AppUser.is_blocked,
                 AppUser.must_change_password,
                 WorkspaceMember.role,
@@ -95,7 +95,7 @@ async def get_actor(request: Request, db: DbSession) -> Actor:
     actor = Actor(
         user_id=record.user_id,
         workspace_id=record.workspace_id,
-        login=row.login,
+        login=row.login_display,
         role=None if row.role is None else Role(row.role),
         must_change_password=row.must_change_password,
         session_id=record.id,

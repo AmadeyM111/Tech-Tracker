@@ -128,8 +128,20 @@ async def active_admin_count(env: ApiEnv, workspace_id: uuid.UUID) -> int:
     rows = await env.execute(
         text(
             "SELECT count(*) FROM workspace_member m JOIN app_user u ON u.id = m.user_id "
-            "WHERE m.workspace_id = :w AND m.role IN ('tech_admin', 'mixed') "
+            "WHERE m.workspace_id = :w AND m.role = 'tech_admin' "
             "AND NOT u.is_blocked"
+        ).bindparams(w=workspace_id)
+    )
+    assert rows
+    return int(rows[0][0])
+
+
+async def active_ta_count(env: ApiEnv, workspace_id: uuid.UUID) -> int:
+    """Число активных ТА (002/FR-7): роль ``tech_admin`` и не заблокирован."""
+    rows = await env.execute(
+        text(
+            "SELECT count(*) FROM workspace_member m JOIN app_user u ON u.id = m.user_id "
+            "WHERE m.workspace_id = :w AND m.role = 'tech_admin' AND NOT u.is_blocked"
         ).bindparams(w=workspace_id)
     )
     assert rows
@@ -146,7 +158,7 @@ def admin_call(
 ) -> Any:
     """Корутина запроса действия администратора над ``target_id`` (имена как в plan §4.6).
 
-    Действия: block, unblock, reset, revoke, get, role_user, role_ba, role_none, role_mixed,
+    Действия: block, unblock, reset, revoke, get, role_user, role_ba, role_none,
     role_ta, create (``target_id`` игнорируется; логин создаётся уникальный).
     """
     headers = dict(extra or {})
@@ -164,7 +176,6 @@ def admin_call(
         "role_user": "user",
         "role_ba": "business_admin",
         "role_none": None,
-        "role_mixed": "mixed",
         "role_ta": "tech_admin",
     }
     if action in roles:

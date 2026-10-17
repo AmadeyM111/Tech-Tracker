@@ -4,6 +4,10 @@ AC-4 (401 без аутентификации), AC-11 / FR-45a (403 по раз�
 (гейты MANAGE_ACCOUNTS / ASSIGN_ROLES), AC-74 / AC-75 (роль NULL, смена роли без перелогина),
 AC-79 (фоновые запросы не продлевают сессию), FR-7, FR-9, FR-10, FR-66, FR-67, D-16.
 
+002 (R3-T11): роли `mixed` нет (FR-1); гейты учётных записей и журнала - только ТА (FR-7, AC-3,
+AC-5), бизнес-гейты - БА (и П для BUSINESS_ACCESS); строки и параметры `mixed` удалены, смена
+роли в test_fr67_* обращена на `business_admin` (FR-19, 001/AC-76 по 002 §9).
+
 Модули ``app.api.deps`` и ``app.domain.access.roles`` импортируются внутри функций: пока их
 нет, тесты падают с ImportError, а не ошибкой сбора. Поэтому в файле НЕТ
 ``from __future__ import annotations``: FastAPI разбирает аннотации временных обработчиков
@@ -44,21 +48,21 @@ from tests.factories import PLACEHOLDER_HASH, UserRow, get_table, make_user
 
 APP_DIR = Path(__file__).resolve().parents[2] / "app"
 RANDOM_ID = "6f9619ff-8b86-4d11-b42d-00c04fc964ff"
-ALL_ROLES = ("tech_admin", "business_admin", "mixed", "user")
+ALL_ROLES = ("tech_admin", "business_admin", "user")
 
 # Явная матрица (дублирует tests/unit/test_role_matrix.py: HTTP-слой проверяется независимо).
 HOLDERS: dict[str, frozenset[str]] = {
-    "MANAGE_ACCOUNTS": frozenset({"tech_admin", "mixed"}),
-    "ASSIGN_ROLES": frozenset({"tech_admin", "mixed"}),
-    "VIEW_AUDIT": frozenset({"tech_admin", "mixed"}),
-    "BUSINESS_ACCESS": frozenset({"business_admin", "mixed", "user"}),
-    "PROJECT_CREATE": frozenset({"business_admin", "mixed"}),
-    "PROJECT_MANAGE_ANY": frozenset({"mixed"}),
-    "TASK_ASSIGN_OTHERS": frozenset({"business_admin", "mixed"}),
-    "LABELS_MANAGE": frozenset({"business_admin", "mixed"}),
-    "CRM_READ": frozenset({"business_admin", "mixed"}),
-    "CRM_WRITE": frozenset({"business_admin", "mixed"}),
-    "PIPELINE_MANAGE": frozenset({"business_admin", "mixed"}),
+    "MANAGE_ACCOUNTS": frozenset({"tech_admin"}),
+    "ASSIGN_ROLES": frozenset({"tech_admin"}),
+    "VIEW_AUDIT": frozenset({"tech_admin"}),
+    "BUSINESS_ACCESS": frozenset({"business_admin", "user"}),
+    "PROJECT_CREATE": frozenset({"business_admin"}),
+    "PROJECT_MANAGE_ANY": frozenset({"business_admin"}),  # 002/FR-8, D-1
+    "TASK_ASSIGN_OTHERS": frozenset({"business_admin"}),
+    "LABELS_MANAGE": frozenset({"business_admin"}),
+    "CRM_READ": frozenset({"business_admin"}),
+    "CRM_WRITE": frozenset({"business_admin"}),
+    "PIPELINE_MANAGE": frozenset({"business_admin"}),
 }
 GATE_CELLS = [(r, c) for c in HOLDERS for r in ALL_ROLES]
 
@@ -395,16 +399,15 @@ async def test_fr67_ac75_role_change_applies_next_request_without_relogin(env: E
     assert (await env.client.get(url, headers=headers)).status_code == 200
     assert (await env.client.get("/_t/whoami", headers=headers)).json()["role"] == "tech_admin"
 
-    await env.set_member_role(user, "mixed")
-    assert (await env.client.get("/_t/whoami", headers=headers)).json()["role"] == "mixed"
-
+    # 002/FR-19 (R3-T11): прежний шаг со сменой на `mixed` обращён в смену на `business_admin`
     await env.set_member_role(user, "business_admin")
+    assert (await env.client.get("/_t/whoami", headers=headers)).json()["role"] == "business_admin"
     again = await env.client.get(url, headers=headers)
     assert (again.status_code, _code(again)) == (403, "forbidden")
 
 
 async def test_fr67_ac75_role_removed_gives_no_role_next_request(env: Env) -> None:
-    user, token = await env.login_as("mixed")
+    user, token = await env.login_as("business_admin")
     headers = env.cookie(token)
     assert (await env.client.get("/_t/active", headers=headers)).status_code == 200
     await env.set_member_role(user, None)
@@ -541,7 +544,7 @@ async def test_fr9_fr10_require_capability_matrix_over_http(env: Env, role: str,
 
 @pytest.mark.parametrize(
     ("role", "allowed"),
-    [("tech_admin", True), ("business_admin", True), ("mixed", True), ("user", False)],
+    [("tech_admin", True), ("business_admin", True), ("user", False)],
 )
 async def test_require_capability_any_of_listed(env: Env, role: str, allowed: bool) -> None:
     """``require_capability(a, b)``: достаточно любой из возможностей."""
@@ -605,7 +608,7 @@ async def test_fr45a_section_gate_precedes_path_validation(env: Env) -> None:
     assert _code(response) == "forbidden"
 
 
-@pytest.mark.parametrize("role", ["tech_admin", "mixed"])
+@pytest.mark.parametrize("role", ["tech_admin"])
 async def test_fr45a_role_with_access_gets_404_for_missing_object(env: Env, role: str) -> None:
     _, token = await env.login_as(role)
     response = await env.client.get(f"/_t/admin/items/{RANDOM_ID}", headers=env.cookie(token))

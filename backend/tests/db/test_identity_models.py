@@ -187,6 +187,25 @@ def test_t06_metadata_declares_login_and_role_checks() -> None:
     assert any(all(role in c for role in ROLES) for c in member_checks), (
         f"нет CHECK по ролям: {member_checks}"
     )
+    # 002/AC-2: роли `mixed` в CHECK нет
+    assert not any("mixed" in c for c in member_checks), (
+        f"CHECK по ролям содержит mixed: {member_checks}"
+    )
+
+
+def test_002_ac2_metadata_check_lists_exactly_the_role_values() -> None:
+    """002/AC-2 (FR-2, plan §4.6): значения в тексте CHECK ``role_valid`` в метаданных модели =
+    ``{r.value for r in Role}`` (autogenerate CHECK не сравнивает, поэтому проверка здесь)."""
+    from app.domain.access.roles import Role
+
+    texts = [
+        str(c.sqltext)
+        for c in get_table("workspace_member").constraints
+        if isinstance(c, CheckConstraint) and "role" in str(c.sqltext)
+    ]
+    assert len(texts) == 1, texts
+    assert set(re.findall(r"'([^']+)'", texts[0])) == {r.value for r in Role}
+    assert {r.value for r in Role} == {"tech_admin", "business_admin", "user"}
 
 
 # --- структура схемы в БД (миграция 0001 применена фикстурой) -----------------------------
@@ -413,7 +432,8 @@ async def test_ac116_update_to_invalid_login_is_rejected(db: AsyncSession) -> No
 
 
 @pytest.mark.parametrize("role", ROLES)
-async def test_fr66_four_roles_are_accepted(db: AsyncSession, role: str) -> None:
+async def test_fr66_three_roles_are_accepted(db: AsyncSession, role: str) -> None:
+    """001/FR-66, обращён по 002/AC-2: принимаются три роли (было четыре)."""
     user = await make_user(db, role=role)
     stored = (
         await db.execute(
@@ -425,8 +445,11 @@ async def test_fr66_four_roles_are_accepted(db: AsyncSession, role: str) -> None
     assert stored == role
 
 
-@pytest.mark.parametrize("role", ["admin", "ADMIN", "Tech_Admin", "", "superuser", "owner"])
+@pytest.mark.parametrize(
+    "role", ["admin", "ADMIN", "Tech_Admin", "", "superuser", "owner", "mixed", "MIXED"]
+)
 async def test_fr66_unknown_role_is_rejected(db: AsyncSession, role: str) -> None:
+    """001/FR-66, расширен по 002/AC-2: `mixed` - тоже значение вне CHECK (23514)."""
     ws = await make_workspace(db)
     other = user_values()
     await db.execute(get_table("app_user").insert().values(other))
@@ -435,6 +458,56 @@ async def test_fr66_unknown_role_is_rejected(db: AsyncSession, role: str) -> Non
         get_table("workspace_member").insert().values(member_values(ws.id, other["id"], role=role)),
         CHECK_VIOLATION,
     )
+
+
+@pytest.mark.parametrize("role", ["mixed", "admin"])
+async def test_002_ac2_database_rejects_mixed_and_admin(db: AsyncSession, role: str) -> None:
+    """002/AC-2 (FR-2): БД после обновления отклоняет `mixed` и `admin` (23514), и при вставке
+    нового членства, и при смене роли существующего."""
+    user = await make_user(db, role="user")
+    other = user_values()
+    await db.execute(get_table("app_user").insert().values(other))
+    ws = await make_workspace(db)
+    await assert_rejected(
+        db,
+        get_table("workspace_member").insert().values(member_values(ws.id, other["id"], role=role)),
+        CHECK_VIOLATION,
+    )
+    table = get_table("workspace_member")
+    await assert_rejected(
+        db,
+        table.update().where(table.c.user_id == user.id).values(role=role),
+        CHECK_VIOLATION,
+    )
+
+
+@pytest.mark.parametrize("role", [*ROLES, None])
+async def test_002_ac2_database_accepts_three_roles_and_no_role(
+    db: AsyncSession, role: str | None
+) -> None:
+    """002/AC-2 (FR-2): каждое из трёх значений и «без роли» (NULL) принимаются, в том числе
+    при смене роли существующей строки."""
+    user = await make_user(db, role="user")
+    table = get_table("workspace_member")
+    await db.execute(table.update().where(table.c.user_id == user.id).values(role=role))
+    stored = (await db.execute(select(table.c.role).where(table.c.user_id == user.id))).scalar_one()
+    assert stored == role
+
+
+async def test_002_ac2_database_check_matches_role_enum(db: AsyncSession) -> None:
+    """002/AC-2, NON-BLOCKING 3 ревью R3-T11-1: определение CHECK `role_valid` в БД = значения
+    ``Role`` (docstring ``roles.py`` про CHECK верен)."""
+    from app.domain.access.roles import Role
+
+    definition = (
+        await db.execute(
+            text(
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                "WHERE conname = 'ck_workspace_member_role_valid'"
+            )
+        )
+    ).scalar_one()
+    assert set(re.findall(r"'([^']+)'", definition)) == {r.value for r in Role}, definition
 
 
 async def test_fr66_user_without_role_is_allowed(db: AsyncSession) -> None:
@@ -458,7 +531,7 @@ async def test_fr66_second_role_in_same_workspace_is_rejected(db: AsyncSession) 
         db,
         get_table("workspace_member")
         .insert()
-        .values(member_values(user.workspace_id, user.id, role="mixed")),
+        .values(member_values(user.workspace_id, user.id, role="business_admin")),
         UNIQUE_VIOLATION,
     )
 
@@ -470,7 +543,7 @@ async def test_d5_same_global_user_may_belong_to_another_workspace(db: AsyncSess
     await db.execute(
         get_table("workspace_member")
         .insert()
-        .values(member_values(second.id, user.id, role="mixed"))
+        .values(member_values(second.id, user.id, role="business_admin"))
     )
     count = (
         await db.execute(
@@ -758,3 +831,159 @@ async def test_t06_committed_rows_survive_and_violations_fail_on_commit(
     async with committed() as s:
         count = (await s.execute(text("SELECT count(*) FROM app_user"))).scalar_one()
     assert count == 1
+
+
+# --- D-66 / FR-73a: столбец login_display (миграция 0005, plan §11.12.2) ---------------------
+
+KELVIN = "K"  # знак Кельвина: lower() даёт латинскую «k», в шаблон не входит
+
+
+def _constraint_of(exc: DBAPIError) -> str | None:
+    orig: Any = exc.orig
+    for obj in (orig, getattr(orig, "__cause__", None)):
+        name = getattr(obj, "constraint_name", None)
+        if name:
+            return str(name)
+    return None
+
+
+async def test_d66_login_display_column_is_varchar64_not_null(db: AsyncSession) -> None:
+    row = (
+        await db.execute(
+            text(
+                "SELECT data_type, character_maximum_length, is_nullable "
+                "FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = 'app_user' "
+                "AND column_name = 'login_display'"
+            )
+        )
+    ).one_or_none()
+    assert row is not None, "нет столбца app_user.login_display"
+    assert (row.data_type, row.character_maximum_length, row.is_nullable) == (
+        "character varying",
+        64,
+        "NO",
+    )
+
+
+async def test_d66_check_constraint_exists_with_planned_name(db: AsyncSession) -> None:
+    definition = (
+        await db.execute(
+            text(
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                "WHERE conname = 'ck_app_user_login_display_lower' AND contype = 'c' "
+                "AND conrelid = 'app_user'::regclass"
+            )
+        )
+    ).scalar_one_or_none()
+    assert definition is not None, "нет CHECK ck_app_user_login_display_lower"
+    assert "login_display" in definition
+    # COLLATE "C": lower() только ASCII, независимо от локали БД (знак Кельвина не приводится к «k»)
+    assert 'COLLATE "C"' in definition
+
+
+async def test_d66_mixed_case_display_with_lower_key_is_accepted(db: AsyncSession) -> None:
+    table = get_table("app_user")
+    await db.execute(
+        table.insert().values(user_values(login="ivanov.petr", login_display="Ivanov.Petr"))
+    )
+    row = (
+        await db.execute(
+            select(table.c.login, table.c.login_display).where(table.c.login == "ivanov.petr")
+        )
+    ).one()
+    assert (row.login, row.login_display) == ("ivanov.petr", "Ivanov.Petr")
+
+
+@pytest.mark.parametrize(
+    ("login", "display"),
+    [
+        ("ivanov.petr", "Ivanov.Pet"),  # короче ключа
+        ("ivanov.petr", "Ivanov.Petr2"),  # длиннее ключа
+        ("ivanov.petr", "Ivanov.Petx"),  # другая буква
+        ("kivan", f"{KELVIN}ivan"),  # знак Кельвина не равен «K»
+        ("ivan", "іvan"),  # кириллическая «і» среди латиницы
+        ("ivan", "Иван"),
+        ("ivan", "ivan "),  # пробел
+    ],
+    ids=["shorter", "longer", "other-letter", "kelvin", "cyrillic-i", "cyrillic", "space"],
+)
+async def test_d66_display_not_matching_key_up_to_ascii_case_is_rejected(
+    db: AsyncSession, login: str, display: str
+) -> None:
+    await assert_rejected(
+        db,
+        get_table("app_user").insert().values(user_values(login=login, login_display=display)),
+        CHECK_VIOLATION,
+    )
+
+
+async def test_d66_display_defaults_to_login_when_not_given(db: AsyncSession) -> None:
+    table = get_table("app_user")
+    values = user_values(login="ivan.petrov")
+    assert "login_display" not in values
+    await db.execute(table.insert().values(values))
+    stored = (
+        await db.execute(select(table.c.login_display).where(table.c.login == "ivan.petrov"))
+    ).scalar_one()
+    assert stored == "ivan.petrov"
+
+
+async def test_d66_display_is_not_null(db: AsyncSession) -> None:
+    await assert_rejected(
+        db,
+        get_table("app_user").insert().values(user_values(login="ivan.petrov", login_display=None)),
+        NOT_NULL_VIOLATION,
+    )
+
+
+async def test_d66_users_differing_only_by_display_case_collide_on_login_key(
+    db: AsyncSession,
+) -> None:
+    """``Ivanov.Petr`` и ``ivanov.petr`` — один ключ: уникальность регистронезависима."""
+    table = get_table("app_user")
+    await db.execute(
+        table.insert().values(user_values(login="ivanov.petr", login_display="Ivanov.Petr"))
+    )
+    with pytest.raises(DBAPIError) as info:
+        async with db.begin_nested():
+            await db.execute(
+                table.insert().values(user_values(login="ivanov.petr", login_display="ivanov.petr"))
+            )
+    assert _sqlstate(info.value) == UNIQUE_VIOLATION
+    assert _constraint_of(info.value) == "uq_app_user_login"
+
+
+async def test_d66_update_display_to_other_letters_is_rejected(db: AsyncSession) -> None:
+    user = await make_user(db, login="Ivanov.Petr")
+    table = get_table("app_user")
+    await assert_rejected(
+        db,
+        table.update().where(table.c.id == user.id).values(login_display="Ivanov.Petx"),
+        CHECK_VIOLATION,
+    )
+    stored = (
+        await db.execute(select(table.c.login_display).where(table.c.id == user.id))
+    ).scalar_one()
+    assert stored == "Ivanov.Petr"
+
+
+async def test_d66_update_key_without_display_is_rejected(db: AsyncSession) -> None:
+    """Ключ и показ согласованы на уровне БД: менять один без другого нельзя."""
+    user = await make_user(db, login="Ivanov.Petr")
+    table = get_table("app_user")
+    await assert_rejected(
+        db,
+        table.update().where(table.c.id == user.id).values(login="ivanov.pete"),
+        CHECK_VIOLATION,
+    )
+
+
+async def test_d66_factory_stores_key_lower_and_display_as_given(db: AsyncSession) -> None:
+    user = await make_user(db, login="Ivanov.Petr")
+    assert user.login == "Ivanov.Petr"
+    table = get_table("app_user")
+    row = (
+        await db.execute(select(table.c.login, table.c.login_display).where(table.c.id == user.id))
+    ).one()
+    assert (row.login, row.login_display) == ("ivanov.petr", "Ivanov.Petr")

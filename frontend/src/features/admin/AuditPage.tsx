@@ -54,7 +54,10 @@ const ACTION_CODES: readonly string[] = [
   "user.role_assigned",
   "user.role_changed",
   "user.role_removed",
+  "project.ownership_transferred",
 ];
+// Field names with a readable text; any other name is shown as it is.
+const FIELD_CODES: readonly string[] = ["owner_id"];
 const ROLE_VALUES: readonly string[] = ["tech_admin", "business_admin", "mixed", "user"];
 
 // An unknown action code is shown as it is.
@@ -62,12 +65,18 @@ function actionText(code: string): string {
   return ACTION_CODES.includes(code) ? t(`admin.audit.action.${code}` as MessageKey) : code;
 }
 
+function fieldText(name: string): string {
+  return FIELD_CODES.includes(name) ? t(`admin.audit.field.${name}` as MessageKey) : name;
+}
+
 function roleName(value: string | null | undefined): string {
   if (value === null || value === undefined) return t("admin.role.none");
   return ROLE_VALUES.includes(value) ? t(`admin.role.${value}` as MessageKey) : value;
 }
 
-// Role names (never the raw keys) for the role events; empty for other actions.
+// Role names (never the raw keys) for the role events; empty for other actions. The audit API
+// gives no old/new owner for project.ownership_transferred (details exist only for user events,
+// changes are not exposed, BR-2), so that event shows just the action text.
 function detailsText(entry: AuditEntry): string {
   const from = entry.details?.["role_from"];
   const to = entry.details?.["role_to"];
@@ -95,7 +104,7 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
         {entry.entity_id}
         {entry.entity_deleted ? ` ${t("admin.audit.entity_deleted")}` : ""}
       </td>
-      <td data-field="changed_fields">{entry.changed_fields.join(", ")}</td>
+      <td data-field="changed_fields">{entry.changed_fields.map(fieldText).join(", ")}</td>
       <td data-field="details">{detailsText(entry)}</td>
     </tr>
   );

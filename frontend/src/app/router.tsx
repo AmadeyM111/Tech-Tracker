@@ -1,17 +1,22 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, type ReactNode } from "react";
-import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { AuditPage } from "../features/admin/AuditPage";
 import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
-import { me, type MeResponse } from "../features/auth/api";
+import { MyTasksPage } from "../features/tasks/TaskList";
+import { TaskPage } from "../features/tasks/TaskPage";
+import { ProjectPage } from "../features/projects/ProjectPage";
+import { ProjectsPage } from "../features/projects/ProjectsPage";
+import { me, type MeResponse } from "../features/auth/session";
 import { useLogout } from "../features/auth/useLogout";
 import { ApiError, setNavigationHandlers } from "../shared/api/client";
 import { errorMessage, t } from "../shared/i18n";
 import { ErrorAlert, useAlertState } from "../shared/ui/ErrorAlert";
+import { Icon } from "../shared/ui/Icon";
 
 // Session check shared by the guards (not a polled query: key is its own).
 const SESSION_KEY = ["auth", "me"] as const;
@@ -37,8 +42,18 @@ function redirectFor(error: unknown): string | null {
 }
 
 // Inside the App shell the <main> already exists, so a plain wrapper is used.
-function Landmark({ insideMain, children }: { insideMain: boolean; children: ReactNode }) {
-  return insideMain ? <div>{children}</div> : <main>{children}</main>;
+// `shell` adds the two-column layout (left navigation panel, T90); the markup order stays the same.
+function Landmark({
+  insideMain,
+  shell = false,
+  children,
+}: {
+  insideMain: boolean;
+  shell?: boolean;
+  children: ReactNode;
+}) {
+  const className = shell ? "ui-shell" : undefined;
+  return insideMain ? <div className={className}>{children}</div> : <main className={className}>{children}</main>;
 }
 
 /**
@@ -73,31 +88,71 @@ function SessionGate({
   return <>{children(session.data)}</>;
 }
 
+/** Menu items by capabilities (FR-10); the server checks access itself. */
+function MenuItems({ profile }: { profile: MeResponse }) {
+  const has = (capability: MeResponse["capabilities"][number]) => profile.capabilities.includes(capability);
+  return (
+    <>
+      {has("business_access") ? (
+        <>
+          <p>
+            <NavLink to="/projects" end>
+              <Icon name="projects" />
+              {t("nav.projects")}
+            </NavLink>
+          </p>
+          <p>
+            <NavLink to="/my-tasks">
+              <Icon name="tasks" />
+              {t("nav.my_tasks")}
+            </NavLink>
+          </p>
+        </>
+      ) : null}
+      {has("manage_accounts") ? (
+        <p>
+          <NavLink to="/admin/users">
+            <Icon name="users" />
+            {t("admin.home_users_link")}
+          </NavLink>
+        </p>
+      ) : null}
+      {has("view_audit") ? (
+        <p>
+          <NavLink to="/admin/audit">
+            <Icon name="audit" />
+            {t("admin.home_audit_link")}
+          </NavLink>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function Home({ profile }: { profile: MeResponse }) {
   const alert = useAlertState();
   const logout = useLogout(alert);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const focusHeading = (useLocation().state as { focusHeading?: boolean } | null)?.focusHeading === true;
+  useEffect(() => {
+    // After the forced password change the modal is gone: keep focus in the page, not on <body>.
+    if (focusHeading) headingRef.current?.focus();
+  }, [focusHeading]);
   return (
     <>
-      <h1>{t("app.home_title")}</h1>
+      <h1 ref={headingRef} tabIndex={-1}>
+        {t("app.home_title")}
+      </h1>
       <ErrorAlert message={alert.message} seq={alert.seq} />
-      <nav>
-        {profile.capabilities.includes("manage_accounts") ? (
-          <p>
-            <Link to="/admin/users">{t("admin.home_users_link")}</Link>
-          </p>
-        ) : null}
-        {profile.capabilities.includes("view_audit") ? (
-          <p>
-            <Link to="/admin/audit">{t("admin.home_audit_link")}</Link>
-          </p>
-        ) : null}
-        <p>
-          <Link to="/change-password">{t("app.change_password_link")}</Link>
-        </p>
-      </nav>
-      <button type="button" disabled={logout.pending} onClick={() => void logout.run()}>
-        {t("auth.logout")}
-      </button>
+      <div className="ui-sidebar">
+        <nav>
+          <MenuItems profile={profile} />
+        </nav>
+        <button type="button" disabled={logout.pending} onClick={() => void logout.run()}>
+          <Icon name="logout" />
+          {t("auth.logout")}
+        </button>
+      </div>
     </>
   );
 }
@@ -106,7 +161,7 @@ function Root({ insideMain }: { insideMain: boolean }) {
   return (
     <SessionGate insideMain={insideMain}>
       {(profile) => (
-        <Landmark insideMain={insideMain}>
+        <Landmark insideMain={insideMain} shell>
           <Home profile={profile} />
         </Landmark>
       )}
@@ -118,7 +173,10 @@ function Root({ insideMain }: { insideMain: boolean }) {
 function HomeLink() {
   return (
     <p>
-      <Link to="/">{t("app.home_link")}</Link>
+      <Link to="/" className="ui-home-link">
+        <Icon name="home" />
+        {t("app.home_link")}
+      </Link>
     </p>
   );
 }
@@ -126,17 +184,19 @@ function HomeLink() {
 function AdminScreen({
   insideMain,
   capability,
+  shell = false,
   children,
 }: {
   insideMain: boolean;
   capability: MeResponse["capabilities"][number];
+  shell?: boolean;
   children: (profile: MeResponse) => ReactNode;
 }) {
   return (
     <SessionGate insideMain={insideMain}>
       {(profile) =>
         profile.capabilities.includes(capability) ? (
-          <Landmark insideMain={insideMain}>
+          <Landmark insideMain={insideMain} shell={shell}>
             <HomeLink />
             {children(profile)}
           </Landmark>
@@ -151,9 +211,31 @@ function AdminScreen({
   );
 }
 
+// Business screen (T82-T84 replaced the stub bodies); needs business_access.
+function BusinessScreen({
+  insideMain,
+  children,
+}: {
+  insideMain: boolean;
+  children: (profile: MeResponse) => ReactNode;
+}) {
+  return (
+    <AdminScreen insideMain={insideMain} capability="business_access" shell>
+      {(profile) => (
+        <>
+          <nav className="ui-sidebar">
+            <MenuItems profile={profile} />
+          </nav>
+          {children(profile)}
+        </>
+      )}
+    </AdminScreen>
+  );
+}
+
 /**
- * change-password and no-role stay reachable with any session state but 401:
- * the form is shown at once, the check only redirects to the login page.
+ * no-role stays reachable with any session state but 401: the page is shown at
+ * once, the check only redirects to the login page.
  */
 function NeedsSession({ children }: { children: ReactNode }) {
   const session = useSession();
@@ -161,6 +243,36 @@ function NeedsSession({ children }: { children: ReactNode }) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
+}
+
+/**
+ * Forced password change (T103): a modal window over a blank home substrate.
+ * Only a user who must change the password sees it; everybody else goes to "/".
+ */
+function ForcedPasswordChange() {
+  const session = useSession();
+  // A cached answer may be stale (e.g. "no role" from before the redirect here): decide on the fresh one.
+  const [fresh, setFresh] = useState(false);
+  if (!fresh && !session.isFetching) setFresh(true);
+  if (session.isPending || !fresh) return <p role="status">{t("app.loading")}</p>;
+  if (session.isError) {
+    const error = session.error;
+    if (error instanceof ApiError && error.status === 403 && error.code === "password_change_required") {
+      return <PasswordModal />;
+    }
+    return <Navigate to={redirectFor(error) ?? "/"} replace />;
+  }
+  if (!session.data.must_change_password) return <Navigate to="/" replace />;
+  return <PasswordModal />;
+}
+
+function PasswordModal() {
+  return (
+    <>
+      <div className="ui-shell" aria-hidden="true" />
+      <ChangePasswordPage />
+    </>
+  );
 }
 
 function GuestOnly({ children }: { children: ReactNode }) {
@@ -188,9 +300,13 @@ function useClientHandlers(): void {
           queryClient.clear();
           navigate("/login", { replace: true });
         },
-        onPasswordChangeRequired: () => navigate("/change-password", { replace: true }),
+        onPasswordChangeRequired: () => {
+          // Already in the modal: a repeated 403 must not add a history step.
+          if (pathRef.current === "/change-password") return;
+          navigate("/change-password", { replace: true });
+        },
         onNoRole: () => {
-          // A user without a role may still change the password voluntarily (FR-56).
+          // A 403 no_role inside the password modal (a forced user without a role) keeps the modal on screen.
           if (pathRef.current === "/change-password" || pathRef.current === "/no-role") return;
           navigate("/no-role", { replace: true });
         },
@@ -215,9 +331,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
       <Route
         path="/change-password"
         element={
-          <NeedsSession>
-            <ChangePasswordPage />
-          </NeedsSession>
+          <ForcedPasswordChange />
         }
       />
       <Route
@@ -243,6 +357,38 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           <AdminScreen insideMain={insideMain} capability="view_audit">
             {() => <AuditPage />}
           </AdminScreen>
+        }
+      />
+      <Route
+        path="/projects"
+        element={
+          <BusinessScreen insideMain={insideMain}>
+            {(profile) => <ProjectsPage canCreate={profile.capabilities.includes("project_create")} />}
+          </BusinessScreen>
+        }
+      />
+      <Route
+        path="/projects/:projectId"
+        element={
+          <BusinessScreen insideMain={insideMain}>
+            {(profile) => <ProjectPage currentUserId={profile.id} currentRole={profile.role} />}
+          </BusinessScreen>
+        }
+      />
+      <Route
+        path="/tasks/:taskId"
+        element={
+          <BusinessScreen insideMain={insideMain}>
+            {() => <TaskPage />}
+          </BusinessScreen>
+        }
+      />
+      <Route
+        path="/my-tasks"
+        element={
+          <BusinessScreen insideMain={insideMain}>
+            {() => <MyTasksPage />}
+          </BusinessScreen>
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />

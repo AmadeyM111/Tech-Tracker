@@ -71,7 +71,6 @@ class World:
 
     ws: WorkspaceRow
     ta: UserRow
-    sm: UserRow  # СМ, не участник проекта
     ba: UserRow  # БА, владелец проекта
     ba2: UserRow  # БА, участник, не владелец
     ba3: UserRow  # БА, не участник
@@ -86,7 +85,6 @@ async def make_world(db: AsyncSession) -> World:
     w = World()
     w.ws = await make_workspace(db)
     w.ta = await make_user(db, workspace=w.ws, role="tech_admin", login="w.ta")
-    w.sm = await make_user(db, workspace=w.ws, role="mixed", login="w.sm")
     w.ba = await make_user(db, workspace=w.ws, role="business_admin", login="w.ba")
     w.ba2 = await make_user(db, workspace=w.ws, role="business_admin", login="w.ba2")
     w.ba3 = await make_user(db, workspace=w.ws, role="business_admin", login="w.ba3")

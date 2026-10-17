@@ -1,7 +1,171 @@
-/* Visible keyboard focus (NFR-7). #0b3d91 on white: contrast about 10:1 (>= 4.5:1). */
+/*
+ * T90: dark theme (reference: docs/ui/task-plane.png). The contract is checked by
+ * tests/shared/theme.test.ts: colors are hex only inside the :root token block, everywhere
+ * else only var(--...) (the one exception is the rgba() backdrop of .ui-overlay).
+ * No external fonts, images or @import (NFR: offline, no third-party requests).
+ * Contrast (WCAG AA, NFR-7): text, muted text, accent and danger are >= 4.5:1 on --surface;
+ * --focus is >= 3:1 on --bg and --surface.
+ */
+:root {
+  color-scheme: dark;
+  --bg: #0a0a0b;
+  --surface: #131316;
+  --surface-2: #1d1d22;
+  --border: #34343c;
+  --text: #ececf1;
+  --text-muted: #a2a2b0;
+  --accent: #a89bff;
+  --accent-contrast: #0a0a0b;
+  --danger: #ff8d8d;
+  --focus: #8ab4ff;
+  --button-bg: #f1f1f5;
+  --button-text: #121216;
+  --radius: 10px;
+  --sidebar-width: 15rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.1875rem;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: 1.75rem;
+  margin: 1rem 0;
+}
+
+h2 {
+  font-size: 1.375rem;
+}
+
+h3 {
+  font-size: 1.25rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+dt {
+  color: var(--text-muted);
+  font-size: 1.0625rem;
+  margin-top: 8px;
+}
+
+dd {
+  margin: 0;
+}
+
+/* Visible keyboard focus (NFR-7). */
 :focus-visible {
-  outline: 3px solid #0b3d91;
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* Controls. */
+button {
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-bg);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font: inherit;
+  font-size: 1.125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* T92: the "home" link looks like a pill button. */
+.ui-home-link {
+  display: inline-flex;
+  align-items: center;
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-bg);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 1.125rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+/* T100: decorative inline SVG icon before a label (sidebar items, "home" link). */
+.ui-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-right: 8px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ui-home-link:hover {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.ui-home-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+input,
+textarea,
+select {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  max-width: 100%;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  padding: 6px 10px;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.6;
 }
 
 .ui-field {
@@ -12,25 +176,39 @@
 }
 
 .ui-hint {
-  color: #3d3d3d;
-  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-size: 1.125rem;
 }
 
 .ui-error {
-  color: #9b1c1c;
+  color: var(--danger);
   margin: 0 0 12px;
 }
 
+/* Page containers. */
 .ui-form {
   max-width: 24rem;
   margin: 2rem auto;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 .ui-wide {
   max-width: 72rem;
-  margin: 2rem auto;
+  margin: 1rem auto 2rem;
 }
 
+/* Long unbroken names must not break the layout (NFR-6). */
+h1,
+.ui-table td,
+.ui-pre,
+.ui-list {
+  overflow-wrap: anywhere;
+}
+
+/* Tables. */
 .ui-table {
   border-collapse: collapse;
   width: 100%;
@@ -38,10 +216,20 @@
 
 .ui-table th,
 .ui-table td {
-  border-bottom: 1px solid #c4c4c4;
-  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
   text-align: left;
   vertical-align: top;
+}
+
+.ui-table th {
+  color: var(--text-muted);
+  font-size: 1.0625rem;
+  font-weight: 500;
+}
+
+.ui-table tbody tr:hover {
+  background: var(--surface);
 }
 
 .ui-actions {
@@ -57,28 +245,407 @@
   margin: 12px 0;
 }
 
+/* Dialog. */
 .ui-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.6);
+  overflow-y: auto;
   display: flex;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
+  padding: 1rem;
 }
 
 .ui-dialog {
-  background: #fff;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
   max-width: 28rem;
   padding: 1.5rem;
 }
 
+.ui-dialog h2 {
+  margin-top: 0;
+}
+
 .ui-secret {
-  border: 2px solid #0b3d91;
+  background: var(--surface-2);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
   padding: 12px;
   margin: 12px 0;
 }
 
 .ui-secret code {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   user-select: all;
+}
+
+/* Project tabs (T82). */
+.ui-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+.ui-tabs [role="tab"] {
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: var(--bg);
+  color: var(--text-muted);
+  padding: 6px 14px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.ui-tabs [role="tab"][aria-selected="true"] {
+  background: var(--surface-2);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ui-pre {
+  white-space: pre-wrap;
+}
+
+.ui-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.ui-list li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+/* Panels: task page sections, comments, subtasks, owner transfer. */
+[data-section] {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 16px 12px;
+  margin: 16px 0;
+}
+
+[data-section] ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+[data-comment-id],
+[data-subtask-id] {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+[data-comment-id]:last-child,
+[data-subtask-id]:last-child {
+  border-bottom: none;
+}
+
+[data-comment-id] p {
+  margin: 4px 0 8px;
+}
+
+[data-field="edited"],
+[data-field="deleted"],
+[data-role="empty"] {
+  color: var(--text-muted);
+}
+
+/* Board (kanban): columns and cards. */
+.ui-board-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+[data-column] {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 12px 12px;
+  min-width: 0;
+}
+
+[data-column] h3 {
+  color: var(--text-muted);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.ui-board-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.ui-add-task {
+  margin-top: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+}
+
+.ui-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ui-create-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ui-column-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-height: 4rem;
+}
+
+/* Card of the board. The same attribute sits on table rows (task list): they are reset below. */
+[data-task-id] {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  list-style: none;
+}
+
+tr[data-task-id] {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+}
+
+li[data-task-id] [data-field="title"] {
+  font-weight: 500;
+}
+
+li[data-task-id] [data-field]:not([data-field="title"]) {
+  color: var(--text-muted);
+  font-size: 1.0625rem;
+}
+
+/* User picker (combobox listbox). The active option keeps an inline outline (forced colors). */
+[role="listbox"] {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+[role="listbox"] [role="option"] {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+[role="listbox"] [role="option"][aria-selected="true"] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+/* App shell: left navigation panel + content column. DOM order (and so focus order) is unchanged. */
+.ui-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  align-items: start;
+  min-height: 100vh;
+  /* Dynamic viewport: the browser's own bars never add scrollable height. */
+  min-height: 100dvh;
+}
+
+.ui-shell > * {
+  grid-column: 2;
+  min-width: 0;
+  margin-left: 24px;
+  margin-right: 24px;
+}
+
+.ui-shell > .ui-wide {
+  width: calc(100% - 48px);
+}
+
+.ui-shell > .ui-sidebar {
+  grid-column: 1;
+  grid-row: 1 / span 100;
+  margin: 0;
+}
+
+.ui-sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 12px;
+}
+
+.ui-sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ui-sidebar p {
+  margin: 0;
+}
+
+.ui-sidebar a {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.ui-sidebar a:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.ui-sidebar a[aria-current="page"] {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ui-sidebar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: auto;
+}
+
+/* Narrow screens: the panel becomes a strip on top of the content. */
+@media (max-width: 1000px) {
+  .ui-board-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 719px) {
+  .ui-shell {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ui-shell > * {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+
+  .ui-shell > .ui-wide {
+    width: auto;
+  }
+
+  .ui-shell > .ui-sidebar {
+    order: -1;
+    position: static;
+    height: auto;
+    margin: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+  }
+
+  .ui-sidebar nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .ui-sidebar button {
+    margin-top: 0;
+    margin-left: auto;
+  }
+
+  .ui-board-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  .ui-sidebar a {
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+}
+
+/* T101: task card parameters, rows "caption - value"; a control is the value itself. */
+.ui-props {
+  display: grid;
+  grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr);
+  gap: 12px 16px;
+  align-items: start;
+  margin: 0 0 16px;
+}
+
+.ui-props dt {
+  margin-top: 0;
+  padding-top: 7px;
+}
+
+.ui-props dt label {
+  color: inherit;
+}
+
+.ui-props dd input:not([type="checkbox"]):not([type="radio"]),
+.ui-props dd select,
+.ui-props dd textarea {
+  width: 100%;
+  max-width: 32rem;
+}
+
+.ui-props dd .ui-field {
+  margin-bottom: 0;
+  max-width: 32rem;
+}
+
+.ui-props dd.ui-pre {
+  white-space: pre-wrap;
+}
+
+.ui-props .ui-current {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.ui-props dd [data-action="clear-assignee"] {
+  margin-top: 8px;
+}
+
+/* The title input sits in the h1 and keeps the heading look. */
+h1 input[name="title"] {
+  width: 100%;
+  max-width: 48rem;
 }

@@ -343,6 +343,21 @@ describe("action texts, roles, timezone (review T24 attempt 2)", () => {
     expect(cell(entry(container, 200), "action").textContent).toBe("user.mystery_action");
   });
 
+  it("002_fr20_historical_mixed_shows_mixed_role_name_not_code", async () => {
+    const items = [
+      mk(401, "user.role_assigned", { role_from: null, role_to: "mixed" }),
+      mk(402, "user.role_changed", { role_from: "user", role_to: "mixed" }),
+      mk(403, "user.role_removed", { role_from: "mixed", role_to: null }),
+    ];
+    const { container } = await open({ [AUDIT]: () => j(200, page(items)) });
+    for (const id of [401, 402, 403]) {
+      const t = entry(container, id).textContent ?? "";
+      expect(t, String(id)).toContain(ru["admin.role.mixed"]);
+      expect(t, String(id)).not.toMatch(/mixed/i);
+    }
+    expect(entry(container, 402).textContent).toContain(ru["admin.role.user"]);
+  });
+
   it("role_events_show_role_names_from_dictionary", async () => {
     const items = [
       mk(301, "user.role_assigned", { role_from: null, role_to: "tech_admin" }),
@@ -358,6 +373,28 @@ describe("action texts, roles, timezone (review T24 attempt 2)", () => {
     for (const id of [301, 302, 303]) {
       expect(text(id)).not.toMatch(/tech_admin|business_admin|role_from|role_to/);
     }
+  });
+
+  it("project_ownership_transfer_shows_text_not_raw_code_or_owner_id", async () => {
+    const transfer = {
+      id: 400,
+      occurred_at: "2026-10-13T09:00:00Z",
+      actor: { kind: "user", id: ADMIN_ID, login: "demo.ba1" },
+      action: "project.ownership_transferred",
+      entity_type: "project",
+      entity_id: "55555555-5555-4555-8555-555555555555",
+      entity_deleted: false,
+      changed_fields: ["owner_id"],
+      details: null,
+    };
+    const { container } = await open({ [AUDIT]: () => j(200, page([transfer])) });
+    const row = entry(container, 400);
+    expect(cell(row, "action").textContent).toBe("Передано владение проектом");
+    expect(cell(row, "action").textContent).toBe(ru["admin.audit.action.project.ownership_transferred"]);
+    expect(row.textContent).not.toMatch(/ownership_transferred|owner_id|[{}]/);
+    expect(cell(row, "changed_fields").textContent).toBe("Владелец проекта");
+    expect(cell(row, "details").textContent).toBe("");
+    expect(DICT).toContain(cell(row, "entity_type").textContent);
   });
 
   it("nfr5_time_is_europe_moscow_not_utc", async () => {
@@ -380,7 +417,7 @@ describe("links from admin screens to home", () => {
   });
 });
 
-describe("home: logout and voluntary password change (FR-56, FR-60)", () => {
+describe("home: logout and no password-change link (FR-55, FR-60; T103: only forced change)", () => {
   const LOGOUT = "POST /api/v1/auth/logout";
 
   it("home_has_typed_logout_button_that_logs_out_clears_cache_and_goes_to_login", async () => {
@@ -404,14 +441,10 @@ describe("home: logout and voluntary password change (FR-56, FR-60)", () => {
     expect(qc.getQueryData(["sentinel"])).toBeUndefined();
   });
 
-  it("home_has_link_to_voluntary_change_password", async () => {
+  it("t103_home_has_no_change_password_link", async () => {
     setup({}, []);
     const { container } = renderApp("/");
     await screen.findByRole("main");
-    const a = container.querySelector<HTMLAnchorElement>('a[href="/change-password"]');
-    expect(a).toBeTruthy();
-    expect(DICT).toContain(a?.textContent);
-    fireEvent.click(a as HTMLAnchorElement);
-    await expectAt("/change-password");
+    expect(container.querySelector('a[href="/change-password"]')).toBeNull();
   });
 });

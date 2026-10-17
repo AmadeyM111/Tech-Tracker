@@ -78,9 +78,7 @@ async def test_ac73_owner_ba_adds_member_of_each_business_role(
     db: AsyncSession, members: Any
 ) -> None:
     w = await make_world(db)
-    extra_sm = await make_user(db, workspace=w.ws, role="mixed", login="w.sm.extra")
-    await db.commit()
-    for user in (w.ba3, w.usr2, extra_sm):
+    for user in (w.ba3, w.usr2):
         result = await members.add_member(db, actor_of(w.ba), w.project_id, user.id)
         assert result is None
         row = await _member_row(db, w.project_id, user.id)
@@ -90,30 +88,43 @@ async def test_ac73_owner_ba_adds_member_of_each_business_role(
     assert await events(db, w.ws.id) == []  # D-55: member.added не пишется
 
 
-async def test_ac73_sm_not_member_adds_other_and_self(db: AsyncSession, members: Any) -> None:
+async def test_ac73_ba_not_member_adds_other_and_self(db: AsyncSession, members: Any) -> None:
+    """002/AC-11, AC-19: БА, не участник (ba3), добавляет другого и самого себя."""
     w = await make_world(db)
-    await members.add_member(db, actor_of(w.sm), w.project_id, w.usr2.id)
-    await members.add_member(db, actor_of(w.sm), w.project_id, w.sm.id)
-    assert {w.usr2.id, w.sm.id} <= await member_ids(db, w.project_id)
+    await members.add_member(db, actor_of(w.ba3), w.project_id, w.usr2.id)
+    await members.add_member(db, actor_of(w.ba3), w.project_id, w.ba3.id)
+    assert {w.usr2.id, w.ba3.id} <= await member_ids(db, w.project_id)
 
 
-@pytest.mark.parametrize("who", ["ba2", "usr", "ba3", "usr2", "ta", "norole"])
+@pytest.mark.parametrize("who", ["ba2", "ba3"])
+async def test_002_ac11_ba_non_owner_adds_member(db: AsyncSession, members: Any, who: str) -> None:
+    """002/AC-11 (FR-8): БА (участник не владелец и не участник) добавляет участника;
+    раньше 403 (test_ac73_ac54_others_cannot_add)."""
+    w = await make_world(db)
+    await members.add_member(db, actor_of(getattr(w, who)), w.project_id, w.usr2.id)
+    assert w.usr2.id in await member_ids(db, w.project_id)
+    assert await events(db, w.ws.id) == []
+
+
+@pytest.mark.parametrize("who", ["usr", "usr2", "ta", "norole"])
 async def test_ac73_ac54_others_cannot_add(db: AsyncSession, members: Any, who: str) -> None:
+    """002/AC-16: запрет остаётся для П, ТА, без роли."""
     w = await make_world(db)
     before = await member_ids(db, w.project_id)
     await forbidden(db, members.add_member(db, actor_of(getattr(w, who)), w.project_id, w.ba3.id))
     assert await member_ids(db, w.project_id) == before
 
 
-async def test_ac54_ba_cannot_add_self(db: AsyncSession, members: Any) -> None:
+async def test_ac54_ba_can_add_self(db: AsyncSession, members: Any) -> None:
+    """Ожидание обращено по 002/AC-11 (FR-8, AC-19): запрет 001/FR-15 снят, БА добавляет себя
+    (владелец - как no-op, будучи участником; не участник - становится участником)."""
     w = await make_world(db)
     other = await make_project(db, workspace_id=w.ws.id, owner_id=w.ba2.id, name="Чужой БА")
     await db.commit()
-    # владелец-БА, добавляющий себя (даже будучи участником): FR-15 -> 403
-    await forbidden(db, members.add_member(db, actor_of(w.ba), w.project_id, w.ba.id))
-    # БА-не владелец и не участник добавляет себя: 403
-    await forbidden(db, members.add_member(db, actor_of(w.ba3), other.id, w.ba3.id))
-    assert w.ba3.id not in await member_ids(db, other.id)
+    assert await members.add_member(db, actor_of(w.ba), w.project_id, w.ba.id) is None
+    await members.add_member(db, actor_of(w.ba3), other.id, w.ba3.id)
+    assert w.ba3.id in await member_ids(db, other.id)
+    assert w.ba.id in await member_ids(db, w.project_id)
 
 
 async def test_ac74_add_recipient_codes(db: AsyncSession, members: Any) -> None:
@@ -139,7 +150,7 @@ async def test_d46_add_existing_member_is_noop(db: AsyncSession, members: Any) -
     w = await make_world(db)
     before = await _member_row(db, w.project_id, w.usr.id)
     await members.add_member(db, actor_of(w.ba), w.project_id, w.usr.id)
-    await members.add_member(db, actor_of(w.sm), w.project_id, w.usr.id)
+    await members.add_member(db, actor_of(w.ba3), w.project_id, w.usr.id)
     after = await _member_row(db, w.project_id, w.usr.id)
     assert (after.created_at, after.created_by) == (before.created_at, before.created_by)
     assert len(await member_ids(db, w.project_id)) == 3
@@ -150,7 +161,8 @@ async def test_d46_add_existing_member_still_checks_permissions(
     db: AsyncSession, members: Any
 ) -> None:
     w = await make_world(db)
-    await forbidden(db, members.add_member(db, actor_of(w.ba2), w.project_id, w.usr.id))
+    # ba2 (БА) заменён на usr (П): 002/AC-16, у БА 403 больше нет (AC-11)
+    await forbidden(db, members.add_member(db, actor_of(w.usr), w.project_id, w.usr.id))
     await forbidden(db, members.add_member(db, actor_of(w.ta), w.project_id, w.usr.id))
 
 
@@ -170,7 +182,7 @@ async def test_fr13_add_member_foreign_deleted_unknown_project_is_404(
 ) -> None:
     w = await make_world(db)
     other = await make_workspace(db)
-    other_sm = await make_user(db, workspace=other, role="mixed")
+    other_ba = await make_user(db, workspace=other, role="business_admin")
     deleted = await make_project(
         db,
         workspace_id=w.ws.id,
@@ -179,7 +191,7 @@ async def test_fr13_add_member_foreign_deleted_unknown_project_is_404(
         deleted_batch_id=uuid.uuid4(),
     )
     await db.commit()
-    await not_found(db, members.add_member(db, actor_of(other_sm), w.project_id, other_sm.id))
+    await not_found(db, members.add_member(db, actor_of(other_ba), w.project_id, other_ba.id))
     await not_found(db, members.add_member(db, actor_of(w.ba), deleted.id, w.usr2.id))
     await not_found(db, members.add_member(db, actor_of(w.ba), uuid.uuid4(), w.usr2.id))
 
@@ -212,18 +224,31 @@ async def test_ac73_owner_ba_removes_member(db: AsyncSession, members: Any) -> N
     assert await events(db, w.ws.id) == []  # D-55
 
 
-async def test_ac73_sm_not_member_removes_member(db: AsyncSession, members: Any) -> None:
+async def test_ac73_ba_not_member_removes_member(db: AsyncSession, members: Any) -> None:
+    """002/AC-11, AC-19: БА, не участник (ba3), исключает участника-БА (ba2)."""
     w = await make_world(db)
-    await members.remove_member(db, actor_of(w.sm), w.project_id, w.ba2.id)
+    await members.remove_member(db, actor_of(w.ba3), w.project_id, w.ba2.id)
     assert w.ba2.id not in await member_ids(db, w.project_id)
 
 
-@pytest.mark.parametrize("who", ["ba2", "usr", "ta", "norole", "ba3"])
+@pytest.mark.parametrize("who", ["ba3", "ba2"])
+async def test_002_ac11_ba_non_owner_removes_other_member(
+    db: AsyncSession, members: Any, who: str
+) -> None:
+    """002/AC-11 (FR-8): БА не владелец исключает другого участника (ранее 403)."""
+    w = await make_world(db)
+    await members.remove_member(db, actor_of(getattr(w, who)), w.project_id, w.usr.id)
+    assert w.usr.id not in await member_ids(db, w.project_id)
+    assert await events(db, w.ws.id) == []  # D-55
+
+
+@pytest.mark.parametrize("who", ["usr", "ta", "norole"])
 async def test_ac73_ac54_others_cannot_remove_other_member(
     db: AsyncSession, members: Any, who: str
 ) -> None:
+    """002/AC-16: запрет остаётся для П, ТА, без роли."""
     w = await make_world(db)
-    target = w.ba2 if who != "ba2" else w.usr
+    target = w.ba2
     before = await member_ids(db, w.project_id)
     await forbidden(
         db, members.remove_member(db, actor_of(getattr(w, who)), w.project_id, target.id)
@@ -241,7 +266,7 @@ async def test_ac53_fr15a_member_removes_self(db: AsyncSession, members: Any, wh
 
 async def test_ac53_remove_owner_is_422_for_everyone(db: AsyncSession, members: Any) -> None:
     w = await make_world(db)
-    for actor in (w.ba, w.sm):  # владелец сам себя и СМ
+    for actor in (w.ba, w.ba2, w.ba3):  # владелец и (002/AC-19) любой БА
         exc = await fails(
             db,
             members.remove_member(db, actor_of(actor), w.project_id, w.ba.id),
@@ -263,7 +288,7 @@ async def test_ac53_after_transfer_former_owner_can_be_removed(
     assert w.ba.id not in await member_ids(db, w.project_id)
     await fails(
         db,
-        members.remove_member(db, actor_of(w.sm), w.project_id, w.ba2.id),
+        members.remove_member(db, actor_of(w.ba3), w.project_id, w.ba2.id),
         "owner_cannot_be_removed",
     )
 
@@ -272,8 +297,8 @@ async def test_p11_4_remove_non_member_is_404(db: AsyncSession, members: Any) ->
     w = await make_world(db)
     await not_found(db, members.remove_member(db, actor_of(w.ba), w.project_id, w.usr2.id))
     await not_found(db, members.remove_member(db, actor_of(w.ba), w.project_id, uuid.uuid4()))
-    # порядок §11.4: «цель не участник» (404) раньше проверки прав (403)
-    await not_found(db, members.remove_member(db, actor_of(w.ba2), w.project_id, w.usr2.id))
+    # порядок §11.4: «цель не участник» (404) раньше проверки прав (403); 002/AC-16: актор - П
+    await not_found(db, members.remove_member(db, actor_of(w.usr), w.project_id, w.usr2.id))
 
 
 async def test_fr13_remove_member_foreign_or_deleted_project_is_404(
@@ -281,9 +306,9 @@ async def test_fr13_remove_member_foreign_or_deleted_project_is_404(
 ) -> None:
     w = await make_world(db)
     other = await make_workspace(db)
-    other_sm = await make_user(db, workspace=other, role="mixed")
+    other_ba = await make_user(db, workspace=other, role="business_admin")
     await db.commit()
-    await not_found(db, members.remove_member(db, actor_of(other_sm), w.project_id, w.usr.id))
+    await not_found(db, members.remove_member(db, actor_of(other_ba), w.project_id, w.usr.id))
     await db.execute(
         text("UPDATE project SET deleted_at = :t, deleted_batch_id = :b WHERE id = :p").bindparams(
             t=fixed_clock.now(), b=uuid.uuid4(), p=w.project_id
@@ -436,7 +461,7 @@ async def test_d45_list_members_order_flags_and_roles(db: AsyncSession, members:
 
 async def test_d45_list_members_who_can_view(db: AsyncSession, members: Any) -> None:
     w = await make_world(db)
-    for who in (w.ba, w.sm, w.ba3, w.usr):  # БА/СМ — любой проект; П — участник
+    for who in (w.ba, w.ba2, w.ba3, w.usr):  # БА — любой проект; П — участник
         rows, _ = await members.list_members(db, actor_of(who), w.project_id, PageParams())
         assert len(rows) == 3
     for who in (w.usr2, w.ta, w.norole):
@@ -488,7 +513,7 @@ async def test_p10_2_second_add_member_waits_for_first(
 
         async def second() -> None:
             async with committed() as s:
-                await members.add_member(s, actor_of(w.sm), w.project_id, w.ba3.id)
+                await members.add_member(s, actor_of(w.ba2), w.project_id, w.ba3.id)
                 await s.commit()
 
         task = asyncio.ensure_future(second())
@@ -520,7 +545,7 @@ async def test_p10_2_parallel_add_same_member_is_idempotent(
                 return str(exc.code)
             return "ok"
 
-    jobs = [asyncio.ensure_future(add(w.ba)), asyncio.ensure_future(add(w.sm))]
+    jobs = [asyncio.ensure_future(add(w.ba)), asyncio.ensure_future(add(w.ba3))]
     await asyncio.sleep(0)
     go.set()
     assert await asyncio.gather(*jobs) == ["ok", "ok"]

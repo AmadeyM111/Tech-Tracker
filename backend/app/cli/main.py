@@ -6,7 +6,7 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 
-from app.cli.commands import bootstrap, hash_bench, maintenance, openapi
+from app.cli.commands import bootstrap, demo_data, hash_bench, maintenance, openapi
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -19,6 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     openapi.add_parser(subparsers)
     hash_bench.add_parser(subparsers)
     maintenance.add_parser(subparsers)
+    demo_data.add_parser(subparsers)
     return parser
 
 

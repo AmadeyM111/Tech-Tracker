@@ -4,7 +4,7 @@ AC-21 (только своё пространство), AC-75 (без роли �
 FR-45a (ТА — 403: ``require_capability(BUSINESS_ACCESS)``).
 
 Контракт: ``?q&page&page_size`` -> ``Page[DirectoryUser {id, login, role}]``;
-незаблокированные с ролью БА/СМ/П, ``ORDER BY login, id``; 422 на невалидные page/page_size.
+незаблокированные с ролью БА/П, ``ORDER BY login, id``; 422 на невалидные page/page_size.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def _code(r: httpx.Response) -> str:
     return str(r.json()["code"])
 
 
-@pytest.mark.parametrize("role", ["business_admin", "mixed", "user"])
+@pytest.mark.parametrize("role", ["business_admin", "user"])
 async def test_fr13_business_roles_get_directory_page(api_env: ApiEnv, role: str) -> None:
     env = api_env
     ws = await new_workspace(env)
@@ -68,12 +68,12 @@ async def test_fr70_directory_excludes_ta_norole_and_blocked(api_env: ApiEnv) ->
     await seed(env, ws, "tech_admin", login="d.ta")
     await seed(env, ws, None, login="d.none")
     await seed(env, ws, "user", login="d.blocked", blocked=True)
-    await seed(env, ws, "mixed", login="d.mixed")
+    await seed(env, ws, "user", login="d.user")
 
     r = await _get(env, token)
 
     assert r.status_code == 200, r.text
-    assert [i["login"] for i in r.json()["items"]] == ["d.ba", "d.mixed"]
+    assert [i["login"] for i in r.json()["items"]] == ["d.ba", "d.user"]
 
 
 async def test_fr45a_tech_admin_gets_403(api_env: ApiEnv) -> None:
@@ -244,3 +244,64 @@ def test_t35_q_param_has_max_length_64_in_openapi() -> None:
     schema = q["schema"]
     variants = schema.get("anyOf", [schema])
     assert any(v.get("maxLength") == 64 for v in variants), schema
+
+
+# --- AC-130, OI-129 (FR-73a, D-66): отображаемый логин в справочнике ---------------------------
+
+
+@pytest.mark.parametrize("role", ["business_admin", "user"])
+@pytest.mark.parametrize(
+    ("q", "expected"),
+    [
+        ("petr", "Ivanov.Petr"),
+        ("PETR", "Ivanov.Petr"),
+        ("Ivanov.P", "Ivanov.Petr"),
+        ("ivanov.p", "Ivanov.Petr"),
+        ("ANNA", "Sidorova.Anna"),
+        ("sidorova", "Sidorova.Anna"),
+    ],
+)
+async def test_ac130_search_ignores_case_and_returns_login_as_created(
+    api_env: ApiEnv, role: str, q: str, expected: str
+) -> None:
+    env = api_env
+    ws = await new_workspace(env)
+    _, (token,) = await seed(env, ws, role, login="Searcher.One")
+    await seed(env, ws, "business_admin", login="Ivanov.Petr")
+    await seed(env, ws, "user", login="Sidorova.Anna")
+
+    r = await _get(env, token, q=q)
+
+    assert r.status_code == 200, r.text
+    logins = [i["login"] for i in r.json()["items"]]
+    assert expected in logins
+    assert [x for x in logins if x.lower() == expected.lower()] == [expected]
+
+
+async def test_ac130_directory_without_q_shows_mixed_case_logins(api_env: ApiEnv) -> None:
+    env = api_env
+    ws = await new_workspace(env)
+    _, (token,) = await seed(env, ws, "business_admin", login="Ivanov.Petr")
+    me, _ = await seed(env, ws, "user", login="Sidorova.Anna")
+
+    r = await _get(env, token)
+
+    assert r.status_code == 200, r.text
+    by_id = {i["id"]: i["login"] for i in r.json()["items"]}
+    assert by_id[str(me.id)] == "Sidorova.Anna"
+    assert "Ivanov.Petr" in by_id.values()
+
+
+async def test_oi129_directory_is_ordered_by_normalized_login_ignoring_case(
+    api_env: ApiEnv,
+) -> None:
+    """OI-129 а): ``anna, Boris, ivan, Kirill`` (без пунктуации: порядок не зависит от БД)."""
+    env = api_env
+    ws = await new_workspace(env)
+    _, (token,) = await seed(env, ws, "user", login="zed")
+    for login in ("Kirill", "ivan", "Boris", "anna"):
+        await seed(env, ws, "user", login=login, sessions=0)
+
+    r = await _get(env, token)
+
+    assert [i["login"] for i in r.json()["items"]] == ["anna", "Boris", "ivan", "Kirill", "zed"]

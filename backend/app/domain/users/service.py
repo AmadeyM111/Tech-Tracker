@@ -141,7 +141,7 @@ async def _load_target(db: AsyncSession, workspace_id: UUID, user_id: UUID) -> _
     stmt = (
         select(
             AppUser.id,
-            AppUser.login,
+            AppUser.login_display,
             AppUser.is_blocked,
             AppUser.must_change_password,
             AppUser.created_at,
@@ -155,7 +155,7 @@ async def _load_target(db: AsyncSession, workspace_id: UUID, user_id: UUID) -> _
         raise NotFound()
     return _Target(
         id=row.id,
-        login=row.login,
+        login=row.login_display,
         role=Role(row.role) if row.role is not None else None,
         is_blocked=row.is_blocked,
         must_change_password=row.must_change_password,
@@ -260,8 +260,10 @@ async def create_user(
 ) -> UserAccount:
     """Создаёт пользователя без роли с одноразовым паролем (FR-4, FR-66, FR-73, AC-121).
 
-    Логин: только ASCII, нижний регистр, шаблон FR-73 (``login_invalid``), занят —
-    ``login_taken`` (в том числе пользователем другого пространства: логин глобален).
+    Логин: только ASCII, шаблон FR-73 (``login_invalid``); сохраняется написание при вводе
+    (``login_display``, FR-73a), проверки и уникальность — по нормализованному виду (ключ
+    ``login``); занят — ``login_taken`` (в том числе пользователем другого пространства:
+    логин глобален).
     ``must_change_password = true``. Событие ``user.created``. Порядок проверок:
     ``login_invalid`` -> ``login_taken`` -> политика пароля (FR-52/FR-53). Протокол блокировок
     (с автором в роли цели) — после хеширования; одновременное создание того же логина
@@ -290,6 +292,7 @@ async def create_user(
             .values(
                 id=user_id,
                 login=normalized,
+                login_display=login,
                 password_hash=password_hash,
                 must_change_password=True,
                 is_blocked=False,
@@ -324,7 +327,7 @@ async def create_user(
     )
     return UserAccount(
         id=user_id,
-        login=normalized,
+        login=login,
         role=None,
         is_blocked=False,
         must_change_password=True,
@@ -522,7 +525,7 @@ async def list_accounts(
         .options(
             load_only(
                 AppUser.id,
-                AppUser.login,
+                AppUser.login_display,
                 AppUser.is_blocked,
                 AppUser.must_change_password,
                 AppUser.created_at,
@@ -545,7 +548,7 @@ async def list_accounts(
     items = [
         UserAccount(
             id=user.id,
-            login=user.login,
+            login=user.login_display,
             role=None if roles[user.id] is None else Role(roles[user.id]),
             is_blocked=user.is_blocked,
             must_change_password=user.must_change_password,

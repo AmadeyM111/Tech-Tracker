@@ -84,14 +84,13 @@ async def test_ac21_directory_contains_only_unblocked_business_roles_of_own_work
     await make_user(db, workspace=ws, role="user", login="dir.blocked", blocked=True)
     await make_user(db, workspace=other, role="user", login="dir.foreign")
     ba = await make_user(db, workspace=ws, role="business_admin", login="dir.ba")
-    mixed = await make_user(db, workspace=ws, role="mixed", login="dir.mixed")
     usr = await make_user(db, workspace=ws, role="user", login="dir.user")
 
     items = await _list(directory, db, ws)
 
-    assert _logins(items) == ["dir.ba", "dir.mixed", "dir.user"]
-    assert [i.id for i in items] == [ba.id, mixed.id, usr.id]
-    assert [Role(i.role) for i in items] == [Role.BUSINESS_ADMIN, Role.MIXED, Role.USER]
+    assert _logins(items) == ["dir.ba", "dir.user"]
+    assert [i.id for i in items] == [ba.id, usr.id]
+    assert [Role(i.role) for i in items] == [Role.BUSINESS_ADMIN, Role.USER]
 
 
 async def test_ac21_other_workspace_sees_only_its_own_users(
@@ -218,7 +217,7 @@ async def _capture_selects(db: AsyncSession, coro_factory: Any) -> tuple[Any, li
 async def test_t35_list_directory_is_one_select_with_role_join(
     db: AsyncSession, directory: Any
 ) -> None:
-    """Список и роль — одним SELECT (JOIN workspace_member, role IN БА/СМ/П): нет гонки."""
+    """Список и роль — одним SELECT (JOIN workspace_member, role IN БА/П): нет гонки."""
     ws = await make_workspace(db)
     for i in range(3):
         await make_user(db, workspace=ws, role="user", login=f"one.u{i}")
@@ -240,7 +239,7 @@ async def test_t35_list_directory_role_is_consistent_with_membership_snapshot(
     ws = await make_workspace(db)
     await make_user(db, workspace=ws, role="tech_admin", login="snap.ta")
     await make_user(db, workspace=ws, role=None, login="snap.none")
-    await make_user(db, workspace=ws, role="mixed", login="snap.mixed")
+    await make_user(db, workspace=ws, role="business_admin", login="snap.ba")
     await make_user(db, workspace=ws, role="user", login="snap.user")
 
     items = await _list(directory, db, ws)
@@ -254,7 +253,7 @@ async def test_t35_list_directory_role_is_consistent_with_membership_snapshot(
     ).all()
     member_role = {r.id: r.role for r in rows}
 
-    assert _logins(items) == ["snap.mixed", "snap.user"]
+    assert _logins(items) == ["snap.ba", "snap.user"]
     for item in items:
         assert member_role[item.id] is not None
         assert Role(item.role) == Role(member_role[item.id])
@@ -280,7 +279,6 @@ async def test_fr70_load_recipient_member_facts(db: AsyncSession, directory: Any
     ("role", "expected"),
     [
         ("tech_admin", Role.TECH_ADMIN),
-        ("mixed", Role.MIXED),
         ("user", Role.USER),
         (None, None),
     ],

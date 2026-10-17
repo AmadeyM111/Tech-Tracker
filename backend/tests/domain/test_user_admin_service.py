@@ -296,16 +296,17 @@ async def test_ac121_ac64_create_writes_exactly_one_user_created_event(
     await spy_hash_not_in(db, ONE_TIME, "$argon2")
 
 
-async def test_ac116_login_is_lowercased_on_create(
+async def test_ac116_login_keeps_case_on_create_key_is_lowercase(
     db: AsyncSession, env: SimpleNamespace, svc: Any, mods: SimpleNamespace
 ) -> None:
+    """FR-73a: написание сохраняется, ключ в БД строчный, вход — в любом регистре."""
     w = await world(db)
     created = await svc.create_user(
         db, w.actor, env.hasher, login="Ivan.Petrov", one_time_password=SecretStr(ONE_TIME)
     )
-    assert created.login == "ivan.petrov"
+    assert created.login == "Ivan.Petrov"
     assert await user_by_login(db, "ivan.petrov") is not None
-    assert (await login_as(db, env, mods, "IVAN.PETROV", ONE_TIME)).login == "ivan.petrov"
+    assert (await login_as(db, env, mods, "IVAN.PETROV", ONE_TIME)).login == "Ivan.Petrov"
 
 
 @pytest.mark.parametrize(
@@ -352,7 +353,186 @@ async def test_ac116_boundary_valid_logins_are_accepted(
     created = await svc.create_user(
         db, w.actor, env.hasher, login=good, one_time_password=SecretStr(ONE_TIME)
     )
-    assert created.login == good.lower()
+    assert created.login == good
+    assert await user_by_login(db, good.lower()) is not None
+
+
+# --- AC-125, AC-128, AC-130 (FR-73a, D-66): отображаемый логин ------------------------------
+
+
+async def _stored_logins(db: AsyncSession, user_id: uuid.UUID) -> tuple[str, str]:
+    row = (
+        await db.execute(
+            text("SELECT login, login_display FROM app_user WHERE id = :u"), {"u": user_id}
+        )
+    ).one()
+    return row.login, row.login_display
+
+
+@pytest.mark.parametrize("login", ["Ivanov.Petr", "QA-Team_1"])
+async def test_ac125_create_stores_and_returns_login_as_typed(
+    db: AsyncSession, env: SimpleNamespace, svc: Any, login: str
+) -> None:
+    w = await world(db)
+    created = await svc.create_user(
+        db, w.actor, env.hasher, login=login, one_time_password=SecretStr(ONE_TIME)
+    )
+    assert created.login == login
+    assert await _stored_logins(db, created.id) == (login.lower(), login)
+    assert (await svc.get_account(db, w.actor, created.id)).login == login
+    from app.core.pagination import PageParams
+
+    items, _ = await svc.list_accounts(db, w.actor, PageParams(page=1, page_size=100))
+    assert login in [a.login for a in items]
+    assert login.lower() not in [a.login for a in items]
+
+
+async def test_ac125_login_unchanged_by_block_reset_and_role_operations(
+    db: AsyncSession, env: SimpleNamespace, svc: Any
+) -> None:
+    from app.core.pagination import PageParams
+
+    w = await world(db)
+    created = await svc.create_user(
+        db, w.actor, env.hasher, login="Ivanov.Petr", one_time_password=SecretStr(ONE_TIME)
+    )
+    uid = created.id
+
+    async def shown() -> tuple[str, str]:
+        items, _ = await svc.list_accounts(db, w.actor, PageParams(page=1, page_size=100))
+        listed = next(a.login for a in items if a.id == uid)
+        return (await svc.get_account(db, w.actor, uid)).login, listed
+
+    await svc.block_user(db, w.actor, env.sessions, uid)
+    assert await shown() == ("Ivanov.Petr", "Ivanov.Petr")
+    await svc.unblock_user(db, w.actor, uid)
+    assert await shown() == ("Ivanov.Petr", "Ivanov.Petr")
+    await svc.reset_password(
+        db, w.actor, env.hasher, env.sessions, uid, one_time_password=SecretStr(ONE_TIME_2)
+    )
+    assert await shown() == ("Ivanov.Petr", "Ivanov.Petr")
+    for role in (Role.USER, Role.BUSINESS_ADMIN, None):
+        await svc.set_role(db, w.actor, uid, role)
+        assert await shown() == ("Ivanov.Petr", "Ivanov.Petr")
+    assert await _stored_logins(db, uid) == ("ivanov.petr", "Ivanov.Petr")
+
+
+@pytest.mark.parametrize("attempt", ["ivanov.PETR", "ivanov.petr", "IVANOV.PETR", "Ivanov.Petr"])
+async def test_ac128_case_variant_of_taken_login_is_login_taken_and_changes_nothing(
+    db: AsyncSession, env: SimpleNamespace, svc: Any, attempt: str
+) -> None:
+    w = await world(db)
+    existing = await svc.create_user(
+        db, w.actor, env.hasher, login="Ivanov.Petr", one_time_password=SecretStr(ONE_TIME)
+    )
+    await db.commit()
+    users_before = (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one()
+    events_before = await events(db)
+
+    await fails(
+        db,
+        svc.create_user(
+            db, w.actor, env.hasher, login=attempt, one_time_password=SecretStr(ONE_TIME_2)
+        ),
+        "login_taken",
+    )
+
+    assert (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one() == users_before
+    assert await events(db) == events_before
+    assert (await svc.get_account(db, w.actor, existing.id)).login == "Ivanov.Petr"
+    assert await _stored_logins(db, existing.id) == ("ivanov.petr", "Ivanov.Petr")
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ["Ivanov.Пётр", "\u212aivan", ".Ivan", "Iv", "A" * 65],
+    ids=["cyrillic", "kelvin", "leading-dot", "2-chars", "65-chars"],
+)
+async def test_ac128_invalid_mixed_case_login_is_login_invalid_and_changes_nothing(
+    db: AsyncSession, env: SimpleNamespace, svc: Any, bad: str
+) -> None:
+    w = await world(db)
+    users_before = (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one()
+    events_before = await events(db)
+    await fails(
+        db,
+        svc.create_user(db, w.actor, env.hasher, login=bad, one_time_password=SecretStr(ONE_TIME)),
+        "login_invalid",
+    )
+    assert (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one() == users_before
+    assert await events(db) == events_before
+
+
+async def test_ac128_login_check_order_invalid_then_taken_then_password(
+    db: AsyncSession, env: SimpleNamespace, svc: Any
+) -> None:
+    """Порядок проверок прежний: ``login_invalid`` -> ``login_taken`` -> политика пароля."""
+    w = await world(db)
+    await svc.create_user(
+        db, w.actor, env.hasher, login="Ivanov.Petr", one_time_password=SecretStr(ONE_TIME)
+    )
+    await db.commit()
+    await fails(
+        db,
+        svc.create_user(
+            db, w.actor, env.hasher, login="ivanov.PETR", one_time_password=SecretStr(SHORT_11)
+        ),
+        "login_taken",
+    )
+
+
+@pytest.mark.committed
+@pytest.mark.parametrize("same_workspace", [True, False], ids=["one-workspace", "two-workspaces"])
+async def test_ac128_parallel_create_of_case_variants_has_exactly_one_winner(
+    committed: async_sessionmaker[AsyncSession],
+    env: SimpleNamespace,
+    svc: Any,
+    same_workspace: bool,
+) -> None:
+    from app.core.errors import AppError
+
+    async with committed() as s:
+        ws1 = await make_workspace(s)
+        admin1 = await make_user(s, workspace=ws1, role="tech_admin", login="admin.one")
+        if same_workspace:
+            admin2 = await make_user(s, workspace=ws1, role="tech_admin", login="admin.two")
+        else:
+            admin2 = await make_user(s, role="tech_admin", login="admin.two")
+        await s.commit()
+
+    async def attempt(admin: UserRow, login: str) -> str:
+        async with committed() as s:
+            try:
+                await svc.create_user(
+                    s, actor_of(admin), env.hasher, login=login, one_time_password=SecretStr(OK_12)
+                )
+                await s.commit()
+            except AppError as exc:
+                await s.rollback()
+                assert exc.status_code == 422
+                return str(exc.code)
+            return "ok"
+
+    outcomes = await asyncio.gather(attempt(admin1, "Ivanov.Petr"), attempt(admin2, "ivanov.petr"))
+
+    assert sorted(outcomes) == ["login_taken", "ok"], outcomes
+    async with committed() as s:
+        rows = (
+            await s.execute(
+                text("SELECT login, login_display FROM app_user WHERE login = 'ivanov.petr'")
+            )
+        ).all()
+        created_events = (
+            await s.execute(
+                text(
+                    "SELECT count(*) FROM domain_event WHERE action = 'user.created' "
+                    "AND entity_id IN (SELECT id FROM app_user WHERE login = 'ivanov.petr')"
+                )
+            )
+        ).scalar_one()
+    assert len(rows) == 1
+    assert rows[0].login_display in ("Ivanov.Petr", "ivanov.petr")
+    assert created_events == 1
 
 
 @pytest.mark.parametrize("attempt", ["ivan.petrov", "Ivan.Petrov", "IVAN.PETROV"])
@@ -480,7 +660,9 @@ async def test_ac39_ac44_ac45_non_account_admins_get_403_on_every_account_action
     )
     await forbidden(db, svc.revoke_sessions(db, actor, env.sessions, victim.id))
     await forbidden(db, svc.set_role(db, actor, victim.id, Role.USER))
-    await forbidden(db, svc.set_role(db, actor, outsider.id, Role.MIXED))  # себе — тоже 403
+    await forbidden(
+        db, svc.set_role(db, actor, outsider.id, Role.BUSINESS_ADMIN)
+    )  # себе — тоже 403
 
     assert await user_by_login(db, "new.user") is None
     assert (await state(db, victim.id)).is_blocked is False
@@ -490,12 +672,12 @@ async def test_ac39_ac44_ac45_non_account_admins_get_403_on_every_account_action
     assert await events(db) == before
 
 
-@pytest.mark.parametrize("role", ["tech_admin", "mixed"])
-async def test_ac26_tech_admin_and_mixed_can_run_account_actions(
-    db: AsyncSession, env: SimpleNamespace, svc: Any, role: str
+async def test_ac26_second_tech_admin_can_run_account_actions(
+    db: AsyncSession, env: SimpleNamespace, svc: Any
 ) -> None:
+    """002/AC-3: два ТА (``world`` уже содержит ТА); действия выполняет второй, не СМ."""
     w = await world(db)
-    boss = await make_user(db, workspace=w.ws, role=role, login="boss.x")
+    boss = await make_user(db, workspace=w.ws, role="tech_admin", login="boss.x")
     await db.commit()
     actor = actor_of(boss)
     await svc.set_role(db, actor, w.target.id, Role.BUSINESS_ADMIN)
@@ -577,15 +759,18 @@ async def test_fr66_unknown_role_value_is_422(
 async def test_ac26_self_assignment_is_allowed_and_audited(
     db: AsyncSession, env: SimpleNamespace, svc: Any
 ) -> None:
+    # 002/AC-4, AC-7: при втором активном ТА первый меняет свою роль на БА
     w = await world(db)
-    await svc.set_role(db, w.actor, w.admin.id, Role.MIXED)  # ТА -> СМ себе
-    assert await member_role(db, w.admin.id) == "mixed"
+    await make_user(db, workspace=w.ws, role="tech_admin", login="second.ta")
+    await db.commit()
+    await svc.set_role(db, w.actor, w.admin.id, Role.BUSINESS_ADMIN)
+    assert await member_role(db, w.admin.id) == "business_admin"
     ev = (await events(db, w.ws.id))[0]
     assert ev.action == "user.role_changed"
     assert ev.entity_id == w.admin.id
     assert ev.actor_id == w.admin.id
     assert ev.details["role_from"] == "tech_admin"
-    assert ev.details["role_to"] == "mixed"
+    assert ev.details["role_to"] == "business_admin"
 
 
 async def test_fr67_set_role_does_not_touch_sessions_or_other_users(
@@ -595,7 +780,7 @@ async def test_fr67_set_role_does_not_touch_sessions_or_other_users(
     tokens = await open_sessions(db, env, w.target, 2)
     other = await make_user(db, workspace=w.ws, role="user", login="other.user")
     await db.commit()
-    await svc.set_role(db, w.actor, w.target.id, Role.MIXED)
+    await svc.set_role(db, w.actor, w.target.id, Role.BUSINESS_ADMIN)
     for token in tokens:  # действует со следующего запроса без повторного входа
         assert await env.sessions.resolve(db, token, now=NOW, background=True) is not None
     assert await member_role(db, other.id) == "user"
@@ -605,11 +790,11 @@ async def test_fr67_set_role_does_not_touch_sessions_or_other_users(
 
 
 async def lone_admin_world(db: AsyncSession) -> SimpleNamespace:
-    """Единственный активный ТА; второй ТА и СМ заблокированы; есть БА и «Пользователь»."""
+    """Единственный активный ТА; второй ТА заблокирован; есть БА и «Пользователь»."""
     ws = await make_workspace(db)
     last = await make_user(db, workspace=ws, role="tech_admin", login="last.admin")
     await make_user(db, workspace=ws, role="tech_admin", login="blocked.ta", blocked=True)
-    await make_user(db, workspace=ws, role="mixed", login="blocked.sm", blocked=True)
+    await make_user(db, workspace=ws, role="tech_admin", login="blocked.ta2", blocked=True)
     await make_user(db, workspace=ws, role="business_admin", login="plain.ba")
     await make_user(db, workspace=ws, role="user", login="plain.user")
     await db.commit()
@@ -638,19 +823,16 @@ async def test_ac78_last_admin_cannot_block_self(
     assert await events(db, w.ws.id) == []
 
 
-async def test_ac78_last_admin_may_become_mixed(
-    db: AsyncSession, env: SimpleNamespace, svc: Any
-) -> None:
-    w = await lone_admin_world(db)
-    await svc.set_role(db, w.actor, w.last.id, Role.MIXED)
-    assert await member_role(db, w.last.id) == "mixed"
+# Удалён ``test_ac78_last_admin_may_become_mixed``: по 002/FR-7 единственный ТА не меняет роль
+# на другую. Заменители: ``test_002_ac6_*`` (api/test_tech_admins_002.py), в R3-T11
+# ``test_002_ac24_*``.
 
 
 async def test_ac78_with_second_active_admin_first_may_remove_own_role(
     db: AsyncSession, env: SimpleNamespace, svc: Any
 ) -> None:
     w = await lone_admin_world(db)
-    await make_user(db, workspace=w.ws, role="mixed", login="second.sm")
+    await make_user(db, workspace=w.ws, role="tech_admin", login="second.ta")
     await db.commit()
     await svc.set_role(db, w.actor, w.last.id, None)
     assert await member_role(db, w.last.id) is None
@@ -729,7 +911,7 @@ async def test_ac78_concurrent_mutual_demotion_leaves_one_admin(
             res = await s.execute(
                 text(
                     "SELECT count(*) FROM workspace_member m JOIN app_user u ON u.id = m.user_id "
-                    "WHERE m.workspace_id = :w AND m.role IN ('tech_admin','mixed') "
+                    "WHERE m.workspace_id = :w AND m.role = 'tech_admin' "
                     "AND NOT u.is_blocked"
                 ),
                 {"w": ws.id},
@@ -992,8 +1174,10 @@ async def test_ac21_foreign_workspace_user_is_404_for_every_action(
         ),
     )
     await not_found(db, svc.revoke_sessions(db, w.actor, env.sessions, stranger.id))
-    await not_found(db, svc.set_role(db, w.actor, stranger.id, Role.MIXED))
-    await not_found(db, svc.set_role(db, w.actor, uuid.uuid4(), Role.MIXED))  # несуществующий
+    await not_found(db, svc.set_role(db, w.actor, stranger.id, Role.BUSINESS_ADMIN))
+    await not_found(
+        db, svc.set_role(db, w.actor, uuid.uuid4(), Role.BUSINESS_ADMIN)
+    )  # несуществующий
 
     assert await events(db) == before
     after_state = await state(db, stranger.id)
@@ -1053,7 +1237,7 @@ async def test_ac67_rollback_removes_event_and_change_together(
     await svc.create_user(
         db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
     )
-    await svc.set_role(db, w.actor, w.target.id, Role.MIXED)
+    await svc.set_role(db, w.actor, w.target.id, Role.BUSINESS_ADMIN)
     await svc.block_user(db, w.actor, env.sessions, w.target.id)
     await db.rollback()
 
@@ -1105,7 +1289,7 @@ async def test_ac67_event_write_failure_aborts_the_action(
             one_time_password=SecretStr(ONE_TIME),
         ),
         "revoke": lambda: svc.revoke_sessions(db, w.actor, env.sessions, w.target.id),
-        "role": lambda: svc.set_role(db, w.actor, w.target.id, Role.MIXED),
+        "role": lambda: svc.set_role(db, w.actor, w.target.id, Role.BUSINESS_ADMIN),
     }
     with pytest.raises(RuntimeError):
         await calls[action]()
@@ -1229,7 +1413,7 @@ def test_t11_note_bootstrap_and_provider_agree_on_boundary_logins(
         assert (expected is not None) is valid, repr(raw)
         cfg = settings.model_copy(update={"initial_admin_login": raw})
         if valid:
-            assert bootstrap._initial_login(cfg) == expected
+            assert bootstrap._initial_login(cfg) == (expected, raw)
         else:
             with pytest.raises(ValueError):
                 bootstrap._initial_login(cfg)
@@ -1258,11 +1442,12 @@ async def test_t11_note_create_user_and_login_normalize_identically(
         created = await svc.create_user(
             db, w.actor, env.hasher, login=raw, one_time_password=SecretStr(ONE_TIME)
         )
-        assert created.login == expected
+        assert created.login == raw  # FR-73a: ответ — написание при вводе
+        assert (await user_by_login(db, expected)) is not None  # ключ в БД нормализован
         await db.commit()
         result = await login_as(db, env, mods, raw, ONE_TIME)
         assert result.user_id == created.id
-        assert result.login == expected
+        assert result.login == raw
 
 
 # --- заметка ревью T14: две ветки change_own_password ------------------------------------
@@ -1432,7 +1617,7 @@ async def _pair_setup(
     async with committed() as s:
         ws = await make_workspace(s)
         a = await make_user(s, workspace=ws, role="tech_admin")
-        c = await make_user(s, workspace=ws, role="mixed")
+        c = await make_user(s, workspace=ws, role="tech_admin")
         x = await make_user(s, workspace=ws, role="user", blocked=blocked)
         for _ in range(2):
             await env.sessions.create(s, user_id=x.id, workspace_id=ws.id, now=NOW)
@@ -1501,7 +1686,7 @@ async def _run_pairs(
             res = await s.execute(
                 text(
                     "SELECT count(*) FROM workspace_member m JOIN app_user u ON u.id = m.user_id "
-                    "WHERE m.workspace_id = :w AND m.role IN ('tech_admin','mixed') "
+                    "WHERE m.workspace_id = :w AND m.role = 'tech_admin' "
                     "AND NOT u.is_blocked"
                 ),
                 {"w": w.ws.id},
@@ -1616,7 +1801,7 @@ TRIO_ITERATIONS = 150
 
 
 @pytest.mark.committed
-@pytest.mark.parametrize("variant", ["roles", "mixed"])
+@pytest.mark.parametrize("variant", ["roles", "actions"])
 async def test_t16_review_three_admins_six_concurrent_actions_no_deadlock(
     committed: async_sessionmaker[AsyncSession],
     env: SimpleNamespace,
@@ -1674,7 +1859,7 @@ async def test_t16_review_three_admins_six_concurrent_actions_no_deadlock(
         async with committed() as s:
             ws = await make_workspace(s)
             a = await make_user(s, workspace=ws, role="tech_admin")
-            b = await make_user(s, workspace=ws, role="mixed")
+            b = await make_user(s, workspace=ws, role="tech_admin")
             c = await make_user(s, workspace=ws, role="tech_admin")
             for u in (a, b, c):
                 for _ in range(2):
@@ -1718,7 +1903,7 @@ async def test_t16_review_three_admins_six_concurrent_actions_no_deadlock(
                     text(
                         "SELECT count(*) FROM workspace_member m JOIN app_user u "
                         "ON u.id = m.user_id WHERE m.workspace_id = :w "
-                        "AND m.role IN ('tech_admin','mixed') AND NOT u.is_blocked"
+                        "AND m.role = 'tech_admin' AND NOT u.is_blocked"
                     ),
                     {"w": ws.id},
                 )
