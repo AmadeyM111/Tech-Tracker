@@ -14,7 +14,7 @@ describe("preselectProject (004 FR-12)", () => {
     expect(preselectProject([P1], P1.id)).toBe(P1.id);
   });
 
-  it("004_ac20_current_project_not_in_list_with_single_project_selects_single", () => {
+  it("004_ac41_current_project_not_in_list_with_single_project_selects_single", () => {
     expect(preselectProject([P1], OTHER)).toBe(P1.id);
   });
 

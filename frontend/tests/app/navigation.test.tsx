@@ -25,7 +25,7 @@ import { err, expectAt, installFetch, j, meWith, page, renderApp, where } from "
 const REMOVED_HOME_LINK = "На главную";
 
 const DICT = Object.values(ru) as string[];
-const CREATE_TASK = (ru as Record<string, string>)["nav.create_task"] ?? "Задача"; // 004
+const CREATE_TASK = ru["nav.create_task"]; // 004
 const ME = "GET /api/v1/me";
 const BUSINESS = ["business_access", "project_create", "task_assign_others"];
 const ADMIN_ONLY = ["manage_accounts", "assign_roles", "view_audit"];

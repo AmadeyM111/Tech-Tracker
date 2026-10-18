@@ -1,6 +1,8 @@
 // T82: клиент API проектов (контракт - в шапке helpers.tsx).
+import { waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { deferred } from "../admin/helpers";
 import {
   CREATABLE_PAGE_SIZE,
   addMember,
@@ -119,6 +121,27 @@ describe("listCreatableProjects (004 R5-T01)", () => {
     ]);
     expect(f.count(CARD(P2))).toBe(1);
     expect(f.last(LIST).headers.get("X-GT-Background")).toBeNull();
+  });
+
+  it("004_nfr4_card_requests_go_in_parallel_before_the_first_answer", async () => {
+    const gate = deferred<null>();
+    const started: string[] = [];
+    const slow = (id: string, name: string) => async () => {
+      started.push(id);
+      if (id === P1) await gate.promise;
+      return j(200, card(id, name, true));
+    };
+    installFetch({
+      [LIST]: () => j(200, page([listItem(P1, "Альфа"), listItem(P2, "Бета"), listItem(P3, "Гамма")])),
+      [CARD(P1)]: slow(P1, "Альфа"),
+      [CARD(P2)]: slow(P2, "Бета"),
+      [CARD(P3)]: slow(P3, "Гамма"),
+    });
+    const pending = listCreatableProjects();
+    // первая карточка ещё не отвечена, а запросы остальных уже ушли
+    await waitFor(() => expect(started).toHaveLength(3));
+    gate.resolve(null);
+    expect((await pending).map((x) => x.id)).toEqual([P1, P2, P3]);
   });
 
   it("004_ac17_reads_all_pages_with_page_size_100_in_server_order", async () => {

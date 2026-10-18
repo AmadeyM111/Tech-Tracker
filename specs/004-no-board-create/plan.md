@@ -5,6 +5,10 @@
 - **Основа:** `specs/003-no-home-screen/plan.md`. 004 выполняется после 003 (Q-7) и
   опирается на её `Sidebar`, `RoleScreen`, `data-action="logout"` (003 plan §4.3). Код
   `e43d435` с изменениями R4.
+- **Правка 2026-10-18:** по финальной приёмке (`reviews/FINAL-acceptance.md`, отклонения 1–4,
+  остаток п. 4) в §4.4 записаны принятые отклонения реализации от плана, в §9 уточнены П-1,
+  П-3, П-5 и добавлен П-6 (риск: Shift+Tab после щелчка по подложке). Поведение кода не
+  меняется.
 - **Нумерация:** решения — `D-1…` (снаружи — `004/D-1`), задачи — `R5-T01…`. Новые тесты
   vitest называются `004_acN_*`.
 
@@ -147,7 +151,8 @@ div.ui-overlay
   `errorMessage("validation_error")`, запроса нет, введённое сохраняется. Иначе
   `createTask(projectId, { title: name })`.
 - **Успех (FR-15).** `invalidateQueries` для `["tasks","project",pid]`, `["board",pid]`,
-  `["tasks","mine"]`, затем `onCreated(task)`.
+  `["tasks","mine"]`, затем `onCreated(task)`. Перезапросы не ожидаются (принятое отклонение,
+  §4.4, О-1).
 - **Ошибка (FR-16).** `errorMessage(e instanceof ApiError ? e.code : "unknown")`, проект и
   название сохраняются, `busy` снимается. 401 обрабатывает клиент (переход на `/login`,
   диалог размонтируется вместе с экраном).
@@ -178,7 +183,11 @@ function Sidebar({ profile }: { profile: MeResponse }) {
   const navigate = useNavigate();
   const projectMatch = useMatch("/projects/:projectId");
   const createRef = useRef<HTMLButtonElement>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  // Реализовано: createPath вместо createOpen (§4.4, О-2)
+  const { pathname } = useLocation();
+  const [createPath, setCreatePath] = useState<string | null>(null);
+  if (createPath !== null && createPath !== pathname) setCreatePath(null);
+  const createOpen = createPath !== null;
   const canCreate = profile.capabilities.includes("business_access");   // FR-5 (Q-6 а): и на экранах отказа
   return (
     <>
@@ -186,7 +195,7 @@ function Sidebar({ profile }: { profile: MeResponse }) {
         <nav aria-label={t("app.menu_label")}><MenuItems profile={profile} /></nav>
         {canCreate ? (
           <button type="button" data-action="create-task" aria-haspopup="dialog" ref={createRef}
-                  onClick={() => setCreateOpen(true)}>
+                  onClick={() => setCreatePath(pathname)}>
             <Icon name="plus" />{t("nav.create_task")}
           </button>
         ) : null}
@@ -196,8 +205,8 @@ function Sidebar({ profile }: { profile: MeResponse }) {
       {createOpen ? (
         <CreateTaskDialog
           currentProjectId={projectMatch?.params.projectId ?? null}
-          onClose={() => { setCreateOpen(false); createRef.current?.focus(); }}
-          onCreated={(task) => { setCreateOpen(false); navigate(`/tasks/${task.id}`); }}
+          onClose={() => { setCreatePath(null); createRef.current?.focus(); }}
+          onCreated={(task) => { setCreatePath(null); navigate(`/tasks/${task.id}`); }}
         />
       ) : null}
     </>
@@ -209,6 +218,36 @@ function Sidebar({ profile }: { profile: MeResponse }) {
 - Пока диалог закрыт, запросов нет (FR-7, AC-13).
 - Порядок документа: ссылки → «Задача» → «Выйти» → сообщение об ошибке выхода (`tabindex=-1`)
   → (окно диалога, если открыто) → содержимое экрана (AC-12, 003/AC-30).
+
+**Принятые отклонения реализации от плана** (финальная приёмка `reviews/FINAL-acceptance.md`,
+отклонения 1–4; ревью `reviews/R5-T03-1.md`, `reviews/R5-T05-1.md`). Код уже такой, тесты
+зелёные.
+- **О-1. Инвалидация без ожидания** (`CreateTaskForm.tsx`, `CreateTaskDialog`). После 201
+  диалог вызывает `void queryClient.invalidateQueries(…)` для трёх ключей (D-9) и сразу
+  `onCreated(task)`, не дожидаясь перезапросов. Причина: при ожидании
+  `Promise.all(invalidateQueries)` окно оставалось запертым после 201 на время перезапросов
+  активных запросов: до ~7 с при 503, без сети — бесконечно (блокирующее замечание
+  R5-T03-1). `invalidateQueries` помечает кэш устаревшим синхронно, поэтому следующий экран
+  всё равно читает свежие данные (FR-15, AC-27).
+- **О-2. `createPath` вместо `createOpen`** (`router.tsx`, `Sidebar`). Состояние окна — путь,
+  на котором его открыли (`string | null`), а не флаг. Если путь изменился, а `Sidebar` остался
+  (например, «Назад» на другой экран с ролью), окно закрывается при рендере
+  (`if (createPath !== null && createPath !== pathname) setCreatePath(null)`). Причина:
+  `Sidebar` живёт при переходе между экранами с ролью (тот же экземпляр в `RoleScreen`), а
+  окно должно принадлежать экрану, где его открыли. Фокус при таком закрытии не
+  возвращается: кнопки прежнего экрана может уже не быть.
+- **О-3. Флаг «смонтирован» и ref `created`** (`CreateTaskDialog`). `mounted` (ref,
+  ставится эффектом монтирования, снимается при размонтировании): если окно размонтировано
+  до ответа 201 (пользователь ушёл с экрана), `onCreated` не вызывается. `created` (ref,
+  ставится сразу после 201): повторная отправка после успеха не создаёт дубликат, даже если
+  `onCreated` бросил исключение. Вызов `onCreated` обёрнут в отдельный `try/catch`: сбой
+  вызывающего — не «ошибка создания» (сообщения в окне нет), он пишется в
+  `console.error("CreateTaskDialog: onCreated failed", e)`, чтобы не потеряться как
+  необработанный отказ промиса.
+- **О-4. Ширина окна.** Окну задан класс `ui-dialog ui-create-dialog`, в `ui.css` —
+  `.ui-create-dialog { width: min(24rem, 100%) }` (дополнение к §4.5; добавлено в R5-T02,
+  примечание оркестратора в `tasks.md`, первоначально `width: 24rem`). Окно не шире
+  контейнера на узком экране. Цветов и `font-size` в правиле нет, AC-42 не затрагивается.
 
 ### 4.5. Стили (`ui.css`, R5-T04; D-7, D-11)
 
@@ -374,12 +413,18 @@ AC-28 на экранах отказа — проверяются в `app/sideba
   `.ui-create-form`, `.ui-create-form-actions` в `ui.css` уже нет». На самом деле они есть
   (`git show e43d435:frontend/src/shared/ui/ui.css`, стр. 404–421). Требование не нарушается:
   п. 2 сам предписывает удалить такие правила. R5-T07 их удаляет.
+  Итог (финальная приёмка): правила на `e43d435` фактически были и удалены в R5-T07; в
+  текущем `ui.css` селекторов `.ui-add-task`, `.ui-create-form*` нет. Неверен только факт в
+  разделе 10 п. 2 spec, требование выполнено.
 - **П-2. FR-10 / FR-20: фокус и форма на время загрузки списка не определены.** AC-18 говорит
   «отправка формы не отправляет запрос» во время загрузки. План: форма видна, отправка
   недоступна, фокус на окне до загрузки (D-5, D-6). При иной трактовке меняется только
   разметка состояния «загрузка».
 - **П-3. AC-38 «сравнение с `main`»** — невыполнимо буквально, как 003/AC-33 (003 plan §9,
-  П-1). Используется `e43d435`.
+  П-1). Используется `e43d435`. Итог (финальная приёмка): сравнение выполнено с `e43d435`,
+  `git diff --stat e43d435 -- backend docs/api frontend/src/shared/api/schema.d.ts` и
+  `frontend/package*.json` — пусто. С `main` не сравнивалось. В диапазон `e43d435..HEAD`
+  попали и коммиты 003 и 005, но в перечисленных путях изменений нет.
 - **П-4. Новые модули фронтенда** запрещены белым списком в тесте бэкенда (003 plan §9, П-2).
   План кладёт диалог в существующий `CreateTaskForm.tsx`.
 - **П-5. FR-6 «состояния наведения и нажатия задаются токенами»** — у кнопок проекта (и
@@ -387,6 +432,20 @@ AC-28 на экранах отказа — проверяются в `app/sideba
   кнопок», «изменение вида других кнопок — вне рамок»). AC-42 для наведения проверяет
   обычное состояние. Если владелец хочет видимую реакцию на наведение, нужно отдельное
   решение для всех кнопок.
+  Итог (финальная приёмка): правил `:hover` и `:active` для кнопок в `ui.css` нет и не
+  добавлено (есть только `.ui-table tbody tr:hover` и `.ui-sidebar a:hover`). У «Задача»
+  наведение и нажатие выглядят как обычное состояние; фокус — `:focus-visible` с `--focus`.
+- **П-6 (риск, на решение владельца). Shift+Tab после щелчка по подложке.** У подложки нет
+  обработчика щелчка (FR-20, AC-34), и фон не помечен `inert`. Щелчок по подложке снимает
+  фокус с элементов окна (он уходит на `body`), но Chromium запоминает точку щелчка как
+  начало последовательной навигации. Нажатие клавиши тогда приходит не в `onKeyDown` окна, и
+  ловушка Tab (§4.2) не срабатывает: Tab ведёт в окно (подложка в документе после меню и
+  перед содержимым), а Shift+Tab может увести фокус на элементы бокового меню за окном. Тот
+  же образец у окна смены пароля (`ChangePasswordPage`, `PasswordModal`). AC-34 и AC-36
+  выполняются (их тесты проверяют Tab и Shift+Tab при фокусе внутри окна и отсутствие
+  реакции на щелчок). Варианты: (а) принять; (б) `inert` на фон или обработчик `focusin` на
+  документе, возвращающий фокус в окно, — отдельная правка для обоих окон. Решение
+  владельца.
 
 ## 10. Связь с 001 и 003 (файлы 001 правит только R5-T08; текст 003 не меняется)
 

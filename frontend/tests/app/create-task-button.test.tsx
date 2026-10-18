@@ -51,7 +51,7 @@ import { taskItem } from "../features/tasks/helpers";
 
 const ME = "GET /api/v1/me";
 // Литерал-запасной вариант: пока ключа нет, поиск по роли и имени не должен совпадать со всеми кнопками подряд.
-const TASK = (ru as Record<string, string>)["nav.create_task"] ?? "Задача";
+const TASK = ru["nav.create_task"];
 const MENU = ru["app.menu_label"];
 const BA_CAPS = ["business_access", "project_create", "task_assign_others"];
 const U_CAPS = ["business_access"];
@@ -59,7 +59,6 @@ const ROLES = [
   ["BA", "business_admin", BA_CAPS],
   ["U", "user", U_CAPS],
 ] as const;
-const TID = "44444444-4444-4444-8444-444444444444";
 const OLD_TASK = "a1a1a1a1-0000-4000-8000-000000000001";
 
 afterEach(() => {
@@ -92,7 +91,6 @@ function common(role: Role, over: Record<string, Handler> = {}): Record<string, 
     [ME]: () => j(200, meWith([...role[2]], role[1])),
     "GET /api/v1/me/tasks": () => j(200, page([])),
     [`GET /api/v1/tasks/${T_NEW_ID}`]: () => j(200, T_NEW),
-    [`GET /api/v1/tasks/${TID}`]: () => err(404, "not_found"),
     ...over,
   };
 }
@@ -214,7 +212,7 @@ describe("AC-9 button on every screen with a sidebar", () => {
   for (const role of ROLES) {
     const [name] = role;
     const routes = () => dialogFor(role);
-    it.each(["/projects", "/my-tasks", `/tasks/${TID}`])(`004_ac9_${name}_%s_one_button_with_contract`, async (path) => {
+    it.each(["/projects", "/my-tasks", `/tasks/${T_NEW_ID}`])(`004_ac9_${name}_%s_one_button_with_contract`, async (path) => {
       boot(routes(), path);
       await expectCreateButton();
     });
@@ -282,7 +280,7 @@ describe("AC-11 no button on screens without a sidebar", () => {
 });
 
 describe("AC-12 order in the document and Tab sequence", () => {
-  const PATHS = ["/projects", `/projects/${P1}`, `/tasks/${TID}`, "/my-tasks", "/admin/users", "/admin/audit"];
+  const PATHS = ["/projects", `/projects/${P1}`, `/tasks/${T_NEW_ID}`, "/my-tasks", "/admin/users", "/admin/audit"];
   for (const role of ROLES) {
     it.each(PATHS)(`004_ac12_${role[0]}_%s_links_then_task_then_logout`, async (path) => {
       boot(dialogFor(role), path);
@@ -525,6 +523,10 @@ describe("AC-27 the new task is in lists on the next open, without a poll tick",
     boot(routes, `/projects/${P1}`, 60_000);
     await screen.findByText("Старая");
     expect(within(column(document.body, "todo")!).queryByText("Отчёт")).toBeNull();
+    // вкладка «Задачи» открыта до создания: её список тоже попадает в кэш (свежий минуту)
+    fireEvent.click(document.querySelector<HTMLElement>('[role="tab"][data-tab="tasks"]')!);
+    await waitFor(() => expect(document.querySelector(`tr[data-task-id="${OLD_TASK}"]`)).toBeTruthy());
+    expect(document.querySelector(`tr[data-task-id="${T_NEW_ID}"]`)).toBeNull();
     fireEvent.click(within(await menu()).getByRole("link", { name: ru["nav.my_tasks"] }));
     await expectAt("/my-tasks");
     await openDialog();

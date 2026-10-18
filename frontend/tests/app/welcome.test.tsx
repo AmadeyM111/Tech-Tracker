@@ -15,7 +15,7 @@ import { ru } from "../../src/shared/i18n";
 import { CAPS_ALL, expectAt, installFetch, j, meWith, page, renderApp } from "../features/admin/helpers";
 
 const ME = "GET /api/v1/me";
-const NAME = /Сменить пароль/;
+const NAME = /сменить пароль/i;
 const BUSINESS = ["business_access", "project_create", "task_assign_others"];
 // [имя, роль, возможности, стартовый путь, заголовок стартового экрана]
 const CASES: [string, string, string[], string, string][] = [

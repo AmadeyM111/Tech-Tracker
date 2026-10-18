@@ -4,6 +4,8 @@
 // Контракт (plan §4.4): session.ts экспортирует FOCUS_HEADING_STATE ({ focusHeading: true }),
 // focusHeadingState(state) и useFocusHeadingOnArrival(ref). LoginPage при роли и без флага идёт на "/" с
 // этим состоянием, "/" -> StartRedirect сохраняет его, UsersPage ставит tabIndex=-1 на h1 и фокусирует его.
+// Для BA и U AC-13/AC-15 проверяют поведение ProjectsPage (фокус на h1 после прихода на экран), а не механизм
+// передачи state; сам механизм (FOCUS_HEADING_STATE, очистка чужого state) проверяют блоки ниже на TA и NR.
 // Тесты идут через AppRoutes (состояние перехода живёт через "/" -> StartRedirect). Строки - из словаря ru.
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -372,9 +374,11 @@ describe("003 state forwarding keeps only focusHeading (plan 4.4)", () => {
 
 // Примечание R4-T06-1: ветка ошибки ForcedPasswordChange (мутация M9) передаёт focusHeading дальше.
 describe("003 ForcedPasswordChange error branch forwards focusHeading (plan 4.4)", () => {
+  const FOREIGN = { focusHeading: true, secret: "x", nested: { a: 1 } };
+
   it("003_fr15_change_password_with_no_role_answer_goes_to_no_role_and_focuses_heading", async () => {
     installFetch({ ...DATA, [ME]: NR });
-    renderAt({ pathname: "/change-password", state: { focusHeading: true } });
+    renderAt({ pathname: "/change-password", state: FOREIGN });
     await waitFor(() => expect(where()).toBe("/no-role"));
     expect(locState()).toEqual({ focusHeading: true });
     await expectFocusedHeading(ru["auth.no_role_title"]);

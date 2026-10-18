@@ -31,6 +31,7 @@ import {
   NO_CONTENT,
   ONE,
   PERM_READ,
+  PID,
   PROJ_CREATE,
   PROJ_TASKS_GET,
   TA,
@@ -180,7 +181,7 @@ describe("004 AC-7: создание через вкладку «Задачи»,
     await waitFor(() => expect(taskRow(container, TN)).toBeTruthy());
     expect(f.count(PROJ_CREATE)).toBe(1);
     expect(createPosts(f)).toHaveLength(1);
-    expect(new URL(createPosts(f)[0]!.url).pathname).toMatch(/\/projects\/[^/]+\/tasks$/);
+    expect(new URL(createPosts(f)[0]!.url).pathname).toBe(`/api/v1/projects/${PID}/tasks`);
     expect(((await createPosts(f)[0]!.clone().json()) as { title: string }).title).toBe("Проверка");
 
     const boardTab = document.querySelector<HTMLElement>('[role="tab"][data-tab="board"]')!;

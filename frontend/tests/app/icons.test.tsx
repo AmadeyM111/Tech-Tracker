@@ -26,7 +26,7 @@ const ROUTES = {
 };
 
 // 004/AC-9: кнопка «Задача» тоже в .ui-sidebar: первая - иконка, рисунок отличается от остальных.
-const CREATE_TASK = (ru as Record<string, string>)["nav.create_task"] ?? "Задача";
+const CREATE_TASK = ru["nav.create_task"];
 
 const NAV = [ru["nav.projects"], ru["nav.my_tasks"], ru["admin.home_users_link"], ru["admin.home_audit_link"]];
 

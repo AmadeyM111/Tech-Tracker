@@ -46,7 +46,7 @@ afterEach(() => {
 describe("AC-16 no home link anywhere", () => {
   const cases = Object.keys(FIXTURES).flatMap((fx) => PATHS.map((path) => [fx, path] as const));
 
-  it.each(cases)("ac16_%s_%s_has_no_home_link_no_href_root_no_home_text", async (fx, path) => {
+  it.each(cases)("003_ac16_%s_%s_has_no_home_link_no_href_root_no_home_text", async (fx, path) => {
     const { caps, role } = FIXTURES[fx]!;
     installFetch({ ...ROUTES, [ME]: () => j(200, meWith(caps, role)) });
     const { container } = renderApp(path);
@@ -95,8 +95,9 @@ const PWD = () => err(403, "password_change_required");
 const CASES_26 = Object.keys(FIXTURES).flatMap((fx) => PATHS.map((path) => [fx, path] as const));
 
 describe("AC-18 visible strings of the AC-16 screens are in the dictionary", () => {
-  // Динамические данные фикстур исключены: страницы пустые, логин из /me на этих экранах не показывается.
-  it.each(CASES_26)("ac18_%s_%s_all_visible_text_nodes_are_dictionary_values", async (fx, path) => {
+  // Динамические данные (логин пользователя, названия проектов и задач) не проверяются: в фикстурах списки пусты,
+  // карточки отвечают 404, логин из /me на этих экранах не выводится. Любой иной текст обязан быть значением словаря.
+  it.each(CASES_26)("003_ac18_%s_%s_all_visible_text_nodes_are_dictionary_values", async (fx, path) => {
     const { caps, role } = FIXTURES[fx]!;
     installFetch({ ...ROUTES, [ME]: () => j(200, meWith(caps, role)) });
     renderApp(path);
@@ -109,19 +110,19 @@ describe("AC-18 visible strings of the AC-16 screens are in the dictionary", () 
 });
 
 describe("AC-26 no change-password entry on screens with a menu", () => {
-  it.each(CASES_26)("ac26_%s_%s_no_change_password_link_or_button", async (fx, path) => {
+  it.each(CASES_26)("003_ac26_%s_%s_no_change_password_link_or_button", async (fx, path) => {
     const { caps, role } = FIXTURES[fx]!;
     installFetch({ ...ROUTES, [ME]: () => j(200, meWith(caps, role)) });
     const { container } = renderApp(path);
     await screen.findByRole("navigation", { name: ru["app.menu_label"] });
-    expect(screen.queryByRole("link", { name: /Сменить пароль/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Сменить пароль/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /сменить пароль/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /сменить пароль/i })).toBeNull();
     expect(container.querySelector('a[href="/change-password"]')).toBeNull();
   });
 });
 
 describe("AC-17 no link to / on /no-role, /change-password, /login", () => {
-  it("ac17_NR_no_role_has_no_root_link", async () => {
+  it("003_ac17_NR_no_role_has_no_root_link", async () => {
     installFetch({ [ME]: NR });
     const { container } = renderApp("/no-role");
     await screen.findByRole("heading", { level: 1, name: ru["auth.no_role_title"] });
@@ -131,7 +132,7 @@ describe("AC-17 no link to / on /no-role, /change-password, /login", () => {
     expect(texts.filter((t) => !DICT_VALUES.has(t))).toEqual([]);
   });
 
-  it("ac17_PWD_change_password_has_no_root_link", async () => {
+  it("003_ac17_PWD_change_password_has_no_root_link", async () => {
     installFetch({ [ME]: PWD });
     const { container } = renderApp("/change-password");
     await screen.findByRole("dialog");
@@ -142,7 +143,7 @@ describe("AC-17 no link to / on /no-role, /change-password, /login", () => {
     expect(texts.filter((t) => !DICT_VALUES.has(t))).toEqual([]);
   });
 
-  it("ac17_ANON_login_has_no_root_link", async () => {
+  it("003_ac17_ANON_login_has_no_root_link", async () => {
     installFetch({ [ME]: ANON });
     const { container } = renderApp("/login");
     await waitFor(() => field(container, "username"));
@@ -154,16 +155,10 @@ describe("AC-17 no link to / on /no-role, /change-password, /login", () => {
 });
 
 describe("AC-32 /no-role without menu, /change-password window", () => {
-  it("ac32_NR_no_menu_logout_logs_out_like_ac22", async () => {
+  it("003_ac32_NR_no_menu_logout_logs_out_like_ac22", async () => {
     let out = false;
-    const ref: { qc?: unknown } = {};
-    const seen: unknown[] = [];
     const f = installFetch({
-      [ME]: () => {
-        if (!out) return NR();
-        seen.push(ref.qc);
-        return ANON();
-      },
+      [ME]: () => (out ? ANON() : NR()),
       "POST /api/v1/auth/logout": () => ((out = true), new Response(null, { status: 204 })),
     });
     const { container, qc } = renderApp("/no-role");
@@ -171,14 +166,13 @@ describe("AC-32 /no-role without menu, /change-password window", () => {
     expect(container.querySelector(".ui-sidebar")).toBeNull();
     expect(screen.queryByRole("navigation", { name: ru["app.menu_label"] })).toBeNull();
     qc.setQueryData(["sentinel"], 1);
-    ref.qc = undefined;
     fireEvent.click(screen.getByRole("button", { name: ru["auth.logout"] }));
     await expectAt("/login");
     expect(f.count("POST /api/v1/auth/logout")).toBe(1);
     expect(qc.getQueryData(["sentinel"])).toBeUndefined();
   });
 
-  it("ac32_PWD_window_has_logout_inside_blank_aria_hidden_backdrop_no_links", async () => {
+  it("003_ac32_PWD_window_has_logout_inside_blank_aria_hidden_backdrop_no_links", async () => {
     installFetch({ [ME]: PWD });
     const { container } = renderApp("/change-password");
     const dialog = await screen.findByRole("dialog");

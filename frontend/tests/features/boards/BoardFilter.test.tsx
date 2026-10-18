@@ -133,7 +133,7 @@ describe("T91 assignee filter", () => {
   });
 });
 
-describe("T91 filter with move and create", () => {
+describe("T91 filter with move", () => {
   it("t91_move_above_first_visible_card_uses_full_column_order", async () => {
     installLayout();
     const { f, container } = await openBoard({ [MOVE(TC)]: () => NO_CONTENT() });
@@ -180,13 +180,44 @@ describe("T91 filter with move and create", () => {
     expect(filterSelect().value).toBe("none");
     expect(cardEl(container, TA)).toBeNull();
   });
+});
+
+describe("004 poll under filter", () => {
+  it("004_ac4_poll_new_unassigned_todo_card_under_none_filter_is_visible_last_in_todo", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let step = 0;
+    const { container, f } = await openBoard({
+      [BOARD]: () =>
+        j(
+          200,
+          boardBody(step === 0 ? INITIAL : { ...INITIAL, todo: [CA, CB, CC, { ...CB, id: TN, title: "Нов", position: 1000 }] }),
+        ),
+    });
+    pickFilter("none");
+    await waitFor(() => expect(idsIn(container, "todo")).toEqual([TB, TC]));
+    step = 1;
+    const n = f.count(BOARD);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await waitFor(() => expect(f.count(BOARD)).toBeGreaterThan(n));
+    await waitFor(() => expect(idsIn(container, "todo")).toEqual([TB, TC, TN]));
+    expect(filterSelect().value).toBe("none");
+    expect(cardEl(container, TA)).toBeNull();
+    expect(f.count(PROJ_CREATE)).toBe(0);
+  });
 
   it("004_ac5_poll_new_unassigned_card_hidden_under_member_filter_visible_last_under_all", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let step = 0;
     const { container, f } = await openBoard({
       [BOARD]: () =>
-        j(200, boardBody(step === 0 ? INITIAL : { ...INITIAL, todo: [CA, CB, CC, { ...CB, id: TN, title: "Нов", position: 1000 }] })),
+        j(
+          200,
+          boardBody(
+            step === 0
+              ? INITIAL
+              : { ...INITIAL, todo: [{ ...CA, title: "Обновлено опросом" }, CB, CC, { ...CB, id: TN, title: "Нов", position: 1000 }] },
+          ),
+        ),
     });
     pickFilter(R_KUZNETSOV.id);
     await waitFor(() => expect(idsIn(container, "todo")).toEqual([TA]));
@@ -194,6 +225,8 @@ describe("T91 filter with move and create", () => {
     const n = f.count(BOARD);
     await vi.advanceTimersByTimeAsync(15_000);
     await waitFor(() => expect(f.count(BOARD)).toBeGreaterThan(n));
+    // данные опроса применены (видимая под фильтром карточка обновилась) - только после этого проверяем «нет карточки»
+    await waitFor(() => expect(cardEl(container, TA)!.textContent).toContain("Обновлено опросом"));
     // фильтр сохранён, новой карточки без исполнителя нет
     expect(filterSelect().value).toBe(R_KUZNETSOV.id);
     expect(idsIn(container, "todo")).toEqual([TA]);

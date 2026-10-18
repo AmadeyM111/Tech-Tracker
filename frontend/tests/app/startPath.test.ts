@@ -1,21 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import * as router from "../../src/app/router";
+import { startPath, type StartPath } from "../../src/app/router";
 import type { MeResponse } from "../../src/features/auth/session";
 
 type Cap = MeResponse["capabilities"][number];
-type Profile = Pick<MeResponse, "must_change_password" | "capabilities">;
 
 // Representative capability sets of the roles (spec 003, FR-3; AC-1..AC-3, AC-35, AC-36).
 const BA: Cap[] = ["business_access", "project_create", "project_manage_any", "crm_read", "crm_write"];
-const U: Cap[] = ["business_access", "project_create"];
+const U: Cap[] = ["business_access"];
 const TA: Cap[] = ["manage_accounts", "assign_roles", "view_audit"];
 const AUD: Cap[] = ["view_audit"];
 
-function call(capabilities: Cap[], must_change_password = false): string {
-  const fn = (router as unknown as { startPath?: (p: Profile) => string }).startPath;
-  expect(typeof fn, "router.tsx must export startPath").toBe("function");
-  return fn!({ must_change_password, capabilities });
+function call(capabilities: Cap[], must_change_password = false): StartPath {
+  return startPath({ must_change_password, capabilities });
 }
 
 describe("003 startPath (FR-3)", () => {

@@ -1,4 +1,4 @@
-// T91-R (5): neighborsInFullOrder / insertIndexFor. Контракт - в шапке ./helpers.tsx.
+// T91-R (2): neighborsInFullOrder / insertIndexFor. Контракт - в шапке ./helpers.tsx.
 // neighborsInFullOrder(fullIds, visibleIds, movedId, visibleIndex): visibleIndex - итоговый индекс
 // в видимом списке без самой карточки; перед видимой X -> before=X, after=предшественник X в полном
 // порядке (может быть скрытым); за последней видимой или видимых нет -> в конец полного порядка.
