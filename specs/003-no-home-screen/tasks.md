@@ -66,7 +66,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Попытки:** 1
 
 ## R4-T02 — Боковое меню «Меню» с кнопкой «Выйти» на бизнес-экранах
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-19, AC-22 (`BA` на `/projects`), AC-23, AC-24, AC-25, AC-29 (`BA`), AC-30 (`BA`);
   FR-10, FR-13, NFR-2, NFR-3
 - **Файлы:** `frontend/src/app/router.tsx`, `frontend/src/shared/i18n/ru.ts`;
@@ -94,7 +94,8 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
   без правок. Если нет — `PLAN_ISSUE`.
 - **Готово, когда:** `cd frontend && npx vitest run tests/app/sidebar.test.tsx tests/app/navigation.test.tsx tests/app/icons.test.tsx tests/features/admin/AuditPage.test.tsx`
   зелёный; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R4-T02` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (ревью: 3 круга, правки только тестов)
+- **Примечание оркестратора (PLAN_ISSUE снят, 2026-10-18):** AC-30 для `BA` требует, чтобы первой tabbable-ссылкой на бизнес-экране не была «На главную». Поэтому в R4-T02 разрешено убрать `HomeLink` из ветки «разрешённый экран» `BusinessScreen` (без изменения `AdminScreen` для ТА, экранов отказа и самого `HomeLink`). Тесты не меняются.
 
 ## R4-T03 — Боковое меню на экранах ТА и экранах отказа; «На главную» убрана
 - **Статус:** TODO

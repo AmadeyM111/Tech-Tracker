@@ -147,9 +147,25 @@ function MenuItems({ profile }: { profile: MeResponse }) {
   );
 }
 
-function Home({ profile }: { profile: MeResponse }) {
+/** Sidebar (003/FR-10): items by capabilities, "Logout" at the bottom; makes no network requests itself. */
+function Sidebar({ profile }: { profile: MeResponse }) {
   const alert = useAlertState();
   const logout = useLogout(alert);
+  return (
+    <div className="ui-sidebar">
+      <nav aria-label={t("app.menu_label")}>
+        <MenuItems profile={profile} />
+      </nav>
+      <button type="button" data-action="logout" disabled={logout.pending} onClick={() => void logout.run()}>
+        <Icon name="logout" />
+        {t("auth.logout")}
+      </button>
+      <ErrorAlert message={alert.message} seq={alert.seq} />
+    </div>
+  );
+}
+
+function Home({ profile }: { profile: MeResponse }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const focusHeading = (useLocation().state as { focusHeading?: boolean } | null)?.focusHeading === true;
   useEffect(() => {
@@ -161,16 +177,7 @@ function Home({ profile }: { profile: MeResponse }) {
       <h1 ref={headingRef} tabIndex={-1}>
         {t("app.home_title")}
       </h1>
-      <ErrorAlert message={alert.message} seq={alert.seq} />
-      <div className="ui-sidebar">
-        <nav>
-          <MenuItems profile={profile} />
-        </nav>
-        <button type="button" disabled={logout.pending} onClick={() => void logout.run()}>
-          <Icon name="logout" />
-          {t("auth.logout")}
-        </button>
-      </div>
+      <Sidebar profile={profile} />
     </>
   );
 }
@@ -230,6 +237,7 @@ function AdminScreen({
 }
 
 // Business screen (T82-T84 replaced the stub bodies); needs business_access.
+// Allowed branch: shell with the Sidebar and no "home" link (003/FR-10); the refusal branch is unchanged.
 function BusinessScreen({
   insideMain,
   children,
@@ -238,16 +246,21 @@ function BusinessScreen({
   children: (profile: MeResponse) => ReactNode;
 }) {
   return (
-    <AdminScreen insideMain={insideMain} capability="business_access" shell>
-      {(profile) => (
-        <>
-          <nav className="ui-sidebar">
-            <MenuItems profile={profile} />
-          </nav>
-          {children(profile)}
-        </>
-      )}
-    </AdminScreen>
+    <SessionGate insideMain={insideMain}>
+      {(profile) =>
+        profile.capabilities.includes("business_access") ? (
+          <Landmark insideMain={insideMain} shell>
+            <Sidebar profile={profile} />
+            {children(profile)}
+          </Landmark>
+        ) : (
+          <Landmark insideMain={insideMain}>
+            <HomeLink />
+            <ErrorAlert message={errorMessage("forbidden")} />
+          </Landmark>
+        )
+      }
+    </SessionGate>
   );
 }
 
