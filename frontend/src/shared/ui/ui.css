@@ -540,6 +540,11 @@ li[data-task-id] [data-field]:not([data-field="title"]) {
   margin-top: auto;
 }
 
+/* "Task" is a compact pill, not a full-width bar (160px at the 16px root). */
+.ui-sidebar [data-action="create-task"] {
+  width: 10rem;
+}
+
 /* Narrow screens: the panel becomes a strip on top of the content. */
 @media (max-width: 1000px) {
   .ui-board-grid {

@@ -166,6 +166,11 @@ describe("004 AC-42 / D-11: раскладка бокового меню (к н�
     expect(logout()["margin-top"]).toBe("auto");
   });
 
+  it("004_ac42_task_button_is_a_compact_pill_160px", () => {
+    const r = rules.find((x) => x.selectors.includes('.ui-sidebar [data-action="create-task"]'));
+    expect(r?.decls["width"]).toBe("10rem");
+  });
+
   it("004_ac42_narrow_screen_moves_margin_to_logout_only", () => {
     const narrow = parseRules(mediaNarrow);
     const lo = narrow.find((r) => r.selectors.includes('.ui-sidebar [data-action="logout"]'));
