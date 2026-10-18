@@ -257,9 +257,10 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Примечание оркестратора (2026-10-18, TEST_ISSUE implementer-а):** тесты `frontend/tests/app/home-link.test.tsx`, `navigation.test.tsx`, `sidebar.test.tsx` ссылаются на удаляемый `ru["app.home_link"]` (при `name: undefined` проверка «ссылки нет» теряет смысл). Файлы добавлены в задачу: заменить ключ на литерал «На главную» (как в `icons.test.tsx`), ассерты не ослаблять.
 
 ## R4-T08 — Сквозные проверки: нет «Главной», «На главную», «Сменить пароль»; экраны без меню прежние (только тесты)
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-16, AC-17, AC-18 (видимые строки), AC-26, AC-32; FR-1, FR-2, FR-12, FR-17
-- **Файлы:** тесты: `frontend/tests/app/home-link.test.tsx`
+- **Файлы:** тесты: `frontend/tests/app/home-link.test.tsx`, `frontend/tests/app/start-screen.test.tsx`,
+  `frontend/tests/app/focus-heading.test.tsx`, `frontend/tests/shared/theme.test.ts`, `frontend/tests/shared/i18n.test.ts`
 - **Зависит от:** R4-T07
 - **Описание:** Только тесты. Дописать в `home-link.test.tsx`: AC-16 — для `BA`, `U`, `TA`
   на каждом из `/projects`, `/projects/:id`, `/tasks/:id`, `/my-tasks`, `/admin/users`,
@@ -275,10 +276,11 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Готово, когда:** `cd frontend && npx vitest run tests/app/home-link.test.tsx` зелёный;
   `git diff --stat -- frontend/src` пуст; проверки фронтенда зелёные; бэкенд не тронут;
   `python scripts/task_scope.py R4-T08` → 0.
-- **Попытки:** 0
+- **Попытки:** 1
 - **Примечание оркестратора (R4-T04-2, желательное 1):** в `start-screen.test.tsx` AC-9 для неизвестных путей добавить проверку отсутствия промежуточного шага `/` (`steps().some(s => s.path === "/")` → false).
 - **Примечание оркестратора (R4-T06-1):** добавить тест на ветку ошибки `ForcedPasswordChange` (`/change-password` с `focusHeading`, `/me` отвечает 403 `no_role` → `/no-role`, фокус на h1; мутация M9) и в AC-14 проверку активного элемента (поле логина, не h1).
 - **Примечание оркестратора (R4-T07-1):** в `theme.test.ts` заменить `/home link/i` на `/home"?\s+link/i` (ловит возврат комментария), в `i18n.test.ts` AC-18 искать подстроку «главн» в значениях словаря.
+- **Остаток в финальную уборку (R4-T08-1):** тест `003_fr15_change_password_with_no_role_…` передавать с `FOREIGN` state (ловит M14); убрать лишние `ref`/`seen` в home-link.test.tsx; регистронезависимый `/сменить пароль/i`.
 
 ## R4-T09 — Документы: spec 001 v0.19 и пометки в tasks 001 (T81, T92, T100, T103)
 - **Статус:** TODO

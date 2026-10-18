@@ -156,6 +156,7 @@ describe("003 dictionary cleanup (AC-18)", () => {
     const values = Object.values(dict).map((v) => v.trim().toLowerCase());
     expect(values).not.toContain("главная");
     expect(values).not.toContain("на главную");
+    expect(values.filter((v) => v.includes("главн"))).toEqual([]);
   });
 
   it("003_ac18_menu_label", () => {

@@ -293,11 +293,15 @@ describe("003 AC-14: 401 on password change", () => {
         [ME]: () => (gone ? ANON() : PWD()),
         [PWD_POST]: () => ((gone = true), err(401, "not_authenticated")),
       });
-      renderApp("/change-password");
+      const { container } = renderApp("/change-password");
       await fillAndSubmitPasswordForm();
       await waitFor(() => expect(where()).toBe("/login"));
       await new Promise((r) => setTimeout(r, 60));
       expect(screen.queryByRole("heading", { level: 1, name: ru["auth.no_role_title"] })).toBeNull();
+      // активный элемент - поле логина на экране входа, а не заголовок
+      const active = document.activeElement as HTMLElement;
+      expect(active).toBe(field(container, "username"));
+      expect(active.tagName).not.toBe("H1");
       expect(spy).not.toHaveBeenCalled();
     } finally {
       spy.mockRestore();
@@ -360,6 +364,17 @@ describe("003 state forwarding keeps only focusHeading (plan 4.4)", () => {
   it("003_fr16_on_no_role_forwards_only_focus_heading", async () => {
     installFetch({ ...DATA, [ME]: NR });
     renderAt({ pathname: "/", state: FOREIGN });
+    await waitFor(() => expect(where()).toBe("/no-role"));
+    expect(locState()).toEqual({ focusHeading: true });
+    await expectFocusedHeading(ru["auth.no_role_title"]);
+  });
+});
+
+// Примечание R4-T06-1: ветка ошибки ForcedPasswordChange (мутация M9) передаёт focusHeading дальше.
+describe("003 ForcedPasswordChange error branch forwards focusHeading (plan 4.4)", () => {
+  it("003_fr15_change_password_with_no_role_answer_goes_to_no_role_and_focuses_heading", async () => {
+    installFetch({ ...DATA, [ME]: NR });
+    renderAt({ pathname: "/change-password", state: { focusHeading: true } });
     await waitFor(() => expect(where()).toBe("/no-role"));
     expect(locState()).toEqual({ focusHeading: true });
     await expectFocusedHeading(ru["auth.no_role_title"]);

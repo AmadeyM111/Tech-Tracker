@@ -250,7 +250,7 @@ describe('003: "Выйти" в боковом меню — светлая таб
 
   it("003_nfr2 no .ui-home-link selector (rules or comments) remains in ui.css", () => {
     expect(raw).not.toMatch(/ui-home-link/);
-    expect(raw).not.toMatch(/home link/i);
+    expect(raw).not.toMatch(/home"?\s+link/i);
     for (const r of rules) {
       expect(r.selectors.some((s) => s.includes("ui-home-link")), r.selectors.join(",")).toBe(false);
     }

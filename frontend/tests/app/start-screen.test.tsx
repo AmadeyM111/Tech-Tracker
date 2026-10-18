@@ -304,6 +304,9 @@ describe("AC-9 redirects replace the history entry (FR-8)", () => {
     expect(steps()[0]).toEqual({ path: from, type: "POP" });
     expect(steps().at(-1)).toEqual({ path: target, type: "REPLACE" });
     expectAllReplace(steps());
+    // промежуточного шага "/" нет (для пути "/" это исходная запись, она единственная)
+    expect(steps().filter((s) => s.path === "/")).toHaveLength(from === "/" ? 1 : 0);
+    if (from !== "/") expect(steps().some((s) => s.path === "/")).toBe(false);
     // "Назад" не ведёт на исходный путь: в истории осталась одна запись
     await back();
     expect(where()).toBe(target);
