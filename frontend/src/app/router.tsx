@@ -41,6 +41,24 @@ function redirectFor(error: unknown): string | null {
   return null;
 }
 
+type Capability = MeResponse["capabilities"][number];
+
+/**
+ * Start screens (003/FR-3). `/no-role` is not returned here: a profile without a role
+ * answers 403 `no_role`, and `redirectFor` leads there.
+ */
+export type StartPath = "/change-password" | "/projects" | "/admin/users" | "/admin/audit";
+
+/** 003/FR-3 (items 1, 3-6) by the `GET /me` profile. Pure function, no requests. */
+export function startPath(profile: Pick<MeResponse, "must_change_password" | "capabilities">): StartPath {
+  const has = (capability: Capability) => profile.capabilities.includes(capability);
+  if (profile.must_change_password) return "/change-password";
+  if (has("business_access")) return "/projects";
+  if (has("manage_accounts")) return "/admin/users";
+  if (has("view_audit")) return "/admin/audit";
+  return "/admin/users";
+}
+
 // Inside the App shell the <main> already exists, so a plain wrapper is used.
 // `shell` adds the two-column layout (left navigation panel, T90); the markup order stays the same.
 function Landmark({
