@@ -2,7 +2,8 @@
 //
 // Контракт для исполнителя (router.tsx, ChangePasswordPage.tsx, ru.ts, ui.css при необходимости):
 //  - маршрут /change-password: GET /me -> 403 password_change_required (реальный бэкенд) ИЛИ 200 с
-//    must_change_password=true => показывается окно; 200 с must_change_password=false => <Navigate "/">;
+//    must_change_password=true => показывается окно; 200 с must_change_password=false => стартовый экран
+//    по 003/FR-3 (<Navigate replace>; 003/AC-7);
 //    401 -> /login. Окно рендерится внутри контейнера приложения (без портала в body), в оверлее
 //    .ui-overlay: div[role="dialog"][aria-modal="true"] с aria-labelledby на заголовок
 //    ru["app.welcome_title"] и текстом ru["app.welcome_hint"] (= «Для продолжения задайте новый пароль.»).
@@ -11,11 +12,12 @@
 //  - Escape и клик по оверлею окно не закрывают; фокус в первом поле; Tab/Shift+Tab циклично внутри
 //    (обработчик keydown с preventDefault + ручной focus, как в ConfirmDialog).
 //  - содержимое подложки (всё вне .ui-overlay) под inert или aria-hidden="true"; сам оверлей - нет.
-//  - успех: окно закрыто, путь "/", профиль перечитан (повторный GET /me), главная отрисована.
+//  - успех (003/AC-12): окно закрыто, профиль перечитан (повторный GET /me), путь - стартовый экран
+//    по профилю (`U` -> /projects, "Список проектов"); "Главной" нет, "/" только проходной шаг.
 //  - ссылок на /change-password нет.
 //  - (ревью) .ui-overlay: overflow-y:auto и align-items:safe center (theme.test.ts); у окна aria-describedby на
-//    элемент с ru["app.welcome_hint"]; после успеха фокус на h1 главной (tabindex=-1); переходы только
-//    /change-password -> / (replace), /me перечитывается после POST /auth/password; 403 password_change_required
+//    элемент с ru["app.welcome_hint"]; после успеха фокус на h1 стартового экрана (tabindex=-1, 003/AC-13);
+//    переходы /change-password -> / -> /projects, все replace, /me перечитывается после POST /auth/password; 403 password_change_required
 //    с /no-role ведёт на /change-password через replace (одна запись истории, /no-role не остаётся);
 //    повторный 403 password_change_required на /change-password не вызывает navigate.
 // Новые ключи ru.ts (описать в шапке словаря): app.welcome_hint меняется на
@@ -27,13 +29,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppRoutes } from "../../src/app/router";
 import { ru } from "../../src/shared/i18n";
-import { ADMIN_ID, err, expectAt, installFetch, j, meWith, renderApp, where } from "../features/admin/helpers";
+import { ADMIN_ID, err, expectAt, installFetch, j, meWith, page, renderApp, where } from "../features/admin/helpers";
 
 const ME = "GET /api/v1/me";
 const PWD = "POST /api/v1/auth/password";
 const FORCED = () => err(403, "password_change_required");
 const FORCED_200 = () => j(200, { ...meWith([], "user"), must_change_password: true });
 const OK204 = () => new Response(null, { status: 204 });
+const PROJECTS_ROUTE = { "GET /api/v1/projects": () => j(200, page([])) };
 const OLD = "One-Time-Pass-123";
 const NEW = "Brand-New-Passw0rd!";
 
@@ -133,9 +136,11 @@ describe("T103 modal password change", () => {
     expect(screen.queryByRole("main")).toBeNull();
   });
 
-  it("ac1_success_closes_dialog_goes_home_and_rereads_profile", async () => {
+  // Бывший ac1_success_closes_dialog_goes_home_and_rereads_profile (003/AC-12): профиль U -> /projects.
+  it("003_ac12_success_closes_dialog_goes_to_start_screen_and_rereads_profile", async () => {
     let changed = false;
     const f = installFetch({
+      ...PROJECTS_ROUTE,
       [ME]: () => (changed ? j(200, meWith(["business_access"], "user")) : FORCED()),
       [PWD]: () => ((changed = true), OK204()),
     });
@@ -145,9 +150,10 @@ describe("T103 modal password change", () => {
     fireEvent.change(input(dialog, "new-password", 0), { target: { value: NEW } });
     fireEvent.change(input(dialog, "new-password", 1), { target: { value: NEW } });
     fireEvent.click(within(dialog).getByRole("button", { name: ru["auth.change_password_submit"] }));
-    await expectAt("/");
+    await expectAt("/projects");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(await screen.findByRole("heading", { level: 1, name: ru["app.home_title"] })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: ru["projects.title"] })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Главная" })).toBeNull();
     expect(await f.last(PWD).json()).toEqual({ current_password: OLD, new_password: NEW });
     expect(f.count(ME)).toBeGreaterThanOrEqual(2);
     expect(document.querySelector('a[href="/change-password"]')).toBeNull();
@@ -178,11 +184,12 @@ describe("T103 modal password change", () => {
     expect(container.querySelectorAll(".ui-overlay").length).toBe(1);
   });
 
-  it("ac3_not_forced_user_is_redirected_home_without_dialog", async () => {
-    installFetch({ [ME]: () => j(200, meWith(["business_access"], "user")) });
+  // Бывший ac3_not_forced_user_is_redirected_home_without_dialog (003/AC-7): U -> /projects.
+  it("003_ac7_not_forced_user_is_redirected_to_start_screen_without_dialog", async () => {
+    installFetch({ ...PROJECTS_ROUTE, [ME]: () => j(200, meWith(["business_access"], "user")) });
     renderApp("/change-password");
-    await expectAt("/");
-    expect(await screen.findByRole("heading", { level: 1, name: ru["app.home_title"] })).toBeTruthy();
+    await expectAt("/projects");
+    expect(await screen.findByRole("heading", { level: 1, name: ru["projects.title"] })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.querySelector(".ui-overlay")).toBeNull();
   });
@@ -194,7 +201,8 @@ describe("T103 modal password change", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("ac1_forced_user_on_home_is_sent_to_modal", async () => {
+  // 003/AC-4: "/" у пользователя с обязательной сменой пароля ведёт на окно смены.
+  it("003_ac4_forced_user_on_root_is_sent_to_modal", async () => {
     installFetch({ [ME]: FORCED });
     renderApp("/");
     await expectAt("/change-password");
@@ -248,32 +256,36 @@ describe("T103 review follow-ups", () => {
     expect(el!.textContent).toBe(ru["app.welcome_hint"]);
   });
 
-  it("rv3_after_success_focus_is_on_home_heading_not_body", async () => {
+  // Бывший rv3_after_success_focus_is_on_home_heading_not_body (003/AC-13): фокус на «Список проектов».
+  it("003_ac13_after_success_focus_is_on_start_heading_not_body", async () => {
     let changed = false;
     installFetch({
+      ...PROJECTS_ROUTE,
       [ME]: () => (changed ? j(200, meWith(["business_access"], "user")) : FORCED()),
       [PWD]: () => ((changed = true), OK204()),
     });
     renderApp("/change-password");
     await submitForm(await screen.findByRole("dialog"));
-    const h1 = await screen.findByRole("heading", { level: 1, name: ru["app.home_title"] });
+    const h1 = await screen.findByRole("heading", { level: 1, name: ru["projects.title"] });
     await waitFor(() => expect(document.activeElement).toBe(h1));
     expect(h1.getAttribute("tabindex")).toBe("-1");
     expect(document.activeElement).not.toBe(document.body);
   });
 
-  it("rv4_success_path_sequence_and_me_reread_after_post", async () => {
+  // Бывший rv4_success_path_sequence_and_me_reread_after_post (003/AC-12): /change-password -> / -> /projects.
+  it("003_ac12_success_path_sequence_and_me_reread_after_post", async () => {
     let changed = false;
     const f = installFetch({
+      ...PROJECTS_ROUTE,
       [ME]: () => (changed ? j(200, meWith(["business_access"], "user")) : FORCED()),
       [PWD]: () => ((changed = true), OK204()),
     });
     const { steps } = renderRecorded("/change-password");
     await submitForm(await screen.findByRole("dialog"));
-    await screen.findByRole("heading", { level: 1, name: ru["app.home_title"] });
+    await screen.findByRole("heading", { level: 1, name: ru["projects.title"] });
     await new Promise((r) => setTimeout(r, 50));
-    expect(steps().map((s) => s.path)).toEqual(["/change-password", "/"]);
-    expect(steps()[1]!.type).toBe("REPLACE");
+    expect(steps().map((s) => s.path)).toEqual(["/change-password", "/", "/projects"]);
+    expect(steps().slice(1).map((s) => s.type)).toEqual(["REPLACE", "REPLACE"]);
     const keys = f.calls.map((c) => `${c.method} ${new URL(c.url).pathname}`);
     const post = keys.indexOf(PWD);
     expect(post).toBeGreaterThan(-1);

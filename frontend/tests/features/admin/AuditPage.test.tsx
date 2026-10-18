@@ -27,6 +27,7 @@ import {
 const DICT = Object.values(ru) as string[];
 const AUDIT = "GET /api/v1/admin/audit";
 const ME = "GET /api/v1/me";
+const USERS_ROUTE: Record<string, Handler> = { "GET /api/v1/admin/users": () => j(200, page([])) };
 const SECRET = "SECRET-TITLE-VALUE";
 
 const E_USER = {
@@ -278,9 +279,12 @@ describe("access and navigation (FR-41, FR-42, T23 note 1)", () => {
     expect(f.count(AUDIT)).toBe(0);
   });
 
-  it("home_links_follow_capabilities", async () => {
-    setup({}, ["manage_accounts", "view_audit"]);
+  // Бывший home_links_follow_capabilities (003/AC-20, AC-36): "/" -> стартовый экран ТА, ссылки по возможностям;
+  // пустые возможности -> отказ на /admin/users без ссылок /admin*.
+  it("003_ac20_ac36_start_screen_links_follow_capabilities", async () => {
+    setup(USERS_ROUTE, ["manage_accounts", "view_audit"]);
     const first = renderApp("/");
+    await expectAt("/admin/users");
     await waitFor(() => expect(document.querySelector('a[href="/admin/users"]')).toBeTruthy());
     expect(document.querySelector('a[href="/admin/audit"]')).toBeTruthy();
     for (const a of Array.from(document.querySelectorAll("a"))) {
@@ -288,17 +292,21 @@ describe("access and navigation (FR-41, FR-42, T23 note 1)", () => {
     }
     first.unmount();
 
-    setup({}, []);
+    setup(USERS_ROUTE, []);
     renderApp("/");
-    await screen.findByRole("main");
+    await expectAt("/admin/users");
+    expect((await screen.findByRole("alert")).textContent).toBe(errorMessage("forbidden"));
     expect(document.querySelector('a[href^="/admin"]')).toBeNull();
   });
 
-  it("home_shows_only_audit_link_with_only_view_audit", async () => {
+  // Бывший home_shows_only_audit_link_with_only_view_audit (003/AC-35): AUD -> /admin/audit, в меню только журнал.
+  it("003_ac35_only_view_audit_start_screen_has_only_audit_link", async () => {
     setup({}, ["view_audit"]);
     renderApp("/");
+    await expectAt("/admin/audit");
     await waitFor(() => expect(document.querySelector('a[href="/admin/audit"]')).toBeTruthy());
     expect(document.querySelector('a[href="/admin/users"]')).toBeNull();
+    expect(f.count("GET /api/v1/admin/users")).toBe(0);
   });
 });
 
@@ -422,34 +430,47 @@ describe("sidebar on admin screens (003/AC-20, AC-16)", () => {
   });
 });
 
-describe("home: logout and no password-change link (FR-55, FR-60; T103: only forced change)", () => {
+describe("start screen: logout and no password-change link (FR-55, FR-60; T103: only forced change)", () => {
   const LOGOUT = "POST /api/v1/auth/logout";
 
-  it("home_has_typed_logout_button_that_logs_out_clears_cache_and_goes_to_login", async () => {
+  // Бывший home_has_typed_logout_button_... (003/AC-22, AC-20): "/" -> /admin/users; на экране есть кнопки
+  // UsersPage, поэтому «Выйти» ищется внутри .ui-sidebar: ровно одна, type=button, выход, кэш очищен.
+  it("003_ac22_start_screen_has_typed_logout_button_that_logs_out_clears_cache_and_goes_to_login", async () => {
     let out = false;
     setup({
+      ...USERS_ROUTE,
       [ME]: () => (out ? err(401, "not_authenticated") : j(200, meWith(CAPS_ALL))),
       [LOGOUT]: () => ((out = true), new Response(null, { status: 204 })),
     });
     const { container, qc } = renderApp("/");
+    await expectAt("/admin/users");
     await screen.findByRole("main");
-    await waitFor(() => expect(container.querySelector('a[href="/admin/users"]')).toBeTruthy());
+    await waitFor(() => expect(container.querySelector('a[href="/admin/audit"]')).toBeTruthy());
     qc.setQueryData(["sentinel"], 1);
-    const btns = Array.from(container.querySelectorAll<HTMLButtonElement>("button"));
+    const sidebar = container.querySelector<HTMLElement>(".ui-sidebar");
+    expect(sidebar).not.toBeNull();
+    const btns = Array.from(sidebar!.querySelectorAll<HTMLButtonElement>("button"));
     expect(btns.length).toBe(1);
     const btn = btns[0] as HTMLButtonElement;
     expect(btn.type).toBe("button");
-    expect(DICT).toContain(btn.textContent);
+    expect(btn.textContent).toBe(ru["auth.logout"]);
     fireEvent.click(btn);
     await expectAt("/login");
     expect(f.count(LOGOUT)).toBe(1);
     expect(qc.getQueryData(["sentinel"])).toBeUndefined();
   });
 
-  it("t103_home_has_no_change_password_link", async () => {
-    setup({}, []);
+  // Бывший t103_home_has_no_change_password_link (003/AC-26): на стартовых экранах ТА и без возможностей.
+  it.each([
+    ["TA", CAPS_ALL],
+    ["NOCAP", [] as string[]],
+  ])("003_ac26_t103_%s_start_screen_has_no_change_password_link", async (_n, caps) => {
+    setup(USERS_ROUTE, caps);
     const { container } = renderApp("/");
+    await expectAt("/admin/users");
     await screen.findByRole("main");
+    await waitFor(() => expect(container.querySelector(".ui-sidebar")).toBeTruthy());
     expect(container.querySelector('a[href="/change-password"]')).toBeNull();
+    expect(screen.queryByRole("link", { name: /Сменить пароль/ })).toBeNull();
   });
 });

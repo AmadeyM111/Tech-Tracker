@@ -21,7 +21,11 @@ import { Icon } from "../shared/ui/Icon";
 // Session check shared by the guards (not a polled query: key is its own).
 const SESSION_KEY = ["auth", "me"] as const;
 
-function useSession() {
+// A profile this young is not asked for again when the next screen mounts: the redirect from "/" to the
+// start screen must not cost a second `GET /me` (003/AC-36). Errors are never "fresh", they are re-asked.
+const SESSION_FRESH_MS = 5_000;
+
+function useSession(staleTime: number = SESSION_FRESH_MS) {
   return useQuery({
     queryKey: SESSION_KEY,
     queryFn: () => me(),
@@ -29,6 +33,7 @@ function useSession() {
     // extend the session by itself on every window focus.
     retry: false,
     refetchOnWindowFocus: false,
+    staleTime,
   });
 }
 
@@ -165,31 +170,15 @@ function Sidebar({ profile }: { profile: MeResponse }) {
   );
 }
 
-function Home({ profile }: { profile: MeResponse }) {
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const focusHeading = (useLocation().state as { focusHeading?: boolean } | null)?.focusHeading === true;
-  useEffect(() => {
-    // After the forced password change the modal is gone: keep focus in the page, not on <body>.
-    if (focusHeading) headingRef.current?.focus();
-  }, [focusHeading]);
-  return (
-    <>
-      <h1 ref={headingRef} tabIndex={-1}>
-        {t("app.home_title")}
-      </h1>
-      <Sidebar profile={profile} />
-    </>
-  );
-}
-
-function Root({ insideMain }: { insideMain: boolean }) {
+/**
+ * `/` and any path without a screen (003/FR-1, FR-6...FR-9): only the session check and a
+ * replacing redirect to the start screen. A failed check redirects as usual (`SessionGate`).
+ */
+function StartRedirect({ insideMain }: { insideMain: boolean }) {
+  const { state } = useLocation();
   return (
     <SessionGate insideMain={insideMain}>
-      {(profile) => (
-        <Landmark insideMain={insideMain} shell>
-          <Home profile={profile} />
-        </Landmark>
-      )}
+      {(profile) => <Navigate to={startPath(profile)} replace state={state} />}
     </SessionGate>
   );
 }
@@ -236,11 +225,12 @@ function NeedsSession({ children }: { children: ReactNode }) {
 }
 
 /**
- * Forced password change (T103): a modal window over a blank home substrate.
- * Only a user who must change the password sees it; everybody else goes to "/".
+ * Forced password change (T103): a modal window over a blank substrate.
+ * Only a user who must change the password sees it; everybody else goes to their start screen.
  */
 function ForcedPasswordChange() {
-  const session = useSession();
+  const session = useSession(0);
+  const { state } = useLocation();
   // A cached answer may be stale (e.g. "no role" from before the redirect here): decide on the fresh one.
   const [fresh, setFresh] = useState(false);
   if (!fresh && !session.isFetching) setFresh(true);
@@ -252,7 +242,7 @@ function ForcedPasswordChange() {
     }
     return <Navigate to={redirectFor(error) ?? "/"} replace />;
   }
-  if (!session.data.must_change_password) return <Navigate to="/" replace />;
+  if (!session.data.must_change_password) return <Navigate to={startPath(session.data)} replace state={state} />;
   return <PasswordModal />;
 }
 
@@ -267,7 +257,8 @@ function PasswordModal() {
 
 function GuestOnly({ children }: { children: ReactNode }) {
   const session = useSession();
-  if (session.data !== undefined) return <Navigate to="/" replace />;
+  const { state } = useLocation();
+  if (session.data !== undefined) return <Navigate to={startPath(session.data)} replace state={state} />;
   return <>{children}</>;
 }
 
@@ -332,7 +323,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           </NeedsSession>
         }
       />
-      <Route path="/" element={<Root insideMain={insideMain} />} />
+      <Route path="/" element={<StartRedirect insideMain={insideMain} />} />
       <Route
         path="/admin/users"
         element={
@@ -381,7 +372,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           </RoleScreen>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<StartRedirect insideMain={insideMain} />} />
     </Routes>
   );
 }

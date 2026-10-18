@@ -42,9 +42,11 @@ function expectIcon(el: HTMLElement) {
 }
 
 describe("T100 sidebar icons", () => {
-  it("home: every sidebar link and the logout button start with an icon, names unchanged", async () => {
+  // Бывший `home: every sidebar link...` (003/AC-19): "/" больше не экран, проверка на /projects
+  // с business_access и админскими возможностями (4 ссылки и «Выйти»).
+  it("003_ac19 /projects: every sidebar link and the logout button start with an icon, names unchanged", async () => {
     installFetch(ROUTES);
-    renderApp("/");
+    renderApp("/projects");
     // T102: «Сменить пароль» переехала из меню в приветственный блок (см. welcome.test.tsx).
     const names = NAV;
     const markup: string[] = [];

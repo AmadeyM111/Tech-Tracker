@@ -135,7 +135,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Попытки:** 1 (ревью: 2 круга, правки только тестов)
 
 ## R4-T04 — «Главная» удалена: `/` и неизвестные пути ведут на стартовый экран
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7, AC-8, AC-9, AC-10 (пути и кэш), AC-11,
   AC-12, AC-35, AC-36, AC-26 (стартовые экраны); FR-1, FR-3…FR-9
 - **Файлы:** `frontend/src/app/router.tsx`;
@@ -173,7 +173,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
   зелёный; `git grep -n -E "function (Home|Root)\b|<Navigate to=\"/\"" -- frontend/src/app/router.tsx`
   пусто (кроме `redirectFor(error) ?? "/"` в `ForcedPasswordChange`, plan §4.2); проверки
   фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R4-T04` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (TEST_ISSUE снят; ревью: 2 круга, правки тестов и plan)
 
 ## R4-T05 — Фокус на заголовке стартового экрана после входа (`BA`, `U`, `TA`)
 - **Статус:** TODO
@@ -210,6 +210,14 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
   `state: focusHeadingState(stateRef.current)`. Редирект `SessionGate` и `StartRedirect`
   передают `focusHeadingState(location.state)` вместо `location.state`. Остальное
   поведение `NoRolePage` не меняется (FR-17): меню нет, «Выйти» на месте.
+  **Примечание по ревью R4-T04 (`reviews/R4-T04-1.md`, желательные 1 и 2; plan §4.2, §4.4, D-12):**
+  (1) `GuestOnly` и ветка «смена не нужна» в `ForcedPasswordChange` сейчас передают в
+  `<Navigate>` `state={state}` целиком. Заменить на `state={focusHeadingState(state)}`, как в
+  `StartRedirect`. (2) Комментарий у `SESSION_FRESH_MS` в `router.tsx` («Errors are never
+  "fresh", they are re-asked») уточнить. Свежим не бывает ответ без данных: запрос, у которого
+  есть только ошибка, при монтировании повторяется. Свежесть считается от `dataUpdatedAt`
+  последнего успешного ответа. Значения `SESSION_FRESH_MS` (5 с) и `useSession(0)` в
+  `ForcedPasswordChange` не менять (D-12).
   Test-writer: AC-13 для `NR` (смена пароля → `/no-role` → фокус на «Роль не назначена»).
   AC-14 (401 на смену → `/login`, `console.error` не вызывался). `AUD`: вход →
   `/admin/audit` → фокус на «Журнал аудита». Прямое открытие `/no-role` без смены пароля
@@ -265,6 +273,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
   `git diff --stat -- frontend/src` пуст; проверки фронтенда зелёные; бэкенд не тронут;
   `python scripts/task_scope.py R4-T08` → 0.
 - **Попытки:** 0
+- **Примечание оркестратора (R4-T04-2, желательное 1):** в `start-screen.test.tsx` AC-9 для неизвестных путей добавить проверку отсутствия промежуточного шага `/` (`steps().some(s => s.path === "/")` → false).
 
 ## R4-T09 — Документы: spec 001 v0.19 и пометки в tasks 001 (T81, T92, T100, T103)
 - **Статус:** TODO

@@ -8,12 +8,13 @@
 //   403 no_role -> /no-role (как у /admin/*).
 //   Нужна capability business_access: без неё остаётся на маршруте и показывает role="alert"
 //   с errorMessage("forbidden"), h1 страницы не показывается.
-//   Меню: <nav> на главной "/" и на каждой из четырёх страниц; ссылки (<a>):
+//   Меню (пересмотрено 003: "/" только перенаправляет на стартовый экран по роли, меню - на каждом
+//   экране с ролью: стартовые /projects и /admin/users, четыре страницы выше); ссылки (<a>):
 //     a[href="/projects"] и a[href="/my-tasks"] - только при business_access;
 //     a[href="/admin/users"] (manage_accounts), a[href="/admin/audit"] (view_audit) - как в R1.0;
 //     ссылок на CRM, метки, корзину, поиск, упоминания нет ни при каких capabilities.
 //   Текст ссылок - из словаря; ссылка в меню на текущую страницу может иметь aria-current="page".
-// AC: FR-10, NFR-6, NFR-7.
+// AC: FR-10, NFR-6, NFR-7; 003: AC-1, AC-19, AC-20, AC-21, AC-27.
 import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -43,6 +44,10 @@ const PROJECT_ROUTES = {
   [`GET /api/v1/projects/${PROJECT_ID}`]: () => err(404, "not_found"),
   [`GET /api/v1/projects/${PROJECT_ID}/members`]: () => err(404, "not_found"),
 };
+const ADMIN_ROUTES = {
+  "GET /api/v1/admin/users": () => j(200, page([])),
+  "GET /api/v1/admin/audit": () => j(200, page([])),
+};
 const FORBIDDEN_LINKS = ["/crm", "/labels", "/trash", "/search", "/mentions", "/deals", "/pipeline"];
 
 function hrefs(): string[] {
@@ -52,19 +57,27 @@ function hrefs(): string[] {
 }
 
 describe("T81 routes under the session gate", () => {
-  it("ac_stub_titles_are_distinct_and_differ_from_home", async () => {
+  // Бывший ac_stub_titles_are_distinct_and_differ_from_home (003/AC-1): "Главной" нет,
+  // "/" ведёт на стартовый экран, заголовки стартового экрана и остальных страниц различны.
+  it("003_ac1_titles_are_distinct_and_none_is_home", async () => {
     installFetch({ [ME]: () => j(200, meWith(BUSINESS, "user")), ...PROJECT_ROUTES });
     const titles: string[] = [];
-    const home = renderApp("/");
+    const start = renderApp("/");
+    await expectAt("/projects");
     titles.push((await screen.findByRole("heading", { level: 1 })).textContent ?? "");
-    home.unmount();
+    start.unmount();
     for (const p of ["/projects", "/my-tasks", ...STUB_PATHS]) {
       const r = renderApp(p);
       await screen.findByRole("main");
       titles.push(screen.getByRole("heading", { level: 1 }).textContent ?? "");
       r.unmount();
     }
-    expect(new Set(titles).size).toBe(titles.length);
+    const [startTitle, projectsTitle, ...others] = titles;
+    expect(startTitle).toBe(ru["projects.title"]);
+    expect(projectsTitle).toBe(startTitle);
+    expect(titles).not.toContain("Главная");
+    // заголовки /projects и /my-tasks различны (T81)
+    expect(new Set([projectsTitle, ...others]).size).toBe(1 + others.length);
   });
 
   it.each(PAGE_PATHS)("ac_guard_%s_401_goes_to_login", async (path) => {
@@ -103,23 +116,31 @@ describe("T81 routes under the session gate", () => {
 });
 
 describe("T81 menu by capabilities (FR-10)", () => {
-  it("ac_menu_business_access_has_projects_and_my_tasks_on_home", async () => {
-    installFetch({ [ME]: () => j(200, meWith(BUSINESS, "user")) });
+  // Бывшие тесты на "/" (003: меню - на стартовых экранах /projects и /admin/users).
+  it.each([
+    ["BA", BUSINESS, "business_admin"],
+    ["U", ["business_access"], "user"],
+  ])("003_ac19_menu_business_access_%s_has_projects_and_my_tasks_on_start_screen", async (_n, caps, role) => {
+    installFetch({ [ME]: () => j(200, meWith(caps, role)), ...PROJECT_ROUTES });
     renderApp("/");
-    await screen.findByRole("navigation");
+    await expectAt("/projects");
+    await screen.findByRole("navigation", { name: ru["app.menu_label"] });
     const links = hrefs();
     expect(links).toContain("/projects");
     expect(links).toContain("/my-tasks");
     expect(links).not.toContain("/admin/users");
     expect(links).not.toContain("/admin/audit");
-    const texts = Array.from(screen.getByRole("navigation").querySelectorAll("a")).map((a) => a.textContent);
+    const texts = Array.from(screen.getByRole("navigation", { name: ru["app.menu_label"] }).querySelectorAll("a")).map(
+      (a) => a.textContent,
+    );
     for (const text of texts) expect(DICT).toContain(text);
   });
 
-  it("ac_menu_tech_admin_without_business_access_has_only_admin_items", async () => {
-    installFetch({ [ME]: () => j(200, meWith(ADMIN_ONLY)) });
+  it("003_ac20_menu_tech_admin_without_business_access_has_only_admin_items_on_users", async () => {
+    installFetch({ [ME]: () => j(200, meWith(ADMIN_ONLY)), ...ADMIN_ROUTES });
     renderApp("/");
-    await screen.findByRole("navigation");
+    await expectAt("/admin/users");
+    await screen.findByRole("navigation", { name: ru["app.menu_label"] });
     const links = hrefs();
     expect(links).toContain("/admin/users");
     expect(links).toContain("/admin/audit");
@@ -127,20 +148,23 @@ describe("T81 menu by capabilities (FR-10)", () => {
     expect(links).not.toContain("/my-tasks");
   });
 
-  it("ac_menu_partial_admin_capabilities_as_in_r1_0", async () => {
-    installFetch({ [ME]: () => j(200, meWith(["manage_accounts"])) });
+  it("003_ac21_menu_partial_admin_capabilities_as_in_r1_0", async () => {
+    installFetch({ [ME]: () => j(200, meWith(["manage_accounts"])), ...ADMIN_ROUTES });
     renderApp("/");
-    await screen.findByRole("navigation");
+    await expectAt("/admin/users");
+    await screen.findByRole("navigation", { name: ru["app.menu_label"] });
     const links = hrefs();
     expect(links).toContain("/admin/users");
     expect(links).not.toContain("/admin/audit");
   });
 
-  it("ac_menu_has_no_crm_labels_trash_search_mentions_items", async () => {
+  it("003_ac19_menu_has_no_crm_labels_trash_search_mentions_items", async () => {
     const all = [...BUSINESS, ...ADMIN_ONLY, "labels_manage", "crm_read", "crm_write", "pipeline_manage", "project_manage_any"];
-    installFetch({ [ME]: () => j(200, meWith(all, "business_admin")) });
+    installFetch({ [ME]: () => j(200, meWith(all, "business_admin")), ...PROJECT_ROUTES, ...ADMIN_ROUTES });
     renderApp("/");
-    await screen.findByRole("navigation");
+    await expectAt("/projects");
+    await screen.findByRole("navigation", { name: ru["app.menu_label"] });
+    expect(hrefs().length).toBeGreaterThan(0);
     for (const href of hrefs()) {
       for (const bad of FORBIDDEN_LINKS) expect(href.startsWith(bad), href).toBe(false);
     }

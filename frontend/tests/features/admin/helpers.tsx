@@ -25,8 +25,9 @@
 //   403 no_role -> /no-role (по ошибке запроса me, не только по колбэку клиента).
 //   Нет нужной capability -> остаётся на маршруте и показывает role="alert" с
 //   errorMessage("forbidden"); запросов к /admin/* при этом нет.
-//   Главная ("/"): ссылки <a href="/admin/users"> и <a href="/admin/audit"> только при
-//   соответствующих capabilities (manage_accounts / view_audit).
+//   Ссылки разделов - в боковом меню экранов с ролью (003/FR-10; "/" не экран, а перенаправление):
+//   <a href="/admin/users"> и <a href="/admin/audit"> только при соответствующих capabilities
+//   (manage_accounts / view_audit).
 //
 // Разметка UsersPage:
 //   список: строки <tr data-user-id="<uuid>"> с ячейками [data-field="login"|"role"|"status"];

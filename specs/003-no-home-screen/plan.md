@@ -2,6 +2,8 @@
 
 - **Spec:** ./spec.md v0.2 (APPROVED, утверждена владельцем 2026-10-18)
 - **Статус:** DRAFT
+- **Правка 2026-10-18:** по ревью `reviews/R4-T04-1.md` добавлены D-12 (свежесть профиля
+  `useSession`), R-8 (профиль в кэше до 5 с), обновлены §3, §4.2 и примечание к R4-T06.
 - **Основа:** код ветки `feat/r1.0-foundation` на коммите `e43d435`; `context.md` этой папки.
   Файлы 001 и 002 этот план не правит, кроме docs-задачи R4-T09 (spec 003, раздел 10).
 - **Нумерация:** решения — `D-1…` (снаружи — `003/D-1`), задачи — `R4-T01…`. Новые тесты
@@ -46,14 +48,16 @@
 | D-9 | Основа сравнения для AC-33 | Коммит `e43d435` (начало фичи), а не `main` | `main` | Ветка `feat/r1.0-foundation` уже отличается от `main` всем бэкендом 001/002 (`git diff --stat main -- backend` — 217 файлов). Буквальное сравнение с `main` невыполнимо (§9, П-1) |
 | D-10 | Старые тесты удаляемого поведения (NFR-5) | Переписываются в тот же файл и проверяют критерий 003, в имени или комментарии указан AC. Удаление — только дубликата нового теста, с названием удалённого теста в комментарии заменителя | Удалить файлы `home-link.test.tsx`, `welcome.test.tsx` | NFR-5, CLAUDE.md. Таблица §6.2 |
 | D-11 | Индикатор при перенаправлении | `StartRedirect` пока ждёт `/me`, показывает только `p[role=status]` («Проверка сессии…»), как сейчас `SessionGate` | — | FR-6, FR-9: ни данных, ни запросов разделов |
+| D-12 | Свежесть профиля в кэше (принятое отклонение по итогам R4-T04, ревью `reviews/R4-T04-1.md`) | `useSession(staleTime = SESSION_FRESH_MS)`, `SESSION_FRESH_MS = 5_000` (5 с) в `router.tsx`. `SessionGate`, `GuestOnly`, `NeedsSession` берут значение по умолчанию. `ForcedPasswordChange` вызывает `useSession(0)` и решает только по ответу, полученному после монтирования (флаг `fresh`) | (а) `staleTime: 0` везде, как было до R4-T04; (б) передавать профиль из `StartRedirect` в целевой экран через `state` перехода; (в) `staleTime: Infinity` с ручной инвалидацией | После `StartRedirect` (`SessionGate` → `<Navigate>`) целевой экран монтирует свой `useQuery` с тем же ключом. При (а) уходит второй `GET /me`, а AC-36 требует «ровно один сетевой запрос» (так же AC-3, AC-35 по счётчикам). (б) — профиль в истории браузера и второй источник истины рядом с кэшем. (в) — устаревший профиль живёт до перезагрузки, если пропущена инвалидация. 5 с перекрывают цепочку переходов и не держат профиль долго (R-8). `ForcedPasswordChange` читает профиль заново: на `/change-password` попадают по 403 `password_change_required` (`onPasswordChangeRequired`), и в кэше может лежать «свежий» профиль без флага. По нему экран увёл бы на стартовый экран, тот снова получил бы 403, и начался бы цикл переходов. Проверка: мутацию `SESSION_FRESH_MS = 0` ловит тест AC-36 (число запросов); ветку `useSession(0)` — тест `start-screen.test.tsx::003_ac7_*` «в кэше свежий профиль без флага, `GET /me` отвечает 403 `password_change_required` → модальное окно `/change-password`, без цикла» |
 
 ## 3. Затрагиваемые модули и файлы
 
 Код (только `frontend/src`):
 - `frontend/src/app/router.tsx` — изменяется: `startPath`, `StartRedirect`, `Sidebar`,
   `RoleScreen`. Удаляются `Home`, `Root`, `HomeLink`, `AdminScreen`, `BusinessScreen`.
-  `GuestOnly` и `ForcedPasswordChange` ведут по `startPath`. `useClientHandlers.onNoRole`
-  переносит состояние фокуса (R4-T01…R4-T04, R4-T06).
+  `GuestOnly` и `ForcedPasswordChange` ведут по `startPath`. `useSession` получает
+  `staleTime` (`SESSION_FRESH_MS`, D-12). `useClientHandlers.onNoRole` переносит состояние
+  фокуса (R4-T01…R4-T04, R4-T06).
 - `frontend/src/features/auth/session.ts` — изменяется: `FOCUS_HEADING_STATE`,
   `focusHeadingState`, `useFocusHeadingOnArrival` (R4-T05).
 - `frontend/src/features/auth/LoginPage.tsx` — переход на `/` с `state: FOCUS_HEADING_STATE`
@@ -115,11 +119,29 @@ function StartRedirect({ insideMain }: { insideMain: boolean }): JSX.Element;
 <Route path="*" element={<StartRedirect insideMain={insideMain} />} />   // D-3
 
 function GuestOnly(...)            // session.data !== undefined → <Navigate to={startPath(session.data)} replace />
-function ForcedPasswordChange()    // !must_change_password → <Navigate to={startPath(session.data)} replace />
+function ForcedPasswordChange()    // useSession(0), решение только по ответу после монтирования (D-12)
+                                   // !must_change_password → <Navigate to={startPath(session.data)} replace />
+                                   // 403 password_change_required → модальное окно (PasswordModal)
                                    // ошибка, не являющаяся редиректом, — как сейчас: redirectFor(error) ?? "/"
+
+/** Профиль сессии, общий ключ ["auth", "me"] (D-12). */
+const SESSION_FRESH_MS = 5_000;
+function useSession(staleTime: number = SESSION_FRESH_MS): UseQueryResult<MeResponse, Error>;
+//   useQuery({ queryKey: SESSION_KEY, queryFn: me, retry: false, refetchOnWindowFocus: false, staleTime })
+//   SessionGate, GuestOnly, NeedsSession — по умолчанию (5 с); ForcedPasswordChange — useSession(0).
 ```
-До R4-T06 `StartRedirect` передаёт `location.state` в `Navigate` как есть. Начиная с R4-T06
-передаётся только `focusHeadingState(location.state)`.
+Свежесть профиля (D-12, R-8). Профиль, полученный не раньше чем 5 с назад, не
+запрашивается заново, когда монтируется следующий экран. Поэтому цепочка `/` →
+`StartRedirect` → стартовый экран стоит один `GET /me` (AC-36). Свежим бывает только ответ с
+данными: у запроса без данных (только ошибка 401/403/5xx/сеть) TanStack Query считает
+данные устаревшими и запрашивает их снова при монтировании. Ошибка после ранее полученных
+данных не обновляет `dataUpdatedAt`: свежесть считается от времени последнего успешного
+ответа. Кэш очищается (`queryClient.clear()`) при входе (`LoginPage`), выходе (`useLogout`),
+успешной смене пароля и 401 на неё (`ChangePasswordPage`) и при любом 401 (`onUnauthenticated`
+в `useClientHandlers`, кроме `/login`).
+
+До R4-T06 `StartRedirect`, `GuestOnly` и `ForcedPasswordChange` передают `location.state` в
+`Navigate` как есть. Начиная с R4-T06 все три передают только `focusHeadingState(location.state)`.
 
 ### 4.3. Боковое меню и экраны (`router.tsx`, R4-T02, R4-T03)
 
@@ -190,6 +212,8 @@ export function useFocusHeadingOnArrival(ref: RefObject<HTMLElement | null>): vo
 - `router.tsx` (R4-T06): `useClientHandlers` хранит `stateRef` рядом с `pathRef`, и
   `onNoRole: navigate("/no-role", { replace: true, state: focusHeadingState(stateRef.current) })`.
   Редирект `SessionGate`: `<Navigate to={target} replace state={focusHeadingState(location.state)} />`.
+  `StartRedirect`, `GuestOnly` и ветка «смена не нужна» в `ForcedPasswordChange` тоже передают
+  `state={focusHeadingState(location.state)}`, а не `location.state` целиком.
 
 Почему это нужно (последовательность для пользователя без роли после смены пароля):
 `ChangePasswordPage` → `navigate("/", { state: { focusHeading: true } })` → `StartRedirect` →
@@ -238,7 +262,7 @@ ML-кода нет, seed не нужен. Тестовые данные — мо
 | AC-1, AC-2, AC-3 | `StartRedirect`, `startPath` | R4-T04 (правило — R4-T01) | `app/start-screen.test.tsx::003_ac1_*…003_ac3_*`; `app/startPath.test.ts` |
 | AC-4, AC-5 | `StartRedirect` + `redirectFor`, маршрут `*` | R4-T04 | `app/start-screen.test.tsx::003_ac4_*`, `003_ac5_*` (6 фикстур × 3 пути) |
 | AC-6 | `GuestOnly` → `startPath` | R4-T04 | `app/start-screen.test.tsx::003_ac6_*` |
-| AC-7 | `ForcedPasswordChange` → `startPath` | R4-T04 | `app/start-screen.test.tsx::003_ac7_*`; `password-modal.test.tsx` (бывший `ac3_*`) |
+| AC-7 | `ForcedPasswordChange` → `startPath` | R4-T04 | `app/start-screen.test.tsx::003_ac7_*` (в том числе ветка `useSession(0)`, D-12); `password-modal.test.tsx` (бывший `ac3_*`) |
 | AC-8 | `SessionGate` (без изменений) на `/` | R4-T04 | `app/start-screen.test.tsx::003_ac8_*`; `SessionGate.test.tsx::me_%s_shows_alert…` (переписан) |
 | AC-9 | `Navigate replace` | R4-T04 | `app/start-screen.test.tsx::003_ac9_*` (тип перехода REPLACE) |
 | AC-10, AC-11 | `LoginPage` → `/` → `StartRedirect` | R4-T04 (пути), R4-T05 (состояние) | `app/start-screen.test.tsx::003_ac10_*`, `003_ac11_*`; `SessionGate.test.tsx::successful_login_clears_previous_users_cache` |
@@ -321,6 +345,16 @@ FR без отдельного AC: FR-9 проверяют AC-3, AC-27, AC-28, A
   стартовых экранов с содержимым.
 - **R-7. `/change-password` при 5xx** ведёт на `/` (как сейчас), где `SessionGate` показывает
   ошибку и «Повторить». Адрес меняется (§9, П-3).
+- **R-8. Профиль в кэше до 5 с** (D-12). В течение `SESSION_FRESH_MS` экраны решают по
+  профилю из кэша и не перечитывают `GET /me`. Безопасность держится на `queryClient.clear()`
+  при входе, выходе, успешной смене пароля и 401 (§4.2): профиль другого пользователя в кэше
+  не остаётся, и его данные не показываются. При 403 `no_role` кэш не очищается
+  (`onNoRole` только переходит на `/no-role`). Поэтому после снятия роли кнопка «Назад» может
+  на миг показать экран прежней роли того же пользователя по профилю из кэша. Затем запрос
+  экрана получает 403 `no_role`, и клиент ведёт на `/no-role`. Окно не больше 5 с, и сервер
+  проверяет доступ сам. Если риск сочтут неприемлемым, нужно очищать `SESSION_KEY` в `onNoRole`
+  (отдельная правка, вне 003). `ForcedPasswordChange` от этого риска защищён: он читает
+  профиль заново (`useSession(0)`).
 
 ## 9. Противоречия и неполнота spec (не исправлены; на решение владельца или spec-writer)
 
