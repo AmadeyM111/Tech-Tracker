@@ -11,7 +11,6 @@ import {
   CE,
   INITIAL,
   MOVE,
-  NEW_TITLE,
   NO_CONTENT,
   PID,
   PROJ_CREATE,
@@ -32,14 +31,10 @@ import {
   installLayout,
   j,
   keyboardDrag,
-  liveBoard,
   openBoard,
-  openCreate,
   pickFilter,
-  titleInput,
   where,
 } from "./helpers";
-import { fireEvent } from "@testing-library/react";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -103,6 +98,7 @@ describe("T91 assignee filter", () => {
     expect(idsIn(container, "done")).toEqual([TE]);
   });
 
+  // 004/AC-4: опрос при фильтре «Без исполнителя» - новая карточка без исполнителя последняя в колонке.
   it("t91_poll_keeps_filter_and_applies_new_data_to_it", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let step = 0;
@@ -185,37 +181,26 @@ describe("T91 filter with move and create", () => {
     expect(cardEl(container, TA)).toBeNull();
   });
 
-  it("t91_create_with_filter_keeps_filter_and_shows_new_unassigned_card", async () => {
-    const live = liveBoard();
-    const { container, f } = await openBoard(live.routes);
-    pickFilter("none");
-    await waitFor(() => expect(idsIn(container, "todo")).toEqual([TB, TC]));
-    const form = openCreate(container, "review");
-    fireEvent.change(titleInput(form), { target: { value: NEW_TITLE } });
-    fireEvent.submit(form);
-    await waitFor(() => expect(idsIn(container, "review")).toEqual([TN]));
-    expect(await body(f.last(PROJ_CREATE))).toEqual({ title: NEW_TITLE });
-    expect(filterSelect().value).toBe("none");
-    expect(idsIn(container, "todo")).toEqual([TB, TC]);
-    expect(f.count(MOVE(TN))).toBe(1);
-  });
-
-  it("t91_create_under_other_member_filter_still_posts_and_hides_unassigned_new_card", async () => {
-    const live = liveBoard();
-    const { container, f } = await openBoard(live.routes);
+  it("004_ac5_poll_new_unassigned_card_hidden_under_member_filter_visible_last_under_all", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let step = 0;
+    const { container, f } = await openBoard({
+      [BOARD]: () =>
+        j(200, boardBody(step === 0 ? INITIAL : { ...INITIAL, todo: [CA, CB, CC, { ...CB, id: TN, title: "Нов", position: 1000 }] })),
+    });
     pickFilter(R_KUZNETSOV.id);
     await waitFor(() => expect(idsIn(container, "todo")).toEqual([TA]));
-    const form = openCreate(container, "todo");
-    fireEvent.change(titleInput(form), { target: { value: NEW_TITLE } });
-    fireEvent.submit(form);
-    await waitFor(() => expect(f.count(PROJ_CREATE)).toBe(1));
-    expect(await body(f.last(PROJ_CREATE))).toEqual({ title: NEW_TITLE });
-    await waitFor(() => expect(f.count(BOARD)).toBeGreaterThan(1));
+    step = 1;
+    const n = f.count(BOARD);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await waitFor(() => expect(f.count(BOARD)).toBeGreaterThan(n));
+    // фильтр сохранён, новой карточки без исполнителя нет
     expect(filterSelect().value).toBe(R_KUZNETSOV.id);
     expect(idsIn(container, "todo")).toEqual([TA]);
+    expect(cardEl(container, TN)).toBeNull();
     pickFilter("");
     await waitFor(() => expect(idsIn(container, "todo")).toEqual([TA, TB, TC, TN]));
-    void CD;
+    expect(f.count(PROJ_CREATE)).toBe(0);
   });
 });
 

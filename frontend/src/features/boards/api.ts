@@ -30,14 +30,3 @@ export async function moveTask(taskId: string, body: TaskMove): Promise<void> {
     body,
   });
 }
-
-/** Creates a task from a board column: only the title is sent, the server fills in the rest (FR-18a). */
-export async function createTask(projectId: string, title: string): Promise<{ id: string }> {
-  const { data } = await getAppClient().POST("/api/v1/projects/{project_id}/tasks", {
-    params: { path: { project_id: projectId } },
-    // The schema marks `description` / `priority` as required only because they have server defaults.
-    body: { title } as components["schemas"]["TaskCreate"],
-  });
-  if (data === undefined) throw new ApiError(201, INVALID_RESPONSE, "invalid response body");
-  return data;
-}

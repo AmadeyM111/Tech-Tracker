@@ -203,7 +203,7 @@ R5-T10. R5-T04 можно делать параллельно с R5-T01…R5-T03
 - **Остаток в финальную уборку (R5-T05-1):** в AC-27 открыть вкладку «Задачи» до создания; AC-9 на реальной карточке `/tasks/<id>`; убрать запасной литерал `?? "Задача"` в тестах.
 
 ## R5-T06 — Доска без создания задач
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7; FR-1…FR-4; раздел 10 п. 3
 - **Файлы:** `frontend/src/features/boards/BoardView.tsx`, `frontend/src/features/boards/api.ts`,
   `frontend/src/features/projects/ProjectPage.tsx`;
@@ -234,10 +234,10 @@ R5-T10. R5-T04 можно делать параллельно с R5-T01…R5-T03
   пусто; `git grep -n "<BoardView" -- frontend/src/features/projects/ProjectPage.tsx` показывает
   `<BoardView projectId={project.id} />`; `git grep -n createTask -- frontend/src/features/boards/api.ts`
   пусто; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R5-T06` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (объединены с R5-T07/R5-T06, ускоренный режим)
 
 ## R5-T07 — Словарь и стили создания из колонки удалены
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-8; NFR-2; раздел 10 пп. 1–2 (plan §9, П-1)
 - **Файлы:** `frontend/src/shared/i18n/ru.ts`, `frontend/src/shared/ui/ui.css`;
   тесты: `frontend/tests/features/boards/BoardCreate.test.tsx`
@@ -254,7 +254,8 @@ R5-T10. R5-T04 можно делать параллельно с R5-T01…R5-T03
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/boards tests/shared`
   зелёный; `git grep -n -E "boards\.(add_task|create_)|ui-add-task|ui-create-form" -- frontend/src`
   пусто; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R5-T07` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (объединены с R5-T07/R5-T06, ускоренный режим)
+- **Остаток в финальную уборку (R5-T06-T07-1):** `004_ac7` — точный путь POST; имя describe `T91 filter with move and create`; нумерация контракта в `boards/helpers.tsx`; ожидание применения данных опроса в `004_ac5`.
 
 ## R5-T08 — Документы: spec 001 (v0.19) и пометка T91 в tasks 001
 - **Статус:** TODO

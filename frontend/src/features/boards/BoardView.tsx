@@ -1,7 +1,8 @@
 // Kanban board: content of the project's "Board" tab (T86).
 // UF-5, FR-18a, FR-28, FR-28a (the client sends the neighbours), FR-29 (polling),
 // FR-19b (a refused move is rolled back with a message), AC-97 (keyboard), NFR-5..7, D-61.
-// T91: create a task from a column, optimistic move, client-side assignee filter.
+// 004: создания задач на Доске нет (создание — диалог бокового меню и вкладка "Задачи").
+// T91: optimistic move, client-side assignee filter.
 import {
   DndContext,
   KeyboardSensor,
@@ -25,14 +26,14 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS, type Coordinates } from "@dnd-kit/utilities";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import type { TaskStatus } from "../tasks/api";
-import { createTask, getBoard, moveTask, type Board, type BoardCard, type BoardColumn } from "./api";
+import { getBoard, moveTask, type Board, type BoardCard, type BoardColumn } from "./api";
 import { dropIndexInColumn, insertIndexFor, nearestCardIndex, neighborsInFullOrder, pickDropColumn } from "./dnd";
 
 const YMD = /^(\d{4})-(\d{2})-(\d{2})/;
@@ -165,127 +166,7 @@ function Card({ card }: { card: BoardCard }) {
   );
 }
 
-/** What happened to a create request: nothing created / created but not moved / all done. */
-type CreateResult = "failed" | "created" | "ok";
-
-function CreateTask({
-  status,
-  onCreate,
-  onInvalid,
-}: {
-  status: TaskStatus;
-  onCreate: (status: TaskStatus, title: string) => Promise<CreateResult>;
-  onInvalid: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const addRef = useRef<HTMLButtonElement>(null);
-  // Bumped when the form is opened or closed: an answer to an older request must not touch a newer form.
-  const epoch = useRef(0);
-  const [busy, setBusy] = useState(false);
-  const restoreFocus = useRef(false);
-  const inputId = useId();
-
-  useEffect(() => {
-    if (open) {
-      inputRef.current?.focus();
-    } else if (restoreFocus.current) {
-      restoreFocus.current = false;
-      addRef.current?.focus();
-    }
-  }, [open]);
-
-  function close(focusButton: boolean): void {
-    epoch.current += 1;
-    restoreFocus.current = focusButton;
-    setBusy(false);
-    setOpen(false);
-    setTitle("");
-  }
-
-  function openForm(): void {
-    epoch.current += 1;
-    setBusy(false);
-    setOpen(true);
-  }
-
-  async function submit(event: FormEvent): Promise<void> {
-    event.preventDefault();
-    if (busy) return;
-    const trimmed = title.trim();
-    if (trimmed === "") {
-      onInvalid();
-      return;
-    }
-    const mine = epoch.current;
-    setBusy(true);
-    const result = await onCreate(status, trimmed);
-    // The form was closed (and maybe re-opened) while the request was in flight: leave it alone.
-    if (epoch.current !== mine) return;
-    if (result === "failed") setBusy(false);
-    else close(result === "ok");
-  }
-
-  function onKeyDown(event: KeyboardEvent): void {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close(true);
-    }
-  }
-
-  if (!open) {
-    return (
-      <button type="button" data-action="add-task" className="ui-add-task" ref={addRef} onClick={openForm}>
-        {t("boards.add_task")}
-      </button>
-    );
-  }
-  return (
-    <form
-      data-form="board-create-task"
-      className="ui-create-form"
-      aria-label={t("boards.create_form_label", {
-        status: statusTitle(status),
-      })}
-      onSubmit={(e) => void submit(e)}
-      onKeyDown={onKeyDown}
-      noValidate
-    >
-      <label htmlFor={inputId}>{t("boards.create_title_label")}</label>
-      <input
-        id={inputId}
-        name="title"
-        type="text"
-        ref={inputRef}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-      <div className="ui-create-form-actions">
-        <button type="submit" aria-busy={busy ? "true" : undefined}>
-          {t("boards.create_submit")}
-        </button>
-        <button type="button" data-action="cancel-create" onClick={() => close(true)}>
-          {t("boards.create_cancel")}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function Column({
-  status,
-  cards,
-  canCreate,
-  onCreate,
-  onInvalid,
-}: {
-  status: TaskStatus;
-  cards: readonly BoardCard[];
-  canCreate: boolean;
-  onCreate: (status: TaskStatus, title: string) => Promise<CreateResult>;
-  onInvalid: () => void;
-}) {
+function Column({ status, cards }: { status: TaskStatus; cards: readonly BoardCard[] }) {
   const headingId = useId();
   // The drop zone is the whole section, not only the list of cards (B2).
   const { setNodeRef } = useDroppable({
@@ -307,7 +188,6 @@ function Column({
           ))}
         </ul>
       </SortableContext>
-      {canCreate ? <CreateTask status={status} onCreate={onCreate} onInvalid={onInvalid} /> : null}
     </section>
   );
 }
@@ -333,7 +213,7 @@ function applyMove(
   });
 }
 
-export function BoardView({ projectId, canCreate = false }: { projectId: string; canCreate?: boolean }) {
+export function BoardView({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const alert = useAlertState();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -546,35 +426,6 @@ export function BoardView({ projectId, canCreate = false }: { projectId: string;
     }
   }
 
-  /** Creates a task in the column; for a column other than "todo" moves it there (no neighbours: the end). */
-  async function onCreate(status: TaskStatus, title: string): Promise<CreateResult> {
-    alert.clear();
-    let id: string;
-    try {
-      id = (await createTask(projectId, title)).id;
-    } catch (e) {
-      alert.show(errorMessage(codeOf(e)));
-      return "failed";
-    }
-    let result: CreateResult = "ok";
-    if (status !== "todo") {
-      try {
-        await moveTask(id, { status });
-      } catch (e) {
-        // The task exists, in the first column: say so, with the reason of the refused move.
-        alert.show(
-          t("boards.create_move_failed", {
-            status: statusTitle("todo"),
-            reason: errorMessage(codeOf(e)),
-          }),
-        );
-        result = "created";
-      }
-    }
-    await queryClient.invalidateQueries({ queryKey });
-    return result;
-  }
-
   const loadError = board.isError ? errorMessage(codeOf(board.error)) : null;
 
   return (
@@ -618,14 +469,7 @@ export function BoardView({ projectId, canCreate = false }: { projectId: string;
           >
             <div className="ui-board-grid">
               {(shown ?? columns).map((column) => (
-                <Column
-                  key={column.status}
-                  status={column.status}
-                  cards={column.tasks}
-                  canCreate={canCreate}
-                  onCreate={onCreate}
-                  onInvalid={() => alert.show(errorMessage("validation_error"))}
-                />
+                <Column key={column.status} status={column.status} cards={column.tasks} />
               ))}
             </div>
           </DndContext>
