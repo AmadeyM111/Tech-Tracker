@@ -2171,6 +2171,7 @@ T69 → T73.
 - **Файлы:** `frontend/src/features/boards/{BoardView.tsx,dnd.ts,api.ts}`, `ProjectPage.tsx`, `ru.ts`, `ui.css`; тесты `frontend/tests/features/boards/{BoardCreate,BoardOptimistic,BoardFilter}.test.tsx`, `dnd.full.test.ts`
 - **Заметки:** создание — POST create (в todo) + move для не-todo колонок (backend не менялся); фильтр клиентский, соседи для move по ПОЛНОМУ порядку колонки; бэклог: задача, созданная под фильтром исполнителя, может быть не видна; `createTask` дублирует `tasks/api.ts`.
 - **Попытки:** 2
+- **Пересмотрено:** 004 снимает создание из колонки (кнопка, форма, связка create + move, `createTask` в `boards/api.ts`, ключи `boards.add_task`, `boards.create_*`); оптимистичный перенос и фильтр остаются; заметка бэклога о задаче, созданной под фильтром, неактуальна
 
 ## T92 — Стиль ссылки «На главную»
 - **Статус:** DONE
