@@ -195,6 +195,23 @@ select:disabled {
   border-radius: var(--radius);
 }
 
+.ui-login-help {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.ui-login-help h2 {
+  margin: 0 0 0.5rem;
+  color: var(--text);
+}
+
+.ui-login-help p {
+  margin: 0 0 0.5rem;
+}
+
 .ui-wide {
   max-width: 100rem;
   margin: 1rem auto 2rem;

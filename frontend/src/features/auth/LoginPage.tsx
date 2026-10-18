@@ -75,6 +75,11 @@ export function LoginPage() {
           {t("auth.login_submit")}
         </button>
       </form>
+      <section className="ui-login-help" aria-labelledby="login-help-title">
+        <h2 id="login-help-title">{t("auth.help_title")}</h2>
+        <p>{t("auth.help_p1")}</p>
+        <p>{t("auth.help_p2")}</p>
+      </section>
     </section>
   );
 }

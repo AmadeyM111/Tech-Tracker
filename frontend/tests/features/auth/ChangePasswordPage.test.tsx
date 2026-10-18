@@ -222,3 +222,44 @@ describe("NoRolePage (T23, FR-66)", () => {
     expect(container.textContent).toContain(errorMessage("no_role"));
   });
 });
+
+// Spec 005-login-help, AC-6 (FR-7): the help block exists only on /login.
+describe("login help block is absent elsewhere (spec 005, AC-6)", () => {
+  const P1_PART = "трекер задач для команды";
+  const P2_PART = "выдаёт технический администратор";
+
+  function expectNoHelp() {
+    expect(screen.queryByRole("region", { name: "О системе" })).toBeNull();
+    expect(screen.queryByRole("complementary", { name: "О системе" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "О системе" })).toBeNull();
+    expect(document.body.textContent).not.toContain(P1_PART);
+    expect(document.body.textContent).not.toContain(P2_PART);
+    expect(document.body.textContent).not.toContain("GOSTracker — ");
+  }
+
+  it("ac6_change_password_page_has_no_help_block", () => {
+    renderAt("/change-password", <ChangePasswordPage />);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expectNoHelp();
+  });
+
+  it("ac6_no_role_page_has_no_help_block", () => {
+    const { container } = renderAt("/no-role", <NoRolePage />);
+    expect(container.textContent).toContain(errorMessage("no_role"));
+    expectNoHelp();
+  });
+
+  it("ac6_routes_change_password_and_no_role_have_no_help_block", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ detail: "x", code: "password_change_required" }), { status: 403, headers: { "Content-Type": "application/json" } })),
+    );
+    try {
+      renderAt("/change-password", <AppRoutes />, "*");
+      await screen.findByRole("dialog");
+      expectNoHelp();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

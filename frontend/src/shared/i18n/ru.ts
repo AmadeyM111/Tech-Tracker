@@ -43,6 +43,11 @@ export const ru = {
   "auth.login_label": "Логин",
   "auth.password_label": "Пароль",
   "auth.login_submit": "Войти",
+  "auth.help_title": "О системе",
+  "auth.help_p1":
+    "GOSTracker — трекер задач для команды. Проекты, задачи с подзадачами и комментариями, список и канбан-доска.",
+  "auth.help_p2":
+    "Учётную запись и первый пароль выдаёт технический администратор. После первого входа пароль нужно сменить.",
   "auth.current_password_label": "Текущий пароль",
   "auth.new_password_label": "Новый пароль",
   "auth.confirm_password_label": "Повторите новый пароль",
