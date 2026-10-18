@@ -404,16 +404,21 @@ describe("action texts, roles, timezone (review T24 attempt 2)", () => {
   });
 });
 
-describe("links from admin screens to home", () => {
-  it.each(["/admin/audit", "/admin/users"])("%s_has_link_to_home", async (path) => {
+describe("sidebar on admin screens (003/AC-20, AC-16)", () => {
+  it.each(["/admin/audit", "/admin/users"])("%s_has_ta_menu_and_logout_and_no_link_to_home", async (path) => {
     setup({
       "GET /api/v1/admin/users": () => j(200, page([])),
     });
     const { container } = renderApp(path);
     await waitFor(() => expect(container.querySelector("form")).toBeTruthy());
-    const a = container.querySelector<HTMLAnchorElement>('a[href="/"]');
-    expect(a).toBeTruthy();
-    expect(DICT).toContain(a?.textContent);
+    const nav = screen.getByRole("navigation", { name: ru["app.menu_label"] });
+    const hrefs = Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(["/admin/users", "/admin/audit"]);
+    for (const a of Array.from(nav.querySelectorAll("a"))) expect(DICT).toContain(a.textContent);
+    const logout = screen.getAllByRole("button", { name: ru["auth.logout"] });
+    expect(logout).toHaveLength(1);
+    expect((logout[0] as HTMLButtonElement).type).toBe("button");
+    expect(container.querySelector('a[href="/"]')).toBeNull();
   });
 });
 

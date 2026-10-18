@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { AuditPage } from "../features/admin/AuditPage";
 import { UsersPage } from "../features/admin/UsersPage";
@@ -194,72 +194,31 @@ function Root({ insideMain }: { insideMain: boolean }) {
   );
 }
 
-/** Admin screen: the session guard plus a capability; without it no request is made. */
-function HomeLink() {
-  return (
-    <p>
-      <Link to="/" className="ui-home-link">
-        <Icon name="home" />
-        {t("app.home_link")}
-      </Link>
-    </p>
-  );
-}
-
-function AdminScreen({
+/**
+ * Screen with a role (003/FR-10, FR-11, FR-14): the session guard, the shell with the Sidebar,
+ * then the content or a refusal. Without the capability no section data is requested.
+ */
+function RoleScreen({
   insideMain,
   capability,
-  shell = false,
   children,
 }: {
   insideMain: boolean;
-  capability: MeResponse["capabilities"][number];
-  shell?: boolean;
+  capability: Capability;
   children: (profile: MeResponse) => ReactNode;
 }) {
   return (
     <SessionGate insideMain={insideMain}>
-      {(profile) =>
-        profile.capabilities.includes(capability) ? (
-          <Landmark insideMain={insideMain} shell={shell}>
-            <HomeLink />
-            {children(profile)}
-          </Landmark>
-        ) : (
-          <Landmark insideMain={insideMain}>
-            <HomeLink />
+      {(profile) => (
+        <Landmark insideMain={insideMain} shell>
+          <Sidebar profile={profile} />
+          {profile.capabilities.includes(capability) ? (
+            children(profile)
+          ) : (
             <ErrorAlert message={errorMessage("forbidden")} />
-          </Landmark>
-        )
-      }
-    </SessionGate>
-  );
-}
-
-// Business screen (T82-T84 replaced the stub bodies); needs business_access.
-// Allowed branch: shell with the Sidebar and no "home" link (003/FR-10); the refusal branch is unchanged.
-function BusinessScreen({
-  insideMain,
-  children,
-}: {
-  insideMain: boolean;
-  children: (profile: MeResponse) => ReactNode;
-}) {
-  return (
-    <SessionGate insideMain={insideMain}>
-      {(profile) =>
-        profile.capabilities.includes("business_access") ? (
-          <Landmark insideMain={insideMain} shell>
-            <Sidebar profile={profile} />
-            {children(profile)}
-          </Landmark>
-        ) : (
-          <Landmark insideMain={insideMain}>
-            <HomeLink />
-            <ErrorAlert message={errorMessage("forbidden")} />
-          </Landmark>
-        )
-      }
+          )}
+        </Landmark>
+      )}
     </SessionGate>
   );
 }
@@ -377,49 +336,49 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
       <Route
         path="/admin/users"
         element={
-          <AdminScreen insideMain={insideMain} capability="manage_accounts">
+          <RoleScreen insideMain={insideMain} capability="manage_accounts">
             {(profile) => <UsersPage canAssignRoles={profile.capabilities.includes("assign_roles")} />}
-          </AdminScreen>
+          </RoleScreen>
         }
       />
       <Route
         path="/admin/audit"
         element={
-          <AdminScreen insideMain={insideMain} capability="view_audit">
+          <RoleScreen insideMain={insideMain} capability="view_audit">
             {() => <AuditPage />}
-          </AdminScreen>
+          </RoleScreen>
         }
       />
       <Route
         path="/projects"
         element={
-          <BusinessScreen insideMain={insideMain}>
+          <RoleScreen insideMain={insideMain} capability="business_access">
             {(profile) => <ProjectsPage canCreate={profile.capabilities.includes("project_create")} />}
-          </BusinessScreen>
+          </RoleScreen>
         }
       />
       <Route
         path="/projects/:projectId"
         element={
-          <BusinessScreen insideMain={insideMain}>
+          <RoleScreen insideMain={insideMain} capability="business_access">
             {(profile) => <ProjectPage currentUserId={profile.id} currentRole={profile.role} />}
-          </BusinessScreen>
+          </RoleScreen>
         }
       />
       <Route
         path="/tasks/:taskId"
         element={
-          <BusinessScreen insideMain={insideMain}>
+          <RoleScreen insideMain={insideMain} capability="business_access">
             {() => <TaskPage />}
-          </BusinessScreen>
+          </RoleScreen>
         }
       />
       <Route
         path="/my-tasks"
         element={
-          <BusinessScreen insideMain={insideMain}>
+          <RoleScreen insideMain={insideMain} capability="business_access">
             {() => <MyTasksPage />}
-          </BusinessScreen>
+          </RoleScreen>
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />

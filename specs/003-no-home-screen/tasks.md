@@ -98,7 +98,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Примечание оркестратора (PLAN_ISSUE снят, 2026-10-18):** AC-30 для `BA` требует, чтобы первой tabbable-ссылкой на бизнес-экране не была «На главную». Поэтому в R4-T02 разрешено убрать `HomeLink` из ветки «разрешённый экран» `BusinessScreen` (без изменения `AdminScreen` для ТА, экранов отказа и самого `HomeLink`). Тесты не меняются.
 
 ## R4-T03 — Боковое меню на экранах ТА и экранах отказа; «На главную» убрана
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-20, AC-21, AC-22 (`TA` на `/admin/users`), AC-27, AC-28, AC-29 (`TA`), AC-30 (`TA`),
   AC-16 (ссылки на экранах ТА и экранах отказа); FR-2, FR-11, FR-14
 - **Файлы:** `frontend/src/app/router.tsx`;
@@ -132,7 +132,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Готово, когда:** `cd frontend && npx vitest run tests/app/sidebar.test.tsx tests/app/home-link.test.tsx tests/app/icons.test.tsx tests/app/navigation.test.tsx tests/features/admin`
   зелёный; `git grep -n -E "HomeLink|AdminScreen|BusinessScreen" -- frontend/src` пусто;
   проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R4-T03` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (ревью: 2 круга, правки только тестов)
 
 ## R4-T04 — «Главная» удалена: `/` и неизвестные пути ведут на стартовый экран
 - **Статус:** TODO

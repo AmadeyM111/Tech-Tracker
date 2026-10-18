@@ -1,9 +1,10 @@
-// T100: иконки слева у пунктов бокового меню и у ссылки «На главную».
+// T100 / 003 R4-T03 (AC-20, AC-16): иконки слева у пунктов бокового меню и у «Выйти»; «На главную» нет.
 //
 // Контракт для исполнителя:
 //  - у каждой ссылки/кнопки внутри `.ui-sidebar` первый дочерний ЭЛЕМЕНТ (и первый узел) -
 //    inline <svg class="ui-icon" aria-hidden="true" focusable="false"> без <title>/текста;
-//    то же у ссылки `.ui-home-link` на admin-экранах. Доступные имена не меняются.
+//    это же верно для ссылок меню и «Выйти» на экранах ТА (AC-20); ссылки «На главную»
+//    (`.ui-home-link`) нет нигде (AC-16). Доступные имена не меняются.
 //  - у разных пунктов меню разная разметка иконки (innerHTML).
 //  - ui.css: `.ui-icon` с width и height (20px или 1.25em), flex-shrink: 0, отступ справа
 //    (margin-right|margin-inline-end у .ui-icon либо gap у `.ui-sidebar a`/`.ui-sidebar button`);
@@ -22,8 +23,6 @@ const ALL = ["business_access", "project_create", "task_assign_others", ...CAPS_
 const ROUTES = {
   [ME]: () => j(200, meWith(ALL)),
   "GET /api/v1/projects": () => j(200, page([])),
-  "GET /api/v1/users": () => j(200, page([])),
-  "GET /api/v1/audit": () => j(200, page([])),
 };
 
 const NAV = [ru["nav.projects"], ru["nav.my_tasks"], ru["admin.home_users_link"], ru["admin.home_audit_link"]];
@@ -72,12 +71,26 @@ describe("T100 sidebar icons", () => {
     expect(new Set(markup).size).toBe(NAV.length);
   });
 
-  it.each(["/admin/users", "/admin/audit"])("%s: home link has an icon", async (path) => {
-    installFetch(ROUTES);
+  it.each(["/admin/users", "/admin/audit"])("AC-20 %s: menu links and logout have distinct icons, no home link", async (path) => {
+    installFetch({
+      ...ROUTES,
+      [ME]: () => j(200, meWith(CAPS_ALL)),
+      "GET /api/v1/admin/users": () => j(200, page([])),
+      "GET /api/v1/admin/audit": () => j(200, page([])),
+    });
     renderApp(path);
-    const link = await screen.findByRole("link", { name: ru["app.home_link"] });
-    expect(link.className.split(/\s+/)).toContain("ui-home-link");
-    expectIcon(link);
+    const markup: string[] = [];
+    for (const name of [ru["admin.home_users_link"], ru["admin.home_audit_link"]]) {
+      const link = await screen.findByRole("link", { name });
+      expect(link.closest(".ui-sidebar")).not.toBeNull();
+      markup.push(expectIcon(link).innerHTML);
+    }
+    const logout = screen.getByRole("button", { name: ru["auth.logout"] });
+    expect(logout.closest(".ui-sidebar")).not.toBeNull();
+    markup.push(expectIcon(logout).innerHTML);
+    expect(new Set(markup).size).toBe(markup.length);
+    expect(screen.queryByRole("link", { name: ru["app.home_link"] })).toBeNull();
+    expect(document.querySelector(".ui-home-link")).toBeNull();
   });
 });
 

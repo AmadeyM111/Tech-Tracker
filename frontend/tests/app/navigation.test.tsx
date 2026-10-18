@@ -92,6 +92,13 @@ describe("T81 routes under the session gate", () => {
     expect(alert.textContent).toBe(ru["error.forbidden"]);
     expect(where()).toBe(path);
     expect(f.calls.length).toBe(1);
+    // 003/AC-27: меню ТА, «Выйти», нет «На главную»
+    const nav = await screen.findByRole("navigation", { name: ru["app.menu_label"] });
+    expect(Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/admin/users", "/admin/audit"]);
+    expect(screen.getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: ru["app.home_link"] })).toBeNull();
+    expect(document.querySelector('a[href="/"]')).toBeNull();
+    expect(f.calls.length).toBe(1);
   });
 });
 
