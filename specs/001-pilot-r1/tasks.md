@@ -1936,6 +1936,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Готово, когда:** фронтенд зелёный (общие условия R1.1).
 - **Заметки ревью T81:** кандидатов для `allowedIds` брать из GET /projects/{id}/members (не /users); UserPicker: live region, maxLength 64, Escape — сделано в T82; сканер `scanLatinUi` на compiler API; известные лазейки: вызовы/объектные литералы/массивы, `value`/`defaultValue` в TECHNICAL_ATTRS.
 - **Попытки:** 1
+- **Пересмотрено:** 003 (2026-10-18): "/" только перенаправляет на стартовый экран по роли, меню — на каждом экране с ролью; контракт «`<nav>` на главной "/"» снят (specs/003-no-home-screen/spec.md, FR-1…FR-3, FR-10, FR-11, FR-14).
 
 ## T82 — Экраны проектов: список, создание, карточка, участники, владение, удаление
 - **Статус:** DONE
@@ -2175,12 +2176,14 @@ T69 → T73.
 - **Статус:** DONE
 - **Файлы:** `frontend/src/app/router.tsx` (`ui-home-link`), `ui.css`; тесты `theme.test.ts`, `tests/app/home-link.test.tsx`
 - **Попытки:** 1
+- **Пересмотрено:** снято 003 (2026-10-18): ссылки «На главную» и стиля `.ui-home-link` нет (specs/003-no-home-screen/spec.md).
 
 ## T100 — Шрифты +4px и иконки в меню (docs/ui/backlog.md п.3; п.1 — не воспроизведён)
 - **Статус:** DONE (по тестам; визуально — владельцем)
 - **Файлы:** `frontend/src/shared/ui/{ui.css,Icon.tsx}`, `frontend/src/app/router.tsx`; тесты `frontend/tests/shared/typography.test.ts`, `frontend/tests/app/icons.test.tsx`; whitelist `backend/tests/infra/test_frontend_scaffold.py`
 - **Заметки:** п.1 бэклога («верхняя панель браузера закрывает шапку», `docs/ui/1.png`) воспроизвести не удалось (документ не выше окна, sticky-панель стоит на top=0, проверено в headless Chrome на 6 размерах); добавлена страховка `100dvh`; вероятная причина — кэш старого бандла или момент до отрисовки React; уточнить у владельца экран, размер окна, масштаб, консоль/Network, Cmd+Shift+R. Заметка владельца `docs/ui/Untitled`: «Сменить пароль лучше вынести в приветственное окно» — не реализовано, ждёт решения.
 - **Попытки:** 1
+- **Пересмотрено:** 003 (2026-10-18): иконка `home` удалена, иконки у пунктов меню и «Выйти» остаются (specs/003-no-home-screen/spec.md).
 
 ## T101 — Карточка задачи без дублей полей (docs/ui/backlog.md п.2)
 - **Статус:** DONE
@@ -2193,6 +2196,7 @@ T69 → T73.
 - **Файлы:** `frontend/src/app/router.tsx` (Home), `frontend/src/shared/i18n/ru.ts` (`app.welcome_title`, `app.welcome_hint`); тесты `frontend/tests/app/{welcome.test.tsx,icons.test.tsx}`
 - **Заметки:** решение владельца 2026-10-16 (docs/ui/Untitled): ссылка убрана из боковой панели, блок `section[data-section="welcome"]` на `/` под заголовком; на бизнес-экранах ссылки нет; визуально не проверялось.
 - **Попытки:** 1
+- **Пересмотрено:** заменена T103 (ссылка в приветственном блоке убрана); блока приветствия и страницы «Главная» больше нет — 003 (2026-10-18), specs/003-no-home-screen/spec.md.
 
 ## T103 — Принудительная смена пароля: модальное окно после первого входа
 - **Статус:** DONE (ревью CHANGES_REQUESTED → правки; повторное ревью не проводилось — исправлены блокер и замечания по тестам)
@@ -2200,6 +2204,7 @@ T69 → T73.
 - **Файлы:** `frontend/src/features/auth/{ChangePasswordPage.tsx,session.ts,api.ts}`, `frontend/src/app/router.tsx`, `frontend/src/shared/api/client.ts` (набор `fired` сбрасывается при регистрации обработчиков), `ui.css` (`.ui-overlay` прокручивается), `ru.ts`; тесты `frontend/tests/app/{password-modal,welcome}.test.tsx`, `tests/features/auth/*`, `AuditPage.test.tsx`; whitelist `test_frontend_scaffold.py`
 - **Заметки:** окно без закрытия (Escape/оверлей), фокус-ловушка, `aria-describedby`, фокус на h1 после успеха; не-принудительный пользователь на `/change-password` → `/`; проверено в headless Chrome на мок-сервере (вход, F5, выход, без роли, опрос 34 с); бэклог: `fired` перерегистрируется при смене пути (семантика «раз на экран»), тесты M3/M8 добавлены.
 - **Попытки:** 2
+- **Пересмотрено:** 003 (2026-10-18): после смены пароля — стартовый экран по 003/FR-3, фокус на его заголовке (003/FR-15), а не путь "/" и заголовок «Главной» (specs/003-no-home-screen/spec.md).
 
 ## T93 — Столбец `login_display`: модель и миграция 0005
 - **Статус:** DONE
