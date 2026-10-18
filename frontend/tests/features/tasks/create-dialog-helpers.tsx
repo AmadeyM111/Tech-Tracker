@@ -96,3 +96,13 @@ export function renderDialog(opts: RenderOpts = {}) {
   );
   return { ...out, qc, onClose, onCreated };
 }
+
+// --- R5-T03: отправка ---
+
+/** Тело перехваченного запроса как объект (clone: тело можно читать повторно). */
+export const readBody = async (r: Request) => (await r.clone().json()) as Record<string, unknown>;
+
+/** Обработчик, имитирующий падение сети (fetch бросает TypeError). */
+export const networkFail = (): Response => {
+  throw new TypeError("Failed to fetch");
+};

@@ -168,15 +168,19 @@ export interface CreateTaskDialogProps {
   /** Закрытие без создания: Escape, «Отмена», «Закрыть». Фокус возвращает вызывающий. */
   onClose: () => void;
   /** 201: задача создана, кэши инвалидированы. Вызывающий закрывает диалог и открывает карточку. */
-  // The submit that calls it is R5-T03.
   onCreated: (task: TaskDetail) => void;
 }
 
 const DIALOG_FOCUSABLE = 'input, select, button, [tabindex]:not([tabindex="-1"])';
 
-/** 004/FR-8..FR-12, FR-19, FR-20: modal "new task" (project + title); submit is added by R5-T03. */
-export function CreateTaskDialog({ currentProjectId, onClose }: CreateTaskDialogProps) {
+/** 004/FR-8..FR-12, FR-19, FR-20: modal "new task" (project + title), submit per FR-13..FR-18. */
+export function CreateTaskDialog({ currentProjectId, onClose, onCreated }: CreateTaskDialogProps) {
   const id = useId();
+  const queryClient = useQueryClient();
+  const alert = useAlertState();
+  const busy = useRef(false);
+  const created = useRef(false);
+  const [pending, setPending] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const projectRef = useRef<HTMLSelectElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -212,7 +216,7 @@ export function CreateTaskDialog({ currentProjectId, onClose }: CreateTaskDialog
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     if (event.key === "Escape") {
       event.stopPropagation();
-      onClose();
+      if (!busy.current) onClose(); // FR-18: no closing while the create request is in flight
       return;
     }
     if (event.key !== "Tab") return;
@@ -234,17 +238,54 @@ export function CreateTaskDialog({ currentProjectId, onClose }: CreateTaskDialog
     }
   }
 
-  function onSubmit(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault(); // sending is R5-T03
-  }
-
   const listError =
     query.isError ? errorMessage(query.error instanceof ApiError ? query.error.code : "unknown") : null;
   const loading = projects === undefined && !query.isError;
   const selected = choice ?? (projects === undefined ? null : preselectProject(projects, currentProjectId)) ?? "";
 
+  // 004/FR-13..FR-17: one request at a time; the list must be there; input is kept on any failure.
+  function onSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    if (busy.current || created.current || loading) return;
+    const name = title.trim();
+    if (name === "" || selected === "") {
+      alert.show(errorMessage("validation_error"));
+      return;
+    }
+    const projectId = selected;
+    busy.current = true;
+    setPending(true);
+    alert.clear();
+    void (async () => {
+      let task: TaskDetail;
+      try {
+        task = await createTask(projectId, { title: name });
+      } catch (e) {
+        alert.show(errorMessage(e instanceof ApiError ? e.code : "unknown"));
+        busy.current = false;
+        setPending(false);
+        return;
+      }
+      // The task exists: a repeated submit must not create a duplicate even if onCreated throws.
+      created.current = true;
+      // invalidateQueries marks the cache stale synchronously; refetches are not awaited (FR-15).
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "project", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["board", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "mine"] });
+      busy.current = false;
+      setPending(false);
+      // Separate from the create try/catch: a failure of the caller is not a "create error" (no alert);
+      // it is reported to the console so that it is not lost as an unhandled rejection.
+      try {
+        onCreated(task);
+      } catch (e) {
+        console.error("CreateTaskDialog: onCreated failed", e);
+      }
+    })();
+  }
+
   const cancel = (
-    <button type="button" data-action="cancel" onClick={onClose}>
+    <button type="button" data-action="cancel" disabled={pending} onClick={onClose}>
       {t("admin.cancel")}
     </button>
   );
@@ -300,7 +341,7 @@ export function CreateTaskDialog({ currentProjectId, onClose }: CreateTaskDialog
           </div>
         )}
         {titleField}
-        <button type="submit" disabled={loading}>
+        <button type="submit" disabled={loading} aria-busy={pending ? "true" : undefined}>
           {t("tasks.create_submit")}
         </button>{" "}
         {cancel}
@@ -320,7 +361,7 @@ export function CreateTaskDialog({ currentProjectId, onClose }: CreateTaskDialog
         onKeyDown={onKeyDown}
       >
         <h2 id={`${id}-title`}>{t("tasks.create_title")}</h2>
-        <ErrorAlert message={listError} />
+        <ErrorAlert message={alert.message ?? listError} seq={alert.seq} />
         {body}
       </div>
     </div>

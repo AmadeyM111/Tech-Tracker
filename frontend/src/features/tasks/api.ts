@@ -19,6 +19,9 @@ export interface TaskCreate {
   assignee_id?: string;
 }
 
+/** Тело запроса создания: обязательно только название, остальное — значения сервера (004/FR-14). */
+export type TaskCreateInput = Pick<TaskCreate, "title"> & Partial<TaskCreate>;
+
 export interface ProjectTasksParams extends PageParams {
   projectId: string;
   assigneeId?: string;
@@ -68,7 +71,7 @@ export async function listMyTasks(p: PageParams, options: ReadOptions = {}): Pro
   return data;
 }
 
-export async function createTask(projectId: string, body: TaskCreate): Promise<TaskDetail> {
+export async function createTask(projectId: string, body: TaskCreateInput): Promise<TaskDetail> {
   // The schema marks `description` as required only because it has a server default.
   const { data } = await getAppClient().POST("/api/v1/projects/{project_id}/tasks", {
     params: { path: { project_id: projectId } },
