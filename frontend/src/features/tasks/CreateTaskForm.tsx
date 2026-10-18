@@ -1,13 +1,13 @@
 // Create-task form of the project's "Tasks" tab (T83; UF-3, FR-20, FR-26, NFR-5..7).
-import { useQueryClient } from "@tanstack/react-query";
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { UserPicker } from "../../shared/ui/UserPicker";
-import type { CreatableProject } from "../projects/api";
-import { createTask, type TaskCreate, type TaskPriority } from "./api";
+import { listCreatableProjects, type CreatableProject } from "../projects/api";
+import { createTask, type TaskCreate, type TaskDetail, type TaskPriority } from "./api";
 
 const PRIORITIES: readonly TaskPriority[] = ["base", "high"];
 
@@ -159,5 +159,170 @@ export function CreateTaskForm({ projectId, canPickAssignee, assigneeIds }: Crea
         <button type="submit">{t("tasks.create_submit")}</button>
       </form>
     </section>
+  );
+}
+
+export interface CreateTaskDialogProps {
+  /** id проекта из пути `/projects/:projectId` (любая вкладка) или null. */
+  currentProjectId: string | null;
+  /** Закрытие без создания: Escape, «Отмена», «Закрыть». Фокус возвращает вызывающий. */
+  onClose: () => void;
+  /** 201: задача создана, кэши инвалидированы. Вызывающий закрывает диалог и открывает карточку. */
+  // The submit that calls it is R5-T03.
+  onCreated: (task: TaskDetail) => void;
+}
+
+const DIALOG_FOCUSABLE = 'input, select, button, [tabindex]:not([tabindex="-1"])';
+
+/** 004/FR-8..FR-12, FR-19, FR-20: modal "new task" (project + title); submit is added by R5-T03. */
+export function CreateTaskDialog({ currentProjectId, onClose }: CreateTaskDialogProps) {
+  const id = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const projectRef = useRef<HTMLSelectElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const focusMoved = useRef(false);
+  const [choice, setChoice] = useState<string | null>(null); // null: not touched, "": placeholder
+  const [title, setTitle] = useState("");
+
+  const query = useQuery({
+    queryKey: ["projects", "creatable"],
+    queryFn: listCreatableProjects,
+    retry: false,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
+  });
+  const projects = query.data;
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
+
+  // FR-20: once the list is there, focus moves one time from the window to the right element.
+  useEffect(() => {
+    if (projects === undefined || focusMoved.current) return;
+    focusMoved.current = true;
+    if (document.activeElement !== dialogRef.current) return;
+    if (projects.length === 0) closeRef.current?.focus();
+    else if (preselectProject(projects, currentProjectId) !== null) titleRef.current?.focus();
+    else projectRef.current?.focus();
+  }, [projects, currentProjectId]);
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE)).filter(
+      (el) => !(el as HTMLButtonElement).disabled,
+    );
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (first === undefined || last === undefined) return;
+    const index = items.indexOf(document.activeElement as HTMLElement);
+    if (event.shiftKey) {
+      if (index <= 0) {
+        event.preventDefault();
+        last.focus();
+      }
+    } else if (index === -1 || index === items.length - 1) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function onSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault(); // sending is R5-T03
+  }
+
+  const listError =
+    query.isError ? errorMessage(query.error instanceof ApiError ? query.error.code : "unknown") : null;
+  const loading = projects === undefined && !query.isError;
+  const selected = choice ?? (projects === undefined ? null : preselectProject(projects, currentProjectId)) ?? "";
+
+  const cancel = (
+    <button type="button" data-action="cancel" onClick={onClose}>
+      {t("admin.cancel")}
+    </button>
+  );
+  const titleField = (
+    <div className="ui-field">
+      <label htmlFor={`${id}-title-input`}>{t("tasks.title_label")}</label>
+      <input
+        id={`${id}-title-input`}
+        ref={titleRef}
+        type="text"
+        name="title"
+        autoComplete="off"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
+    </div>
+  );
+
+  let body;
+  if (listError !== null) {
+    body = cancel;
+  } else if (projects !== undefined && projects.length === 0) {
+    body = (
+      <>
+        <p>{t("tasks.no_creatable_projects")}</p>
+        <button type="button" data-action="close" ref={closeRef} onClick={onClose}>
+          {t("tasks.dialog_close")}
+        </button>
+      </>
+    );
+  } else {
+    body = (
+      <form data-form="create-task-dialog" onSubmit={onSubmit} noValidate>
+        {loading || projects === undefined ? (
+          <p role="status">{t("admin.loading")}</p>
+        ) : (
+          <div className="ui-field">
+            <label htmlFor={`${id}-project`}>{t("tasks.project_label")}</label>
+            <select
+              id={`${id}-project`}
+              ref={projectRef}
+              name="project"
+              value={selected}
+              onChange={(e) => setChoice(e.target.value)}
+            >
+              <option value="">{t("tasks.project_placeholder")}</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {titleField}
+        <button type="submit" disabled={loading}>
+          {t("tasks.create_submit")}
+        </button>{" "}
+        {cancel}
+      </form>
+    );
+  }
+
+  return (
+    <div className="ui-overlay">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${id}-title`}
+        tabIndex={-1}
+        className="ui-dialog ui-create-dialog"
+        onKeyDown={onKeyDown}
+      >
+        <h2 id={`${id}-title`}>{t("tasks.create_title")}</h2>
+        <ErrorAlert message={listError} />
+        {body}
+      </div>
+    </div>
   );
 }

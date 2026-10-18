@@ -66,14 +66,15 @@ R5-T10. R5-T04 можно делать параллельно с R5-T01…R5-T03
 - **Остаток в финальную уборку (R5-T01-1):** тест параллельности запросов карточек (NFR-4, мутация M13); переименовать `004_ac20_current_project_not_in_list_with_single_project_selects_single` в `004_ac41_*`.
 
 ## R5-T02 — Диалог «Новая задача»: состав, список, предвыбор, фокус, клавиатура
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-14 (кроме проверки «вне `nav`»), AC-15, AC-16, AC-17, AC-18, AC-19 (окно: текст,
   только «Закрыть», фокус на ней, Escape → `onClose`), AC-20, AC-21, AC-41 (по
   `currentProjectId`), AC-32 (Escape и «Отмена» → `onClose`, запросов нет), AC-33, AC-34;
   FR-8…FR-12, FR-19, FR-20
-- **Файлы:** `frontend/src/features/tasks/CreateTaskForm.tsx`, `frontend/src/shared/i18n/ru.ts`;
+- **Файлы:** `frontend/src/features/tasks/CreateTaskForm.tsx`, `frontend/src/shared/i18n/ru.ts`,
+  `frontend/src/shared/ui/ui.css`;
   тесты: `frontend/tests/features/tasks/create-dialog-helpers.tsx` (новый),
-  `frontend/tests/features/tasks/CreateTaskDialog.test.tsx` (новый)
+  `frontend/tests/features/tasks/CreateTaskDialog.test.tsx` (новый), `frontend/tests/shared/theme.test.ts` (проверка ширины окна)
 - **Зависит от:** R5-T01
 - **Описание:** По plan §4.2 (разметка и поведение) и D-3, D-5, D-6 добавить экспорт
   `CreateTaskDialog({ currentProjectId, onClose, onCreated })`. Загрузка через `useQuery`
@@ -95,7 +96,9 @@ R5-T10. R5-T04 можно делать параллельно с R5-T01…R5-T03
 - **Старые тесты → AC:** нет.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/tasks/CreateTaskDialog.test.tsx tests/shared/i18n.test.ts`
   зелёный; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R5-T02` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (TEST_ISSUE по AC-33 снят; ревью: 1 проход, исправление ловушки Tab и ширины окна, проверено оркестратором прогоном)
+- **Примечание оркестратора (2026-10-18):** в задачу добавлен `frontend/src/shared/ui/ui.css` (одно правило `.ui-create-dialog { width: 24rem }`, без цветов и font-size); `ru.ts` — ключи диалога.
+- **Остаток (R5-T02, ревью):** в R5-T03 тест `004_ac18_loading_shows_status_and_submit_sends_nothing` должен проверять ранний выход обработчика при `disabled`, снятом через DOM; `004_fr20_user_choice_is_kept_after_focus_move` почти тривиален (его заменяют тесты M9).
 
 ## R5-T03 — Диалог: отправка, ошибки, повторная отправка, закрытие во время запроса
 - **Статус:** TODO

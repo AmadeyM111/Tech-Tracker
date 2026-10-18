@@ -271,3 +271,15 @@ describe(".ui-overlay on a low viewport (T103)", () => {
     expect(safe || (o()["align-items"] === "center" && marginAuto), "safe center or center + margin:auto").toBe(true);
   });
 });
+
+// 004 / R5-T02 review: the "new task" dialog must not be wider than its window.
+describe(".ui-create-dialog width (004)", () => {
+  it("is never wider than the window: min(..., 100%) or max-width: 100%", () => {
+    const d = declsFor(".ui-create-dialog");
+    const width = d["width"] ?? "";
+    const maxWidth = d["max-width"] ?? "";
+    const minFn = /min\([^)]*100%[^)]*\)/;
+    const ok = minFn.test(width) || minFn.test(maxWidth) || maxWidth.trim() === "100%";
+    expect(ok, `.ui-create-dialog: width=${width}, max-width=${maxWidth}`).toBe(true);
+  });
+});
