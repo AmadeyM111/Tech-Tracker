@@ -242,9 +242,10 @@ describe('003: "Выйти" в боковом меню — светлая таб
     expect(contrast(tok("button-text"), tok("button-bg"))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("003_ac19 .ui-sidebar button is pushed to the bottom (margin-top: auto)", () => {
+  it("003_ac19 .ui-sidebar logout button is pushed to the bottom (margin-top: auto)", () => {
+    // 004/D-11: margin-top: auto перенесён с `.ui-sidebar button` на «Выйти», чтобы «Задача» не уезжала вниз.
     // declsFor склеивает и медиа-правило узкого экрана (там margin-top: 0), поэтому берём базовое правило.
-    const base = rules.find((r) => r.selectors.includes(".ui-sidebar button"));
+    const base = rules.find((r) => r.selectors.includes('.ui-sidebar [data-action="logout"]'));
     expect(base?.decls["margin-top"]).toBe("auto");
   });
 

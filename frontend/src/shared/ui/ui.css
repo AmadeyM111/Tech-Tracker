@@ -257,6 +257,7 @@ h1,
   align-items: safe center;
   justify-content: center;
   padding: 1rem;
+  z-index: 10;
 }
 
 .ui-dialog {
@@ -499,6 +500,10 @@ li[data-task-id] [data-field]:not([data-field="title"]) {
   margin: 0;
 }
 
+.ui-shell > .ui-overlay {
+  margin: 0;
+}
+
 .ui-sidebar {
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -547,6 +552,10 @@ li[data-task-id] [data-field]:not([data-field="title"]) {
   display: flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
+}
+
+.ui-sidebar [data-action="logout"] {
   margin-top: auto;
 }
 
@@ -591,7 +600,7 @@ li[data-task-id] [data-field]:not([data-field="title"]) {
     gap: 4px;
   }
 
-  .ui-sidebar button {
+  .ui-sidebar [data-action="logout"] {
     margin-top: 0;
     margin-left: auto;
   }

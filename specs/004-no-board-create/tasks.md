@@ -130,7 +130,7 @@ R5-T10. R5-T04 можно делать параллельно с R5-T01…R5-T03
 - **Для R5-T05 (R5-T03-1):** диалог не должен вызывать `onCreated` после размонтирования (флаг «смонтирован» или обработка в Sidebar); `create-task-button.test.tsx` проверяет AC-28 «путь не изменился» и AC-29 (401 → `/login`).
 
 ## R5-T04 — Вид кнопки «Задача»: иконка «+», раскладка меню, стиль-контракт
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-42 (CSS); FR-6 (цвета токенами, таблетка, одна строка, «Выйти» внизу)
 - **Файлы:** `frontend/src/shared/ui/Icon.tsx`, `frontend/src/shared/ui/ui.css`;
   тесты: `frontend/tests/shared/create-button.test.ts` (новый), `frontend/tests/shared/theme.test.ts`
@@ -154,7 +154,7 @@ R5-T10. R5-T04 можно делать параллельно с R5-T01…R5-T03
   остаётся без правок (`.ui-sidebar button` — flex, `align-items: center`).
 - **Готово, когда:** `cd frontend && npx vitest run tests/shared tests/app/icons.test.tsx`
   зелёный; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R5-T04` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (ускоренный режим: отдельное ревью не проводилось, diff читает ревью R5-T05; проверено оркестратором прогоном)
 
 ## R5-T05 — Кнопка «Задача» в боковом меню и связка с диалогом
 - **Статус:** TODO
