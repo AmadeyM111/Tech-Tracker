@@ -1,11 +1,12 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t, type MessageKey } from "../../shared/i18n";
 import { ErrorAlert } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
 import { TextField } from "../../shared/ui/TextField";
+import { useFocusHeadingOnArrival } from "../auth/session";
 import { listAudit, type AuditEntry, type EntityType } from "./api";
 
 const ENTITY_TYPES: readonly EntityType[] = [
@@ -112,6 +113,8 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
 
 export function AuditPage() {
   const typeId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useFocusHeadingOnArrival(headingRef);
   const [page, setPage] = useState(1);
   const [draft, setDraft] = useState<Filters>(NO_FILTERS);
   const [applied, setApplied] = useState<Filters>(NO_FILTERS);
@@ -147,7 +150,9 @@ export function AuditPage() {
 
   return (
     <section className="ui-wide">
-      <h1>{t("admin.audit.title")}</h1>
+      <h1 ref={headingRef} tabIndex={-1}>
+        {t("admin.audit.title")}
+      </h1>
       <ErrorAlert message={error} seq={audit.errorUpdateCount} />
 
       <form onSubmit={onApply} noValidate aria-label={t("admin.audit.filters_title")}>

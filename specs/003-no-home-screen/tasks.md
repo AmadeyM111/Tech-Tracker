@@ -199,7 +199,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Попытки:** 1
 
 ## R4-T06 — Фокус после смены пароля у пользователя без роли и на «Журнале аудита»
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-13 (`NR`), AC-14, AC-15 (`AUD` — правило FR-16 для стартового экрана журнала); FR-15, FR-16
 - **Файлы:** `frontend/src/features/auth/NoRolePage.tsx`, `frontend/src/features/admin/AuditPage.tsx`,
   `frontend/src/app/router.tsx`; тесты: `frontend/tests/app/focus-heading.test.tsx`
@@ -225,7 +225,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Старые тесты → AC:** нет.
 - **Готово, когда:** `cd frontend && npx vitest run tests/app/focus-heading.test.tsx tests/app/password-modal.test.tsx tests/features/auth tests/features/admin/AuditPage.test.tsx`
   зелёный; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R4-T06` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (TEST_ISSUE по фикстуре role:null снят)
 
 ## R4-T07 — Мёртвый код «Главной»: словарь, стиль ссылки, иконка
 - **Статус:** TODO
@@ -274,6 +274,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
   `python scripts/task_scope.py R4-T08` → 0.
 - **Попытки:** 0
 - **Примечание оркестратора (R4-T04-2, желательное 1):** в `start-screen.test.tsx` AC-9 для неизвестных путей добавить проверку отсутствия промежуточного шага `/` (`steps().some(s => s.path === "/")` → false).
+- **Примечание оркестратора (R4-T06-1):** добавить тест на ветку ошибки `ForcedPasswordChange` (`/change-password` с `focusHeading`, `/me` отвечает 403 `no_role` → `/no-role`, фокус на h1; мутация M9) и в AC-14 проверку активного элемента (поле логина, не h1).
 
 ## R4-T09 — Документы: spec 001 v0.19 и пометки в tasks 001 (T81, T92, T100, T103)
 - **Статус:** TODO

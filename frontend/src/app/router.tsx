@@ -11,7 +11,7 @@ import { MyTasksPage } from "../features/tasks/TaskList";
 import { TaskPage } from "../features/tasks/TaskPage";
 import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
-import { me, type MeResponse } from "../features/auth/session";
+import { focusHeadingState, me, type MeResponse } from "../features/auth/session";
 import { useLogout } from "../features/auth/useLogout";
 import { ApiError, setNavigationHandlers } from "../shared/api/client";
 import { errorMessage, t } from "../shared/i18n";
@@ -22,7 +22,8 @@ import { Icon } from "../shared/ui/Icon";
 const SESSION_KEY = ["auth", "me"] as const;
 
 // A profile this young is not asked for again when the next screen mounts: the redirect from "/" to the
-// start screen must not cost a second `GET /me` (003/AC-36). Errors are never "fresh", they are re-asked.
+// start screen must not cost a second `GET /me` (003/AC-36). Freshness is counted from `dataUpdatedAt` of the
+// last successful answer; a query that has only an error (no data) is never fresh and is re-asked on mount.
 const SESSION_FRESH_MS = 5_000;
 
 function useSession(staleTime: number = SESSION_FRESH_MS) {
@@ -91,13 +92,14 @@ function SessionGate({
   children: (profile: MeResponse) => ReactNode;
 }) {
   const session = useSession();
+  const { state } = useLocation();
   if (session.isPending) {
     // Not a landmark: the page content has not arrived yet.
     return <p role="status">{t("app.loading")}</p>;
   }
   if (session.isError) {
     const target = redirectFor(session.error);
-    if (target !== null) return <Navigate to={target} replace />;
+    if (target !== null) return <Navigate to={target} replace state={focusHeadingState(state)} />;
     const code = session.error instanceof ApiError ? session.error.code : "unknown";
     return (
       <Landmark insideMain={insideMain}>
@@ -178,7 +180,7 @@ function StartRedirect({ insideMain }: { insideMain: boolean }) {
   const { state } = useLocation();
   return (
     <SessionGate insideMain={insideMain}>
-      {(profile) => <Navigate to={startPath(profile)} replace state={state} />}
+      {(profile) => <Navigate to={startPath(profile)} replace state={focusHeadingState(state)} />}
     </SessionGate>
   );
 }
@@ -240,9 +242,11 @@ function ForcedPasswordChange() {
     if (error instanceof ApiError && error.status === 403 && error.code === "password_change_required") {
       return <PasswordModal />;
     }
-    return <Navigate to={redirectFor(error) ?? "/"} replace />;
+    return <Navigate to={redirectFor(error) ?? "/"} replace state={focusHeadingState(state)} />;
   }
-  if (!session.data.must_change_password) return <Navigate to={startPath(session.data)} replace state={state} />;
+  if (!session.data.must_change_password) {
+    return <Navigate to={startPath(session.data)} replace state={focusHeadingState(state)} />;
+  }
   return <PasswordModal />;
 }
 
@@ -258,7 +262,9 @@ function PasswordModal() {
 function GuestOnly({ children }: { children: ReactNode }) {
   const session = useSession();
   const { state } = useLocation();
-  if (session.data !== undefined) return <Navigate to={startPath(session.data)} replace state={state} />;
+  if (session.data !== undefined) {
+    return <Navigate to={startPath(session.data)} replace state={focusHeadingState(state)} />;
+  }
   return <>{children}</>;
 }
 
@@ -266,11 +272,13 @@ function GuestOnly({ children }: { children: ReactNode }) {
 function useClientHandlers(): void {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { pathname } = useLocation();
+  const { pathname, state } = useLocation();
   const pathRef = useRef(pathname);
+  const stateRef = useRef<unknown>(state);
   useEffect(() => {
     pathRef.current = pathname;
-  }, [pathname]);
+    stateRef.current = state;
+  }, [pathname, state]);
 
   useEffect(
     () =>
@@ -279,7 +287,7 @@ function useClientHandlers(): void {
           // On the login page there is no session data to drop and nothing to leave.
           if (pathRef.current === "/login") return;
           queryClient.clear();
-          navigate("/login", { replace: true });
+          navigate("/login", { replace: true, state: focusHeadingState(stateRef.current) });
         },
         onPasswordChangeRequired: () => {
           // Already in the modal: a repeated 403 must not add a history step.
@@ -289,7 +297,7 @@ function useClientHandlers(): void {
         onNoRole: () => {
           // A 403 no_role inside the password modal (a forced user without a role) keeps the modal on screen.
           if (pathRef.current === "/change-password" || pathRef.current === "/no-role") return;
-          navigate("/no-role", { replace: true });
+          navigate("/no-role", { replace: true, state: focusHeadingState(stateRef.current) });
         },
       }),
     [navigate, queryClient],
