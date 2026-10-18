@@ -176,7 +176,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Попытки:** 1 (TEST_ISSUE снят; ревью: 2 круга, правки тестов и plan)
 
 ## R4-T05 — Фокус на заголовке стартового экрана после входа (`BA`, `U`, `TA`)
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-15, AC-13 (`BA`, `U`, `TA`), AC-10 (состояние перехода); FR-15, FR-16, NFR-3
 - **Файлы:** `frontend/src/features/auth/session.ts`, `frontend/src/features/auth/LoginPage.tsx`,
   `frontend/src/features/admin/UsersPage.tsx`;
@@ -196,7 +196,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Старые тесты → AC:** нет (`LoginPage.test.tsx` не меняется: путь `/` прежний).
 - **Готово, когда:** `cd frontend && npx vitest run tests/app/focus-heading.test.tsx tests/features/auth tests/features/admin/UsersPage.test.tsx`
   зелёный; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R4-T05` → 0.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## R4-T06 — Фокус после смены пароля у пользователя без роли и на «Журнале аудита»
 - **Статус:** TODO

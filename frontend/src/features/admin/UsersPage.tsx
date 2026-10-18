@@ -18,6 +18,7 @@ import {
   type AdminUser,
   type Role,
 } from "./api";
+import { useFocusHeadingOnArrival } from "../auth/session";
 import { generateOneTimePassword } from "./password";
 
 const USERS_KEY = ["admin", "users"] as const;
@@ -157,6 +158,8 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [shown, setShown] = useState<ShownPassword | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useFocusHeadingOnArrival(headingRef);
   const shownRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   // Row whose control had the focus when an action started (see the effect below).
@@ -264,7 +267,9 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
 
   return (
     <section className="ui-wide">
-      <h1>{t("admin.users.title")}</h1>
+      <h1 ref={headingRef} tabIndex={-1}>
+        {t("admin.users.title")}
+      </h1>
       <ErrorAlert message={alert.message ?? listError} seq={alert.seq} />
 
       {shown === null ? null : (
