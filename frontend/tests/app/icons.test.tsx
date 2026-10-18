@@ -25,6 +25,9 @@ const ROUTES = {
   "GET /api/v1/projects": () => j(200, page([])),
 };
 
+// 004/AC-9: кнопка «Задача» тоже в .ui-sidebar: первая - иконка, рисунок отличается от остальных.
+const CREATE_TASK = (ru as Record<string, string>)["nav.create_task"] ?? "Задача";
+
 const NAV = [ru["nav.projects"], ru["nav.my_tasks"], ru["admin.home_users_link"], ru["admin.home_audit_link"]];
 
 function expectIcon(el: HTMLElement) {
@@ -55,6 +58,9 @@ describe("T100 sidebar icons", () => {
       expect(link.closest(".ui-sidebar")).not.toBeNull();
       markup.push(expectIcon(link).innerHTML);
     }
+    const create = await screen.findByRole("button", { name: CREATE_TASK });
+    expect(create.closest(".ui-sidebar")).not.toBeNull();
+    markup.push(expectIcon(create).innerHTML);
     const logout = screen.getByRole("button", { name: ru["auth.logout"] });
     expect(logout.closest(".ui-sidebar")).not.toBeNull();
     markup.push(expectIcon(logout).innerHTML);

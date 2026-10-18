@@ -157,12 +157,13 @@ R5-T10. R5-T04 можно делать параллельно с R5-T01…R5-T03
 - **Попытки:** 1 (ускоренный режим: отдельное ревью не проводилось, diff читает ревью R5-T05; проверено оркестратором прогоном)
 
 ## R5-T05 — Кнопка «Задача» в боковом меню и связка с диалогом
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-9, AC-10, AC-11, AC-12, AC-13, AC-14 (вне `nav`), AC-19 (кнопка видна, фокус на
   «Задача» после Escape), AC-20 (на вкладках «Доска», «Задачи», «Участники»), AC-26, AC-27,
   AC-29, AC-31 (путь после 201), AC-32 (фокус на «Задача»), AC-35, AC-36, AC-42 (разметка);
   FR-5, FR-6, FR-7, FR-15, FR-20…FR-22
-- **Файлы:** `frontend/src/app/router.tsx`, `frontend/src/shared/i18n/ru.ts`;
+- **Файлы:** `frontend/src/app/router.tsx`, `frontend/src/shared/i18n/ru.ts`,
+  `frontend/src/features/tasks/CreateTaskForm.tsx` (флаг «смонтирован», R5-T03-1);
   тесты: `frontend/tests/app/create-task-button.test.tsx` (новый), `frontend/tests/app/navigation.test.tsx`,
   `frontend/tests/app/icons.test.tsx`, `frontend/tests/app/sidebar.test.tsx`
   (+ `frontend/tests/features/projects/ProjectPage.test.tsx`, `frontend/tests/features/admin/UsersPage.test.tsx`,
@@ -198,7 +199,8 @@ R5-T10. R5-T04 можно делать параллельно с R5-T01…R5-T03
   003/AC-30, spec 004, раздел 11).
 - **Готово, когда:** `cd frontend && npx vitest run tests/app tests/features/projects tests/features/admin tests/features/tasks`
   зелёный; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R5-T05` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (TEST_ISSUE по ac30_U снят; ревью: 1 проход)
+- **Остаток в финальную уборку (R5-T05-1):** в AC-27 открыть вкладку «Задачи» до создания; AC-9 на реальной карточке `/tasks/<id>`; убрать запасной литерал `?? "Задача"` в тестах.
 
 ## R5-T06 — Доска без создания задач
 - **Статус:** TODO

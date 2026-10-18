@@ -8,6 +8,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ru } from "../../src/shared/i18n";
+import { TID1, taskItem } from "../features/tasks/helpers";
 import { CAPS_ALL, deferred, err, expectAt, installFetch, j, meWith, page, renderApp, type Handler } from "../features/admin/helpers";
 
 // Удалённый ключ app.home_link (003): литерал, чтобы проверка «ссылки нет» не зависела от словаря.
@@ -16,6 +17,8 @@ const REMOVED_HOME_LINK = "На главную";
 const ME = "GET /api/v1/me";
 const LOGOUT = "POST /api/v1/auth/logout";
 const MENU = "Меню";
+// 004: кнопка «Задача» между ссылками и «Выйти» (только при business_access).
+const CREATE_TASK = (ru as Record<string, string>)["nav.create_task"] ?? "Задача";
 const DICT = Object.values(ru) as string[];
 const BA_CAPS = ["business_access", "project_create", "task_assign_others"];
 const U_CAPS = ["business_access"];
@@ -82,6 +85,16 @@ describe("AC-19 business sidebar", () => {
     // последний фокусируемый элемент меню
     const focusable = Array.from(sidebar!.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), [tabindex]:not([tabindex='-1'])"));
     expect(focusable.at(-1)).toBe(btn);
+    // 004/AC-9, AC-12: «Задача» - сразу после последней ссылки и непосредственно перед «Выйти», вне nav
+    const create = within(sidebar!).getByRole("button", { name: CREATE_TASK });
+    expect(create.getAttribute("data-action")).toBe("create-task");
+    expect(nav.contains(create)).toBe(false);
+    expect(last.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(create.compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(focusable.at(-2)).toBe(create);
+    expect(create.firstElementChild?.nodeName.toLowerCase()).toBe("svg");
+    expect(create.firstElementChild?.getAttribute("aria-hidden")).toBe("true");
+    expect(create.firstElementChild?.innerHTML).not.toBe(btn.firstElementChild?.innerHTML);
     // первый дочерний элемент - декоративная иконка
     const icon = btn.firstChild as Element | null;
     expect(icon?.nodeType).toBe(Node.ELEMENT_NODE);
@@ -197,10 +210,30 @@ describe("AC-30 tab order of the BA /projects screen", () => {
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
     const form = container.querySelector<HTMLElement>('form[data-form="create-project"]')!;
     const firstInForm = tabbable.find((el) => form.contains(el))!;
-    const labels = tabbable.slice(0, 4);
+    const labels = tabbable.slice(0, 5);
     expect(labels.slice(0, 2).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks"]);
-    expect(labels[2]?.getAttribute("data-action")).toBe("logout");
-    expect(labels[3]).toBe(firstInForm);
+    // 004/AC-12: ссылки меню, «Задача», «Выйти», затем содержимое
+    expect(labels[2]?.getAttribute("data-action")).toBe("create-task");
+    expect(labels[3]?.getAttribute("data-action")).toBe("logout");
+    expect(labels[4]).toBe(firstInForm);
+  });
+});
+
+describe("AC-30 tab order of the U /my-tasks screen (004/AC-12)", () => {
+  it("ac30_U_menu_links_then_task_then_logout_then_content", async () => {
+    // непустой список задач: после меню есть первый элемент содержимого (ссылка на задачу)
+    setup("user", { "GET /api/v1/me/tasks": () => j(200, page([taskItem(TID1, "Подготовить отчёт")])) });
+    const { container } = await openMenu("/my-tasks");
+    const taskLink = await screen.findByRole("link", { name: "Подготовить отчёт" });
+    const tabbable = Array.from(
+      container.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
+    ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
+    expect(tabbable.slice(0, 2).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks"]);
+    expect(tabbable[2]?.getAttribute("data-action")).toBe("create-task");
+    expect(tabbable[3]?.getAttribute("data-action")).toBe("logout");
+    // дальше - содержимое экрана, не меню
+    expect(tabbable[4]).toBe(taskLink);
+    expect(tabbable[4]?.closest(".ui-sidebar") ?? null).toBeNull();
   });
 });
 
@@ -228,6 +261,7 @@ describe("AC-20 tech admin sidebar", () => {
     expect(hrefsOf(nav)).toEqual([USERS, AUDIT_PATH]);
     expect(within(nav).queryByRole("link", { name: ru["nav.projects"] })).toBeNull();
     expect(within(nav).queryByRole("link", { name: ru["nav.my_tasks"] })).toBeNull();
+    expect(screen.queryByRole("button", { name: CREATE_TASK })).toBeNull(); // 004/AC-10
     const sidebar = container.querySelector<HTMLElement>(".ui-sidebar")!;
     expect(sidebar).not.toBeNull();
     expect(sidebar.parentElement?.classList.contains("ui-shell")).toBe(true);
@@ -310,6 +344,8 @@ describe("AC-27 tech admin on business paths", () => {
     expect(hrefsOf(nav)).toEqual([USERS, AUDIT_PATH]);
     expect(container.querySelector<HTMLElement>(".ui-sidebar")!.parentElement?.classList.contains("ui-shell")).toBe(true);
     expect(within(container.querySelector<HTMLElement>(".ui-sidebar")!).getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: CREATE_TASK })).toBeNull(); // 004/AC-10
+    expect(container.querySelector('[data-action="create-task"]')).toBeNull();
     expect(screen.queryByRole("link", { name: REMOVED_HOME_LINK })).toBeNull();
     expect(container.querySelector('a[href="/"]')).toBeNull();
     expect(f.calls).toHaveLength(1);
@@ -344,6 +380,8 @@ describe("AC-28 business roles on tech admin paths", () => {
     expect(within(nav).getByRole("link", { name: ru["nav.projects"] })).toBeTruthy();
     expect(within(nav).getByRole("link", { name: ru["nav.my_tasks"] })).toBeTruthy();
     expect(within(container.querySelector<HTMLElement>(".ui-sidebar")!).getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
+    // 004/AC-9 (Q-6 а): на экране отказа БА и «Пользователь» тоже видят «Задача»
+    expect(within(container.querySelector<HTMLElement>(".ui-sidebar")!).getAllByRole("button", { name: CREATE_TASK })).toHaveLength(1);
     expect(screen.queryByRole("link", { name: REMOVED_HOME_LINK })).toBeNull();
     expect(f.calls.filter((c) => new URL(c.url).pathname.startsWith("/api/v1/admin"))).toHaveLength(0);
   });

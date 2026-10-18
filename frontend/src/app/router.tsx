@@ -1,12 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 
 import { AuditPage } from "../features/admin/AuditPage";
 import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
+import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
 import { MyTasksPage } from "../features/tasks/TaskList";
 import { TaskPage } from "../features/tasks/TaskPage";
 import { ProjectPage } from "../features/projects/ProjectPage";
@@ -158,17 +159,53 @@ function MenuItems({ profile }: { profile: MeResponse }) {
 function Sidebar({ profile }: { profile: MeResponse }) {
   const alert = useAlertState();
   const logout = useLogout(alert);
+  const navigate = useNavigate();
+  const projectMatch = useMatch("/projects/:projectId");
+  const createRef = useRef<HTMLButtonElement>(null);
+  // The Sidebar survives a move between role screens, the window must not: it is tied to the path it was opened on.
+  const { pathname } = useLocation();
+  const [createPath, setCreatePath] = useState<string | null>(null);
+  if (createPath !== null && createPath !== pathname) setCreatePath(null);
+  const createOpen = createPath !== null;
+  const canCreate = profile.capabilities.includes("business_access");
   return (
-    <div className="ui-sidebar">
-      <nav aria-label={t("app.menu_label")}>
-        <MenuItems profile={profile} />
-      </nav>
-      <button type="button" data-action="logout" disabled={logout.pending} onClick={() => void logout.run()}>
-        <Icon name="logout" />
-        {t("auth.logout")}
-      </button>
-      <ErrorAlert message={alert.message} seq={alert.seq} />
-    </div>
+    <>
+      <div className="ui-sidebar">
+        <nav aria-label={t("app.menu_label")}>
+          <MenuItems profile={profile} />
+        </nav>
+        {canCreate ? (
+          <button
+            type="button"
+            data-action="create-task"
+            aria-haspopup="dialog"
+            ref={createRef}
+            onClick={() => setCreatePath(pathname)}
+          >
+            <Icon name="plus" />
+            {t("nav.create_task")}
+          </button>
+        ) : null}
+        <button type="button" data-action="logout" disabled={logout.pending} onClick={() => void logout.run()}>
+          <Icon name="logout" />
+          {t("auth.logout")}
+        </button>
+        <ErrorAlert message={alert.message} seq={alert.seq} />
+      </div>
+      {createOpen ? (
+        <CreateTaskDialog
+          currentProjectId={projectMatch?.params.projectId ?? null}
+          onClose={() => {
+            setCreatePath(null);
+            createRef.current?.focus();
+          }}
+          onCreated={(task) => {
+            setCreatePath(null);
+            navigate(`/tasks/${task.id}`);
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 

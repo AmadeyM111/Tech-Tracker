@@ -180,6 +180,7 @@ export function CreateTaskDialog({ currentProjectId, onClose, onCreated }: Creat
   const alert = useAlertState();
   const busy = useRef(false);
   const created = useRef(false);
+  const mounted = useRef(false);
   const [pending, setPending] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const projectRef = useRef<HTMLSelectElement>(null);
@@ -201,6 +202,14 @@ export function CreateTaskDialog({ currentProjectId, onClose, onCreated }: Creat
 
   useEffect(() => {
     dialogRef.current?.focus();
+  }, []);
+
+  // A window that is gone (the user left the screen) must not report a result to its caller.
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
   }, []);
 
   // FR-20: once the list is there, focus moves one time from the window to the right element.
@@ -274,6 +283,7 @@ export function CreateTaskDialog({ currentProjectId, onClose, onCreated }: Creat
       void queryClient.invalidateQueries({ queryKey: ["tasks", "mine"] });
       busy.current = false;
       setPending(false);
+      if (!mounted.current) return;
       // Separate from the create try/catch: a failure of the caller is not a "create error" (no alert);
       // it is reported to the console so that it is not lost as an unhandled rejection.
       try {

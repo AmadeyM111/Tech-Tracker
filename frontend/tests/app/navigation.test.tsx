@@ -25,6 +25,7 @@ import { err, expectAt, installFetch, j, meWith, page, renderApp, where } from "
 const REMOVED_HOME_LINK = "На главную";
 
 const DICT = Object.values(ru) as string[];
+const CREATE_TASK = (ru as Record<string, string>)["nav.create_task"] ?? "Задача"; // 004
 const ME = "GET /api/v1/me";
 const BUSINESS = ["business_access", "project_create", "task_assign_others"];
 const ADMIN_ONLY = ["manage_accounts", "assign_roles", "view_audit"];
@@ -112,6 +113,7 @@ describe("T81 routes under the session gate", () => {
     const nav = await screen.findByRole("navigation", { name: ru["app.menu_label"] });
     expect(Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/admin/users", "/admin/audit"]);
     expect(screen.getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: CREATE_TASK })).toBeNull(); // 004/AC-10
     expect(screen.queryByRole("link", { name: REMOVED_HOME_LINK })).toBeNull();
     expect(document.querySelector('a[href="/"]')).toBeNull();
     expect(f.calls.length).toBe(1);
@@ -137,6 +139,11 @@ describe("T81 menu by capabilities (FR-10)", () => {
       (a) => a.textContent,
     );
     for (const text of texts) expect(DICT).toContain(text);
+    // 004/AC-9: состав меню БА и «Пользователя» дополнен кнопкой «Задача» (вне nav, текст из словаря)
+    const create = screen.getByRole("button", { name: CREATE_TASK });
+    expect(create.closest("nav")).toBeNull();
+    expect(create.closest(".ui-sidebar")).not.toBeNull();
+    expect(DICT).toContain(create.textContent);
   });
 
   it("003_ac20_menu_tech_admin_without_business_access_has_only_admin_items_on_users", async () => {
@@ -144,6 +151,7 @@ describe("T81 menu by capabilities (FR-10)", () => {
     renderApp("/");
     await expectAt("/admin/users");
     await screen.findByRole("navigation", { name: ru["app.menu_label"] });
+    expect(screen.queryByRole("button", { name: CREATE_TASK })).toBeNull(); // 004/AC-10
     const links = hrefs();
     expect(links).toContain("/admin/users");
     expect(links).toContain("/admin/audit");

@@ -148,6 +148,7 @@ export const ru = {
   "app.retry": "Повторить",
   "nav.projects": "Проекты",
   "nav.my_tasks": "Мои задачи",
+  "nav.create_task": "Задача",
   "projects.title": "Список проектов",
   "projects.project_title": "Карточка проекта",
   "projects.list_label": "Проекты пространства",
