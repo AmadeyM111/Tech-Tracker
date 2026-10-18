@@ -6,9 +6,22 @@ import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { UserPicker } from "../../shared/ui/UserPicker";
+import type { CreatableProject } from "../projects/api";
 import { createTask, type TaskCreate, type TaskPriority } from "./api";
 
 const PRIORITIES: readonly TaskPriority[] = ["base", "high"];
+
+/**
+ * 004/FR-12: проект страницы, если он доступен; иначе единственный доступный; иначе null.
+ */
+export function preselectProject(
+  projects: readonly CreatableProject[],
+  currentProjectId: string | null,
+): string | null {
+  if (currentProjectId !== null && projects.some((p) => p.id === currentProjectId)) return currentProjectId;
+  const [only] = projects;
+  return projects.length === 1 && only !== undefined ? only.id : null;
+}
 
 export interface CreateTaskFormProps {
   projectId: string;

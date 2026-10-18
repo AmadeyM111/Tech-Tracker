@@ -41,7 +41,7 @@ R5-T10. R5-T04 можно делать параллельно с R5-T01…R5-T03
 ---
 
 ## R5-T01 — Доступные проекты и правило предвыбора (функции)
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-16, AC-17, AC-18 (отказ при ошибке) — на уровне функции; FR-9, FR-12 (правило
   для AC-20, AC-21, AC-41)
 - **Файлы:** `frontend/src/features/projects/api.ts`, `frontend/src/features/tasks/CreateTaskForm.tsx`;
@@ -62,7 +62,8 @@ R5-T10. R5-T04 можно делать параллельно с R5-T01…R5-T03
 - **Старые тесты → AC:** нет.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/projects/api.test.ts tests/features/tasks/preselect.test.ts tests/features/tasks/CreateTaskForm.test.tsx`
   зелёный; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R5-T01` → 0.
-- **Попытки:** 0
+- **Попытки:** 1
+- **Остаток в финальную уборку (R5-T01-1):** тест параллельности запросов карточек (NFR-4, мутация M13); переименовать `004_ac20_current_project_not_in_list_with_single_project_selects_single` в `004_ac41_*`.
 
 ## R5-T02 — Диалог «Новая задача»: состав, список, предвыбор, фокус, клавиатура
 - **Статус:** TODO

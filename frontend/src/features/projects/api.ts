@@ -90,3 +90,30 @@ export async function removeMember(id: string, userId: string): Promise<void> {
     params: { path: { project_id: id, user_id: userId } },
   });
 }
+
+/** Проект, в котором текущий пользователь может создавать задачи (004/FR-9). */
+export interface CreatableProject {
+  id: string;
+  name: string;
+}
+
+/** Размер страницы при полном чтении списка: предел сервера (core/pagination.py, MAX_PAGE_SIZE). */
+export const CREATABLE_PAGE_SIZE = 100;
+
+/**
+ * 004/FR-9: все страницы GET /projects (пока has_next), затем GET /projects/{id} для каждого
+ * проекта параллельно; остаются проекты с permissions.create_task в порядке списка сервера.
+ * Любая ошибка — reject ApiError, без частичного результата.
+ */
+export async function listCreatableProjects(): Promise<CreatableProject[]> {
+  const items: ProjectListItem[] = [];
+  for (let page = 1; ; page += 1) {
+    const res = await listProjects({ page, pageSize: CREATABLE_PAGE_SIZE });
+    items.push(...res.items);
+    if (!res.has_next) break;
+  }
+  const cards = await Promise.all(items.map((item) => getProject(item.id)));
+  return cards
+    .filter((card) => card.permissions.create_task === true)
+    .map((card) => ({ id: card.id, name: card.name }));
+}
