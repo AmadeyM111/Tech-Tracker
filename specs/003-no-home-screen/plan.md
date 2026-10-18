@@ -4,6 +4,9 @@
 - **Статус:** DRAFT
 - **Правка 2026-10-18:** по ревью `reviews/R4-T04-1.md` добавлены D-12 (свежесть профиля
   `useSession`), R-8 (профиль в кэше до 5 с), обновлены §3, §4.2 и примечание к R4-T06.
+- **Правка 2026-10-18:** по ревью `reviews/R4-T06-1.md` в D-6 и §4.4 записано: `onUnauthenticated`
+  тоже передаёт `focusHeadingState(stateRef.current)`. Описано, какие переносы состояния
+  защитные и тестами не наблюдаются (мутации M6, M7).
 - **Основа:** код ветки `feat/r1.0-foundation` на коммите `e43d435`; `context.md` этой папки.
   Файлы 001 и 002 этот план не правит, кроме docs-задачи R4-T09 (spec 003, раздел 10).
 - **Нумерация:** решения — `D-1…` (снаружи — `003/D-1`), задачи — `R4-T01…`. Новые тесты
@@ -42,7 +45,7 @@
 | D-3 | Неизвестные пути | `<Route path="*">` показывает `StartRedirect` на месте, без перехода на `/` | Оставить `<Navigate to="/">` | FR-7: при ошибке проверки сессии адрес не меняется. Так меньше записей истории (FR-8) |
 | D-4 | Экраны с ролью | Один `RoleScreen(capability)`: `SessionGate` → оболочка `ui-shell` → `Sidebar` → содержимое или `ErrorAlert(forbidden)` | Оставить `AdminScreen`/`BusinessScreen` и добавить меню в каждый | FR-10, FR-11, FR-14 требуют одинаковое меню везде. Один компонент — одна разметка и одни тесты |
 | D-5 | Разметка бокового меню | Как у нынешней `Home`: `div.ui-sidebar > nav[aria-label="Меню"] + button[type=button][data-action="logout"]`, затем `ErrorAlert` ошибки выхода | (а) кнопка внутри `nav`; (б) сообщение об ошибке выхода в содержимом экрана | FR-10: «оформлена так же, как сейчас на Главной». Стили `.ui-sidebar button` (прижатие к низу) уже есть. Сообщение — `p[role=alert][tabindex=-1]`: Tab на нём не останавливается, поэтому «Выйти» остаётся последним элементом меню в последовательности Tab (AC-19, AC-30). В содержимом экрана сообщение могло бы дублировать алерты экрана. `data-action="logout"` нужен 004, чтобы прижимать к низу только «Выйти» |
-| D-6 | Фокус на заголовке после входа и смены пароля (FR-15, FR-16) | Состояние перехода `FOCUS_HEADING_STATE = { focusHeading: true }`. Его передают `LoginPage` и `ChangePasswordPage` (уже передаёт). `StartRedirect`, редирект `SessionGate` и обработчик клиента `onNoRole` переносят его дальше. Экраны `UsersPage`, `AuditPage`, `NoRolePage` ставят фокус на `h1` хуком `useFocusHeadingOnArrival`. `ProjectsPage` и так ставит фокус на заголовок при каждом открытии | (а) фокус на `h1` при каждом открытии всех экранов; (б) флаг на уровне модуля | (а) меняет поведение «Роль не назначена» вне FR-15 (FR-17, раздел 6 spec) и экранов ТА при переходе по меню. (б) — общее состояние между рендерами и тестами. Перенос через `onNoRole` обязателен: при `403 no_role` клиент (`client.ts`, `redirectOnce`) переходит на `/no-role` раньше, чем `SessionGate` отрисует `<Navigate>` (§4.4) |
+| D-6 | Фокус на заголовке после входа и смены пароля (FR-15, FR-16) | Состояние перехода `FOCUS_HEADING_STATE = { focusHeading: true }`. Его передают `LoginPage` и `ChangePasswordPage` (уже передаёт). `StartRedirect`, редирект `SessionGate` и обработчики клиента `onNoRole` и `onUnauthenticated` переносят его дальше (`focusHeadingState(stateRef.current)`; принятое отклонение R4-T06, `reviews/R4-T06-1.md`). Экраны `UsersPage`, `AuditPage`, `NoRolePage` ставят фокус на `h1` хуком `useFocusHeadingOnArrival`. `ProjectsPage` и так ставит фокус на заголовок при каждом открытии | (а) фокус на `h1` при каждом открытии всех экранов; (б) флаг на уровне модуля | (а) меняет поведение «Роль не назначена» вне FR-15 (FR-17, раздел 6 spec) и экранов ТА при переходе по меню. (б) — общее состояние между рендерами и тестами. Перенос через `onNoRole` обязателен: при `403 no_role` клиент (`client.ts`, `redirectOnce`) переходит на `/no-role` раньше, чем `SessionGate` отрисует `<Navigate>` (§4.4). То же при 401 (`onUnauthenticated`) и 403 `password_change_required` (`onPasswordChangeRequired`). Поэтому перенос состояния в `<Navigate>` `SessionGate` защитный и тестами напрямую не наблюдается (мутации M6, M7 в `reviews/R4-T06-1.md`) |
 | D-7 | Новые файлы в `frontend/src` | Не создаются. Новый код — в существующих модулях (`router.tsx`, `features/auth/session.ts`) | Новые модули и строка в белом списке `test_frontend_scaffold.py` | AC-33: в `backend/` изменений нет, тесты бэкенда не меняются. Новые файлы тестов в `frontend/tests` разрешены |
 | D-8 | Мёртвый код | Удалить `Home`, `Root`, `HomeLink`, ключи `app.home_title`, `app.home_link`, правила `.ui-home-link` (3 блока), иконку `home` | Оставить неиспользуемым | NFR-2 (строк нет в словаре), чистота кода. Тесты `theme.test.ts` (блок T92) и `typography.test.ts` (строка `.ui-home-link`) переписываются вместе со стилем |
 | D-9 | Основа сравнения для AC-33 | Коммит `e43d435` (начало фичи), а не `main` | `main` | Ветка `feat/r1.0-foundation` уже отличается от `main` всем бэкендом 001/002 (`git diff --stat main -- backend` — 217 файлов). Буквальное сравнение с `main` невыполнимо (§9, П-1) |
@@ -56,8 +59,8 @@
 - `frontend/src/app/router.tsx` — изменяется: `startPath`, `StartRedirect`, `Sidebar`,
   `RoleScreen`. Удаляются `Home`, `Root`, `HomeLink`, `AdminScreen`, `BusinessScreen`.
   `GuestOnly` и `ForcedPasswordChange` ведут по `startPath`. `useSession` получает
-  `staleTime` (`SESSION_FRESH_MS`, D-12). `useClientHandlers.onNoRole` переносит состояние
-  фокуса (R4-T01…R4-T04, R4-T06).
+  `staleTime` (`SESSION_FRESH_MS`, D-12). `useClientHandlers.onNoRole` и `onUnauthenticated`
+  переносят состояние фокуса (R4-T01…R4-T04, R4-T06).
 - `frontend/src/features/auth/session.ts` — изменяется: `FOCUS_HEADING_STATE`,
   `focusHeadingState`, `useFocusHeadingOnArrival` (R4-T05).
 - `frontend/src/features/auth/LoginPage.tsx` — переход на `/` с `state: FOCUS_HEADING_STATE`
@@ -211,6 +214,8 @@ export function useFocusHeadingOnArrival(ref: RefObject<HTMLElement | null>): vo
   `tabIndex` нет, поэтому заголовок не входит в последовательность Tab (AC-13, AC-15).
 - `router.tsx` (R4-T06): `useClientHandlers` хранит `stateRef` рядом с `pathRef`, и
   `onNoRole: navigate("/no-role", { replace: true, state: focusHeadingState(stateRef.current) })`.
+  `onUnauthenticated` (кроме `/login`) так же: `navigate("/login", { replace: true, state: focusHeadingState(stateRef.current) })`
+  (принятое отклонение R4-T06, `reviews/R4-T06-1.md`). `onPasswordChangeRequired` состояние не передаёт.
   Редирект `SessionGate`: `<Navigate to={target} replace state={focusHeadingState(location.state)} />`.
   `StartRedirect`, `GuestOnly` и ветка «смена не нужна» в `ForcedPasswordChange` тоже передают
   `state={focusHeadingState(location.state)}`, а не `location.state` целиком.
@@ -219,6 +224,18 @@ export function useFocusHeadingOnArrival(ref: RefObject<HTMLElement | null>): vo
 `ChangePasswordPage` → `navigate("/", { state: { focusHeading: true } })` → `StartRedirect` →
 `GET /me` 403 `no_role` → middleware клиента вызывает `onNoRole` раньше, чем `SessionGate`
 отрисует `<Navigate>` → без переноса состояние теряется, и фокус остаётся на `body`.
+
+Что наблюдают тесты (`reviews/R4-T06-1.md`). При 401, 403 `no_role` и 403
+`password_change_required` обработчик клиента (`onUnauthenticated`, `onNoRole`,
+`onPasswordChangeRequired`) переходит раньше, чем `SessionGate` отрисует `<Navigate>`.
+Поэтому `state={focusHeadingState(...)}` в `<Navigate>` `SessionGate` — защитный перенос, и
+тестами напрямую он не наблюдается (выжившие мутации M6, M7). Тест
+`focus-heading.test.tsx::003_fr16_session_gate_redirect_forwards_only_focus_heading`
+(`/admin/users`, `GET /me` 401) на деле проверяет `onUnauthenticated`, а не `SessionGate`.
+Ветка ошибки `ForcedPasswordChange` (`redirectFor(error) ?? "/"`) при 401 тоже защитная:
+раньше срабатывает `onUnauthenticated`. При 403 `no_role` на `/change-password` она ведёт сама,
+потому что `onNoRole` на этом пути ничего не делает. Этот случай наблюдаем, но тестом пока не
+покрыт (выжившая мутация M9; тест — в примечании к R4-T06 в `tasks.md`).
 
 ### 4.5. Словарь
 

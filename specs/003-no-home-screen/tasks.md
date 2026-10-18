@@ -228,12 +228,14 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Попытки:** 1 (TEST_ISSUE по фикстуре role:null снят)
 
 ## R4-T07 — Мёртвый код «Главной»: словарь, стиль ссылки, иконка
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-18 (словарь); NFR-2; plan D-8
 - **Файлы:** `frontend/src/shared/i18n/ru.ts`, `frontend/src/shared/ui/ui.css`,
   `frontend/src/shared/ui/Icon.tsx`;
   тесты: `frontend/tests/shared/i18n.test.ts`, `frontend/tests/shared/theme.test.ts`,
-  `frontend/tests/shared/typography.test.ts`
+  `frontend/tests/shared/typography.test.ts`, `frontend/tests/app/icons.test.tsx`,
+  `frontend/tests/app/home-link.test.tsx`, `frontend/tests/app/navigation.test.tsx`,
+  `frontend/tests/app/sidebar.test.tsx`
 - **Зависит от:** R4-T04
 - **Описание:** Удалить ключи `app.home_title` и `app.home_link` из `ru.ts` (комментарий в
   шапке словаря при необходимости поправить). Удалить из `ui.css` правила `.ui-home-link`,
@@ -251,7 +253,8 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Готово, когда:** `cd frontend && npx vitest run tests/shared tests/app/icons.test.tsx`
   зелёный; `git grep -n -E "home_title|home_link|ui-home-link" -- frontend/src` пусто;
   проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R4-T07` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (TEST_ISSUE по ключу app.home_link снят)
+- **Примечание оркестратора (2026-10-18, TEST_ISSUE implementer-а):** тесты `frontend/tests/app/home-link.test.tsx`, `navigation.test.tsx`, `sidebar.test.tsx` ссылаются на удаляемый `ru["app.home_link"]` (при `name: undefined` проверка «ссылки нет» теряет смысл). Файлы добавлены в задачу: заменить ключ на литерал «На главную» (как в `icons.test.tsx`), ассерты не ослаблять.
 
 ## R4-T08 — Сквозные проверки: нет «Главной», «На главную», «Сменить пароль»; экраны без меню прежние (только тесты)
 - **Статус:** TODO
@@ -275,6 +278,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Попытки:** 0
 - **Примечание оркестратора (R4-T04-2, желательное 1):** в `start-screen.test.tsx` AC-9 для неизвестных путей добавить проверку отсутствия промежуточного шага `/` (`steps().some(s => s.path === "/")` → false).
 - **Примечание оркестратора (R4-T06-1):** добавить тест на ветку ошибки `ForcedPasswordChange` (`/change-password` с `focusHeading`, `/me` отвечает 403 `no_role` → `/no-role`, фокус на h1; мутация M9) и в AC-14 проверку активного элемента (поле логина, не h1).
+- **Примечание оркестратора (R4-T07-1):** в `theme.test.ts` заменить `/home link/i` на `/home"?\s+link/i` (ловит возврат комментария), в `i18n.test.ts` AC-18 искать подстроку «главн» в значениях словаря.
 
 ## R4-T09 — Документы: spec 001 v0.19 и пометки в tasks 001 (T81, T92, T100, T103)
 - **Статус:** TODO

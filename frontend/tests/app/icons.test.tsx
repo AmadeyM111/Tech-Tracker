@@ -4,7 +4,7 @@
 //  - у каждой ссылки/кнопки внутри `.ui-sidebar` первый дочерний ЭЛЕМЕНТ (и первый узел) -
 //    inline <svg class="ui-icon" aria-hidden="true" focusable="false"> без <title>/текста;
 //    это же верно для ссылок меню и «Выйти» на экранах ТА (AC-20); ссылки «На главную»
-//    (`.ui-home-link`) нет нигде (AC-16). Доступные имена не меняются.
+//    (`.ui-home-link`) нет нигде; иконки "home" в Icon.tsx тоже нет (R4-T07) (AC-16). Доступные имена не меняются.
 //  - у разных пунктов меню разная разметка иконки (innerHTML).
 //  - ui.css: `.ui-icon` с width и height (20px или 1.25em), flex-shrink: 0, отступ справа
 //    (margin-right|margin-inline-end у .ui-icon либо gap у `.ui-sidebar a`/`.ui-sidebar button`);
@@ -91,7 +91,7 @@ describe("T100 sidebar icons", () => {
     expect(logout.closest(".ui-sidebar")).not.toBeNull();
     markup.push(expectIcon(logout).innerHTML);
     expect(new Set(markup).size).toBe(markup.length);
-    expect(screen.queryByRole("link", { name: ru["app.home_link"] })).toBeNull();
+    expect(screen.queryByRole("link", { name: "На главную" })).toBeNull();
     expect(document.querySelector(".ui-home-link")).toBeNull();
   });
 });
@@ -134,5 +134,13 @@ describe("T100 .ui-icon styles", () => {
     const d = decls(sel);
     expect(["flex", "inline-flex"]).toContain(d["display"]);
     expect(d["align-items"]).toBe("center");
+  });
+});
+
+describe("003 R4-T07: dead home icon removed", () => {
+  it("003_nfr2 Icon.tsx has no home icon in IconName/PATHS", () => {
+    const src = readFileSync(resolve(__dirname, "../../src/shared/ui/Icon.tsx"), "utf8");
+    expect(src).not.toMatch(/["']home["']/);
+    expect(src).not.toMatch(/^\s*home\s*:/m);
   });
 });

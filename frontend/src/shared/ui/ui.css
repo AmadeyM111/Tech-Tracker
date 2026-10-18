@@ -96,21 +96,7 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* T92: the "home" link looks like a pill button. */
-.ui-home-link {
-  display: inline-flex;
-  align-items: center;
-  background: var(--button-bg);
-  color: var(--button-text);
-  border: 1px solid var(--button-bg);
-  border-radius: 999px;
-  padding: 4px 14px;
-  font-size: 1.125rem;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-/* T100: decorative inline SVG icon before a label (sidebar items, "home" link). */
+/* T100: decorative inline SVG icon before a label (sidebar items). */
 .ui-icon {
   width: 20px;
   height: 20px;
@@ -121,18 +107,6 @@ button:disabled {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.ui-home-link:hover {
-  background: var(--accent);
-  color: var(--accent-contrast);
-  border-color: var(--accent);
-  text-decoration: none;
-}
-
-.ui-home-link:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 input,

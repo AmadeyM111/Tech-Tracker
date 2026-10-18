@@ -2,7 +2,7 @@
 // name always comes from the text next to the icon. Colour, stroke width and caps come from ui.css
 // (`.ui-icon`, `currentColor`). Shapes are path data only (24x24 grid) so no Latin attribute literals
 // sit in the JSX (the i18n scan of tests/shared/i18n.test.ts).
-export type IconName = "projects" | "tasks" | "users" | "audit" | "password" | "logout" | "home";
+export type IconName = "projects" | "tasks" | "users" | "audit" | "password" | "logout";
 
 const PATHS: Record<IconName, string[]> = {
   // Folder.
@@ -22,8 +22,6 @@ const PATHS: Record<IconName, string[]> = {
   password: ["M4 15a4 4 0 1 0 8 0a4 4 0 1 0-8 0", "M11 12l9-9", "M16 7l3 3"],
   // Arrow leaving a door.
   logout: ["M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5", "M16 8l4 4-4 4", "M20 12H9"],
-  // House.
-  home: ["M3 11l9-8 9 8", "M5 10v10h14V10", "M10 20v-6h4v6"],
 };
 
 export function Icon({ name }: { name: IconName }) {

@@ -143,8 +143,6 @@ export const ru = {
   "admin.entity.deal": "Сделка",
   "app.loading": "Проверка сессии…",
   "app.menu_label": "Меню",
-  "app.home_title": "Главная",
-  "app.home_link": "На главную",
   "app.welcome_title": "Добро пожаловать",
   "app.welcome_hint": "Для продолжения задайте новый пароль.",
   "app.retry": "Повторить",

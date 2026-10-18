@@ -146,6 +146,23 @@ describe("ru dictionary (NFR-6)", () => {
   });
 });
 
+describe("003 dictionary cleanup (AC-18)", () => {
+  it("003_ac18_no_home_keys", () => {
+    expect(dict).not.toHaveProperty("app.home_title");
+    expect(dict).not.toHaveProperty("app.home_link");
+  });
+
+  it("003_ac18_no_home_texts_among_values", () => {
+    const values = Object.values(dict).map((v) => v.trim().toLowerCase());
+    expect(values).not.toContain("главная");
+    expect(values).not.toContain("на главную");
+  });
+
+  it("003_ac18_menu_label", () => {
+    expect(dict["app.menu_label"]).toBe("Меню");
+  });
+});
+
 describe("MVP error codes (T81, FR-45)", () => {
   const MVP = [
     "owner_cannot_be_removed",

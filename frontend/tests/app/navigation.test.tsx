@@ -21,6 +21,9 @@ import { describe, expect, it } from "vitest";
 import { ru } from "../../src/shared/i18n";
 import { err, expectAt, installFetch, j, meWith, page, renderApp, where } from "../features/admin/helpers";
 
+// Удалённый ключ app.home_link (003): литерал, чтобы проверка «ссылки нет» не зависела от словаря.
+const REMOVED_HOME_LINK = "На главную";
+
 const DICT = Object.values(ru) as string[];
 const ME = "GET /api/v1/me";
 const BUSINESS = ["business_access", "project_create", "task_assign_others"];
@@ -109,7 +112,7 @@ describe("T81 routes under the session gate", () => {
     const nav = await screen.findByRole("navigation", { name: ru["app.menu_label"] });
     expect(Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/admin/users", "/admin/audit"]);
     expect(screen.getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
-    expect(screen.queryByRole("link", { name: ru["app.home_link"] })).toBeNull();
+    expect(screen.queryByRole("link", { name: REMOVED_HOME_LINK })).toBeNull();
     expect(document.querySelector('a[href="/"]')).toBeNull();
     expect(f.calls.length).toBe(1);
   });

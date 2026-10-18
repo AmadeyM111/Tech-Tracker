@@ -34,7 +34,6 @@ const OLD: Record<string, number> = {
   h3: 16,
   dt: 13,
   button: 14,
-  ".ui-home-link": 14,
   ".ui-hint": 14,
   ".ui-table th": 13,
   ".ui-secret code": 20,

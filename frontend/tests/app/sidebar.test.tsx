@@ -10,6 +10,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ru } from "../../src/shared/i18n";
 import { CAPS_ALL, deferred, err, expectAt, installFetch, j, meWith, page, renderApp, type Handler } from "../features/admin/helpers";
 
+// Удалённый ключ app.home_link (003): литерал, чтобы проверка «ссылки нет» не зависела от словаря.
+const REMOVED_HOME_LINK = "На главную";
+
 const ME = "GET /api/v1/me";
 const LOGOUT = "POST /api/v1/auth/logout";
 const MENU = "Меню";
@@ -307,7 +310,7 @@ describe("AC-27 tech admin on business paths", () => {
     expect(hrefsOf(nav)).toEqual([USERS, AUDIT_PATH]);
     expect(container.querySelector<HTMLElement>(".ui-sidebar")!.parentElement?.classList.contains("ui-shell")).toBe(true);
     expect(within(container.querySelector<HTMLElement>(".ui-sidebar")!).getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
-    expect(screen.queryByRole("link", { name: ru["app.home_link"] })).toBeNull();
+    expect(screen.queryByRole("link", { name: REMOVED_HOME_LINK })).toBeNull();
     expect(container.querySelector('a[href="/"]')).toBeNull();
     expect(f.calls).toHaveLength(1);
     expect(f.count(ME)).toBe(1);
@@ -341,7 +344,7 @@ describe("AC-28 business roles on tech admin paths", () => {
     expect(within(nav).getByRole("link", { name: ru["nav.projects"] })).toBeTruthy();
     expect(within(nav).getByRole("link", { name: ru["nav.my_tasks"] })).toBeTruthy();
     expect(within(container.querySelector<HTMLElement>(".ui-sidebar")!).getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
-    expect(screen.queryByRole("link", { name: ru["app.home_link"] })).toBeNull();
+    expect(screen.queryByRole("link", { name: REMOVED_HOME_LINK })).toBeNull();
     expect(f.calls.filter((c) => new URL(c.url).pathname.startsWith("/api/v1/admin"))).toHaveLength(0);
   });
 });

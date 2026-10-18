@@ -6,6 +6,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ru } from "../../src/shared/i18n";
 import { CAPS_ALL, err, installFetch, j, meWith, page, renderApp, type Handler } from "../features/admin/helpers";
 
+// Удалённый ключ app.home_link (003): литерал, чтобы проверка «ссылки нет» не зависела от словаря.
+const REMOVED_HOME_LINK = "На главную";
+
 const ME = "GET /api/v1/me";
 const TASK_ID = "44444444-4444-4444-8444-444444444444";
 const PROJECT_ID = "33333333-3333-4333-8333-333333333333";
@@ -46,9 +49,9 @@ describe("AC-16 no home link anywhere", () => {
     // боковое меню есть на каждом из этих экранов (в том числе на экранах отказа): ждём его
     await screen.findByRole("navigation", { name: ru["app.menu_label"] });
     expect(container.querySelector('a[href="/"]')).toBeNull();
-    expect(screen.queryByRole("link", { name: ru["app.home_link"] })).toBeNull();
+    expect(screen.queryByRole("link", { name: REMOVED_HOME_LINK })).toBeNull();
     expect(container.querySelector(".ui-home-link")).toBeNull();
     expect(document.body.textContent ?? "").not.toContain("Главная");
-    expect(document.body.textContent ?? "").not.toContain(ru["app.home_link"]);
+    expect(document.body.textContent ?? "").not.toContain(REMOVED_HOME_LINK);
   });
 });
