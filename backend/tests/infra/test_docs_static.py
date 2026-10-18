@@ -1207,7 +1207,7 @@ def test_002_ac27_checklist_item_names_roles() -> None:
         "«Смешанная роль» в пункте 002/AC-27 должна быть названа исторической записью журнала"
     )
     assert re.search(r"журнал", item, re.I)
-    for role in ("Тех-Админ", "Бизнес-админ", "Пользователь"):
+    for role in ("Тех-админ", "Бизнес-админ", "Пользователь"):
         assert role in item, f"в пункте 002/AC-27 не названа роль «{role}» из выбора роли"
     assert not re.search(r"`mixed`", item), "код `mixed` не должен быть виден как значение"
 

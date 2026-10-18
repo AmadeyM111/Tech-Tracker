@@ -61,7 +61,7 @@ export const ru = {
   "admin.confirm": "Подтвердить",
   "admin.cancel": "Отмена",
   "admin.role.none": "Без роли",
-  "admin.role.tech_admin": "Тех-Админ",
+  "admin.role.tech_admin": "Тех-админ",
   "admin.role.business_admin": "Бизнес-админ",
   "admin.role.mixed": "Смешанная роль",
   "admin.role.user": "Пользователь",
