@@ -21,3 +21,5 @@ deploy/tls/*
 
 # dev DATA_DIR (секреты: secret_key, файл пароля первого администратора)
 .data/
+ui/
+.png

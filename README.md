@@ -7,13 +7,17 @@ GOSTracker is a self-hosted tracker for client pipelines, projects and employee 
 
 ## Быстрый старт
 
-Состояние R1.0: фундамент - вход, роли, управление учётными записями, журнал аудита. Проекты,
-задачи и CRM появятся в следующих этапах (`specs/001-pilot-r1/plan.md`).
+Состояние: MVP-демо таск-трекера (R1, решение владельца продукта -
+`docs/adr/0012-mvp-task-tracker-first.md`): вход, роли, управление учётными записями, журнал
+аудита, проекты, задачи с подзадачами, комментарии, канбан-доска и демо-данные. Что входит и что
+отложено - в разделе «Состав MVP-демо и что отложено» ниже; подробный план -
+`specs/001-pilot-r1/plan.md`.
 
 Нужны Docker с плагином Compose v2 и свободные порты 80 и 443 (как их сменить - ниже).
 
 ```bash
 git clone <URL репозитория> gostracker && cd gostracker
+# все следующие команды выполняйте в каталоге клона
 cp .env.example .env
 docker compose up -d --build --wait
 docker compose exec api cat /data/secrets/initial-admin-password.txt
@@ -26,6 +30,99 @@ docker compose exec api cat /data/secrets/initial-admin-password.txt
 Первый запуск занимает несколько минут: собираются образы `api` и `web`. Если `docker compose up`
 запускали без `-d`, команду с паролем выполните в другом терминале.
 
+Команды `docker compose ...` выполняются в каталоге клона: имя проекта Compose по умолчанию - имя
+этого каталога. Если стек запущен под другим именем (`COMPOSE_PROJECT_NAME` или ключ `-p`),
+добавляйте то же имя ко всем командам: `docker compose -p <имя> exec api ...`.
+
+### Состав MVP-демо и что отложено
+
+R1 - прототип таск-трекера (MVP): приёмка R1 проходит по этому составу, остальное принято
+владельцем продукта в следующую версию (`docs/adr/0012-mvp-task-tracker-first.md`).
+
+Входит в MVP-демо:
+
+- вход, роли, учётные записи и журнал аудита (этап R1.0);
+- проекты: создание, правка названия и описания, участники, передача владения, мягкое удаление;
+- задачи: название, описание, исполнитель, срок, приоритет, статус; подзадачи одного уровня и
+  прогресс по ним;
+- комментарии: простой текст, HTML вырезается, без упоминаний;
+- личный список «Мои задачи» и список задач проекта с фильтрами по исполнителю и статусу;
+- канбан-доска с перетаскиванием, ручным порядком карточек и клавиатурной заменой
+  перетаскивания;
+- опрос сервера (не реже раза в 15 с) на доске, в списках задач и в карточке задачи;
+- демо-данные одной командой (см. ниже).
+
+Отложено (не входит в MVP, вернётся в следующей версии):
+
+- CRM: клиенты, контакты, сделки, воронка - отложено;
+- метки - отложены;
+- вложения (файлы к задачам) - отложены;
+- упоминания и уведомления - отложены;
+- корзина, восстановление и окончательное удаление: в MVP нет, отложены; удаление мягкое, а
+  удалённое не видно и отвечает 404;
+- поиск, лента активности проекта, архив проекта - отложены;
+- фильтры по сроку и общий список задач по всем проектам (FR-27a) - отложены;
+- экспорт и импорт - отложены;
+- резервная копия БД - отложена: прототип показывают, работу в нём не ведут;
+- замеры производительности и автоматические e2e-тесты браузера - отложены.
+
+### Демо-данные и пароли демо-пользователей
+
+На свежей установке (после `docker compose up -d --build --wait`) загрузите демо-данные одной
+командой и прочитайте пароли:
+
+```bash
+docker compose exec api gostracker demo-data
+docker compose exec api cat /data/secrets/demo-passwords.txt
+```
+
+- Команда создаёт 12 учётных записей (`demo.ta`, `demo.ba1`…`demo.ba4`,
+  `demo.user1`…`demo.user7`; вместе с первым техническим администратором в системе 13 записей),
+  2 проекта («Внедрение трекера» и «Подготовка пилота»), 30 задач (из них 6 подзадач) и около
+  20 комментариев; сделок нет. `demo.ba4` - бизнес-администратор, участник обоих проектов, не
+  владелец. Выполняется одной транзакцией; `--seed` задаёт seed генератора (по умолчанию 1).
+- Пароли пишутся в `/data/secrets/demo-passwords.txt` внутри контейнера `api` (том `appdata`,
+  права 0600): по строке `login=...` и `password=...` через табуляцию. В stdout, stderr и логи
+  пароли не попадают, команда печатает только путь к файлу и счётчики. При первом входе каждый
+  демо-пользователь обязан сменить пароль.
+- Повторный запуск отказывает (код 2, данные не меняются), если в базе уже есть проекты, задачи
+  или пользователи сверх первого технического администратора.
+- **Если файл паролей потерян** (или том `appdata` пересоздан), пароль читать больше негде:
+  войдите первым техническим администратором и для каждого демо-пользователя выполните
+  `reset-password` (`POST /api/v1/admin/users/{id}/reset-password`; в интерфейсе - «Сбросить
+  пароль» на странице «Учётные записи») либо переустановите стек с удалением тома:
+  `docker compose down -v` и новый `up` (все данные, включая БД, будут потеряны; только для
+  тестового проекта).
+- **Предупреждение `ENV=production`.** В поставляемом стеке `ENV=production` задан по умолчанию,
+  поэтому `demo-data` всегда печатает в stderr предупреждение (код возврата не меняется).
+  Смысл: учётные записи `demo.*` общеизвестны. Перед реальной работой в такой установке
+  заблокируйте все `demo.*` («Заблокировать» на странице «Учётные записи»): удаления учётных
+  записей нет. Для показа заказчику используйте отдельную установку.
+
+### Сценарий демо (UF-2…UF-6)
+
+Чек-лист для ручной проверки и показа - `docs/acceptance/mvp-demo.md`. Сценарий UF-2…UF-6:
+
+- UF-2: технический администратор входит, заводит учётную запись, назначает роль,
+  блокирует и разблокирует пользователя;
+- UF-3: бизнес-администратор (например, `demo.ba1`) создаёт проект, добавляет участников, ставит
+  задачи со сроками и исполнителями; исполнитель видит их в списке «Мои задачи»;
+- UF-4: исполнитель делит задачу на подзадачи и закрывает их, прогресс родителя растёт;
+- UF-5: участник перетаскивает карточку на доске в другую колонку, второй участник после опроса
+  (до 15 с) видит новый статус;
+- UF-6: участник фильтрует список задач проекта по исполнителю и статусу, открывает карточку и
+  оставляет комментарий;
+- права бизнес-администратора (FR-8, FR-9 фичи 002): `demo.ba2` - участник, но не владелец
+  проекта «Внедрение трекера» (владелец - `demo.ba1`) - правит и удаляет любые задачи проекта
+  (в том числе чужие), меняет исполнителя и удаляет любые комментарии; владение не требуется.
+  Бизнес-админ, даже не участник проекта, правит его название и описание, ведёт
+  участников (в том числе добавляет себя), передаёт владение (получатель - участник проекта с
+  ролью «Бизнес-админ») и удаляет проект; задачи проекта, где он не участник, он видит
+  только после того, как добавит себя в участники. Перенос карточки на доске без прав (403)
+  воспроизводится так: `demo.userN` переносит карточку, где он и не исполнитель, и не автор.
+  Удаление проверяйте на проекте и задаче, заведённых для проверки: демо-проекты удалять не
+  нужно (демо-данные заново не загрузить).
+
 ### Где взять пароль первого технического администратора
 
 Пароль не задаётся в `.env`: он генерируется при первом запуске и записывается в файл
@@ -35,6 +132,9 @@ docker compose exec api cat /data/secrets/initial-admin-password.txt
 две строки `login=...` и `password=...`. Логин первого администратора задаёт
 `INITIAL_ADMIN_LOGIN` в `.env` (по умолчанию `admin`); он читается без обрезки, поэтому значение
 не должно содержать пробелов и перевода строки по краям - иначе `api` не запустится.
+
+`INITIAL_ADMIN_LOGIN` показывается как задан: при значении `Admin.Root` логин в интерфейсе и в
+строке `login=` файла пароля - `Admin.Root`, то же написание; вход при этом без учёта регистра.
 
 ### Самоподписанный сертификат и подключение своего
 
@@ -88,7 +188,8 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
   Смена пароля после первой инициализации БД не меняет пароль внутри БД (том `pgdata`
   уже создан); пароль внутри БД меняется отдельно (`ALTER USER`).
 - `HTTP_PORT`, `HTTPS_PORT`, `TLS_SERVER_NAME` - см. выше.
-- `INITIAL_ADMIN_LOGIN` - логин первого администратора, только при первом запуске.
+- `INITIAL_ADMIN_LOGIN` - логин первого администратора (в заданном написании), только при
+  первом запуске.
 - `ARGON2_TIME_COST`, `ARGON2_MEMORY_COST_KIB`, `ARGON2_PARALLELISM` - параметры хеширования
   паролей (по умолчанию 3, 131072 КиБ, 2).
 - `SECRET_KEY` в `.env.example` нет и из `.env` в `api` не пробрасывается: ключ создаётся один
@@ -103,6 +204,48 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
 Удаления учётных записей в интерфейсе и API нет и не предусмотрено: пользователя можно
 заблокировать (и сбросить пароль, завершить сессии, сменить или снять роль), но не удалить.
 
+### Логины и регистр
+
+Логин показывается в написании при создании учётной записи (например, `Ivanov.Petr`) - везде:
+в интерфейсе, ответах API и журнале аудита. Вход выполняется без учёта регистра: `ivanov.petr`
+и `IVANOV.PETR` открывают ту же запись. Логин, отличающийся только регистром от существующего,
+занят: создание такой записи отклоняется с ответом 422 и кодом `login_taken`.
+
+### Обновление с предыдущей версии MVP
+
+Обновляйтесь только командой `docker compose up -d --build --wait` (стек под другим именем
+Compose - `docker compose -p <имя> up -d --build --wait`; правило имени - в «Быстром старте»).
+Entrypoint контейнера `api` выполняет миграции до старта API; если миграция падает, API не
+запускается. При ручном запуске (без Docker) сначала `gostracker bootstrap`, потом API. Не
+запускайте `uvicorn` вручную на немигрированной БД: код 002 на схеме ≤ 0005 с пользователем, у
+которого упразднённая роль `mixed`, отвечает 500.
+
+Если порт 80 занят другим стеком (например, `gostracker` при работающем `gostracker-web`),
+контейнер `web` нового стека не стартует из-за конфликта порта, и команда
+`docker compose up -d --build --wait` вернёт ненулевой код. Такой стек обновляйте только API:
+`docker compose up -d --build --wait api` (с `-p <имя>`, если стек запущен под другим именем
+Compose). Веб-часть (frontend внутри образа `web`) при этом остаётся старой: пересоберите её,
+когда порт свободен (`docker compose up -d --build --wait web`), иначе старый интерфейс может
+предлагать упразднённую роль, а API ответит 422. `docker compose restart api` образ не
+пересобирает: если на стеке перед этим поднимали образ версии 001, выполните
+`docker compose up -d --build --wait` из клона на коде 002, а не `restart`.
+
+Миграция `0006` (три роли) снимает упразднённую роль `mixed` у всех пользователей и пишет это в
+журнал от имени «системы»: бывшие пользователи с этой ролью остаются без роли (если после этого
+не остаётся активного технического администратора, роль технического администратора получают
+активные бывшие пользователи с этой ролью). Поэтому при
+обновлении с версии 001 оператору нужно сделать резервную копию БД (отдельным файлом на каждый
+стек, например `~/<имя-стека>-001.dump`, и проверить размер файла командой `ls -l`), выписать
+пользователей с упразднённой ролью `mixed` и проверить результат. Порядок, чек-лист владельца и команды - в
+`docs/adr/0013-three-roles.md`, раздел «Порядок обновления» (команды - в его блоке «Команды
+чек-листа»). Откат роль `mixed` не возвращает.
+
+Миграция `0005` (столбец с написанием логина) применяется при старте, до запуска `api`, без
+действий оператора. Прежние логины не меняются: у существующих записей написание равно
+логину как прежде (строчными), вход и пароли те же. Откат ниже `0005`
+(`alembic downgrade 0004` и ниже) теряет написание логинов: остаются строчные ключи; вход и
+уникальность логинов откат не затрагивает. Перед откатом сделайте копию БД.
+
 ### Предупреждения оператору
 
 - **Откат миграций.** `downgrade 0002` (откат ревизии 0002, то есть `alembic downgrade 0001`
@@ -114,7 +257,7 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
   `min(32, CPU + 4)`, поэтому при одновременных входах и сменах паролей пиковое потребление
   памяти `api` на стенде 3 vCPU составляет около 900 МиБ. Планируйте память с запасом;
   уменьшение `ARGON2_MEMORY_COST_KIB` ослабляет защиту паролей.
-- **Запуск API.** Команда `gostracker` (bootstrap, openapi, hash-bench, maintenance) API не
+- **Запуск API.** Команда `gostracker` (bootstrap, openapi, hash-bench, maintenance, demo-data) API не
   запускает. Запускайте `api` командой `uvicorn app.main:app` (как в образе), не
   программным `uvicorn.run(app)`: при таком запуске `dictConfig` uvicorn
   вернёт обработчики без фильтра секретов, и значения паролей и токенов могут попасть в лог.
@@ -124,9 +267,16 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
 - **Журнал доступа nginx.** access-log контейнера `web` пишет полный запрос, включая строку
   query. Не передавайте секреты в URL. Журнал самого `api` пишет путь без query.
 - **Таймауты.** У `db` заданы `lock_timeout=30s` и `idle_in_transaction_session_timeout=60s`:
-  административное действие при занятой блокировке получает ответ 500 через 30 с (код
-  `internal_error`), зависшая транзакция закрывается через 60 с. Прокси `web` ждёт ответ
-  `api` до 60 с. Не обновляйте стек во время резервного копирования.
+  при ожидании блокировки дольше 30 с или при взаимоблокировке запрос получает ответ 503 с кодом
+  `service_busy` и заголовком `Retry-After: 5` (повторите через 5 с; интерфейс показывает
+  «Сервис занят, повторите действие через несколько секунд»), зависшая транзакция закрывается
+  через 60 с. Если 503 не прекращаются,
+  перезапустите `api` (`docker compose restart api`): его соединения с БД закрываются, открытые
+  транзакции откатываются. Прокси `web` ждёт ответ `api` до 60 с. Не обновляйте стек во время
+  резервного копирования.
+- **Битый JSON.** Синтаксически некорректное тело запроса к API получает ответ 400
+  (`bad_request`) до проверки входа и прав; раньше приходил 422. Если JSON валиден, а поля
+  неверны, порядок прежний: 401/403, затем 422.
 - **Блокировки при старте.** Миграции и первый запуск (bootstrap) выполняют `SET lock_timeout = 0`
   и ждут блокировку бессрочно. Если блокировка зависла, `api` не станет healthy;
   примерно через 100 с он получит статус unhealthy, а `docker compose up` завершится ошибкой
@@ -141,27 +291,34 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
 - **TLS_SERVER_NAME.** Значение проверяется только на допустимые символы; синтаксически неверные
   имена (`a..b`, `a-`) проходят проверку - сертификат для них бесполезен.
 - **Удаление томов.** `docker compose down -v` удаляет тома, в том числе БД (`pgdata`) и
-  `appdata`: в R1.0 том содержит `secret_key` и файл пароля первого администратора
-  (`initial-admin-password.txt`); вложений пока нет. Используйте `-v` только для тестового проекта (см. ниже).
+  `appdata`: том содержит `secret_key`, файл пароля первого администратора
+  (`initial-admin-password.txt`) и файл паролей демо-пользователей (`demo-passwords.txt`);
+  вложений пока нет. Используйте `-v` только для тестового проекта (см. ниже).
 
 ### Регулярное обслуживание
 
-Команда `gostracker maintenance` выполняет служебную очистку: удаляет истёкшие сессии
-пользователей и (по мере появления функций R1.1) очищает корзину и осиротевшие файлы. Без
-регулярного запуска корзина (срок хранения 30 дней) и истёкшие сессии не очищаются: данные
-остаются в БД и на диске. Запускайте команду раз в сутки, например из `crontab` хоста:
+В MVP команда `gostracker maintenance` удаляет только истёкшие сессии пользователей (простой
+или абсолютный срок). Корзины в MVP нет (она отложена), поэтому чистить больше нечего. Без
+регулярного запуска истёкшие сессии остаются в БД: на работу это не влияет, но таблица растёт.
+Запускайте команду раз в сутки, например из `crontab` пользователя, у которого есть доступ к
+Docker:
 
 ```
-17 3 * * * cd /opt/gostracker && docker compose exec -T api gostracker maintenance >> /var/log/gostracker-maintenance.log 2>&1
+17 3 * * * cd /path/to/gostracker && { date -u; docker compose exec -T api gostracker maintenance; } >> /var/log/gostracker-maintenance.log 2>&1
 ```
 
-Ключ `-T` отключает TTY, без него `cron` не сможет выполнить `docker compose exec`.
+- `/path/to/gostracker` - замените на каталог клона репозитория (из него Compose берёт
+  `docker-compose.yml`, `.env` и имя проекта). Если стек запущен под другим именем
+  (`COMPOSE_PROJECT_NAME` или `-p`), укажите его: `docker compose -p <имя> exec -T api ...`.
+- `date -u` пишет в журнал время запуска в UTC перед результатом команды.
+- Ключ `-T` отключает TTY, без него `cron` не сможет выполнить `docker compose exec`.
 
 - Для проверки перед первым запуском: `docker compose exec -T api gostracker maintenance --dry-run`
   только считает, что было бы очищено, и ничего не меняет.
 - Вывод - ровно восемь строк `ключ=значение` (`dry_run`, `sessions_expired`, `projects_purged`,
   `tasks_purged`, `comments_purged`, `attachments_purged`, `files_removed`,
-  `orphan_files_removed`); при ошибке команда пишет сообщение в stderr и завершается с кодом 1.
+  `orphan_files_removed`); в MVP значимо только `sessions_expired`, остальные счётчики равны 0.
+  При ошибке команда пишет сообщение в stderr и завершается с кодом 1.
 - Команда безопасна при работающем API: обработка идёт короткими пакетами, строки, занятые
   запросами пользователей, пропускаются; повторный запуск ничего не ломает.
 - Фонового планировщика в R1 нет: сервиса compose для обслуживания нет, `api` его сам не
@@ -228,20 +385,24 @@ docker compose -p gostracker-infratest down -v
 
 ### Прочее
 
-- Модель данных R1.0 - `docs/data-model.md`.
+- Модель данных (R1.0 и MVP) - `docs/data-model.md`.
 - Контракт API - `docs/api/openapi.json` (генерируется `scripts/gen-api.sh`).
 - Состояние проекта - `docs/STATE.md`, правила для агентов - `AGENTS.md`.
 
 ## Quick start
 
-State of R1.0: the foundation - login, roles, account management, audit log. Projects, tasks and
-CRM arrive in the next stages (`specs/001-pilot-r1/plan.md`).
+State: the MVP demo of the task tracker (R1, a product owner decision -
+`docs/adr/0012-mvp-task-tracker-first.md`): login, roles, account management, audit log,
+projects, tasks with subtasks, comments, a kanban board and demo data. What is included and what
+is deferred is listed in "What the MVP demo includes and what is deferred" below; the detailed
+plan is `specs/001-pilot-r1/plan.md`.
 
 You need Docker with the Compose v2 plugin and free ports 80 and 443 (see below how to change
 them).
 
 ```bash
 git clone <repository URL> gostracker && cd gostracker
+# run all the following commands in the clone directory
 cp .env.example .env
 docker compose up -d --build --wait
 docker compose exec api cat /data/secrets/initial-admin-password.txt
@@ -255,6 +416,99 @@ password is changed.
 The first start takes a few minutes: the `api` and `web` images are built. If you ran
 `docker compose up` without `-d`, run the password command in another terminal.
 
+Run the `docker compose ...` commands in the clone directory: the default Compose project name
+is the name of that directory. If the stack runs under another name (`COMPOSE_PROJECT_NAME` or
+the `-p` option), add the same name to every command: `docker compose -p <name> exec api ...`.
+
+### What the MVP demo includes and what is deferred
+
+R1 is a task tracker prototype (MVP): the R1 acceptance covers exactly this scope; the rest was
+moved to the next version by the product owner (`docs/adr/0012-mvp-task-tracker-first.md`).
+
+Included in the MVP demo:
+
+- login, roles, accounts and the audit log (stage R1.0);
+- projects: create, edit name and description, members, ownership transfer, soft delete;
+- tasks: title, description, assignee, due date, priority, status; one-level subtasks and their
+  progress;
+- comments: plain text, HTML is stripped, no mentions;
+- the personal "My tasks" list and the project task list with assignee and status filters;
+- a kanban board with drag and drop, manual card order and a keyboard replacement for dragging;
+- server polling (at least every 15 s) on the board, task lists and the task card;
+- demo data with one command (see below).
+
+Deferred (not part of the MVP, planned for the next version):
+
+- CRM: clients, contacts, deals, pipeline - deferred;
+- labels - deferred;
+- attachments (files on tasks) - deferred;
+- mentions and notifications - deferred;
+- trash, restore and permanent delete: not in the MVP, deferred; deletion is soft, and a deleted
+  item is hidden and answers 404;
+- search, the project activity feed, project archive - deferred;
+- due-date filters and a cross-project task list (FR-27a) - deferred;
+- export and import - deferred;
+- database backup - deferred: the prototype is shown, not used for real work;
+- performance measurements and automated browser e2e tests - deferred.
+
+### Demo data and demo user passwords
+
+On a fresh installation (after `docker compose up -d --build --wait`) load the demo data with
+one command and read the passwords:
+
+```bash
+docker compose exec api gostracker demo-data
+docker compose exec api cat /data/secrets/demo-passwords.txt
+```
+
+- The command creates 12 accounts (`demo.ta`, `demo.ba1`…`demo.ba4`,
+  `demo.user1`…`demo.user7`; together with the first technical administrator the system has 13
+  accounts), 2 projects ("Внедрение трекера" and "Подготовка пилота"), 30 tasks (6 of them
+  subtasks) and about 20 comments; there are no deals. `demo.ba4` is a business administrator,
+  a member of both projects and not an owner. It runs in a single transaction; `--seed` sets the
+  generator seed (1 by default).
+- The passwords are written to `/data/secrets/demo-passwords.txt` inside the `api` container
+  (the `appdata` volume, mode 0600): one `login=...` and `password=...` pair per line, separated
+  by a tab. They never appear in stdout, stderr or logs; the command prints only the file path
+  and counters. Every demo user must change the password at the first login.
+- A repeated run is refused (exit code 2, data unchanged) if the database already has projects,
+  tasks or users besides the first technical administrator.
+- **If the password file is lost** (or the `appdata` volume was recreated), there is nowhere to
+  read the passwords from: log in as the first technical administrator and run `reset-password`
+  for every demo user (`POST /api/v1/admin/users/{id}/reset-password`; in the UI it is "Сбросить
+  пароль" on the accounts page), or reinstall the stack removing the volume: `docker compose
+  down -v` and a new `up` (all data including the database is lost; for a test project only).
+- **The `ENV=production` warning.** The shipped stack has `ENV=production` by default, so
+  `demo-data` always prints a warning to stderr (the exit code is not affected). Meaning: the
+  `demo.*` accounts are publicly known. Before real work in such an installation, block every
+  `demo.*` account ("Заблокировать" on the accounts page): accounts cannot be deleted. Use a
+  separate installation for customer demos.
+
+### Demo scenario (UF-2…UF-6)
+
+The checklist for manual verification and for the demo is `docs/acceptance/mvp-demo.md`. The
+scenario UF-2…UF-6:
+
+- UF-2: the technical administrator logs in, creates an account, assigns a role, blocks and
+  unblocks a user;
+- UF-3: a business administrator (for example `demo.ba1`) creates a project, adds members and
+  sets tasks with due dates and assignees; an assignee sees them in "My tasks";
+- UF-4: an assignee splits a task into subtasks and closes them, the parent progress grows;
+- UF-5: a member drags a card on the board to another column, a second member sees the new status
+  after polling (within 15 s);
+- UF-6: a member filters the project task list by assignee and status, opens a card and leaves a
+  comment;
+- business administrator rights (FR-8, FR-9 of feature 002): `demo.ba2` - a member but not the
+  owner of the project "Внедрение трекера" (the owner is `demo.ba1`) - edits and deletes any
+  task of the project (including other people's), changes the assignee and deletes any comment;
+  ownership is not required. A business administrator, even a non-member, edits the project name
+  and description, manages members (including adding himself), transfers ownership (the
+  recipient is a project member with the business administrator role) and deletes the project;
+  he sees the tasks of a project he is not a member of only after adding himself as a member. A
+  board move without rights (403) is reproduced like this: `demo.userN` moves a card where he is
+  neither the assignee nor the author. Check deletion on a project and a task created for the
+  check: the demo projects need not be deleted (the demo data cannot be reloaded).
+
 ### Where to find the first technical administrator password
 
 The password is not set in `.env`: it is generated on the first start and written to
@@ -264,6 +518,9 @@ mode 0600). It never appears in logs or standard output. Read it with
 `login=...` and `password=...`. The login of the first administrator is `INITIAL_ADMIN_LOGIN`
 in `.env` (`admin` by default); it is read without trimming, so the value must not contain
 leading or trailing spaces or a newline - otherwise `api` fails to start.
+
+`INITIAL_ADMIN_LOGIN` is shown as set: with the value `Admin.Root` the login in the UI and on the
+`login=` line of the password file is `Admin.Root`, the same spelling; sign-in ignores case.
 
 ### Self-signed certificate and using your own
 
@@ -319,7 +576,8 @@ The session cookie always carries the `Secure` flag (the shipped configuration h
   password inside the database (the `pgdata` volume already exists); change it separately
   (`ALTER USER`).
 - `HTTP_PORT`, `HTTPS_PORT`, `TLS_SERVER_NAME` - see above.
-- `INITIAL_ADMIN_LOGIN` - the login of the first administrator, used on the first start only.
+- `INITIAL_ADMIN_LOGIN` - the login of the first administrator (shown as set), used on the
+  first start only.
 - `ARGON2_TIME_COST`, `ARGON2_MEMORY_COST_KIB`, `ARGON2_PARALLELISM` - password hashing
   parameters (defaults 3, 131072 KiB, 2).
 - `SECRET_KEY` is not in `.env.example` and is not passed from `.env` to `api`: the key is
@@ -336,6 +594,50 @@ There is no UI and no API endpoint for deleting accounts, and none is planned: a
 blocked (and have the password reset, sessions revoked, role changed or removed) but accounts
 cannot be deleted.
 
+### Logins and case
+
+A login is shown in the spelling used when the account is created (for example, `Ivanov.Petr`)
+everywhere: in the UI, API responses and the audit log. Sign-in is case-insensitive: `ivanov.petr`
+and `IVANOV.PETR` open the same account. A login that differs only in case from an existing one
+is taken: creating it is rejected with a 422 response and the `login_taken` code.
+
+### Upgrading from the previous MVP version
+
+Upgrade only with `docker compose up -d --build --wait` (a stack under another Compose name:
+`docker compose -p <name> up -d --build --wait`; the name rule is in "Quick start"). The `api`
+container entrypoint runs the migrations before the API starts; if a migration fails, the API
+does not start. When starting by hand (without Docker), run `gostracker bootstrap` first, then
+the API. Do not run `uvicorn` by hand on an unmigrated database: on a schema ≤ 0005 with a
+user who has the retired `mixed` role, the 002 code answers 500.
+
+If port 80 is taken by another stack (for example `gostracker` while `gostracker-web` is
+running), the `web` container of the new stack does not start because of the port conflict, and
+`docker compose up -d --build --wait` returns a non-zero exit code. Upgrade such a stack with the
+API only: `docker compose up -d --build --wait api` (with `-p <name>` if the stack runs under
+another Compose name). The web part (the frontend inside the `web` image) then stays old:
+rebuild it when the port is free (`docker compose up -d --build --wait web`), otherwise the old
+interface may offer the retired role and the API answers 422. `docker compose restart api` does
+not rebuild the image: if the 001 image was brought up on the stack before, run
+`docker compose up -d --build --wait` from a clone on the 002 code, not `restart`.
+
+Migration `0006` (three roles) removes the retired `mixed` role from all users and records it in
+the audit log on behalf of "system": former holders of that role are left without a role (if no
+active technical administrator would remain, the active former holders get the technical
+administrator role). So when
+upgrading from version 001 the operator must back up the database (a separate file for each
+stack, for example `~/<stack-name>-001.dump`, and check the file size with `ls -l`), list the
+users with the retired `mixed` role and check the result afterwards. The order, the owner checklist and the
+commands are in `docs/adr/0013-three-roles.md`, section "Порядок обновления" (Upgrade order;
+the commands are in its "Команды чек-листа" block). A downgrade does not bring the `mixed` role
+back.
+
+Migration `0005` (the column with the login spelling) is applied at start, before `api` runs,
+with no operator action. Existing logins stay unchanged: for existing accounts the
+spelling equals the login as before (lower case), and sign-in and passwords are the same. A
+downgrade below `0005` (`alembic downgrade 0004` and lower) loses the spelling of logins: only
+the lower-case keys remain; sign-in and login uniqueness are not affected. Back up the database
+before a downgrade.
+
 ### Operator warnings
 
 - **Migration downgrade.** `downgrade 0002` (reverting revision 0002, i.e. `alembic downgrade
@@ -348,7 +650,7 @@ cannot be deleted.
   `min(32, CPU + 4)`, so with simultaneous logins and password changes the peak memory of `api`
   on a 3 vCPU host is about 900 MiB. Plan memory with a margin; lowering
   `ARGON2_MEMORY_COST_KIB` weakens password protection.
-- **Starting the API.** The `gostracker` command (bootstrap, openapi, hash-bench, maintenance) does
+- **Starting the API.** The `gostracker` command (bootstrap, openapi, hash-bench, maintenance, demo-data) does
   not start the API. Run `api` with `uvicorn app.main:app` (as the image does), not
   programmatically with `uvicorn.run(app)`: that way uvicorn's
   `dictConfig` restores handlers without the secrets filter, and passwords or tokens may leak
@@ -360,9 +662,15 @@ cannot be deleted.
   including the query string. Do not pass secrets in URLs. The `api` own log keeps the path
   without the query.
 - **Timeouts.** `db` runs with `lock_timeout=30s` and `idle_in_transaction_session_timeout=60s`:
-  an administrative action that meets a held lock gets a 500 response (`internal_error`) after
-  30 s, and a stuck transaction is closed after 60 s. The `web` proxy waits for `api` up to
-  60 s. Do not upgrade the stack during a backup.
+  a request that waits for a lock longer than 30 s, or hits a deadlock, gets a 503 response
+  with the code `service_busy` and the `Retry-After: 5` header (retry in 5 s; the UI shows
+  "Сервис занят, повторите действие через несколько секунд"), and a stuck transaction is closed
+  after 60 s. If 503 does not go away, restart `api` (`docker compose restart api`): its database
+  connections are closed and open transactions are rolled back. The `web` proxy waits for `api`
+  up to 60 s. Do not upgrade the stack during a backup.
+- **Malformed JSON.** A syntactically invalid request body gets 400 (`bad_request`) before the
+  login and permission checks; it used to be 422. If the JSON is valid but the fields are
+  wrong, the order is unchanged: 401/403, then 422.
 - **Locks at startup.** Migrations and the first-run bootstrap execute `SET lock_timeout = 0`
   and wait for a lock indefinitely. If a lock is stuck, `api` does not become healthy;
   after about 100 s it gets the unhealthy status and `docker compose up` fails with
@@ -380,28 +688,34 @@ cannot be deleted.
 - **TLS_SERVER_NAME.** The value is checked for allowed characters only; syntactically invalid
   names (`a..b`, `a-`) pass the check - a certificate for them is useless.
 - **Removing volumes.** `docker compose down -v` removes the volumes, including the database
-  (`pgdata`) and `appdata`: in R1.0 that volume contains `secret_key` and the first
-  administrator password file (`initial-admin-password.txt`); there are no attachments yet. Use `-v` for the test project only (see below).
+  (`pgdata`) and `appdata`: that volume contains `secret_key`, the first administrator password
+  file (`initial-admin-password.txt`) and the demo users password file (`demo-passwords.txt`);
+  there are no attachments yet. Use `-v` for the test project only (see below).
 
 ### Regular maintenance
 
-The `gostracker maintenance` command performs the housekeeping: it deletes expired user
-sessions and (as R1.1 features appear) purges the trash and orphaned files. Without regular
-runs the trash (30-day retention) and expired sessions are not cleaned up: the data stays in
-the database and on disk. Run the command once a day, for example from the host `crontab`:
+In the MVP the `gostracker maintenance` command deletes only expired user sessions (idle or
+absolute timeout). There is no trash in the MVP (it is deferred), so there is nothing else to
+clean up. Without regular runs expired sessions stay in the database: work is not affected,
+but the table grows. Run the command once a day, for example from the `crontab` of a user
+who has access to Docker:
 
 ```
-17 3 * * * cd /opt/gostracker && docker compose exec -T api gostracker maintenance >> /var/log/gostracker-maintenance.log 2>&1
+17 3 * * * cd /path/to/gostracker && { date -u; docker compose exec -T api gostracker maintenance; } >> /var/log/gostracker-maintenance.log 2>&1
 ```
 
-The `-T` flag disables the TTY; without it `cron` cannot run `docker compose exec`.
+- `/path/to/gostracker` - replace it with the clone directory of the repository (Compose takes
+  `docker-compose.yml`, `.env` and the project name from it). If the stack runs under another
+  name (`COMPOSE_PROJECT_NAME` or `-p`), give it: `docker compose -p <name> exec -T api ...`.
+- `date -u` writes the start time in UTC to the log before the command output.
+- The `-T` flag disables the TTY; without it `cron` cannot run `docker compose exec`.
 
 - To check before the first run: `docker compose exec -T api gostracker maintenance --dry-run`
   only counts what would be cleaned up and changes nothing.
 - The output is exactly eight `key=value` lines (`dry_run`, `sessions_expired`,
   `projects_purged`, `tasks_purged`, `comments_purged`, `attachments_purged`, `files_removed`,
-  `orphan_files_removed`); on failure the command writes a message to stderr and exits with
-  code 1.
+  `orphan_files_removed`); in the MVP only `sessions_expired` is meaningful, the other counters
+  are 0. On failure the command writes a message to stderr and exits with code 1.
 - The command is safe while the API is running: it works in short batches, rows held by user
   requests are skipped, and a repeated run breaks nothing.
 - There is no background scheduler in R1 and no compose service for maintenance; `api` does
@@ -469,6 +783,6 @@ the first-run tests fail with the "fresh stack needed" message.
 
 ### More
 
-- R1.0 data model - `docs/data-model.md`.
+- Data model (R1.0 and MVP) - `docs/data-model.md`.
 - API contract - `docs/api/openapi.json` (generated by `scripts/gen-api.sh`).
 - Project state - `docs/STATE.md`, rules for agents - `AGENTS.md`.

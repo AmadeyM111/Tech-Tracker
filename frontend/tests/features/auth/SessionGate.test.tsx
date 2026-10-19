@@ -1,11 +1,13 @@
 // T23 (попытка 2): проверка сессии, редиректы, колбэки навигации, очистка кэша.
 // Контракт: AppRoutes без мока api-модуля, сеть подменена глобальным fetch.
-//   GET /api/v1/me: 200 -> заглушка "/" (role="main" с непустым h1 из словаря);
+//   003 (R4-T04): "/" и неизвестные пути только перенаправляют на стартовый экран по FR-3, "Главной" нет.
+//   GET /api/v1/me: 200 -> стартовый экран роли (USER = роль user без возможностей, фикстура NOCAP ->
+//   /admin/users с отказом "нет прав" и одним запросом - профилем, AC-36);
 //   401 -> /login; 403 password_change_required -> /change-password; 403 no_role -> /no-role.
 //   Ожидание me -> role="status" с текстом из словаря, без полей и форм.
 //   Один общий клиент приложения: 401 (кроме login/logout) -> queryClient.clear() + /login;
 //   403 password_change_required -> /change-password; 403 no_role -> /no-role.
-// AC: FR-4, FR-55, FR-56, FR-57, FR-66, AC-75, NFR-7.
+// AC: FR-4, FR-55, FR-57, FR-66, AC-75, NFR-7.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -66,13 +68,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("session gate on / (T23)", () => {
-  it("me_200_with_role_shows_home_stub_not_blank", async () => {
+  // Бывший me_200_with_role_shows_home_stub_not_blank (003/AC-36): роль без возможностей -> /admin/users,
+  // отказ вместо пустого экрана, меню только с «Выйти», ровно один запрос (профиль).
+  it("003_ac36_me_200_with_role_without_capabilities_shows_forbidden_at_users_not_blank", async () => {
     routes["GET /api/v1/me"] = ME_OK;
     renderApp("/");
     const main = await screen.findByRole("main");
-    expect(main.querySelector("h1")?.textContent?.trim()).toBeTruthy();
-    expect(Object.values(ru)).toContain(main.querySelector("h1")?.textContent);
-    expect(where()).toBe("/");
+    await expectAt("/admin/users");
+    expect((await screen.findByRole("alert")).textContent).toBe(ru["error.forbidden"]);
+    expect(main.querySelector("a")).toBeNull();
+    expect(screen.getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "Главная" })).toBeNull();
+    await new Promise((r) => setTimeout(r, 40));
+    expect(calls).toHaveLength(1);
   });
 
   it.each([
@@ -86,7 +94,9 @@ describe("session gate on / (T23)", () => {
     expect(screen.queryByRole("main")).toBeNull();
   });
 
-  it("unknown_path_redirects_to_root_then_by_me", async () => {
+  // Бывший unknown_path_redirects_to_root_then_by_me (003/AC-5): неизвестный путь идёт по правилу «/» (прямоту
+  // без промежуточного "/" проверяет start-screen.test.tsx, AC-8 и AC-9).
+  it("003_ac5_unknown_path_start_screen_follows_me_rule", async () => {
     routes["GET /api/v1/me"] = ME_NOROLE;
     const first = renderApp("/no/such/page");
     await expectAt("/no-role");
@@ -94,7 +104,7 @@ describe("session gate on / (T23)", () => {
     routes["GET /api/v1/me"] = ME_OK;
     renderApp("/another");
     expect(await screen.findByRole("main")).toBeTruthy();
-    expect(where()).toBe("/");
+    await expectAt("/admin/users");
   });
 
   it("loading_indicator_from_dictionary_while_me_pending", async () => {
@@ -111,10 +121,11 @@ describe("session gate on / (T23)", () => {
 });
 
 describe("login/change-password/no-role guards (T23)", () => {
-  it("login_with_active_session_goes_home", async () => {
+  // Бывший login_with_active_session_goes_home (003/AC-6).
+  it("003_ac6_login_with_active_session_goes_to_start_screen", async () => {
     routes["GET /api/v1/me"] = ME_OK;
     renderApp("/login");
-    await expectAt("/");
+    await expectAt("/admin/users");
     expect(await screen.findByRole("main")).toBeTruthy();
   });
 
@@ -131,10 +142,22 @@ describe("login/change-password/no-role guards (T23)", () => {
     await expectAt("/login");
   });
 
-  it("fr56_voluntary_change_password_allowed_with_session", async () => {
+  // T103: смена пароля по собственной инициативе не предусмотрена - не-принудительный уходит на
+  // стартовый экран (003/AC-7; бывший t103_voluntary_change_password_redirects_home).
+  it("003_ac7_t103_voluntary_change_password_redirects_to_start_screen", async () => {
     routes["GET /api/v1/me"] = ME_OK;
     const { container } = renderApp("/change-password");
-    await waitFor(() => expect(field(container, "new-password")).toBeTruthy());
+    await expectAt("/admin/users");
+    expect(await screen.findByRole("main")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(container.querySelector('input[autocomplete="new-password"]')).toBeNull();
+  });
+
+  it("t103_forced_me_403_shows_dialog_on_change_password", async () => {
+    routes["GET /api/v1/me"] = ME_PWD;
+    renderApp("/change-password");
+    const dialog = await screen.findByRole("dialog");
+    expect(field(dialog, "new-password", 1)).toBeTruthy();
     expect(where()).toBe("/change-password");
   });
 });
@@ -157,7 +180,8 @@ describe("after password change and login (T23)", () => {
     await expectAt("/no-role");
   });
 
-  it("change_password_with_role_lands_on_home", async () => {
+  // Бывший change_password_with_role_lands_on_home (003/AC-12).
+  it("003_ac12_change_password_with_role_lands_on_start_screen", async () => {
     let changed = false;
     routes["GET /api/v1/me"] = () => (changed ? ME_OK() : ME_PWD());
     routes["POST /api/v1/auth/password"] = () => ((changed = true), OK204());
@@ -165,7 +189,7 @@ describe("after password change and login (T23)", () => {
     await fillChange(container);
     fireEvent.click(submitButton(container));
     expect(await screen.findByRole("main")).toBeTruthy();
-    expect(where()).toBe("/");
+    await expectAt("/admin/users");
   });
 
   it("expired_session_on_password_change_goes_to_login_not_form", async () => {
@@ -190,6 +214,7 @@ describe("after password change and login (T23)", () => {
     expect(await req.json()).toEqual({ login: "uok", password: "Correct-Horse-Battery-9" });
   });
 
+  // 003/AC-10: после входа - стартовый экран (USER -> /admin/users), кэш предыдущего пользователя очищен.
   it("successful_login_clears_previous_users_cache", async () => {
     routes["GET /api/v1/me"] = ME_401;
     routes["POST /api/v1/auth/login"] = () => j(200, { user: USER });
@@ -200,14 +225,14 @@ describe("after password change and login (T23)", () => {
     fireEvent.change(field(container, "current-password"), { target: { value: "Correct-Horse-Battery-9" } });
     routes["GET /api/v1/me"] = ME_OK;
     fireEvent.click(submitButton(container));
-    await expectAt("/");
+    await expectAt("/admin/users");
     expect(qc.getQueryData(["previous-user"])).toBeUndefined();
   });
 });
 
 describe("navigation callbacks of the shared client (T23)", () => {
   async function onChangePassword(next: Handler) {
-    routes["GET /api/v1/me"] = ME_OK;
+    routes["GET /api/v1/me"] = ME_PWD;
     routes["POST /api/v1/auth/password"] = next;
     const { container } = renderApp("/change-password");
     await waitFor(() => field(container, "current-password"));
@@ -229,8 +254,10 @@ describe("navigation callbacks of the shared client (T23)", () => {
     routes["GET /api/v1/me"] = ME_NOROLE;
     const { container } = renderApp("/no-role");
     await waitFor(() => plainButtons(container)[0]!);
+    routes["GET /api/v1/me"] = ME_PWD; // T103: the flag is the reason for the redirect, so /me reports it
     fireEvent.click(plainButtons(container)[0]!);
     await expectAt("/change-password");
+    expect(await screen.findByRole("dialog")).toBeTruthy();
   });
 
   it("403_no_role_goes_to_no_role", async () => {
@@ -239,7 +266,7 @@ describe("navigation callbacks of the shared client (T23)", () => {
     routes["GET /api/v1/admin/users"] = () => err(403, "no_role");
     renderApp("/");
     await screen.findByRole("main");
-    expect(where()).toBe("/");
+    await expectAt("/admin/users"); // 003/AC-36: "/" уже не экран
     await act(async () => {
       await getAppClient().GET("/api/v1/admin/users", {}).catch(() => undefined);
     });
@@ -274,7 +301,7 @@ describe("logout and alert focus (T23)", () => {
   });
 
   it("nfr7_repeated_identical_client_error_refocuses_alert", async () => {
-    routes["GET /api/v1/me"] = ME_OK;
+    routes["GET /api/v1/me"] = ME_PWD;
     const { container } = renderApp("/change-password");
     await waitFor(() => field(container, "current-password"));
     fireEvent.change(field(container, "current-password"), { target: { value: "Old-Password-123" } });
@@ -291,7 +318,7 @@ describe("logout and alert focus (T23)", () => {
   });
 });
 
-describe("no_role user keeps change-password reachable (T23 attempt 3)", () => {
+describe("no_role user and the forced password change (T23 attempt 3, T103)", () => {
   async function fill(c: HTMLElement) {
     await waitFor(() => field(c, "current-password"));
     fireEvent.change(field(c, "current-password"), { target: { value: "Old-Password-123" } });
@@ -299,22 +326,16 @@ describe("no_role user keeps change-password reachable (T23 attempt 3)", () => {
     fireEvent.change(field(c, "new-password", 1), { target: { value: "New-Password-12345" } });
   }
 
-  it("fr56_fr66_no_role_me_stays_on_change_password_then_changes_and_goes_no_role", async () => {
+  // T103: пользователь без роли и без принудительной смены - не-forced: "/" -> /no-role, без диалога.
+  it("t103_no_role_me_on_change_password_goes_to_no_role_without_dialog", async () => {
     routes["GET /api/v1/me"] = ME_NOROLE;
-    routes["POST /api/v1/auth/password"] = OK204;
-    const { container } = renderApp("/change-password");
-    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/me"))).toBe(true));
-    await new Promise((r) => setTimeout(r, 50));
-    expect(where()).toBe("/change-password");
-    await fill(container);
-    expect(field(container, "new-password", 0)).toBeTruthy();
-    fireEvent.click(submitButton(container));
-    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/auth/password"))).toBe(true));
+    renderApp("/change-password");
     await expectAt("/no-role");
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("fr56_no_role_callback_from_password_request_stays_on_form", async () => {
-    routes["GET /api/v1/me"] = ME_OK;
+  it("fr55_no_role_callback_from_password_request_stays_on_form", async () => {
+    routes["GET /api/v1/me"] = ME_PWD;
     routes["POST /api/v1/auth/password"] = () => err(403, "no_role");
     const { container } = renderApp("/change-password");
     await fill(container);
@@ -350,13 +371,14 @@ describe("handler removal (T23 attempt 3)", () => {
     routes["GET /api/v1/me"] = ME_OK;
     const out = renderApp("/");
     await screen.findByRole("main");
+    await expectAt("/admin/users"); // 003/AC-36: "/" уже не экран
     qc.setQueryData(["sentinel"], 1);
     const at = where();
     out.unmount();
     routes["GET /api/v1/me"] = ME_401;
     await getAppClient().GET("/api/v1/me").catch(() => undefined);
     expect(qc.getQueryData(["sentinel"])).toBe(1);
-    expect(at).toBe("/");
+    expect(at).toBe("/admin/users");
   });
 });
 
@@ -373,7 +395,7 @@ describe("me error retry (T23 attempt 3)", () => {
       return ok ? ME_OK() : bad(r);
     };
     renderApp("/");
-    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect((await screen.findByRole("alert")).textContent).not.toBe(ru["error.forbidden"]);
     expect(where()).toBe("/");
     const btn = (await screen.findByRole("button")) as HTMLButtonElement;
     expect(btn.type).toBe("button");
@@ -384,6 +406,9 @@ describe("me error retry (T23 attempt 3)", () => {
     fireEvent.click(btn);
     expect(await screen.findByRole("main")).toBeTruthy();
     expect(meCalls).toBeGreaterThan(before);
-    expect(screen.queryByRole("alert")).toBeNull();
+    // 003/AC-8: после «Повторить» - стартовый экран; вместо ошибки сессии теперь только отказ (USER без возможностей)
+    await expectAt("/admin/users");
+    expect((await screen.findByRole("alert")).textContent).toBe(ru["error.forbidden"]);
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
   });
 });

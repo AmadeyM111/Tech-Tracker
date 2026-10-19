@@ -27,7 +27,7 @@ class WorkspaceMember(TimestampMixin, AuthoredMixin, Base):
     __tablename__ = "workspace_member"
     __table_args__ = (
         CheckConstraint(
-            "role IN ('tech_admin','business_admin','mixed','user')",
+            "role IN ('tech_admin','business_admin','user')",
             name="role_valid",
         ),
         Index("ix_workspace_member_workspace_id_role", "workspace_id", "role"),

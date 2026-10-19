@@ -99,14 +99,29 @@ async def test_ac75_change_and_remove_role_with_events(api_env: ApiEnv) -> None:
     assert log[1].details["role_from"] == "business_admin"
 
 
-@pytest.mark.parametrize("role", ["tech_admin", "business_admin", "mixed", "user"])
+@pytest.mark.parametrize("role", ["tech_admin", "business_admin", "user"])
 async def test_fr12_every_role_value_can_be_assigned(api_env: ApiEnv, role: str) -> None:
+    """001/FR-12, обращён по 002/FR-1: три значения роли назначаются (200); `mixed` - ниже."""
     env = api_env
     ws, _, token = await admin_in_new_workspace(env)
     target, _ = await seed(env, ws, None)
     response = await _put_role(env, token, target.id, role)
     assert response.status_code == 200, response.text
     assert response.json()["role"] == role
+
+
+async def test_002_ac24_fr1_mixed_role_is_422_and_role_unchanged(api_env: ApiEnv) -> None:
+    """002/AC-24, FR-1, FR-18: `mixed` от ТА отклоняется, роль цели не меняется."""
+    env = api_env
+    ws, _, token = await admin_in_new_workspace(env)
+    target, _ = await seed(env, ws, "user")
+
+    response = await _put_role(env, token, target.id, "mixed")
+
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "validation_error"
+    assert await member_role(env, target.id) == "user"
+    assert await events(env, entity_id=target.id) == []
 
 
 async def test_ac75_same_role_returns_200_without_new_event(api_env: ApiEnv) -> None:
@@ -193,22 +208,23 @@ async def test_fr67_promoted_user_gets_admin_access_with_the_same_token(api_env:
 # --- самоназначение (FR-12, ADR-0003) -----------------------------------------------------------
 
 
-@pytest.mark.parametrize("actor_role", ["tech_admin", "mixed"])
-async def test_fr12_ta_and_mixed_may_change_own_role(api_env: ApiEnv, actor_role: str) -> None:
+async def test_fr12_ta_may_change_own_role_when_another_ta_remains(api_env: ApiEnv) -> None:
+    """002/AC-4, AC-7: ТА при втором активном ТА меняет свою роль на БА (было: ТА/СМ <-> mixed)."""
     env = api_env
-    ws, _, _ = await admin_in_new_workspace(env)
-    actor, (token,) = await seed(env, ws, actor_role)
-    new_role = "mixed" if actor_role == "tech_admin" else "tech_admin"
+    ws, _, _ = await admin_in_new_workspace(env)  # второй активный ТА
+    actor, (token,) = await seed(env, ws, "tech_admin")
 
-    response = await _put_role(env, token, actor.id, new_role)
+    response = await _put_role(env, token, actor.id, "business_admin")
 
     assert response.status_code == 200, response.text
-    assert response.json()["role"] == new_role
+    assert response.json()["role"] == "business_admin"
     log = await events(env, entity_id=actor.id)
     assert [e.action for e in log] == ["user.role_changed"]
     assert log[0].actor_id == actor.id  # самоназначение фиксируется в журнале
+    assert log[0].details["role_from"] == "tech_admin"
+    assert log[0].details["role_to"] == "business_admin"
     me = await env.me(token)
-    assert me.json()["role"] == new_role
+    assert me.json()["role"] == "business_admin"
 
 
 async def test_fr12_admin_may_demote_self_when_another_admin_remains(api_env: ApiEnv) -> None:
@@ -234,7 +250,12 @@ async def test_ac26_non_admins_cannot_assign_roles_including_self(
     actor, (token,) = await seed(env, ws, role)
     target, _ = await seed(env, ws, "user")
 
-    for victim, value in ((target.id, "mixed"), (target.id, None), (actor.id, "tech_admin")):
+    # 002/AC-5: набор администраторов учётных записей - только ТА (``mixed`` убран)
+    for victim, value in (
+        (target.id, "business_admin"),
+        (target.id, None),
+        (actor.id, "tech_admin"),
+    ):
         response = await _put_role(env, token, victim, value)
         assert response.status_code == 403, (victim, value, response.text)
 
@@ -272,7 +293,7 @@ async def test_ac78_last_admin_cannot_remove_own_role(api_env: ApiEnv) -> None:
 
 @pytest.mark.parametrize(
     ("role", "new_role"),
-    [("tech_admin", "business_admin"), ("tech_admin", "user"), ("mixed", "business_admin")],
+    [("tech_admin", "business_admin"), ("tech_admin", "user")],
 )
 async def test_ac78_last_admin_cannot_switch_to_role_without_manage_accounts(
     api_env: ApiEnv, role: str, new_role: str
@@ -287,12 +308,11 @@ async def test_ac78_last_admin_cannot_switch_to_role_without_manage_accounts(
     assert await member_role(env, admin.id) == role
 
 
-async def test_ac78_last_admin_may_switch_between_admin_roles(api_env: ApiEnv) -> None:
-    env = api_env
-    _, admin, token = await admin_in_new_workspace(env, "tech_admin")
-    response = await _put_role(env, token, admin.id, "mixed")
-    assert response.status_code == 200
-    assert response.json()["role"] == "mixed"
+# Удалён ``test_ac78_last_admin_may_switch_between_admin_roles`` (ТА -> mixed): по 002/FR-7
+# единственный ТА не меняет роль ни на какую другую. Заменители: ``test_002_ac6_*``
+# (api/test_tech_admins_002.py) и в R3-T11 ``test_002_ac24_*``. Также удалён параметр
+# ``("mixed", "business_admin")`` из ``test_ac78_last_admin_cannot_switch_to_role_without_manage_
+# accounts``: покрытие перенесено в ``test_002_ac6_*`` (ТА -> БА/П/без роли -> 422).
 
 
 async def test_ac78_last_admin_cannot_block_self_and_sessions_survive(api_env: ApiEnv) -> None:
@@ -383,7 +403,7 @@ async def test_ac78_parallel_requests_never_leave_zero_active_admins(
     for i in range(ITERATIONS_RACE):
         ws = await new_workspace(env)
         a, (tok_a,) = await seed(env, ws, "tech_admin")
-        b, (tok_b,) = await seed(env, ws, "tech_admin" if i % 2 else "mixed")
+        b, (tok_b,) = await seed(env, ws, "tech_admin")  # 002/AC-10: был СМ -> второй ТА
         act_a, act_b = variants[i % 3]
         results = await asyncio.gather(
             _call(admin_call(env, tok_a, act_a, b.id)),

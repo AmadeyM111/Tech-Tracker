@@ -51,7 +51,7 @@ async def list_members(
         raise Forbidden()
     stmt = (
         select(AppUser)
-        .options(load_only(AppUser.id, AppUser.login, AppUser.is_blocked))
+        .options(load_only(AppUser.id, AppUser.login_display, AppUser.is_blocked))
         .join(ProjectMember, ProjectMember.user_id == AppUser.id)
         .where(ProjectMember.project_id == project_id)
         .order_by(AppUser.login, AppUser.id)
@@ -68,7 +68,7 @@ async def list_members(
     roles = {row.user_id: None if row.role is None else Role(row.role) for row in role_rows}
     return [
         ProjectMemberRow(
-            user=UserRef(id=u.id, login=u.login),
+            user=UserRef(id=u.id, login=u.login_display),
             role=roles.get(u.id),
             is_blocked=u.is_blocked,
             is_owner=u.id == facts.owner_id,
@@ -98,6 +98,9 @@ async def add_member(db: AsyncSession, actor: Actor, project_id: UUID, user_id: 
 
 async def remove_member(db: AsyncSession, actor: Actor, project_id: UUID, user_id: UUID) -> None:
     facts = await load_project_facts(db, actor, project_id, lock="update")
+    # видимость проекта раньше «цель не участник»: иначе 404 раскрывает состав (D-45, ревью T71)
+    if not can_view_project(actor, facts):
+        raise Forbidden()
     is_member = (
         user_id == facts.owner_id
         or (

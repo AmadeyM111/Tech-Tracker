@@ -39,6 +39,8 @@ export interface ApiClientOptions extends NavigationHandlers {
   /** Site root by default: schema paths already carry the /api/v1 prefix. */
   baseUrl?: string;
   fetch?: typeof fetch;
+  /** Redirects already fired in the current series; shared so the owner can re-arm them. */
+  firedRedirects?: Set<Redirect>;
 }
 
 type Redirect = "unauthenticated" | "passwordChangeRequired" | "noRole";
@@ -87,12 +89,18 @@ function parsesAsJson(text: string): boolean {
 }
 
 export function createApiClient(options: ApiClientOptions = {}): Client<paths> {
-  const { baseUrl = "/", fetch: fetchImpl, onUnauthenticated, onPasswordChangeRequired, onNoRole } =
-    options;
+  const {
+    baseUrl = "/",
+    fetch: fetchImpl,
+    onUnauthenticated,
+    onPasswordChangeRequired,
+    onNoRole,
+    firedRedirects = new Set<Redirect>(),
+  } = options;
 
   // Each redirect fires once per series (parallel requests fail together);
   // any successful response re-arms them (login again without a page reload).
-  const fired = new Set<Redirect>();
+  const fired = firedRedirects;
 
   function redirectOnce(kind: Redirect, handler: (() => void) | undefined): void {
     if (fired.has(kind)) return;
@@ -158,12 +166,18 @@ export function createApiClient(options: ApiClientOptions = {}): Client<paths> {
 // One client for the whole application (plan §4.14): navigation callbacks are
 // registered once at the app level (AppRoutes) and shared by every request.
 let appHandlers: NavigationHandlers = {};
+// A new set of handlers (an application instance) starts a new series: earlier failures must not mute it.
+const appFired = new Set<Redirect>();
 
 /** Registers the app-level callbacks; returns a function that removes them. */
 export function setNavigationHandlers(handlers: NavigationHandlers): () => void {
   appHandlers = handlers;
+  appFired.clear();
   return () => {
-    if (appHandlers === handlers) appHandlers = {};
+    if (appHandlers === handlers) {
+      appHandlers = {};
+      appFired.clear();
+    }
   };
 }
 
@@ -175,6 +189,7 @@ export function getAppClient(): Client<paths> {
     // Request needs an absolute URL outside a browser page (jsdom, Node).
     baseUrl: globalThis.location.origin,
     fetch: (input, init) => globalThis.fetch(input, init),
+    firedRedirects: appFired,
     onUnauthenticated: () => appHandlers.onUnauthenticated?.(),
     onPasswordChangeRequired: () => appHandlers.onPasswordChangeRequired?.(),
     onNoRole: () => appHandlers.onNoRole?.(),

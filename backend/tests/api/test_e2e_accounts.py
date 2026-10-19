@@ -1,8 +1,9 @@
 """T32: сквозные API-сценарии AC-2 и AC-64 (приёмка R1.0, замечание 3).
 
-AC-2 (FR-1, FR-4, FR-8, AC-121): ТА создаёт 12 учётных записей и назначает 4 роли по 3;
-каждый входит одноразовым паролем, получает 403 ``password_change_required``, меняет пароль,
-``/me`` отдаёт назначенную роль; в журнале ровно 24 записи (12 created + 12 role_assigned).
+AC-2 (FR-1, FR-4, FR-8, AC-121): ТА создаёт 12 учётных записей и назначает три роли
+(002/AC-24, FR-1, AC-28: состав демо - 1 ТА, 4 БА, 7 П; прежде 4 роли по 3); каждый входит
+одноразовым паролем, получает 403 ``password_change_required``, меняет пароль, ``/me`` отдаёт
+назначенную роль; в журнале ровно 24 записи (12 created + 12 role_assigned).
 
 AC-64 (FR-41, FR-12, ADR-0006): один сценарий ТА над учётными записями; на каждое действие
 ровно одна запись журнала с автором, временем UTC, действием и затронутым пользователем; ни
@@ -17,12 +18,14 @@ from typing import Any
 
 import httpx
 
-from tests.admin_support import ADMIN_USERS, OTP_FIELD, admin_in_new_workspace
+from tests.admin_support import ADMIN_USERS, OTP_FIELD, admin_in_new_workspace, seed
 from tests.conftest import ApiEnv
 
 AUDIT = "/api/v1/admin/audit"
 PASSWORD_URL = "/api/v1/auth/password"
-ROLES = ["user", "business_admin", "mixed", "tech_admin"]
+# 002/AC-28: состав демо-данных - один ТА, четыре БА (demo.ba1...demo.ba4), семь П (demo.user1...7)
+ROLES = ["tech_admin"] + ["business_admin"] * 4 + ["user"] * 7
+EXPECTED_COUNTS = {"tech_admin": 1, "business_admin": 4, "user": 7}
 
 
 async def _audit(env: ApiEnv, token: str) -> list[dict[str, Any]]:
@@ -33,9 +36,10 @@ async def _audit(env: ApiEnv, token: str) -> list[dict[str, Any]]:
     return list(reversed(body["items"]))  # по возрастанию id
 
 
-async def test_ac2_ta_creates_12_users_with_4_roles_each_logs_in_and_gets_role(
+async def test_ac2_ta_creates_12_users_with_3_roles_each_logs_in_and_gets_role(
     api_env: ApiEnv,
 ) -> None:
+    """001/AC-2, обращён по 002/AC-24, FR-1, AC-28: 12 пользователей, три роли (1 ТА, 4 БА, 7 П)."""
     env = api_env
     _, admin, ta_token = await admin_in_new_workspace(env)
     users: list[tuple[str, str, str, str]] = []  # (id, login, otp, role)
@@ -43,7 +47,7 @@ async def test_ac2_ta_creates_12_users_with_4_roles_each_logs_in_and_gets_role(
     for i in range(12):
         login = f"ac2.user{i:02d}"
         otp = f"Otp-{i:02d}-Pa55phrase-xyz-{uuid.uuid4().hex[:8]}"
-        role = ROLES[i % 4]
+        role = ROLES[i]
         created = await env.client.post(
             ADMIN_USERS, json={"login": login, OTP_FIELD: otp}, headers=env.auth(ta_token)
         )
@@ -57,7 +61,8 @@ async def test_ac2_ta_creates_12_users_with_4_roles_each_logs_in_and_gets_role(
         assert assigned.json()["role"] == role
         users.append((uid, login, otp, role))
 
-    assert Counter(role for *_, role in users) == {r: 3 for r in ROLES}
+    assert len(users) == 12
+    assert Counter(role for *_, role in users) == EXPECTED_COUNTS
 
     for uid, login, otp, role in users:
         response = await env.login(login, otp)
@@ -101,7 +106,9 @@ async def test_ac64_ta_scenario_one_entry_per_action_without_password_values(
     api_env: ApiEnv,
 ) -> None:
     env = api_env
-    _, admin, ta = await admin_in_new_workspace(env)  # ТА меняет свою роль на mixed (админ)
+    # 002/AC-4 (001/AC-64 по 002 §9): есть второй активный ТА, первый в конце меняет свою роль на БА
+    ws, admin, ta = await admin_in_new_workspace(env)
+    _, (ta2,) = await seed(env, ws, "tech_admin")  # читает журнал после смены роли первым ТА
     responses: list[httpx.Response] = []
     otp1, otp2 = "Otp1-Pa55phrase-first-4711", "Otp2-Pa55phrase-reset-4712"
     new_pw = "New-Pa55phrase-chosen-4713"
@@ -121,7 +128,7 @@ async def test_ac64_ta_scenario_one_entry_per_action_without_password_values(
     async def step(action: str, entity: str, method: str, url: str, **kw: Any) -> None:
         await act(method, url, **kw)
         expected.append((action, entity))
-        entries = await _audit(env, ta)
+        entries = await _audit(env, ta2)
         assert [(e["action"], e["entity_id"]) for e in entries] == expected, action
 
     await step("user.blocked", uid, "POST", f"{base}/block")
@@ -133,7 +140,7 @@ async def test_ac64_ta_scenario_one_entry_per_action_without_password_values(
     await step("user.role_removed", uid, "PUT", f"{base}/role", json={"role": None})
     await step(
         "user.role_changed", str(admin.id), "PUT", f"{ADMIN_USERS}/{admin.id}/role",
-        json={"role": "mixed"},
+        json={"role": "business_admin"},
     )  # fmt: skip
 
     # пользователь входит одноразовым паролем и выбирает свой: действия самого пользователя
@@ -151,7 +158,7 @@ async def test_ac64_ta_scenario_one_entry_per_action_without_password_values(
     responses.append(changed)
     assert changed.status_code == 204, changed.text
 
-    entries = await _audit(env, ta)
+    entries = await _audit(env, ta2)
     assert len(entries) == len(expected) == 9
     for entry in entries:
         assert entry["entity_type"] == "user"
@@ -159,7 +166,7 @@ async def test_ac64_ta_scenario_one_entry_per_action_without_password_values(
         occurred = datetime.fromisoformat(entry["occurred_at"].replace("Z", "+00:00"))
         assert occurred.utcoffset() == timedelta(0)
         assert entry["entity_id"] in {uid, str(admin.id)}
-    listing = await env.client.get(AUDIT, params={"page_size": 100}, headers=env.auth(ta))
+    listing = await env.client.get(AUDIT, params={"page_size": 100}, headers=env.auth(ta2))
     responses.append(listing)
 
     dump = json.dumps(entries, ensure_ascii=False) + "".join(r.text for r in responses)

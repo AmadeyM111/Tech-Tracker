@@ -2,6 +2,9 @@
 
 Порядок: user_not_found -> user_blocked -> recipient_wrong_role -> not_project_member;
 все ошибки - ``Unprocessable`` (422) с кодом. AC-73, AC-74, AC-54, AC-110, FR-68.
+
+002/AC-17, AC-18 (R3-T11): строки роли MIXED удалены (роли нет, FR-1); те же случаи покрыты
+строками BUSINESS_ADMIN (допустим как участник и владелец, не участник - not_project_member).
 """
 
 from __future__ import annotations
@@ -63,23 +66,18 @@ def test_purpose_has_no_deal_responsible(rec) -> None:
 # (purpose, роль, участник?, ожидание: None = допустим, иначе код)
 TABLE = [
     ("PROJECT_MEMBER", "BUSINESS_ADMIN", False, None),
-    ("PROJECT_MEMBER", "MIXED", False, None),
     ("PROJECT_MEMBER", "USER", False, None),
     ("PROJECT_MEMBER", "TECH_ADMIN", False, "recipient_wrong_role"),
     ("PROJECT_MEMBER", None, False, "recipient_wrong_role"),
     ("TASK_ASSIGNEE", "BUSINESS_ADMIN", True, None),
-    ("TASK_ASSIGNEE", "MIXED", True, None),
     ("TASK_ASSIGNEE", "USER", True, None),
     ("TASK_ASSIGNEE", "BUSINESS_ADMIN", False, "not_project_member"),
-    ("TASK_ASSIGNEE", "MIXED", False, "not_project_member"),
     ("TASK_ASSIGNEE", "USER", False, "not_project_member"),
     ("TASK_ASSIGNEE", "TECH_ADMIN", True, "recipient_wrong_role"),
     ("TASK_ASSIGNEE", None, True, "recipient_wrong_role"),
     ("TASK_ASSIGNEE", "TECH_ADMIN", False, "recipient_wrong_role"),  # роль проверяется раньше
     ("PROJECT_OWNER", "BUSINESS_ADMIN", True, None),
-    ("PROJECT_OWNER", "MIXED", True, None),
     ("PROJECT_OWNER", "BUSINESS_ADMIN", False, "not_project_member"),
-    ("PROJECT_OWNER", "MIXED", False, "not_project_member"),
     ("PROJECT_OWNER", "USER", True, "recipient_wrong_role"),
     ("PROJECT_OWNER", "USER", False, "recipient_wrong_role"),
     ("PROJECT_OWNER", "TECH_ADMIN", True, "recipient_wrong_role"),
@@ -158,7 +156,7 @@ def test_project_member_purpose_does_not_need_member_ids(rec, roles) -> None:
 
 
 @pytest.mark.parametrize("purpose", ["TASK_ASSIGNEE", "PROJECT_OWNER"])
-@pytest.mark.parametrize("role", ["BUSINESS_ADMIN", "MIXED"])
+@pytest.mark.parametrize("role", ["BUSINESS_ADMIN"])
 def test_membership_purpose_with_none_member_ids_is_caller_error(rec, roles, purpose, role) -> None:
     """Fail Fast: для целей с проверкой членства None - ошибка вызывающего кода."""
     target = _facts(rec, roles, role)

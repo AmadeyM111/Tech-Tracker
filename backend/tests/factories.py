@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 DEFAULT_PASSWORD = "correct-horse-battery-staple"
 PLACEHOLDER_HASH = "$argon2id$v=19$m=1024,t=1,p=1$c3ludGhldGljc2FsdA$c3ludGhldGljaGFzaC1ub3QtcmVhbA"
-ROLES = ("tech_admin", "business_admin", "mixed", "user")
+ROLES = ("tech_admin", "business_admin", "user")
 
 _login_counter = itertools.count(1)
 
@@ -100,6 +100,10 @@ async def make_user(
     """Пользователь + строка ``workspace_member`` (роль ``None`` = «без роли», FR-66).
 
     Если ``workspace`` не передан, создаётся новое пространство.
+
+    Логин (D-66, FR-73a): допускается смешанный регистр. В столбец ``login`` (ключ) пишется
+    ``login.lower()``, в ``login_display`` — написание как передано; ``UserRow.login`` — написание
+    (им же тест входит и сверяет ответы API).
     """
     ws = workspace or await make_workspace(db)
     now = utcnow()
@@ -111,7 +115,8 @@ async def make_user(
         .insert()
         .values(
             id=user_id,
-            login=the_login,
+            login=the_login.lower(),
+            login_display=the_login,
             password_hash=the_hash,
             must_change_password=must_change_password,
             is_blocked=blocked,

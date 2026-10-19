@@ -90,7 +90,8 @@ async def login(
 ) -> LoginResult:
     """Вход по логину и паролю; любая причина отказа — один и тот же ``InvalidCredentials``.
 
-    Логин приводится к нижнему регистру (FR-73); логин вне шаблона отклоняется без обращения
+    Логин нормализуется для поиска учётной записи; в результате — отображаемый логин (FR-73a);
+    логин вне шаблона отклоняется без обращения
     к БД. Заблокированный пользователь и пользователь без членства в пространстве получают тот
     же отказ (FR-5, FR-61). Роль ``NULL`` вход не запрещает (FR-66).
     """
@@ -112,7 +113,7 @@ async def login(
     row = (
         await db.execute(
             select(
-                AppUser.login,
+                AppUser.login_display,
                 AppUser.is_blocked,
                 AppUser.must_change_password,
                 WorkspaceMember.workspace_id,
@@ -132,7 +133,7 @@ async def login(
     return LoginResult(
         token=token,
         user_id=user_id,
-        login=row.login,
+        login=row.login_display,
         role=row.role,
         must_change_password=row.must_change_password,
     )

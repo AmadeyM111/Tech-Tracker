@@ -15,9 +15,9 @@ from app.domain.access.roles import ROLE_CAPABILITIES, Capability, Role
 
 
 class RecipientPurpose(StrEnum):
-    PROJECT_MEMBER = auto()  # БА, СМ, «Пользователь»
-    TASK_ASSIGNEE = auto()  # БА, СМ, «Пользователь» + участник проекта
-    PROJECT_OWNER = auto()  # БА, СМ + участник проекта
+    PROJECT_MEMBER = auto()  # БА, «Пользователь»
+    TASK_ASSIGNEE = auto()  # БА, «Пользователь» + участник проекта
+    PROJECT_OWNER = auto()  # БА + участник проекта
 
 
 @dataclass(frozen=True, slots=True)

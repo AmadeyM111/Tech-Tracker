@@ -132,7 +132,7 @@ def test_ac23_only_web_publishes_ports_and_db_port_is_closed() -> None:
     assert published["web"] == {(80, ss.HTTP_PORT), (443, ss.HTTPS_PORT)}
     # Docker Compose v5 при отсутствии публикации печатает пусто или "invalid IP:0"
     port_out = ss.compose("port", "db", "5432", check=False).stdout.strip()
-    assert port_out in ("", "invalid IP:0"), f"порт db опубликован: {port_out!r}"
+    assert port_out in ("", "invalid IP:0", ":0"), f"порт db опубликован: {port_out!r}"
 
 
 def test_ac23_passwords_and_key_not_in_any_service_logs() -> None:

@@ -250,9 +250,34 @@ def test_t21_src_files_only_expected() -> None:
         # T24
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
         "features/admin/password.ts", "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
+        # T81
+        "shared/ui/UserPicker.tsx", "features/users/api.ts",
+        # T82
+        "features/projects/api.ts", "features/projects/ProjectsPage.tsx",
+        "features/projects/ProjectPage.tsx",
+        # T83
+        "features/tasks/api.ts", "features/tasks/TaskList.tsx", "features/tasks/CreateTaskForm.tsx",
+        "features/tasks/TaskPage.tsx", "features/tasks/SubtaskList.tsx",
+        # T86
+        "features/boards/api.ts", "features/boards/BoardView.tsx", "features/boards/dnd.ts",
+        # T85
+        "features/comments/api.ts", "features/comments/Comments.tsx",
+        # T100
+        "shared/ui/Icon.tsx",
+        # T103
+        "features/auth/session.ts",
     }  # fmt: skip
     assert {"main.tsx", "app/App.tsx", "app/providers.tsx"} <= found
     assert found <= allowed, f"лишние файлы: {sorted(found - allowed)}"
+
+
+def test_t86_boards_files_exist() -> None:
+    for rel in (
+        "features/boards/api.ts",
+        "features/boards/BoardView.tsx",
+        "features/boards/dnd.ts",
+    ):
+        assert (FE / "src" / rel).is_file(), f"нет frontend/src/{rel}"
 
 
 def test_t21_no_build_artifacts_in_git() -> None:

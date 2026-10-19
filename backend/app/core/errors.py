@@ -197,7 +197,9 @@ def _error_response(
 
 async def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком
     err = cast(AppError, exc)
-    return _error_response(err.status_code, err.detail, err.code)
+    # D-40: временное состояние — клиент может повторить запрос (в том числе из домена).
+    headers = {"Retry-After": _RETRY_AFTER_SECONDS} if isinstance(err, ServiceBusy) else None
+    return _error_response(err.status_code, err.detail, err.code, headers=headers)
 
 
 async def _validation_error_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком

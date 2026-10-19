@@ -23,6 +23,7 @@ PW = "Sup3r-secret-Pa55phrase-xyz"
 BG = {"X-GT-Background": "1"}
 
 # Явная матрица BR-1 (значения Capability — имя члена в нижнем регистре, tasks.md T12).
+# 002/FR-1 (R3-T11): ключ "mixed" удалён, ролей три.
 EXPECTED_CAPABILITIES: dict[str, list[str]] = {
     "tech_admin": ["assign_roles", "manage_accounts", "view_audit"],
     "business_admin": [
@@ -32,20 +33,8 @@ EXPECTED_CAPABILITIES: dict[str, list[str]] = {
         "labels_manage",
         "pipeline_manage",
         "project_create",
+        "project_manage_any",  # 002/FR-8, D-1
         "task_assign_others",
-    ],
-    "mixed": [
-        "assign_roles",
-        "business_access",
-        "crm_read",
-        "crm_write",
-        "labels_manage",
-        "manage_accounts",
-        "pipeline_manage",
-        "project_create",
-        "project_manage_any",
-        "task_assign_others",
-        "view_audit",
     ],
     "user": ["business_access"],
 }
@@ -121,16 +110,19 @@ async def test_fr55_me_with_one_time_password_is_403_password_change_required(
 
 
 async def test_fr67_me_reflects_role_change_without_relogin(api_env: ApiEnv) -> None:
+    """001/FR-67, обращён по 002/FR-19: смена П -> БА (прежде -> `mixed`) видна без перелогина."""
     user = await api_env.new_user(role="user", password=PW)
     token = await api_env.login_ok(user)
     assert (await api_env.me(token)).json()["capabilities"] == ["business_access"]
 
     member = get_table("workspace_member")
-    await api_env.execute(member.update().where(member.c.user_id == user.id).values(role="mixed"))
+    await api_env.execute(
+        member.update().where(member.c.user_id == user.id).values(role="business_admin")
+    )
 
     body = (await api_env.me(token)).json()
-    assert body["role"] == "mixed"
-    assert body["capabilities"] == EXPECTED_CAPABILITIES["mixed"]
+    assert body["role"] == "business_admin"
+    assert body["capabilities"] == EXPECTED_CAPABILITIES["business_admin"]
 
 
 # --- logout (AC-34, FR-60) -----------------------------------------------------------------

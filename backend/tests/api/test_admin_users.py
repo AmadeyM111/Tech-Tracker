@@ -12,6 +12,7 @@ AC-2, AC-3, AC-20, AC-22 (страница), AC-39, AC-44, AC-45, AC-113, AC-116
 - ``POST /{id}/reset-password`` ``{one_time_password}`` -> 204 без тела.
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -164,9 +165,10 @@ async def test_t15_list_pages_are_stable_for_users_with_equal_created_at(
 
 
 async def test_ac2_get_user_returns_admin_view(api_env: ApiEnv) -> None:
+    """002/AC-3: цель с ролью ``business_admin`` (прежде ``mixed``)."""
     env = api_env
     ws, _, token = await admin_in_new_workspace(env)
-    target, _ = await seed(env, ws, "mixed", must_change_password=True)
+    target, _ = await seed(env, ws, "business_admin", must_change_password=True)
 
     response = await env.client.get(f"{ADMIN_USERS}/{target.id}", headers=env.auth(token))
 
@@ -175,7 +177,7 @@ async def test_ac2_get_user_returns_admin_view(api_env: ApiEnv) -> None:
     assert set(body) == ADMIN_VIEW_FIELDS
     assert body["id"] == str(target.id)
     assert body["login"] == target.login
-    assert body["role"] == "mixed"
+    assert body["role"] == "business_admin"
     assert body["is_blocked"] is False
     assert body["must_change_password"] is True
 
@@ -243,14 +245,185 @@ async def test_ac113_created_user_logs_in_with_one_time_password_and_must_change
     assert code_of(me) == "password_change_required"
 
 
-async def test_ac116_login_with_capitals_is_normalized_to_lower_case(api_env: ApiEnv) -> None:
+async def test_ac116_login_with_capitals_keeps_case_in_response_login_works_in_any_case(
+    api_env: ApiEnv,
+) -> None:
+    """FR-73a: ответ несёт написание при создании; вход и уникальность — без учёта регистра."""
     env = api_env
     _, _, token = await admin_in_new_workspace(env)
 
     response = await _create(env, token, "Ivan.Petrov")
 
     assert response.status_code == 201, response.text
-    assert response.json()["login"] == "ivan.petrov"
+    assert response.json()["login"] == "Ivan.Petrov"
+    assert (await env.login("IVAN.PETROV", OTP)).status_code == 200
+    assert (await env.login("ivan.petrov", OTP)).json()["user"]["login"] == "Ivan.Petrov"
+
+
+async def _item(env: ApiEnv, token: str, user_id: str) -> dict[str, Any]:
+    r = await env.client.get(f"{ADMIN_USERS}/{user_id}", headers=env.auth(token))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert isinstance(body, dict)
+    return body
+
+
+async def _logins_in_list(env: ApiEnv, token: str) -> dict[str, str]:
+    return {i["id"]: i["login"] for i in await _list_all(env, token)}
+
+
+@pytest.mark.parametrize("login", ["Ivanov.Petr", "QA-Team_1"])
+async def test_ac125_create_returns_login_as_typed_in_response_list_and_card(
+    api_env: ApiEnv, login: str
+) -> None:
+    env = api_env
+    _, _, token = await admin_in_new_workspace(env)
+
+    response = await _create(env, token, login)
+
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert set(created) == ADMIN_VIEW_FIELDS
+    assert created["login"] == login
+    assert (await _item(env, token, created["id"]))["login"] == login
+    assert (await _logins_in_list(env, token))[created["id"]] == login
+    row = await env.user_row(uuid.UUID(created["id"]))
+    assert (row.login, row.login_display) == (login.lower(), login)
+
+
+async def test_ac125_login_unchanged_by_block_unblock_reset_and_role_changes(
+    api_env: ApiEnv,
+) -> None:
+    env = api_env
+    _, _, token = await admin_in_new_workspace(env)
+    created = (await _create(env, token, "Ivanov.Petr")).json()
+    uid = created["id"]
+    base = f"{ADMIN_USERS}/{uid}"
+    auth = env.auth(token)
+
+    async def assert_same() -> None:
+        assert (await _item(env, token, uid))["login"] == "Ivanov.Petr"
+        assert (await _logins_in_list(env, token))[uid] == "Ivanov.Petr"
+
+    assert (await env.client.post(f"{base}/block", headers=auth)).status_code == 204
+    await assert_same()
+    assert (await env.client.post(f"{base}/unblock", headers=auth)).status_code == 204
+    await assert_same()
+    reset = await env.client.post(
+        f"{base}/reset-password", json={OTP_FIELD: OTP + "-2"}, headers=auth
+    )
+    assert reset.status_code == 204, reset.text
+    await assert_same()
+    for role in ("user", "business_admin", None):
+        r = await env.client.put(f"{base}/role", json={"role": role}, headers=auth)
+        assert r.status_code == 200, r.text
+        assert r.json()["login"] == "Ivanov.Petr"
+        await assert_same()
+
+
+@pytest.mark.parametrize("attempt", ["ivanov.PETR", "ivanov.petr", "IVANOV.PETR", "Ivanov.Petr"])
+async def test_ac128_case_variant_of_existing_login_is_422_login_taken(
+    api_env: ApiEnv, attempt: str
+) -> None:
+    env = api_env
+    _, _, token = await admin_in_new_workspace(env)
+    first = (await _create(env, token, "Ivanov.Petr")).json()
+    before_ids = set(await _logins_in_list(env, token))
+    before_events = len(await events(env))
+
+    response = await _create(env, token, attempt)
+
+    assert response.status_code == 422, response.text
+    assert code_of(response) == "login_taken"
+    assert set(await _logins_in_list(env, token)) == before_ids
+    assert len(await events(env)) == before_events
+    assert (await _item(env, token, first["id"]))["login"] == "Ivanov.Petr"
+
+
+@pytest.mark.parametrize(
+    "login",
+    ["Ivanov.Пётр", "\u212aivan", ".Ivan", "Iv", "A" * 65],
+    ids=["cyrillic", "kelvin", "leading-dot", "2-chars", "65-chars"],
+)
+async def test_ac128_invalid_mixed_case_login_is_422_login_invalid(
+    api_env: ApiEnv, login: str
+) -> None:
+    env = api_env
+    _, _, token = await admin_in_new_workspace(env)
+    before = set(await _logins_in_list(env, token))
+
+    response = await _create(env, token, login)
+
+    assert response.status_code == 422, response.text
+    assert code_of(response) == "login_invalid"
+    assert set(await _logins_in_list(env, token)) == before
+
+
+async def test_ac128_login_taken_across_workspaces_for_case_variant(api_env: ApiEnv) -> None:
+    env = api_env
+    _, _, token = await admin_in_new_workspace(env)
+    await seed(env, await new_workspace(env), "user", login="Ivanov.Petr")
+
+    response = await _create(env, token, "ivanov.petr")
+
+    assert response.status_code == 422
+    assert code_of(response) == "login_taken"
+
+
+@pytest.mark.committed
+@pytest.mark.parametrize("same_workspace", [True, False], ids=["one-workspace", "two-workspaces"])
+async def test_ac128_parallel_create_of_case_variants_has_one_winner(
+    committed_api_env: ApiEnv, same_workspace: bool
+) -> None:
+    env = committed_api_env
+    ws1 = await new_workspace(env)
+    _, (t1,) = await seed(env, ws1, "tech_admin")
+    ws2 = ws1 if same_workspace else await new_workspace(env)
+    _, (t2,) = await seed(env, ws2, "tech_admin")
+
+    first, second = await asyncio.gather(
+        _create(env, t1, "Ivanov.Petr"), _create(env, t2, "ivanov.petr")
+    )
+
+    assert sorted([first.status_code, second.status_code]) == [201, 422], (
+        first.text,
+        second.text,
+    )
+    loser = first if first.status_code == 422 else second
+    winner = second if loser is first else first
+    assert code_of(loser) == "login_taken"
+    found = await env.execute(
+        text("SELECT login, login_display FROM app_user WHERE login = 'ivanov.petr'")
+    )
+    assert found is not None and len(found) == 1
+    assert found[0].login_display == winner.json()["login"]
+    created_events = await env.execute(
+        text(
+            "SELECT count(*) FROM domain_event WHERE action = 'user.created' AND entity_id = :e"
+        ).bindparams(e=uuid.UUID(winner.json()["id"]))
+    )
+    assert created_events is not None and created_events[0][0] == 1
+
+
+async def test_oi129_account_list_is_ordered_by_normalized_login_ignoring_case(
+    api_env: ApiEnv,
+) -> None:
+    """OI-129 а): ``anna, Boris, ivan, Kirill`` (без пунктуации: порядок не зависит от БД)."""
+    env = api_env
+    ws, _, token = await admin_in_new_workspace(env)
+    for login in ("Kirill", "ivan", "Boris", "anna"):
+        await seed(env, ws, "user", login=login)
+
+    items = await _list_all(env, token)
+
+    logins = [i["login"] for i in items]
+    assert [x for x in logins if x in {"anna", "Boris", "ivan", "Kirill"}] == [
+        "anna",
+        "Boris",
+        "ivan",
+        "Kirill",
+    ]
+    assert [x.lower() for x in logins] == sorted(x.lower() for x in logins)
 
 
 @pytest.mark.parametrize(
@@ -757,7 +930,7 @@ def _endpoints(target: Any) -> list[tuple[str, str, str, Any]]:
         ("unblock", "POST", f"{base}/unblock", None),
         ("reset", "POST", f"{base}/reset-password", {OTP_FIELD: OTP}),
         ("revoke", "POST", f"{base}/revoke-sessions", None),
-        ("role", "PUT", f"{base}/role", {"role": "mixed"}),
+        ("role", "PUT", f"{base}/role", {"role": "user"}),  # 002/AC-5: 403 не зависит от тела
     ]
 
 
@@ -871,17 +1044,8 @@ async def test_d16_foreign_origin_on_unsafe_admin_requests_is_403_origin_mismatc
     assert [i for i in await _list_all(env, token) if i["login"] == "gate.check"] == []
 
 
-async def test_fr42_mixed_role_has_access_to_admin_section(api_env: ApiEnv) -> None:
-    env = api_env
-    ws, _, _ = await admin_in_new_workspace(env)
-    _, (token,) = await seed(env, ws, "mixed")
-    target, _ = await seed(env, ws, "user")
-
-    listed = await env.client.get(ADMIN_USERS, headers=env.auth(token))
-    created = await _create(env, token, "by.mixed")
-    blocked = await env.client.post(f"{ADMIN_USERS}/{target.id}/block", headers=env.auth(token))
-
-    assert (listed.status_code, created.status_code, blocked.status_code) == (200, 201, 204)
+# Удалён ``test_fr42_mixed_role_has_access_to_admin_section``: СМ больше не администратор учётных
+# записей (002/FR-3). Заменитель: ``test_002_ac3_*`` в api/test_tech_admins_002.py.
 
 
 async def test_fr12_not_allowed_methods_on_admin_users_are_405(api_env: ApiEnv) -> None:

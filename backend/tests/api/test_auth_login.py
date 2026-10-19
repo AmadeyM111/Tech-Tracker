@@ -155,6 +155,48 @@ async def test_ac116_fr73_login_in_upper_case_succeeds(api_env: ApiEnv) -> None:
         assert response.json()["user"]["id"] == str(user.id)
 
 
+@pytest.mark.parametrize("variant", ["ivanov.petr", "IVANOV.PETR", "Ivanov.Petr", "iVaNoV.pEtR"])
+async def test_ac126_login_in_any_case_returns_display_login_in_response_and_profile(
+    api_env: ApiEnv, variant: str
+) -> None:
+    """FR-73a: логин в ответе входа и в ``GET /me`` — написание при создании, а не набранное."""
+    env = api_env
+    user = await env.new_user(role="business_admin", login="Ivanov.Petr", password=SECRET)
+
+    response = await env.login(variant, SECRET)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["user"]["login"] == "Ivanov.Petr"
+    assert response.json()["user"]["id"] == str(user.id)
+    token = env.token_from(response)
+    assert token
+    me = await env.me(token)
+    assert me.status_code == 200, me.text
+    assert me.json()["login"] == "Ivanov.Petr"
+    assert me.json()["id"] == str(user.id)
+
+
+async def test_ac126_wrong_password_with_lower_case_login_is_same_as_unknown_login(
+    api_env: ApiEnv,
+) -> None:
+    env = api_env
+    await env.new_user(role="business_admin", login="Ivanov.Petr", password=SECRET)
+
+    wrong = await env.login("ivanov.petr", WRONG)
+    unknown = await env.login("nobody.here", WRONG)
+
+    assert wrong.status_code == 401
+    assert _cmp(wrong) == _cmp(unknown)
+    assert not wrong.headers.get_list("set-cookie")
+
+
+async def test_ac126_user_key_and_display_are_stored_separately(api_env: ApiEnv) -> None:
+    env = api_env
+    user = await env.new_user(role="user", login="Ivanov.Petr", password=SECRET)
+    row = await env.user_row(user.id)
+    assert (row.login, row.login_display) == ("ivanov.petr", "Ivanov.Petr")
+
+
 # --- отказы: одинаковый 401 (AC-4, AC-20, AC-30, FR-61) -----------------------------------
 
 

@@ -117,7 +117,7 @@ async def test_fr7_login_is_public_and_answers_invalid_credentials_not_not_authe
 async def test_ac4_expired_session_cookie_gives_401_on_every_guarded_route(
     api_env: ApiEnv,
 ) -> None:
-    user = await api_env.new_user(role="mixed", password=PW)
+    user = await api_env.new_user(role="business_admin", password=PW)
     token = await api_env.login_ok(user)
     await api_env.client.post(LOGOUT_URL, headers=api_env.auth(token))
     for method, path in sorted(_api_operations(api_env) - PUBLIC):
@@ -563,9 +563,8 @@ async def test_t17_admin_routes_exist_in_route_walk(api_env: ApiEnv) -> None:
         ("user", {}, (403, "forbidden")),
         (None, {}, (403, "no_role")),
         ("tech_admin", {"must_change_password": True}, (403, "password_change_required")),
-        ("mixed", {"must_change_password": True}, (403, "password_change_required")),
     ],
-    ids=["business_admin", "user", "no_role", "ta_one_time_password", "mixed_one_time_password"],
+    ids=["business_admin", "user", "no_role", "ta_one_time_password"],
 )
 async def test_t17_every_admin_route_rejects_non_admin_actors(
     api_env: ApiEnv, role: str | None, extra: dict[str, Any], expected: tuple[int, str]

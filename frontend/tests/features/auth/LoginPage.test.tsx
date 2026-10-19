@@ -1,12 +1,12 @@
 // T23: экран входа. AC: UF-2, FR-55, FR-66, NFR-7, NFR-6, FR-57.
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppRoutes } from "../../../src/app/router";
 import { LoginPage } from "../../../src/features/auth/LoginPage";
 import * as api from "../../../src/features/auth/api";
 import { ApiError } from "../../../src/shared/api/client";
-import { errorMessage } from "../../../src/shared/i18n";
+import { errorMessage, ru, t } from "../../../src/shared/i18n";
 import { deferred, field, plainButtons, renderAt, submitButton } from "./helpers";
 
 vi.mock("../../../src/features/auth/api", () => ({
@@ -154,5 +154,135 @@ describe("LoginPage (T23)", () => {
     const { container } = renderAt("/login", <AppRoutes />, "*");
     expect(field(container, "username")).toBeTruthy();
     expect(field(container, "current-password").type).toBe("password");
+  });
+});
+
+// Spec 005-login-help. Dictionary keys fixed by this test: auth.help_title, auth.help_p1, auth.help_p2.
+const HELP_KEYS = ["auth.help_title", "auth.help_p1", "auth.help_p2"] as const;
+const HELP_TITLE = "О системе";
+const HELP_P1 =
+  "GOSTracker — трекер задач для команды. Проекты, задачи с подзадачами и комментариями, список и канбан-доска.";
+const HELP_P2 =
+  "Учётную запись и первый пароль выдаёт технический администратор. После первого входа пароль нужно сменить.";
+const dict = ru as Record<string, string>;
+
+function helpBlock(): HTMLElement {
+  return helpBlocks()[0] ?? screen.getByRole("region", { name: HELP_TITLE });
+}
+
+// section[aria-labelledby] is role=region, aside is role=complementary.
+function helpBlocks(): HTMLElement[] {
+  return [
+    ...screen.queryAllByRole("region", { name: HELP_TITLE }),
+    ...screen.queryAllByRole("complementary", { name: HELP_TITLE }),
+  ];
+}
+
+function jsonResponse(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+describe("LoginPage help block (spec 005)", () => {
+  it("ac2_dictionary_values_equal_fr2_strings", () => {
+    expect(dict["auth.help_title"]).toBe(HELP_TITLE);
+    expect(dict["auth.help_p1"]).toBe(HELP_P1);
+    expect(dict["auth.help_p2"]).toBe(HELP_P2);
+    for (const k of HELP_KEYS) expect(t(k as never)).toBe(dict[k]);
+  });
+
+  it("ac1_single_landmark_named_by_h2_after_form_and_single_h1", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    const block = helpBlock();
+    expect(["SECTION", "ASIDE"]).toContain(block.tagName);
+    expect(helpBlocks().length).toBe(1);
+    const labelledby = block.getAttribute("aria-labelledby");
+    expect(labelledby).toBeTruthy();
+    const heading = container.ownerDocument.getElementById(labelledby!);
+    expect(heading?.tagName).toBe("H2");
+    expect(heading?.textContent).toBe(HELP_TITLE);
+    expect(block.contains(heading)).toBe(true);
+
+    const form = container.querySelector("form")!;
+    expect(form.contains(block)).toBe(false);
+    expect(block.contains(form)).toBe(false);
+    expect(form.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const h1 = container.querySelectorAll("h1");
+    expect(h1.length).toBe(1);
+    expect(h1[0]!.textContent).toBe("Вход в систему");
+  });
+
+  it("ac2_block_has_exactly_one_h2_and_two_paragraphs_with_exact_text", () => {
+    renderAt("/login", <LoginPage />);
+    const block = helpBlock();
+    expect(block.querySelectorAll("h2").length).toBe(1);
+    const ps = Array.from(block.querySelectorAll("p"));
+    expect(ps.map((p) => p.textContent)).toEqual([HELP_P1, HELP_P2]);
+    expect(within(block).getByRole("heading", { level: 2 }).textContent).toBe(HELP_TITLE);
+  });
+
+  it("ac3_no_interactive_elements_and_text_is_exactly_the_three_strings", () => {
+    renderAt("/login", <LoginPage />);
+    const block = helpBlock();
+    expect(block.querySelectorAll("a, button, input, select, textarea, [tabindex]").length).toBe(0);
+    expect(block.textContent).toBe(HELP_TITLE + HELP_P1 + HELP_P2);
+  });
+
+  it("ac4_standalone_login_page_makes_no_network_requests", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      renderAt("/login", <LoginPage />);
+      expect(helpBlock()).toBeTruthy();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("ac4_route_login_with_401_me_only_requests_me_and_shows_block", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(401, { detail: "x", code: "not_authenticated" }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      renderAt("/login", <AppRoutes />, "*");
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      await new Promise((r) => setTimeout(r, 50));
+      expect(helpBlock()).toBeTruthy();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0] as unknown as [string | URL | Request, RequestInit | undefined];
+      const u = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+      expect(u).toMatch(/\/me(\?|$)/);
+      expect((init?.method ?? "GET").toUpperCase()).toBe("GET");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("ac4_block_is_visible_while_me_response_is_pending", async () => {
+    const d = deferred<Response>();
+    const fetchMock = vi.fn(() => d.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      renderAt("/login", <AppRoutes />, "*");
+      expect(helpBlock()).toBeTruthy();
+      expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Вход в систему");
+      d.resolve(jsonResponse(401, { detail: "x", code: "not_authenticated" }));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      expect(helpBlock()).toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("ac5_focus_on_login_and_tab_order_is_login_password_submit", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    expect(document.activeElement).toBe(field(container, "username"));
+    const focusable = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((el) => !(el as HTMLButtonElement).disabled);
+    expect(focusable).toEqual([field(container, "username"), field(container, "current-password"), submitButton(container)]);
+    expect(focusable.some((el) => helpBlock().contains(el))).toBe(false);
   });
 });

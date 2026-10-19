@@ -7,6 +7,7 @@ import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { TextField } from "../../shared/ui/TextField";
 import { login } from "./api";
+import { FOCUS_HEADING_STATE } from "./session";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ export function LoginPage() {
       } else if (user.role === null) {
         navigate("/no-role", { replace: true });
       } else {
-        navigate("/", { replace: true });
+        navigate("/", { replace: true, state: FOCUS_HEADING_STATE });
       }
     } catch (e) {
       busy.current = false;
@@ -75,6 +76,11 @@ export function LoginPage() {
           {t("auth.login_submit")}
         </button>
       </form>
+      <section className="ui-login-help" aria-labelledby="login-help-title">
+        <h2 id="login-help-title">{t("auth.help_title")}</h2>
+        <p>{t("auth.help_p1")}</p>
+        <p>{t("auth.help_p2")}</p>
+      </section>
     </section>
   );
 }

@@ -9,6 +9,13 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
 > номером заменяющей задачи) или SKIPPED (следующая версия); реестр с причинами и отложенными
 > AC — раздел **«Отложено (следующая версия)»**. R1.0 (T01–T28) и выполненные T30–T32a не менялись.
 
+> **Фича 002 «Три роли» (архитектор, 2026-10-17).** Роль «Смешанная» упразднена фичей 002
+> (ADR-0013, миграция 0006); см. `specs/002-three-roles/` (spec v0.2 утверждена, plan, задачи
+> R3-T01…R3-T17 выполнены). Описания и заметки задач 001 со «СМ», `Mixed.Admin`, D-54 и OI-127 (а)
+> сохранены как запись выполненной работы; где решение отменено, стоит пометка «Фича 002
+> (ADR-0013)». Статусы задач не менялись. Тесты 001 с поведением СМ переписаны задачами
+> R3-T01…R3-T08 по таблице 002 plan §6.2; действующие права — plan §11.5 в редакции 002.
+
 Синхронизировано со spec v0.15 (OI-103…OI-118, FR-14c, FR-73, AC-108…AC-122).
 Детально расписаны этапы **R1.0 «Фундамент»** (T01–T28, закрыт) и **R1.1 «Проекты и задачи»**
 (T29–T66, детализирован 2026-10-15 по plan §10). Этапы R1.2–R1.4 — крупными блоками в конце
@@ -351,6 +358,9 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
   для ТА/СМ → 404); (5) `ensure_account_admin_remains`: блокировка строк админов `FOR NO KEY UPDATE ORDER BY user_id` + `pg_advisory_xact_lock` по пространству ДО изменения (plan §4.6)
   (иначе deadlock при взаимной смене ролей); (6) единый шаблон логина: `provider.LOGIN_RE`/`normalize_login` — единственное место,
   `bootstrap` использует их же (знак Кельвина отклоняется и у первого ТА); (7) в исходнике сервиса нет подстрок `projects`/`tasks` (BR-2).
+- **Фича 002 (ADR-0013):** администратор учётных записей — только ТА (`ACCOUNT_ADMIN_ROLES =
+  {TECH_ADMIN}`), ТА может быть несколько (002/FR-7); `users/service.py` не менялся. Тесты со СМ в
+  роли администратора переписаны на второго ТА (R3-T04), назначение `mixed` → 422 (R3-T11).
 - **Попытки:** 3
 
 ## T16a — get_actor: не держать блокировку строки сессии до конца запроса (дефект на стыке T12/T16)
@@ -747,6 +757,9 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Описание:** Код приложения не меняется, кроме переноса строк интерфейса в словарь. Если
   сквозные тесты AC-2/AC-64 падают — это дефект R1.0: исправление в соответствующем модуле с
   записью в отчёте; если правка выходит за перечисленные файлы — `BLOCKED` с описанием.
+- **Фича 002 (ADR-0013):** «назначает 4 роли» в AC-2 — история: с R3-T11 12 учётных записей
+  получают роли по составу демо (1 ТА, 4 БА, 7 П), назначение `mixed` → 422; в AC-64 «назначение
+  себе» — ТА при втором активном ТА меняет свою роль на БА (R3-T04, 001/AC-64 по 002 spec §9).
 - **Готово, когда:** `pytest -q backend/tests/db/test_migrations.py backend/tests/api/test_e2e_accounts.py` и
   `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёные; фронтенд зелёный; линтер чистый.
 - **Заметки ревью T32 (в T58/T32a):** (1) ПЕРЕД T58 перевести `scanLatinUi` (i18n.test.ts) на compiler API `typescript` (уже в devDependencies): сейчас регулярные выражения пропускают текст с `( ) ; = & |`, строки в тернарниках/`&&`, шаблоны с подстановкой, константы и пользовательские пропсы (`message="…"`) и дают ложное срабатывание на `{a > b ? <hr/> : null}`; в `src` таких строк пока нет; (2) AC-64: «назначает роль себе» = смена роли ТА на другую (назначение той же — no-op без события; пользователь без роли ничего не может по FR-66) — уточнить формулировку при ближайшей правке spec; (3) в `test_e2e_accounts.py` для самоназначения проверять `details == {role_from, role_to}`; (4) i18n.test.ts: prettier переформатировал существующие строки (шум в diff) — не повторять.
@@ -878,6 +891,8 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
   `RecipientFacts` (нет членства в пространстве → `in_workspace=False`); `lock=True` — строки
   `app_user` и `workspace_member` `FOR SHARE` (§10.2 п.3). `user_refs` — один запрос на набор id.
   Маршрут `GET /users` — router-level `require_capability(BUSINESS_ACCESS)` (ТА → 403).
+- **Фича 002 (ADR-0013):** справочник — незаблокированные с ролью БА/П (`_DIRECTORY_ROLES`
+  строится из `ROLE_CAPABILITIES`, код справочника не менялся; тесты — R3-T07).
 - **Готово, когда:** `pytest -q backend/tests/domain/test_directory.py backend/tests/api/test_users_directory.py` и проверки контракта
   (общие условия) зелёные, линтер чистый.
 - **Заметки ревью T35 (в T71/T72/T88):** (1) `list_directory` повторяет LIMIT+1/OFFSET из `core/pagination.paginate` (колонки из JOIN, не сущность): при втором потребителе (T71 `GET /projects/{id}/members` — строки `{user, role, is_blocked}`) завести `paginate_rows` с проверкой `ORDER BY` и использовать в обоих местах (AHA — после третьего повторения); (2) тело 422 для `q` содержит технический текст регулярки (`^[^\x00]*$`) — человекочитаемость через общий обработчик валидации, не в T35; (3) `ProjectRef` в `schemas/common.py` — задел для T72; (4) `q` ≤ 64 символов, без NUL; список и роль одним SELECT; Seq Scan по логину допустим (pg_trgm отложен, D-24/D-58).
@@ -1258,7 +1273,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Описание:** `q.strip()` короче 2 символов → 422 `search_query_too_short` (в сервисе — ради кода),
   длиннее 255 → 422 `validation_error` (схема); экранирование `\ % _`, `ILIKE … ESCAPE '\'`;
   задачи — неудалённые в неудалённых проектах, где актор участник (архивные входят); проекты —
-  БА/СМ: все неудалённые, П: где участник; `ORDER BY similarity(…, q) DESC, id`, `LIMIT 20`. Ключей
+  БА (фича 002; до неё — БА/СМ): все неудалённые, П: где участник; `ORDER BY similarity(…, q) DESC, id`, `LIMIT 20`. Ключей
   CRM в ответе нет (R1.3).
 - **Готово, когда:** `pytest -q backend/tests/api/test_search.py` и проверки контракта зелёные, линтер чистый.
 - **Попытки:** 0
@@ -1368,7 +1383,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 
 ## T64 — Корзина и управление метками
 - **Статус:** SKIPPED (следующая версия) — корзина и метки отложены (SC-4, SC-7)
-- **AC:** FR-25a, FR-25b (восстановление и окончательное удаление с подтверждением), FR-18b (экран меток для БА/СМ), AC-62, AC-69, AC-99, AC-112 (интерфейс); NFR-6, NFR-7
+- **AC:** FR-25a, FR-25b (восстановление и окончательное удаление с подтверждением), FR-18b (экран меток для БА; до фичи 002 — БА/СМ), AC-62, AC-69, AC-99, AC-112 (интерфейс); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/trash/TrashPage.tsx` (+ `features/trash/api.ts`; фильтр по проекту — D-44),
   `frontend/src/features/labels/LabelsPage.tsx` (+ `features/labels/api.ts`);
   тесты: `frontend/tests/features/trash/TrashPage.test.tsx`, `frontend/tests/features/labels/LabelsPage.test.tsx`
@@ -1548,7 +1563,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 в следующую версию, MVP без оверинжиниринга. Архитектура, решения D-53…D-65, API, права, модель,
 трассировка и SPEC_CHANGES — **plan §11** (имеет приоритет над plan §1–§10 при расхождении).
 Решения владельца по вопросам plan §10.8: Q-1 — 503 `service_busy` (T29); Q-6 — «свой проект» БА
-= владелец (D-54); Q-9/Д-7 — невалидный JSON → 400 `bad_request` (T68); Q-7 — дефолт; Q-8 — этот
+= владелец (D-54; заменено фичей 002, ADR-0013: права БА — по участию); Q-9/Д-7 — невалидный JSON → 400 `bad_request` (T68); Q-7 — дефолт; Q-8 — этот
 раздел; Q-2…Q-5 — закрыты переносом функций.
 
 Итого до демо: **25 задач** (T29, T35, T67–T89), из них 1 — синхронизация spec (T67, не код)
@@ -1670,8 +1685,14 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   plan §4.5 (`user_not_found`, `user_blocked`, `recipient_wrong_role`, `not_project_member`, все —
   `Unprocessable`). Тесты — таблицей «роль × факты → ожидание», включая случай «БА-участник, не
   владелец, автор своей задачи в проекте → чужую задачу править нельзя».
+- **Фича 002 (ADR-0013):** правило D-54 и решение OI-127 (а) ниже отменены (ответ владельца на
+  002/Q-2). Формулы `is_own_project`, `can_edit_task_fully`, `can_delete_comment`,
+  `can_manage_project`, `can_add_member` и цели получателей приведены к plan §11.5 в редакции 002
+  (002 plan §4.2): права БА на задачи и комментарии — по участию, управление любым проектом —
+  у любого БА, `MIXED` удалён. Задачи R3-T01…R3-T03, R3-T11; случай «БА-участник, не владелец →
+  чужую задачу править нельзя» обращён (002/AC-13).
 - **Готово, когда:** `pytest -q backend/tests/unit/test_policy.py backend/tests/unit/test_recipients.py` зелёный, линтер чистый.
-- **Решение владельца (OI-127, 2026-10-15, подтверждено; spec v0.16.1):** принят вариант (а): БА — участник проекта может править/удалять СВОЮ задачу в любом проекте, где он участник; «своя» = автор И исполнитель — он (`created_by == assignee_id == actor`, как в FR-19/AC-48); исполнителя меняет только владелец-БА (FR-19a: `TASK_ASSIGN_OTHERS and is_own_project`), СМ — участник; чужие задачи — только владелец-БА (СМ — где участвует). (Уточнено по ревью T70, попытка 1.) Правило изолировано в одной чистой функции (`can_edit_task_fully`/`can_delete_task`); при выборе варианта (б) — правка функции и тестов T70, остальные задачи не затрагиваются.
+- **Решение владельца (OI-127, 2026-10-15, подтверждено; spec v0.16.1) — заменено фичей 002 (ADR-0013), история:** принят вариант (а): БА — участник проекта может править/удалять СВОЮ задачу в любом проекте, где он участник; «своя» = автор И исполнитель — он (`created_by == assignee_id == actor`, как в FR-19/AC-48); исполнителя меняет только владелец-БА (FR-19a: `TASK_ASSIGN_OTHERS and is_own_project`), СМ — участник; чужие задачи — только владелец-БА (СМ — где участвует). (Уточнено по ревью T70, попытка 1.) Правило изолировано в одной чистой функции (`can_edit_task_fully`/`can_delete_task`); при выборе варианта (б) — правка функции и тестов T70, остальные задачи не затрагиваются.
 - **Заметки ревью T70 (в T71/T72/T74/T75/T80):** (1) вызывающие обязаны передавать `project_member_ids` для `TASK_ASSIGNEE`/`PROJECT_OWNER` — иначе `ValueError`; (2) инвариант «владелец проекта всегда участник» проверять в `load_project_facts` (T71): для БА-владельца policy участие не проверяет; (3) решение OI-127 подтверждено владельцем (вариант а), spec v0.16.1; (4) формулы `can_change_assignee` в plan §4.5 и старом T34 — SUPERSEDED, действует §11.5; (5) имена тестов трассировки переименованы (`test_d45_fr17_*`, `test_fr17_ac55_*`, `test_br1_*`, `test_ac53_fr15a_*`).
 - **Попытки:** 2
 
@@ -1702,12 +1723,16 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   владение») → `assignee_id = NULL` у всех задач проекта, где цель — исполнитель (включая подзадачи
   и мягко удалённые, Q-7) → удалить членство; событий нет. `list_members` — `can_view_project`,
   `ORDER BY login, id`. Событий ленты не писать (D-55).
+- **Фича 002 (ADR-0013):** «БА добавляет себя — 403» и «не владелец → 403» для БА отменены:
+  любой БА правит, удаляет проект, передаёт владение и управляет участниками, включая себя
+  (002/FR-8, FR-11); `list_projects` — БА все неудалённые, П — где участник; получатель владения —
+  участник с ролью БА. Сервисы не менялись (вызывают policy); тесты — R3-T01, R3-T05.
 - **Готово, когда:** `pytest -q backend/tests/domain/test_projects_service.py backend/tests/domain/test_project_members_service.py` зелёный, линтер чистый.
 - **Заметки ревью T71 (в T72/T74/T87/T88):** (1) решение архитектора: в `remove_member` порядок «цель не участник → 404» раньше прав раскрывает Пользователю-неучастнику состав проекта (D-45) — в T72 поставить `can_view_project` → 403 ПЕРВЫМ для неучастника, затем 404 «цель не участник»; (2) добавить тесты: самоисключение ТА/участником без роли → 403 (мутант `can_remove_self` выживает), передача владения в проекте, где у владельца нет строки участника; (3) демо-данные (T87) вставляют проекты мимо сервиса — обязательно добавлять владельцу строку `project_member`; `list_members` не показывает владельца без строки участника; (4) `list_projects`: `populate_existing=True` в production не нужен, а `select(Project)` тянет описания до 10 000 символов — выбирать колонки; (5) коды `owner_cannot_be_removed`, `not_project_member`, `recipient_wrong_role`, `user_blocked`, `user_not_found` добавить в словарь фронтенда (T81); (6) `load_project_facts(lock=…)` делает ДВА запроса (SELECT … FOR … затем факты) — обосновано снимком READ COMMITTED; формулировку «один запрос» в plan §10.4 и в описании T71 исправить; (7) D-46 vs порядок проверок: повторное добавление уже участника, которого заблокировали, → 422 (получатель проверяется первым) — подтверждено как есть; (8) AC-65/FR-41: в `domain_event.changes` лежат `{id, login}` владельцев (`value_fields={owner_id}`); выдача журнала поля `changes` не содержит — spec-writer уточнить формулировку «в выдаче журнала».
 - **Попытки:** 1
 
 ## T72 — API проектов и участников
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-21, AC-51…AC-55, AC-72, AC-73, AC-74 (участник, владелец), AC-75 (список проектов без роли — 403), AC-76 (в редакции SC-14: после смены роли БА → П `POST /projects` — 403, после возврата — 201), AC-94 (ТА → проект с несуществующим id — 403), AC-108 (проект), AC-110 (без 409), AC-65 (через API журнала: запись передачи владения с автором, временем, типом, id, действием, `changed_fields`; без названий и значений); FR-14…FR-17, FR-45a; plan §11.4 (проекты, участники), D-52, D-65
 - **Файлы:** `backend/app/api/v1/projects.py`, `backend/app/api/v1/schemas/projects.py` (+
   `app/api/v1/__init__.py`, генерация контракта); тесты: `backend/tests/api/test_projects.py`,
@@ -1723,12 +1748,13 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   ошибках — `error_responses(...)` по таблице §11.4, у маршрутов с телом — и 400 (D-65).
 - **Готово, когда:** `pytest -q backend/tests/api/test_projects.py backend/tests/api/test_project_members.py backend/tests/api/test_not_found_vs_forbidden.py backend/tests/api/test_role_change_effect.py backend/tests/api/test_workspace_isolation.py backend/tests/api/test_audit.py`
   и проверки контракта (общие условия R1.1) зелёные, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T72 (в T73+/T81/T88):** (1) правка `members.py::remove_member` вне списка T72 — `can_view_project` → 403 первым, затем «цель не участник» → 404 (решение архитектора по T71 п.1); (2) `ProjectPatch.name/description` — без `None` в типе, `Field(default_factory=str)` и `model_fields_set` (явный null → 422, в контракте нет null); приём описан в docstring; (3) `extra="forbid"` на всех схемах тел (контракт `additionalProperties: false`); (4) `list_projects` по-прежнему `select(Project)` с `populate_existing` — `paginate` принимает только сущность; при втором потребителе колонок выделить `paginate_rows` (заметки T35/T71); (5) AC-50/AC-55 части про задачи и доску — T74/T77 (тест `test_d45_user_non_member_gets_403_on_tasks_and_board_when_routes_exist` включится в T77); (6) 503 не объявлен в OpenAPI (решение T29); (7) в `entity_deleted` журнала у мягко удалённого проекта `false` — вне R1 (FR-25b отложено).
+- **Попытки:** 2
 
 ### Backend MVP: задачи и доска
 
 ## T73 — Позиции карточек, перемещение по соседям, прогресс
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** FR-28a (новая — в конец первой колонки; смена статуса без соседей — в конец целевой; перемещение по соседям; перенумерация шагом 1024), AC-61 (домен: 1000 последовательных перемещений в одной колонке — порядок ожидаемый, позиции уникальны), AC-81 (домен), FR-22 и AC-7 (функция прогресса); plan §4.8 (без `place_after`), D-22, §10.2 п.4
 - **Файлы:** `backend/app/domain/tasks/positions.py`, `backend/app/domain/tasks/progress.py`;
   тесты: `backend/tests/db/test_positions.py`, `backend/tests/unit/test_progress.py`
@@ -1744,10 +1770,11 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   `renumber_column` и повторный расчёт; меняет `task.status` и `task.position`. `progress(done,
   total)` — `None` при `total == 0`, иначе `done * 100 // total`.
 - **Готово, когда:** `pytest -q backend/tests/db/test_positions.py backend/tests/unit/test_progress.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T73 (в T77/T32b):** (1) `ServiceBusy`, брошенный из домена (исчерпание попыток `move_task`), проходит через `_app_error_handler` БЕЗ `Retry-After: 5` (D-40 требует) — добавить заголовок в обработчике AppError (errors.py, вне T73) — в T77; (2) тест на расхождение статуса под блокировкой строки (`_read_state(lock=False)` → locked, `lock=True` → другой): убьёт выжившие мутанты «игнорировать возвращённый статус» и «обычное чтение вместо блокирующего»; (3) `conftest.py::_reset_schema`: `SET lock_timeout` перед `DROP SCHEMA` — чужая открытая транзакция на `tracker_test` вешает прогон бесконечно (причина зависания исполнителя); в отчётах указывать БД прогона — T32b; (4) контракт `move_task` для T77: вызывающий проверяет доступ/существование до вызова, `move_task` сам перечитывает и блокирует, права не проверяет; ошибки: 404 (удалена), 422 `invalid_neighbors`/подзадача, 503 `service_busy` (исчерпание, 40P01, 55P03); (5) `renumber_column` не меняет `updated_at`; порядок колонки — `COLUMN_ORDER = (position, created_at, id)` — использовать в выдаче доски; (6) SQL-агрегация прогресса подзадач одним запросом — в T76/T77.
+- **Попытки:** 3
 
 ## T74 — Задачи: создание задачи и подзадачи
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-8, AC-9, AC-24, AC-47 (подзадача себе — да, другому — 403), AC-49, AC-56, AC-61 (новая — последняя в первой колонке), AC-74 (исполнитель), AC-106 (не участник — 403), AC-108 (задача), AC-109, FR-18…FR-21, FR-28a; plan §11.4, §11.5 (`can_create_task`, `can_create_subtask`), §4.5 (FR-20), §10.2, §10.4 (`context`)
 - **Файлы:** `backend/app/domain/tasks/context.py`, `backend/app/domain/tasks/service.py`
   (`create_task`, `create_subtask`); тесты: `backend/tests/domain/test_tasks_create.py`
@@ -1761,11 +1788,15 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   `lock_columns` + `append_position(todo)`). `create_subtask`: родитель (404, `FOR SHARE` проекта) →
   `can_create_subtask` (403) → родитель — подзадача → 422 `subtask_depth_exceeded` → получатель →
   вставка (`position = NULL`, `status = todo`). Событий не писать (D-55). Возвращают `UUID`.
+- **Фича 002 (ADR-0013):** «не передан» → БА: `None` (СМ упразднена); БА-участник создаёт
+  подзадачу к любой задаче проекта (002/FR-9); заметка ревью (6) ниже — история. Тесты — R3-T03,
+  R3-T07.
 - **Готово, когда:** `pytest -q backend/tests/domain/test_tasks_create.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T74 (в T75/T77/plan):** (1) тест перечитывания в `load_task_context` под FOR SHARE: другая сессия под FOR NO KEY UPDATE проекта меняет `assignee_id` родителя и фиксирует; `create_subtask` бывшего исполнителя → 403 (мутант «убрать перечитывание» выживает) — добавить в T75; (2) тип `assignee`/`project_id` в сервисе не проверяется (assignee=5 → 500): через API приведёт pydantic в T77 (или `isinstance(UUID)` → 422); (3) T75: `delete_task` блокирует строку задачи FOR NO KEY UPDATE, `create_subtask` перечитывает родителя под FOR SHARE строки — иначе параллельная подзадача останется неудалённой под удалённым родителем (каскад D-56 её не увидит); (4) T77: ограничения title/description/due_date/priority — в pydantic-схеме `TaskCreate` (порядок 422 схемы → 404 → 403); (5) plan §10.4: параметр `include_deleted` у `load_task_context` — SUPERSEDED (корзина отложена); (6) FR-19b/BR-11: зафиксировать, что БА-участник не владелец не создаёт подзадачу к чужой задаче и к задаче, созданной им другому/без исполнителя (формула plan §11.5, 403); (7) D-52: названия из невидимых символов (U+200B) принимаются — уточнить при необходимости; (8) `Subtask depth` код `subtask_depth_exceeded` — в словаре фронтенда есть (T81).
+- **Попытки:** 2
 
 ## T75 — Задачи: изменение, удаление, перемещение
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-7 (родитель закрывается при незакрытых подзадачах), AC-42, AC-43 (задачи), AC-46, AC-47, AC-48 (SC-2), AC-50 (переназначение после исключения), AC-81, AC-99 (права удаления; каскад на подзадачи и комментарии), AC-103 (задачи), FR-19…FR-20, FR-19b (перенос исполнителем), FR-28a; plan §11.4, §11.5, D-46, D-56, §10.2
 - **Файлы:** `backend/app/domain/tasks/service.py` (`update_task`, `delete_task`, `move`);
   тесты: `backend/tests/domain/test_tasks_update_delete.py`, `backend/tests/domain/test_tasks_move.py`
@@ -1781,11 +1812,14 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   before_task_id, after_task_id)`: контекст (404, `FOR SHARE`) → подзадача → 422 `validation_error`
   («подзадачи не размещаются на доске») → `can_change_task_status` (403) → `positions.move_task`
   (422 `invalid_neighbors`). Событий не писать (D-55).
+- **Фича 002 (ADR-0013):** `null` исполнителя допустим для БА (СМ упразднена); БА-участник правит,
+  переназначает, переносит и удаляет любые задачи проекта (002/FR-9). Тесты — R3-T03, R3-T07.
 - **Готово, когда:** `pytest -q backend/tests/domain/test_tasks_update_delete.py backend/tests/domain/test_tasks_move.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T75 (в T76/T77/backlog):** (1) решение архитектора: участие в проекте (`can_read_project_content`) проверяется ВСЕГДА, до D-46; права по полям — только для меняющихся (уточнить plan §11.4); (2) `update_task`: после блокировки строки задачи пересчитываются `changed`, факты и права (иначе результат не совпадает ни с одним последовательным порядком); порядок блокировок: получатель → advisory колонок → строка (§10.2 п.3–5); (3) `lock_task_columns` вынесена в positions.py; (4) каскад delete_task берёт только неудалённые подзадачи (D-56); (5) правки вне списка T75: positions.py (константа `SUBTASK_NOT_ON_BOARD`, `lock_task_columns`), `create_subtask` (T74: FOR SHARE строки родителя после получателя; повторная проверка прав), `backend/tests/tasks_support.py`; (6) РИСК backlog: в смешанной нагрузке (80 параллельных операций) 2 из 12 прогонов дали 40P01 (цикл только из advisory-блокировок: повтор в `lock_task_columns` добирает колонки вне порядка) → 503 по D-40; улучшение: при повторе брать недостающие колонки через `pg_try_advisory_xact_lock` и при неудаче сразу отвечать 503; (7) тип `assignee_id`/`project_id` не проверяется сервисом (UUID приведёт схема T77); (8) `populate_existing` в `_lock_task` — эквивалентный мутант.
+- **Попытки:** 3
 
 ## T76 — Задачи: карточка и списки (выборки)
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-6, AC-7 (прогресс в карточке), AC-11, AC-22 (частично: фильтры исполнитель и статус, пагинация), AC-43 («находится фильтром по исполнителю»), AC-80 (подзадачи в списках), AC-18 (удалённое не в списках), FR-17, FR-22, FR-26, FR-27 (в редакции SC-10), FR-47; plan §11.4 (`TaskDetail`, `TaskListItem`), D-62
 - **Файлы:** `backend/app/domain/tasks/queries.py`; тесты: `backend/tests/domain/test_tasks_queries.py`
 - **Зависит от:** T73, T74
@@ -1797,15 +1831,18 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   `ORDER BY created_at DESC, id DESC`, `paginate`. `list_my_tasks(db, actor, params)`: исполнитель =
   актор, неудалённые задача и проект, актор — участник, `ORDER BY due_date ASC NULLS LAST, id`.
 - **Готово, когда:** `pytest -q backend/tests/domain/test_tasks_queries.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T76 (в T77/T78):** (1) `permissions.create_subtask` = «операция пройдёт»: для подзадачи False (plan §11.4 записать); (2) `list_my_tasks`: ТА/без роли → строго 403 (в домене); (3) карточка и TaskFacts для permissions — из одного чтения строки (NotFound при исчезновении); (4) списки: `defer(Task.description)`; `get_task` 5 запросов при любом числе подзадач; списки page_size=100 — 3–4 запроса; (5) нарушение инварианта (id не найден в user_refs) → `RuntimeError("UserRef missing …")` — в R1 недостижимо; (6) EXPLAIN на 50 000 задач: индексы `ix_task_project_id_created_at`, `ix_task_workspace_id_assignee_id_due_date` используются; (7) тесты гонок «исчезновение строки между чтениями» и «снятие исполнителя между чтениями» — перенести в test_tasks_queries.py (образцы `/tmp/t76rev/test_rev.py` — может быть удалён); (8) `list_my_tasks` join с project без `Project.workspace_id` (прикрыт `Task.workspace_id`); (9) plan §10.4 сигнатуры list_project_tasks/list_my_tasks заменены §11.4 — пометить SUPERSEDED.
+- **Попытки:** 2
+
+- **Заметки ревью T77 (в T78/T88):** APPROVE с 1-й попытки (524 целевых теста, 15 мутаций: 13 убиты). (1) выжила M13: нет теста, что `Retry-After` отсутствует у 403/404/422 — добавить assert в тест T78; (2) выжила M11: нет теста на порядок «не-участник + NUL в description → 422 схемы, не 403»; (3) правка `domain/tasks/context.py` вне списка T77 (404 «Задача не найдена» для задачи удалённого проекта, AC-94); (4) `GET/DELETE /tasks/{id}` объявляют 422 (невалидный UUID) сверх таблицы plan §11.4 — учесть в plan; (5) название из одних пробелов проверяет домен (`_validate`), схема — длины и NUL.
 
 ## T77 — API задач: карточка, подзадачи, списки
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-6, AC-7, AC-8, AC-9, AC-11, AC-18 (частично), AC-21, AC-22 (частично), AC-24, AC-42, AC-43 (задачи), AC-46, AC-47, AC-48 (SC-2), AC-49, AC-55 (задачи чужого проекта — 403), AC-56, AC-68 (формат срока), AC-74 (исполнитель), AC-75 (`/me/tasks` без роли — 403), AC-77 (в редакции SC-14), AC-80 (списки), AC-81, AC-94 (несуществующая и мягко удалённая задача — 404), AC-99 (частично), AC-103 (задачи), AC-106 (частично), AC-108 (задача), AC-109; plan §11.4, D-51, D-52, D-65
 - **Файлы:** `backend/app/api/v1/tasks.py`, `backend/app/api/v1/schemas/tasks.py` (+ `__init__`,
   генерация контракта); тесты: `backend/tests/api/test_tasks.py`, `backend/tests/api/test_subtasks.py`,
   `backend/tests/api/test_task_permissions.py`, `backend/tests/api/test_reassign_blocked.py`,
-  `backend/tests/api/test_recipients.py`, `backend/tests/api/test_personal_tasks.py`,
+  `backend/tests/api/test_task_recipients.py`, `backend/tests/api/test_personal_tasks.py`,
   `backend/tests/api/test_project_task_list.py`, `backend/tests/api/test_soft_delete.py`, дополнения
   `test_not_found_vs_forbidden.py`, `test_workspace_isolation.py`, `test_role_change_effect.py`
 - **Зависит от:** T72, T75, T76
@@ -1814,12 +1851,14 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   D-51; названия — D-52; `TaskStatus`, `TaskPriority` — перечисления в схеме (вне набора → 422);
   «исполнитель не передан» и «передан `null`» различаются по `model_fields_set` → `UNSET`/`None`.
   Ответ карточки — `TaskDetail` из `get_task`. Маршрута `move` здесь нет (T78).
-- **Готово, когда:** все перечисленные тест-файлы `pytest -q backend/tests/api/test_tasks.py backend/tests/api/test_subtasks.py backend/tests/api/test_task_permissions.py backend/tests/api/test_reassign_blocked.py backend/tests/api/test_recipients.py backend/tests/api/test_personal_tasks.py backend/tests/api/test_project_task_list.py backend/tests/api/test_soft_delete.py backend/tests/api/test_not_found_vs_forbidden.py backend/tests/api/test_workspace_isolation.py backend/tests/api/test_role_change_effect.py`
+- **Готово, когда:** все перечисленные тест-файлы `pytest -q backend/tests/api/test_tasks.py backend/tests/api/test_subtasks.py backend/tests/api/test_task_permissions.py backend/tests/api/test_reassign_blocked.py backend/tests/api/test_task_recipients.py backend/tests/api/test_personal_tasks.py backend/tests/api/test_project_task_list.py backend/tests/api/test_soft_delete.py backend/tests/api/test_not_found_vs_forbidden.py backend/tests/api/test_workspace_isolation.py backend/tests/api/test_role_change_effect.py`
   и проверки контракта зелёные, линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 1
+
+- **Заметки ревью T78 (в T79/T80/T88):** APPROVE с 1-й попытки (431 тест, 15 мутаций: 13 убиты, M7 эквивалентна). (1) порядок проверок `tasks.service.move` изменён на 404 → 403 → 422 домена (plan §4.5), описание T75 про «подзадача → 422 раньше 403» УСТАРЕЛО; правки вне списка: `domain/tasks/service.py`, `tests/domain/test_tasks_move.py`, `tests/api/test_projects.py`, `tests/cli/test_openapi.py`; (2) `after_task_id` имеет приоритет, если соседи не смежны или в обратном порядке (plan §4.8) — зафиксировано тестом; (3) нет теста на `extra="forbid"` у `TaskMove` (M15) и на число SQL-запросов доски (7, не зависит от числа карточек) — добавить при случае; (4) имя проекта читается вторым запросом (trivial).
 
 ## T78 — Доска: выборка и API переноса
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-25, AC-61 (через API: второй пользователь после перемещения видит тот же порядок), AC-80 (доска: одна карточка при 2 подзадачах, `subtask_count`, `progress`), AC-18 (удалённое не на доске), AC-21, FR-19b (исполнитель переносит свою чужую задачу), FR-28, FR-28a, FR-47 (исключение — SC-15); plan §11.4 (`Board`, `move`), D-61
 - **Файлы:** `backend/app/domain/boards/service.py` (+ `__init__.py`), `backend/app/api/v1/boards.py`,
   `backend/app/api/v1/schemas/boards.py` (+ `app/api/v1/__init__.py`, генерация контракта);
@@ -1834,12 +1873,14 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   перемещений и смен статуса в одной колонке через HTTP — без 500 (допустим 503 `service_busy`),
   позиции неудалённых задач колонки уникальны.
 - **Готово, когда:** `pytest -q backend/tests/api/test_board.py backend/tests/api/test_board_move.py` и проверки контракта зелёные, линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ### Backend MVP: комментарии
 
+- **Заметки ревью T79 (в T80/T88/backlog):** 2 итерации (CHANGES_REQUESTED → APPROVE по дельте). Исправлено по ревью: (1) запасной путь `strip_html` после 16 проходов собирал тег — теперь вырезается серия `<+`; (2) терялся `&` в конце текста (sentinel `\n`); (3) гонка `create_comment` ↔ `delete_task` — `_lock_task_rows` (FOR SHARE: родитель → задача, `deleted_at IS NULL`). Остаток: (а) **ВЗАИМОБЛОКИРОВКА в `tasks/service.py::delete_task` (T75)**: комментарии обновляются раньше задач, при параллельном `delete_task(parent)` и `delete_task(sub)` с комментариями у подзадачи — 40P01 (≈56/30 раундов в стрессе) → 500 вместо 503; фикс: сначала `UPDATE task` (или `FOR NO KEY UPDATE ORDER BY id` на семье), потом `UPDATE comment`; выполнить до T89 вместе с T80; (б) нет теста на позицию sentinel (мутант M5): `strip_html("line1\n<br>line2") == "line1\nline2"`, `strip_html("x\n&amp;y") == "x\n&amp;y"`; (в) `a<b` без пробелов в конце/середине ввода вырезается как тег (поведение HTMLParser) — записать как известное; (г) `create_comment` держит FOR SHARE на родителе и задаче до конца транзакции — T80: короткие транзакции; (д) тест длины >10 000 на уровне сервиса есть; NUL строго 422.
+
 ## T79 — Комментарии: очистка HTML и сервис
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-58, AC-103 (комментарии: СМ-участник удаляет чужой, СМ-не участник — 403), FR-23 (без упоминаний; SC-11); plan D-28, D-60, §11.5 (`can_edit_comment`, `can_delete_comment`), §10.2 п.2
 - **Файлы:** `backend/app/domain/comments/sanitize.py`, `backend/app/domain/comments/service.py`;
   тесты: `backend/tests/unit/test_sanitize.py`, `backend/tests/domain/test_comments_service.py`
@@ -1854,11 +1895,14 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   (свой `deleted_batch_id`). `list_comments`: участник (403), все комментарии задачи, включая
   удалённые (`body = None`, `is_deleted = True`, автор и время сохраняются), `ORDER BY created_at,
   id`, `paginate`; `permissions {edit, delete}`. Событий и упоминаний нет.
+- **Фича 002 (ADR-0013):** 001/AC-103 (СМ-участник, СМ-не участник) заменён 002/AC-13, AC-15:
+  чужой комментарий удаляет БА-участник, неучастник — 403, правка — только автор. Тесты
+  `sm`/`sm_m` → `ba3`/`ba2` (R3-T02, R3-T07).
 - **Готово, когда:** `pytest -q backend/tests/unit/test_sanitize.py backend/tests/domain/test_comments_service.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T80 — API комментариев
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-58, AC-103 (комментарии), AC-21; FR-23; plan §11.4 (комментарии), D-65
 - **Файлы:** `backend/app/api/v1/comments.py`, `backend/app/api/v1/schemas/comments.py` (+ `__init__`,
   генерация контракта); тесты: `backend/tests/api/test_comments.py`, дополнение
@@ -1866,13 +1910,17 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Зависит от:** T78, T79
 - **Описание:** `GET|POST /tasks/{id}/comments`, `PATCH|DELETE /comments/{id}`. Тело `{body: str}`,
   1–10 000 символов до очистки (иначе 422). Ответ `Comment` (§11.4).
+- **Фича 002 (ADR-0013):** AC-103 — в редакции 002 (см. T79); API-тесты СМ переписаны на БА
+  (R3-T02, R3-T06). Пожелание (3) заметок ревью ниже («СМ-не участник») — история.
 - **Готово, когда:** `pytest -q backend/tests/api/test_comments.py backend/tests/api/test_workspace_isolation.py` и проверки контракта зелёные, линтер чистый.
-- **Попытки:** 0
+- **Попытки:** 1
+
+- **Заметки ревью T80 (в T85/T88/backlog):** APPROVE с 1-й попытки (589 тестов, 15 мутаций: 12 убиты, 2 эквивалентны, 1 пробел). Вне списка файлов (обосновано): `domain/tasks/service.py::delete_task` — порядок блокировок «задача → живые подзадачи ORDER BY id → UPDATE task → UPDATE comment» (взаимоблокировка из ревью T79 закрыта; стресс 840 раундов: 0 deadlock, 0 сирот) и `tests/domain/test_delete_task_deadlock.py`. Желательное: (1) в тест пагинации добавить `assert p3["page"] == 3` (мутант M8); (2) кейс `"д"*10_001` на несуществующую задачу (422 раньше 404; M13); (3) API-цепочка AC-103: СМ-не участник DELETE → 403 → добавил себя → 204; (4) тест delete_task против create_comment/edit/move; (5) пустое тело → 422 `missing` (не 400) — действующий контракт T68, Д-7 касается только json_invalid.
 
 ### Фронтенд MVP
 
 ## T81 — Фронтенд MVP: навигация, маршруты, коды ошибок, выбор пользователя
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** NFR-6, NFR-7 (видимый фокус, клавиатура), FR-45 (сообщения по кодам MVP: `service_busy`, `owner_cannot_be_removed`, `subtask_depth_exceeded`, `invalid_neighbors`, коды получателей), FR-10 (меню по `/me.capabilities`; сервер проверяет сам); plan §4.14, §11.4; заметка ревью T32 п.1 (сканер строк на compiler API — до экранов)
 - **Файлы:** `frontend/src/app/router.tsx` (маршруты `/projects`, `/projects/:projectId`,
   `/tasks/:taskId`, `/my-tasks` под `SessionGate`, страницы-заглушки заменяют T82–T84; меню:
@@ -1886,10 +1934,12 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   ограничивает выбор переданным набором id (участники проекта). Пунктов меню для CRM, меток,
   корзины, поиска, упоминаний нет.
 - **Готово, когда:** фронтенд зелёный (общие условия R1.1).
-- **Попытки:** 0
+- **Заметки ревью T81:** кандидатов для `allowedIds` брать из GET /projects/{id}/members (не /users); UserPicker: live region, maxLength 64, Escape — сделано в T82; сканер `scanLatinUi` на compiler API; известные лазейки: вызовы/объектные литералы/массивы, `value`/`defaultValue` в TECHNICAL_ATTRS.
+- **Попытки:** 1
+- **Пересмотрено:** 003 (2026-10-18): "/" только перенаправляет на стартовый экран по роли, меню — на каждом экране с ролью; контракт «`<nav>` на главной "/"» снят (specs/003-no-home-screen/spec.md, FR-1…FR-3, FR-10, FR-11, FR-14).
 
 ## T82 — Экраны проектов: список, создание, карточка, участники, владение, удаление
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** UF-3 (проект и участники), FR-14…FR-17 (интерфейс, без статуса), FR-15a (подтверждение самоисключения), AC-51…AC-55, AC-72, AC-73, AC-110 (поведение по ответам API); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/projects/api.ts`, `frontend/src/features/projects/ProjectsPage.tsx`,
   `frontend/src/features/projects/ProjectPage.tsx` (+ маршруты в `router.tsx`);
@@ -1901,10 +1951,11 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   исключение, самоисключение с подтверждением). Вкладки «Доска» (по умолчанию, T86), «Задачи» (T83),
   «Участники» — места под T83/T86. Ошибки — по `code`.
 - **Готово, когда:** фронтенд зелёный.
-- **Попытки:** 0
+- **Заметки ревью T82 (в T83/T84/T86):** ключи задач и доски держать под префиксом `["projects", id, …]`; `listAllMembers` вынести и переиспользовать (`["projects", id, "members"]`) для `allowedIds` исполнителя; опрос карточки не ведётся — `usePolledQuery` в списках/доске (FR-29); фокус на h1 при входе на экран — паттерн; UserPicker `busy`/`quietError`; общий `Pagination` при busy не теряет фокус, но на граничной странице нажатая кнопка становится disabled и фокус уходит в BODY (перевести на соседнюю кнопку); правка T82 вне списка: ru.ts, UserPicker.tsx, ui.css, Pagination.tsx; `.ui-pre` — перенос длинных слов сделан.
+- **Попытки:** 2
 
 ## T83 — Списки задач и создание задачи
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** UF-3, UF-6 (список и фильтр), FR-20 (П: поле исполнителя не отправляется; «без исполнителя» — только БА/СМ), FR-26, FR-27 (фильтры исполнитель и статус, SC-10), FR-29 (опрос списков), AC-6, AC-56, AC-109 (интерфейс); NFR-5 (срок — календарная дата без пересчёта пояса), NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/tasks/api.ts`, `frontend/src/features/tasks/TaskList.tsx`
   (вкладка «Задачи» проекта с фильтрами исполнителя и статуса; страница `/my-tasks`),
@@ -1914,11 +1965,13 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Описание:** Списки — `usePolledQuery`. Форма: название, описание, срок (`input type=date`,
   отправляется `YYYY-MM-DD`), приоритет, исполнитель (`UserPicker` по участникам; для П поля нет).
   Меток нет.
+- **Фича 002 (ADR-0013):** выбор исполнителя и «без исполнителя» — только у БА
+  (`canPickAssignee`, R3-T10); «БА/СМ» в строке AC — история.
 - **Готово, когда:** фронтенд зелёный.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T84 — Карточка задачи: поля, статус, исполнитель, подзадачи, удаление
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** UF-4, UF-6, FR-18…FR-22 (интерфейс; предупреждение при закрытии родителя с незакрытыми подзадачами), FR-29 (опрос карточки), AC-7, AC-46, AC-47 (элементы по `permissions`); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/tasks/TaskPage.tsx`, `frontend/src/features/tasks/SubtaskList.tsx`
   (+ функции в `features/tasks/api.ts`);
@@ -1928,10 +1981,10 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   не затирает ввод). Подзадачи с прогрессом (`null` — «нет подзадач»), создание подзадачи, смена
   статуса, удаление с подтверждением; место под комментарии (T85).
 - **Готово, когда:** фронтенд зелёный.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T85 — Комментарии в карточке задачи
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** UF-6 (комментарий), FR-23 (SC-11: простой текст), FR-29 (опрос), AC-58 (интерфейс: «изменён», «комментарий удалён»); NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/comments/Comments.tsx`, `frontend/src/features/comments/api.ts`
   (+ подключение в `TaskPage.tsx`); тесты: `frontend/tests/features/comments/Comments.test.tsx`
@@ -1940,10 +1993,10 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   `white-space: pre-wrap` (без `dangerouslySetInnerHTML`, без `react-markdown`); правка и удаление — по
   `permissions`; удалённый — заглушка с автором и временем; время — Europe/Moscow (NFR-5).
 - **Готово, когда:** фронтенд зелёный.
-- **Попытки:** 0
+- **Попытки:** 1
 
 ## T86 — Канбан-доска: перетаскивание и клавиатурная замена
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** UF-5, FR-28, FR-28a (клиент передаёт соседей), FR-29 (опрос доски), FR-19b (перенос по ответу 403 откатывается с сообщением), AC-5 *ручной* (подготовка), AC-97 (клавиатура доски) *ручной*, NFR-7; plan D-61, §11.10
 - **Файлы:** `frontend/src/features/boards/BoardView.tsx`, `frontend/src/features/boards/api.ts`,
   `frontend/src/features/boards/dnd.ts` (чистая функция соседей после сброса),
@@ -1960,12 +2013,14 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   инвалидация доски; ошибка (403, 422, 503) — сообщение по коду и возврат к данным сервера.
   Сетевые вызовы — только через общий клиент.
 - **Готово, когда:** `cd frontend && npm ci` успешен; фронтенд зелёный; `pytest -q backend/tests/arch` зелёный.
-- **Попытки:** 0
+- **Попытки:** 1
+
+- **Заметки ревью T83–T86 (в T88/backlog):** все APPROVE после 1–3 итераций (фронтенд 670 тестов; check.sh на слитом дереве зелёный). T83: каст `TaskCreate` в api.ts оставлен (контракт не шлёт пустое description); `error.not_project_member` не предлагает «добавьте участника» (FR-20/OI-18) — вернуться при приёмке; `formatDate` дублируется (TaskList/TaskPage/Comments) — вынести в shared/format при третьем потребителе (уже есть 3). T84: гонка двух быстрых выборов исполнителя (второй молча отбрасывается, поле показывает логин второго) и 404 при опросе после удаления другим пользователем — в бэклог; статус и исполнитель отправляются сразу при выборе (шаг клавиатуры стрелками по select в Windows шлёт PATCH на каждый шаг). T85: после создания комментария на странице 1 при `has_next` новый (ORDER BY created_at) попадает на последнюю страницу и не виден — перейти на последнюю страницу/показать подтверждение; фокус после удаления на h2, лучше на заглушку; при удалении комментария во время правки форма исчезает без сообщения; `trim()` текста против FR-23 «хранится как введён» (отступы markdown) — решение владельца; нет тестов на фокус h2 и двойной submit правки. T86: ручная проверка мышью AC-5/AC-97 обязательна (чек-лист в отчёте ревью, войдёт в T88): сброс между карточками/на заголовок/в пустую колонку, высокая карточка, Enter на ссылке, перенос за текст ссылки не уводит на /tasks/<id> (pointer-events), опрос во время переноса (frozen), медленная сеть (moving), клавиатура Space/стрелки/Tab/Escape, скринридер; зависимости @dnd-kit/{core 6.3.1,sortable 10.0.0,utilities 3.2.2} + транзитивные @dnd-kit/accessibility 3.1.1 и tslib 2.8.1 (0BSD) — занести в реестр лицензий.
 
 ### Демо, документация, приёмка
 
 ## T87 — Команда демо-данных
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-41 *инфра*, AC-104 *инфра*, FR-49 (в редакции SC-13), FR-64, FR-57, BR-9, FR-41 (создание учётных записей и назначение ролей — в журнале, автор «система»); plan §11.8, D-63, D-6, §4.13
 - **Файлы:** `backend/app/domain/ops/demo.py`, `backend/app/cli/commands/demo_data.py`,
   `backend/app/cli/main.py` (регистрация); тесты: `backend/tests/cli/test_demo_data.py`
@@ -1981,11 +2036,14 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   смены пароля; 2 проекта, 30 задач (6 подзадач), каждый исполнитель — участник проекта и не ТА,
   позиции в колонке уникальны, у подзадач `position IS NULL`; журнал содержит `user.created` и
   `user.role_assigned` с автором «система»; повторный запуск — код 2, данные не изменены.
+- **Фича 002 (ADR-0013):** состав демо — 1 ТА, 4 БА, 7 П: `demo.ba4` вместо `demo.mixed`
+  (plan §11.8 в редакции 002, 002/FR-22, R3-T08); 12 пользователей + первый ТА = 13 сохраняются.
 - **Готово, когда:** `pytest -q backend/tests/cli/test_demo_data.py` зелёный, линтер чистый.
-- **Попытки:** 0
+- **Заметки ревью T87 (в T88):** (1) README: восстановление при потере файла паролей — `POST /api/v1/admin/users/{id}/reset-password` от имени первого ТА для каждого демо-пользователя либо переустановка с удалением тома; (2) смысл предупреждения при `ENV=production`: перед реальной работой учётные записи `demo.*` удалить/заблокировать; (3) файл паролей пишется ДО фиксации с проверкой отдельной сессией (как у первого ТА, plan §4.7); при убийстве процесса между записью и фиксацией в файле пароли несуществующих пользователей — безопасно (0600); (4) метки времени идут от `clock.now()` вперёд на секунды (до ~+66 с) — при желании считать назад; (5) ветка `ProgrammingError` ловит любую ProgrammingError (не только отсутствие таблицы); (6) формат файла паролей — TAB (plan §11.8).
+- **Попытки:** 2
 
 ## T88 — Документация MVP и чек-лист демо
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** NFR-3, NFR-11, AC-1 (подготовка), D-64; заметки ревью T31 п.1 (README: каталог клона, `-p`, `date -u`)
 - **Файлы:** `README.md` (ru и en: состав MVP-демо и что отложено; загрузка демо-данных
   `docker compose exec api gostracker demo-data` и чтение паролей; сценарий демо; обслуживание — только
@@ -1994,12 +2052,15 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   AC-5, AC-97 в объёме MVP, AC-98, сценарий UF-2…UF-6, проверка опроса ≤ 15 с вместо AC-107);
   тесты: `backend/tests/infra/test_docs_static.py` (дополнение, `infra_static`)
 - **Зависит от:** T86, T87
+- **Фича 002 (ADR-0013):** README и чек-лист обновлены задачей R3-T17 (`demo.ba4`, права БА по
+  участию, пункт 002/AC-27); «шаг D-54 в демо» из заметок ревью ниже — история.
 - **Готово, когда:** `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёный; ревьюер подтверждает
   соответствие plan §11 и рабочие ссылки.
-- **Попытки:** 0
+- **Попытки:** 1
+- **Заметки ревью T88 (в T89/backlog):** CHANGES_REQUESTED → правки (прогресс 66 %, «at least every 15 s», HTML вырезается, формулировка 503, шаг D-54 в демо, ENV=production в stderr, FR-27a в «Отложено», AC-107 ручной) — приняты без повторного ревью (текстовые). Вне списка: два T31-теста без требования «корзина 30 дней» (ADR-0012 п.3), whitelist `test_frontend_scaffold` (+features/comments), T89a: `AuditPage` показывает `project.ownership_transferred` текстом и поле `owner_id` → «Владелец проекта». Бэклог: «кто → кому» в журнале передачи владения (нужна правка `events/queries.py`/`schemas/audit.py`/openapi); текст предупреждения CLI demo-data «удалите их» против README «заблокируйте» (удаления УЗ нет).
 
 ## T89 — Приёмка MVP
-- **Статус:** TODO
+- **Статус:** DONE (автоматическая и API-часть; ручной чек-лист в Chromium — за владельцем)
 - **AC:** все AC plan §11.7; NFR-10
 - **Файлы:** правок кода нет; вердикт ревьюера оркестратор сохраняет в
   `specs/001-pilot-r1/reviews/MVP-acceptance.md`; дефекты — задачами `T89a…`
@@ -2011,7 +2072,16 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
   прогон `docs/acceptance/mvp-demo.md` в Chromium (в т.ч. с клавиатуры и двумя пользователями на
   доске).
 - **Готово, когда:** `bash scripts/check.sh` и `infra_stack` зелёные; чек-лист пройден; ревьюер подтверждает трассировку.
-- **Попытки:** 0
+- **Попытки:** 1
+- **Вердикт:** `specs/001-pilot-r1/reviews/MVP-acceptance.md` — ПРИНЯТО С ЗАМЕЧАНИЯМИ. Дефекты: T89b (503 при плотных переносах, positions.py `lock_task_columns`), T89c (таблица §11.7), T89d (текст предупреждения demo-data), T89e (Cache-Control no-store) — после показа.
+
+## T90 — Оформление интерфейса по макету docs/ui/task-plane.png
+- **Статус:** DONE (по тестам; визуальная проверка владельцем)
+- **AC:** NFR-7 (контраст AA, видимый фокус), AC-98 (строки без изменений); спец-требований к внешнему виду нет — решение владельца 2026-10-16
+- **Файлы:** `frontend/src/shared/ui/ui.css` (токены, тёмная тема), `frontend/src/app/router.tsx` (классы `ui-shell`, `ui-sidebar`), `BoardView.tsx`, `UserPicker.tsx` (inline-стили → классы); тест `frontend/tests/shared/theme.test.ts` (токены, контраст, без жёстких цветов и внешних ресурсов)
+- **Заметки:** боковая панель на Home и бизнес-экранах; админ-экраны без панели; «Сменить пароль»/«Выйти» только на Home; результат смотрели только по тестам — требуется взгляд человека (sticky-панель, узкий экран <720px, геометрия dnd-kit, близость к макету). Ограничения: без внешних шрифтов/CDN/изображений.
+- **Попытки:** 1
+
 
 ### Порядок MVP и критический путь
 
@@ -2051,7 +2121,7 @@ T69 → T73.
 ### Риски MVP
 
 См. plan §11.11: R-M1 (T67 на критическом пути), R-M2 (цена возврата отложенного), R-M3 (сужение прав
-БА меняет сценарий демо), R-M4 (доска без пагинации), R-M5 (приёмка ТЗ §6 не полная), R-M6
+БА меняет сценарий демо; снят фичей 002, ADR-0013), R-M4 (доска без пагинации), R-M5 (приёмка ТЗ §6 не полная), R-M6
 (последовательные API-задачи), R-M7 (D-65 меняет поведение R1.0). Дополнительно: T68 и T86 правят
 тесты/зависимости, проверяемые сторожевыми тестами (allowlist, контракт) — test-writer обновляет их в
 той же задаче.
@@ -2062,10 +2132,263 @@ T69 → T73.
 - **Q-M1 (D-54):** «права на проект задаются вручную» = только передача владения (один владелец) и
   роль СМ? Или нужен признак «со-управляющий проекта» у участника (несколько БА с правами
   владельца)? Дефолт: один владелец + СМ; признак — аддитивный столбец `project_member` позже.
+  **Закрыт фичей 002 (ADR-0013):** роль СМ упразднена, любой БА управляет любым проектом
+  (002/FR-8), права БА на задачи — по участию (002/FR-9).
 - **Q-M2 (ADR-0012):** подтвердить заказчику, что показ MVP — промежуточный этап, а не приёмка R1:
   пункты ТЗ §6 п.8, п.9 (CRM), п.11 (экспорт/импорт), п.12 (бэкап) в него не входят. Дефолт: да.
 - **Q-M3:** будет ли заказчик вести в прототипе реальную работу неделями (тогда нужна резервная
   копия FR-50, +1 задача из B1.4-C)? Дефолт: нет, прототип только для показа.
+
+### Spec v0.17: отображаемый логин (FR-73a, D-66, архитектор, 2026-10-16)
+
+Изменение принятого требования R1.0 по решению владельца продукта (OI-128): логин хранится и
+показывается в написании при создании (`Ivanov.Petr`), вход, уникальность, поиск и сортировка —
+без учёта регистра. Решения: **plan D-66** (§11.2) и **plan §11.12** (схема, миграция 0005,
+интерфейсы, тест-план). Ответы владельца, переданные оркестратором 2026-10-16: OI-129 — а)
+(порядок по нормализованному логину, как до v0.17), OI-130 — а) (первый ТА — в написании из
+`INITIAL_ADMIN_LOGIN`). Занятый логин — 422 `login_taken` (не 409). Итого 7 задач (T93–T99).
+
+**Общие условия для T93–T99:**
+- Действуют «Общие условия для задач MVP» выше. Источник интерфейсов — plan §11.12; при
+  расхождении spec v0.17 с plan §11.12 (кроме пометок [ВОПРОС ВЛАДЕЛЬЦУ] у OI-129/OI-130 — они
+  решены, SC-22/SC-23) — `PLAN_ISSUE`, не додумывать.
+- `AppUser.login` — **ключ** (строчные): только вход, проверка «занят», `ON CONFLICT`, поиск
+  `ILIKE`, `ORDER BY`. Всё, что отдаёт логин наружу, читает `AppUser.login_display`.
+- Имена полей API и контракт не меняются: `docs/api/openapi.json` и
+  `frontend/src/shared/api/schema.d.ts` не перегенерируются и не правятся. Если тест контракта
+  краснеет — это ошибка реализации, а не повод перегенерировать.
+- Не трогать файлы параллельной работы над доской (T91/T92): `frontend/src/features/boards/*`,
+  `frontend/src/features/projects/ProjectPage.tsx`, `frontend/src/shared/i18n/ru.ts`,
+  `frontend/src/shared/ui/ui.css`, `frontend/tests/features/boards/*` — кроме T98 после фиксации
+  этой работы. `backend/tests/infra/test_stack_first_run.py` не трогать (изменён другой сессией).
+- Логины в тестах — синтетические (BR-9); примеры AC (`Ivanov.Petr`, `Sidorova.Anna`, `Mixed.Admin`,
+  `Kuznetsov.Oleg`, `QA-Team_1`) допустимы (фича 002, ADR-0013: вместо СМ `Mixed.Admin` — ТА
+  `Admin.Main`, 001/AC-129 по 002 spec §9).
+
+## T91 — Доска: создание задачи из колонки, оптимистичный перенос, фильтр по исполнителю
+- **Статус:** DONE (ревью APPROVE + T91-R)
+- **AC:** решение владельца 2026-10-16; FR-18a, FR-19b, FR-20, FR-28/28a, FR-29, NFR-7, AC-98; контракт — шапка `frontend/tests/features/boards/helpers.tsx`
+- **Файлы:** `frontend/src/features/boards/{BoardView.tsx,dnd.ts,api.ts}`, `ProjectPage.tsx`, `ru.ts`, `ui.css`; тесты `frontend/tests/features/boards/{BoardCreate,BoardOptimistic,BoardFilter}.test.tsx`, `dnd.full.test.ts`
+- **Заметки:** создание — POST create (в todo) + move для не-todo колонок (backend не менялся); фильтр клиентский, соседи для move по ПОЛНОМУ порядку колонки; бэклог: задача, созданная под фильтром исполнителя, может быть не видна; `createTask` дублирует `tasks/api.ts`.
+- **Попытки:** 2
+- **Пересмотрено:** 004 снимает создание из колонки (кнопка, форма, связка create + move, `createTask` в `boards/api.ts`, ключи `boards.add_task`, `boards.create_*`); оптимистичный перенос и фильтр остаются; заметка бэклога о задаче, созданной под фильтром, неактуальна
+
+## T92 — Стиль ссылки «На главную»
+- **Статус:** DONE
+- **Файлы:** `frontend/src/app/router.tsx` (`ui-home-link`), `ui.css`; тесты `theme.test.ts`, `tests/app/home-link.test.tsx`
+- **Попытки:** 1
+- **Пересмотрено:** снято 003 (2026-10-18): ссылки «На главную» и стиля `.ui-home-link` нет (specs/003-no-home-screen/spec.md).
+
+## T100 — Шрифты +4px и иконки в меню (docs/ui/backlog.md п.3; п.1 — не воспроизведён)
+- **Статус:** DONE (по тестам; визуально — владельцем)
+- **Файлы:** `frontend/src/shared/ui/{ui.css,Icon.tsx}`, `frontend/src/app/router.tsx`; тесты `frontend/tests/shared/typography.test.ts`, `frontend/tests/app/icons.test.tsx`; whitelist `backend/tests/infra/test_frontend_scaffold.py`
+- **Заметки:** п.1 бэклога («верхняя панель браузера закрывает шапку», `docs/ui/1.png`) воспроизвести не удалось (документ не выше окна, sticky-панель стоит на top=0, проверено в headless Chrome на 6 размерах); добавлена страховка `100dvh`; вероятная причина — кэш старого бандла или момент до отрисовки React; уточнить у владельца экран, размер окна, масштаб, консоль/Network, Cmd+Shift+R. Заметка владельца `docs/ui/Untitled`: «Сменить пароль лучше вынести в приветственное окно» — не реализовано, ждёт решения.
+- **Попытки:** 1
+- **Пересмотрено:** 003 (2026-10-18): иконка `home` удалена, иконки у пунктов меню и «Выйти» остаются (specs/003-no-home-screen/spec.md).
+
+## T101 — Карточка задачи без дублей полей (docs/ui/backlog.md п.2)
+- **Статус:** DONE
+- **Файлы:** `frontend/src/features/tasks/TaskPage.tsx`, `frontend/src/shared/ui/{UserPicker.tsx,ui.css}`, `ru.ts`; тесты `frontend/tests/features/tasks/{TaskPage.test.tsx,taskpage-helpers.tsx}`
+- **Заметки:** каждое поле один раз: при праве значение строки — сам контрол; статус и исполнитель сохраняются сразу, остальное — кнопкой «Сохранить»; название — input в h1; `UserPicker` получил необязательный проп `labelledBy`. Переписанные тесты T84 сохраняют все прежние проверки поведения (изменён только способ поиска элементов).
+- **Попытки:** 1
+
+## T102 — «Сменить пароль» в приветственном окне главной
+- **Статус:** DONE
+- **Файлы:** `frontend/src/app/router.tsx` (Home), `frontend/src/shared/i18n/ru.ts` (`app.welcome_title`, `app.welcome_hint`); тесты `frontend/tests/app/{welcome.test.tsx,icons.test.tsx}`
+- **Заметки:** решение владельца 2026-10-16 (docs/ui/Untitled): ссылка убрана из боковой панели, блок `section[data-section="welcome"]` на `/` под заголовком; на бизнес-экранах ссылки нет; визуально не проверялось.
+- **Попытки:** 1
+- **Пересмотрено:** заменена T103 (ссылка в приветственном блоке убрана); блока приветствия и страницы «Главная» больше нет — 003 (2026-10-18), specs/003-no-home-screen/spec.md.
+
+## T103 — Принудительная смена пароля: модальное окно после первого входа
+- **Статус:** DONE (ревью CHANGES_REQUESTED → правки; повторное ревью не проводилось — исправлены блокер и замечания по тестам)
+- **AC:** FR-55 (принудительная смена), FR-56 (в UI добровольной смены нет — решение владельца 2026-10-16, API сохраняется; spec v0.17 уточнена), FR-66, NFR-7; заменяет T102 (ссылка в приветственном блоке убрана)
+- **Файлы:** `frontend/src/features/auth/{ChangePasswordPage.tsx,session.ts,api.ts}`, `frontend/src/app/router.tsx`, `frontend/src/shared/api/client.ts` (набор `fired` сбрасывается при регистрации обработчиков), `ui.css` (`.ui-overlay` прокручивается), `ru.ts`; тесты `frontend/tests/app/{password-modal,welcome}.test.tsx`, `tests/features/auth/*`, `AuditPage.test.tsx`; whitelist `test_frontend_scaffold.py`
+- **Заметки:** окно без закрытия (Escape/оверлей), фокус-ловушка, `aria-describedby`, фокус на h1 после успеха; не-принудительный пользователь на `/change-password` → `/`; проверено в headless Chrome на мок-сервере (вход, F5, выход, без роли, опрос 34 с); бэклог: `fired` перерегистрируется при смене пути (семантика «раз на экран»), тесты M3/M8 добавлены.
+- **Попытки:** 2
+- **Пересмотрено:** 003 (2026-10-18): после смены пароля — стартовый экран по 003/FR-3, фокус на его заголовке (003/FR-15), а не путь "/" и заголовок «Главной» (specs/003-no-home-screen/spec.md).
+
+## T93 — Столбец `login_display`: модель и миграция 0005
+- **Статус:** DONE
+- **AC:** FR-73a (хранение написания; существующие записи получают `login_display = login`), AC-128 (уровень БД), AC-131 (заполнение при обновлении); plan D-66, §11.12.2–§11.12.4
+- **Файлы:** `backend/app/domain/users/models.py`, `backend/migrations/versions/0005_login_display.py` (новый),
+  `docs/data-model.md` (строка `login_display` в `app_user`, CHECK, строка `0005` в таблице миграций,
+  вступление «миграции 0001–0005»); тесты: `backend/tests/db/test_identity_models.py`,
+  `backend/tests/db/test_migrations.py`, `backend/tests/factories.py`
+- **Зависит от:** —
+- **Описание:** Строго по plan §11.12.2–§11.12.4. Модель: `login_display: Mapped[str] =
+  mapped_column(String(64), nullable=False, default=_login_display_default)`, где
+  `_login_display_default(context: DefaultExecutionContext) -> str` возвращает
+  `context.get_current_parameters()["login"]`; `CheckConstraint('lower(login_display COLLATE "C") =
+  login', name="login_display_lower")` → имя `ck_app_user_login_display_lower`; докстринг модели и
+  комментарии у обоих столбцов: `login` — ключ, не показывать; `login_display` — показ (D-66).
+  Миграция 0005 (`revision = "0005"`, `down_revision = "0004"`): `add_column` (NULL) → `UPDATE
+  app_user SET login_display = login` → `alter_column(nullable=False)` → `create_check_constraint`;
+  `downgrade` — `drop_constraint` и `drop_column`. Код приложения (сервисы, bootstrap, демо) **не
+  менять**: Python-default заполняет `login_display = login`, поведение остаётся прежним до T94.
+  Фабрика `make_user(login=X)`: в столбец `login` — `X.lower()`, в `login_display` — `X`;
+  `UserRow.login` — `X` (так тесты T94–T97 создают учётную запись `Ivanov.Petr` одной строкой).
+  `user_values` в `test_identity_models.py` не обязана передавать `login_display` (default).
+  Тесты (`test_d66_*`): вставка `login='ivanov.petr', login_display='Ivanov.Petr'` принята;
+  `login_display='Ivanov.Pet'` или `'Ivanov.Petr2'` при `login='ivanov.petr'` → `23514`;
+  `login_display` со знаком Кельвина (`'Kivan'`) при `login='kivan'` → `23514`; кириллица в
+  показе → `23514`; без `login_display` → равен `login`; два пользователя с показами `Ivanov.Petr` и
+  `ivanov.petr` → `23505` по `uq_app_user_login`; `UPDATE login_display` в другое написание той же
+  длины, но не совпадающее с ключом → `23514`. `test_t93_*`: файл и цепочка 0004 → 0005, голова одна;
+  `downgrade 0004` при пользователях → столбца и CHECK нет, строки целы; `upgrade head` →
+  `login_display = login` у всех строк, CHECK на месте; `alembic check` чист. Существующие тесты
+  (`test_ac116_*` уровня БД, `test_t69_*`) остаются зелёными без ослабления.
+- **Готово, когда:** `pytest -q backend/tests/db/test_identity_models.py backend/tests/db/test_migrations.py`
+  и `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёные; `alembic -c backend/alembic.ini check`
+  чист; `pytest -q backend/tests` зелёный целиком (поведение API не изменилось); линтер и mypy чистые.
+
+## T94 — Учётные записи и справочник: создание с написанием, показ `login_display`
+- **Статус:** DONE
+- **AC:** AC-125, AC-128, AC-130, OI-129 а) (учётные записи, `GET /users`), AC-116 (тесты приводятся к FR-73a); FR-4, FR-73, FR-73a; plan §11.12.4, §11.12.5
+- **Файлы:** `backend/app/domain/users/service.py`, `backend/app/domain/users/directory.py`; тесты:
+  `backend/tests/domain/test_user_admin_service.py`, `backend/tests/api/test_admin_users.py`,
+  `backend/tests/api/test_users_directory.py`
+- **Зависит от:** T93
+- **Описание:** По таблице plan §11.12.4 (строки `users/service.py`, `users/directory.py`).
+  `create_user`: порядок проверок прежний (`login_invalid` → `login_taken` по ключу → политика
+  пароля); вставка `login=normalized, login_display=login`; ответ `UserAccount(login=login)`.
+  `_load_target`, `list_accounts`, `list_directory`, `user_refs` читают `AppUser.login_display`;
+  `ORDER BY AppUser.login, AppUser.id` и `AppUser.login.ilike(...)` не менять. Докстринг
+  `create_user` — «сохраняется написание при вводе, проверки по нормализованному виду». Тесты — по
+  строкам AC-125, AC-128, AC-130, OI-129 и AC-116 таблицы plan §11.12.8, в том числе параллельное
+  создание `Ivanov.Petr`/`ivanov.petr` (`@pytest.mark.committed`, одно пространство и два разных:
+  ровно один успех, второй — `login_taken`, одна строка с ключом `ivanov.petr`, одно событие
+  `user.created`). Старые тесты, ждавшие строчного логина в ответе, привести к FR-73a:
+  `test_admin_users.py::test_ac116_login_with_capitals_is_normalized_to_lower_case` (ждать
+  `Ivan.Petrov`; переименовать по смыслу), `test_user_admin_service.py::test_ac116_login_is_lowercased_on_create`
+  (`created.login == "Ivan.Petrov"`; ключ `ivan.petrov` в БД; вход `IVAN.PETROV` проходит),
+  `::test_ac116_boundary_valid_logins_are_accepted` (`created.login == good`). Остальные ассерты
+  AC-116 (вход в любом регистре, 422 на регистровый дубль и невалидные логины) не ослаблять.
+  Поиск по коду: других тестов, ждущих строчного логина в ответе для логина, созданного с
+  заглавными, быть не должно — если найдутся вне файлов задачи, перечислить в отчёте.
+- **Готово, когда:** `pytest -q backend/tests/domain/test_user_admin_service.py backend/tests/api/test_admin_users.py backend/tests/api/test_users_directory.py backend/tests/domain/test_directory.py backend/tests/cli/test_openapi.py backend/tests/infra/test_frontend_api_types.py`
+  зелёный; `git diff --exit-code docs/api/openapi.json frontend/src/shared/api/schema.d.ts` — без
+  изменений; линтер и mypy чистые.
+
+## T95 — Вход и профиль: логин в написании при создании
+- **Статус:** DONE
+- **AC:** AC-126, AC-127; FR-1, FR-61, FR-73a; plan §11.12.4
+- **Файлы:** `backend/app/api/deps.py`, `backend/app/domain/auth/service.py`; тесты:
+  `backend/tests/api/test_auth_login.py`, `backend/tests/api/test_login_lockout.py`
+- **Зависит от:** T93 (можно параллельно с T94: файлы не пересекаются)
+- **Описание:** `get_actor` и `service.login` выбирают `AppUser.login_display` (в `Actor.login` и
+  `LoginResult.login`); `normalize_login`, `LocalPasswordProvider`, `reserve_attempt` и
+  `change_own_password` не менять. Докстринг `service.login`: «логин нормализуется для поиска
+  учётной записи; в результате — отображаемый логин (FR-73a)». Тесты — строки AC-126 и AC-127 plan
+  §11.12.8 (учётная запись `make_user(login="Ivanov.Petr", role="business_admin")`; сдвиг часов —
+  как в существующих тестах блокировки). Существующие `test_ac116_*` с логином, созданным строчными,
+  остаются без изменений.
+- **Готово, когда:** `pytest -q backend/tests/api/test_auth_login.py backend/tests/api/test_login_lockout.py backend/tests/domain/test_auth_service.py backend/tests/api/test_password_change.py backend/tests/api/test_deps_gates.py`
+  зелёный; линтер и mypy чистые.
+
+## T96 — Проекты, участники, журнал: логин в написании при создании
+- **Статус:** DONE
+- **AC:** AC-129, OI-129 а) (участники проекта); FR-14, FR-14a, FR-15, FR-20, FR-23, FR-41, FR-73a; plan §11.12.4
+- **Файлы:** `backend/app/domain/projects/queries.py`, `backend/app/domain/projects/members.py`,
+  `backend/app/domain/events/queries.py`; тесты: `backend/tests/api/test_login_display.py` (новый)
+- **Зависит от:** T94
+- **Описание:** `project_view` — `AppUser.login_display.label("owner_login")`; `list_members` —
+  `load_only(AppUser.id, AppUser.login_display, AppUser.is_blocked)` и
+  `UserRef(login=u.login_display)`, `ORDER BY AppUser.login, AppUser.id` не менять; `_to_records` —
+  `select(AppUser.id, AppUser.login_display)`. Задачи, доска, комментарии, список проектов и «мои
+  задачи» берут логин из `user_refs` (исправлено в T94) — здесь только проверяются. Тест
+  `test_ac129_*` — сценарий AC-129 целиком через API: `Mixed.Admin` (СМ, фабрика) создаёт через
+  `POST /admin/users` учётные записи `Ivanov.Petr`, `Kuznetsov.Oleg`, `Sidorova.Anna` и назначает
+  роли через API (нужны записи журнала с автором `Mixed.Admin`); постоянный пароль — сменой
+  одноразового через `POST /auth/password` либо служебным `UPDATE` в тесте (на выбор
+  test-writer); далее проект, участники, задача с исполнителем `Sidorova.Anna`, комментарий,
+  проверки списков и карточек из AC-129, «мои задачи» `Sidorova.Anna`, передача владения
+  `Kuznetsov.Oleg`, журнал от имени `Mixed.Admin` (авторы записей), карточка проекта (владелец).
+  `test_oi129_members_*` — участники `anna`, `Boris`, `ivan`, `Kirill` → порядок `anna, Boris, ivan, Kirill`.
+- **Фича 002 (ADR-0013):** в `test_ac129_*` учётные записи и журнал — от ТА `Admin.Main` (вместо
+  СМ `Mixed.Admin`), проекты — от БА (001/AC-129 по 002 spec §9, R3-T07).
+- **Готово, когда:** `pytest -q backend/tests/api/test_login_display.py backend/tests/api/test_projects.py backend/tests/api/test_project_members.py backend/tests/api/test_audit.py backend/tests/domain/test_projects_service.py backend/tests/domain/test_project_members_service.py`
+  зелёный; линтер и mypy чистые.
+
+## T97 — Первый ТА в написании из настройки; обновление существующей установки
+- **Статус:** DONE
+- **AC:** OI-130 а), FR-6, AC-131; FR-49, FR-64, FR-73a; plan §11.12.3, §11.12.4
+- **Файлы:** `backend/app/domain/system/bootstrap.py`; тесты: `backend/tests/cli/test_bootstrap.py`,
+  `backend/tests/db/test_login_display_upgrade.py` (новый, `@pytest.mark.committed`)
+- **Зависит от:** T94, T95, T96
+- **Описание:** `_initial_login(settings) -> tuple[str, str]` — `(ключ, написание из настройки)`;
+  `ValueError` для логина вне шаблона — как было (текст без значения). `AppUser(login=ключ,
+  login_display=написание, …)`; файл пароля — `login=<написание>\npassword=…`.
+  `remove_initial_admin_file_if_for` сравнивает без учёта регистра (`owner.lower() ==
+  login.strip().lower()`), докстринг — почему (plan §11.12.4). `ops/demo.py` и CLI не менять (демо-
+  логины строчные, `login_display` — default). Тесты: строки OI-130 и AC-131 plan §11.12.8. AC-131:
+  на head — `run_bootstrap`, `create_user("ivan.petrov")` от имени первого ТА (доменная функция с
+  `Actor` ТА), `load_demo_data(seed=1)`; снимок; `run_alembic(url, "downgrade", "0004")` и
+  `"upgrade", "head"` (как `test_t69_*` в `db/test_migrations.py`); после миграций
+  `await db_engine.dispose()` перед запросами приложения (кэш подготовленных выражений asyncpg);
+  проверки через API (`committed_api_env` или своё приложение поверх `committed`): вход прежними
+  паролями (`initial-admin-password.txt`, `demo-passwords.txt`, одноразовый `ivan.petrov`) — `login`
+  в ответе прежний; список учётных записей и журнал — прежние логины и число записей; создание
+  `Demo.BA1` → 422 `login_taken`. Существующие тесты bootstrap (логин по умолчанию `admin`) не
+  менять.
+- **Фича 002 (ADR-0013):** в демо нет СМ (`demo.ba4`), актор теста AC-131 — первый ТА `admin`;
+  `upgrade head` включает 0006, «журнал не изменился» остаётся в силе (R3-T08; 001/AC-131 по 002
+  spec §9). Обновление с ролью СМ в данных — 002/AC-20, AC-21, AC-30.
+- **Готово, когда:** `pytest -q backend/tests/cli/test_bootstrap.py backend/tests/cli/test_bootstrap_hardening.py backend/tests/cli/test_demo_data.py backend/tests/db/test_login_display_upgrade.py backend/tests/api/test_password_change.py`
+  зелёный; линтер и mypy чистые.
+
+## T98 — Фронтенд: порядок исполнителей на доске без учёта регистра, тексты о логине
+- **Статус:** DONE
+- **AC:** OI-129 а) (фильтр исполнителей доски), AC-132 (подготовка); FR-73a; plan §11.12.6
+- **Файлы:** `frontend/src/features/boards/BoardView.tsx`, `frontend/src/features/admin/UsersPage.tsx`
+  (только комментарий у строки показа созданного логина), `frontend/src/shared/i18n/ru.ts`
+  (только `admin.users.login_hint`); тесты: `frontend/tests/features/boards/BoardFilter.test.tsx`
+- **Зависит от:** фиксация параллельной работы над доской T91/T92 (вне этого файла задач: она
+  добавила фильтр исполнителей в `BoardView.tsx`, ключи `boards.filter_*` в `ru.ts` и
+  `BoardFilter.test.tsx`). От backend-задач не зависит: контракт не меняется.
+- **Описание:** В `BoardView.tsx` список исполнителей фильтра сортировать по
+  `login.toLowerCase()`, при равенстве — по `id` (сейчас `a.login < b.login` ставит `Boris` раньше
+  `anna`). `UsersPage.tsx`: комментарий «The server-side (normalized) login» → «The login as the
+  server stored it (FR-73a), not the typed one»; поведение не менять. `ru.ts`
+  `admin.users.login_hint`: «От 3 до 64 символов: латинские буквы, цифры, точка, подчёркивание и
+  дефис; первый символ — буква или цифра. Логин показывается так, как введён; при входе регистр
+  не учитывается». Тест: доска с исполнителями `Boris`, `anna`, `Kirill`, `ivan` → варианты фильтра
+  после «Все исполнители» и «Без исполнителя» в порядке `anna, Boris, ivan, Kirill`; карточки
+  показывают логины как пришли. `ProjectPage.tsx` (фильтр владельца уже без учёта регистра),
+  `UserPicker`, `AuditPage` — не менять.
+- **Готово, когда:** `cd frontend && npm run lint && npm run typecheck && npm test` зелёный.
+
+## T99 — Документация: отображаемый логин, обновление, ручная проверка AC-132
+- **Статус:** DONE
+- **AC:** AC-132 *ручной* (пункт чек-листа), NFR-11, FR-73a; plan §11.12, R-M10
+- **Файлы:** `README.md` (ru и en), `docs/acceptance/mvp-demo.md`; тесты:
+  `backend/tests/infra/test_docs_static.py` (дополнение, `infra_static`)
+- **Зависит от:** T97, T98
+- **Описание:** README (ru и en): логин показывается в написании при создании, вход без учёта
+  регистра, логин, отличающийся только регистром, занят; `INITIAL_ADMIN_LOGIN` показывается как
+  задан, в файле пароля — то же написание; обновление с предыдущей версии MVP — без действий
+  оператора (миграция 0005 при старте), логины прежние; откат версии ниже 0005 теряет написание
+  (R-M10). Чек-лист `mvp-demo.md`: новый пункт AC-132 (учётные записи `Ivanov.Petr` — БА,
+  владелец проекта, и `Sidorova.Anna` — участник, исполнитель с комментарием; перечень экранов из
+  AC-132; ожидание — нигде не строчными). Тесты `test_t99_*`: README ru/en упоминают регистр
+  логина (ru «регистр», en «case»), чек-лист содержит `AC-132`.
+- **Готово, когда:** `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёный;
+  `bash scripts/check.sh` зелёный (финальная проверка v0.17); ревьюер подтверждает трассировку plan
+  §11.12.8.
+
+### Порядок v0.17 и критический путь
+
+| Задача | Название | Зависит от |
+|---|---|---|
+| T93 | `login_display`: модель, миграция 0005 | — |
+| T94 | Учётные записи и справочник | T93 |
+| T95 | Вход и профиль | T93 |
+| T96 | Проекты, участники, журнал | T94 |
+| T97 | Первый ТА; обновление установки (AC-131) | T94, T95, T96 |
+| T98 | Фронтенд: порядок на доске, тексты | фиксация T91/T92 |
+| T99 | Документация, AC-132 | T97, T98 |
+
+Критический путь (5 задач): **T93 → T94 → T96 → T97 → T99**. T95 — параллельно с T94; T98 — как
+только зафиксирована работа T91/T92, независимо от backend. Риски — plan §11.11 R-M8…R-M11.
 
 ---
 

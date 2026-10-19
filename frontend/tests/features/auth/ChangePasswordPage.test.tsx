@@ -1,4 +1,7 @@
-// T23: смена пароля и экран «нет роли». AC: FR-55, FR-56, FR-66, NFR-7, NFR-6, FR-57.
+// T23: смена пароля и экран «нет роли». AC: FR-55, FR-66, NFR-7, NFR-6, FR-57.
+// Решение владельца 2026-10-16: добровольной смены пароля в интерфейсе нет, только принудительная (FR-55).
+// T103: форма смены пароля - модальное окно (role=dialog), все прежние проверки перенесены на него.
+// ChangePasswordPage сам не ходит в /me: редирект не-принудительного пользователя - дело роутера.
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -33,7 +36,8 @@ beforeEach(() => {
 describe("ChangePasswordPage (T23)", () => {
   it("fr56_success_sends_both_passwords_and_navigates_home", async () => {
     vi.mocked(api.changePassword).mockResolvedValue(undefined as never);
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     fill(container);
     fireEvent.click(submitButton(container));
     await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/"));
@@ -42,14 +46,16 @@ describe("ChangePasswordPage (T23)", () => {
   });
 
   it("hint_min_length_comes_from_password_min_length", () => {
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     expect(PASSWORD_MIN_LENGTH).toBe(12);
     expect(container.textContent).toContain(t("auth.password_min_length_hint", { min: PASSWORD_MIN_LENGTH }));
     expect(container.textContent).toContain("Не менее 12 символов");
   });
 
   it("client_check_too_short_new_password_blocks_request", async () => {
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     const short = "a".repeat(PASSWORD_MIN_LENGTH - 1);
     fill(container, OLD, short, short);
     fireEvent.click(submitButton(container));
@@ -60,7 +66,8 @@ describe("ChangePasswordPage (T23)", () => {
 
   it("client_check_exact_min_length_is_accepted", async () => {
     vi.mocked(api.changePassword).mockResolvedValue(undefined as never);
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     const ok = "a1".repeat(PASSWORD_MIN_LENGTH / 2);
     fill(container, OLD, ok, ok);
     fireEvent.click(submitButton(container));
@@ -68,7 +75,8 @@ describe("ChangePasswordPage (T23)", () => {
   });
 
   it("client_check_confirmation_mismatch_blocks_request", async () => {
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     fill(container, OLD, NEW, NEW + "x");
     fireEvent.click(submitButton(container));
     expect((await screen.findByRole("alert")).textContent?.trim()).not.toBe("");
@@ -88,7 +96,8 @@ describe("ChangePasswordPage (T23)", () => {
   ])("error_%s_%s_is_shown_via_dictionary_without_raw_json", async (status, code) => {
     const detail = code === "validation_error" ? [{ loc: ["body", "new_password"], msg: "Too short", type: "x" }] : "raw server text";
     vi.mocked(api.changePassword).mockRejectedValue(new ApiError(status, code, detail));
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     fill(container);
     fireEvent.click(submitButton(container));
     const alert = await screen.findByRole("alert");
@@ -98,7 +107,8 @@ describe("ChangePasswordPage (T23)", () => {
   });
 
   it("nfr7_labels_autocomplete_and_masking", () => {
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     const inputs = [field(container, "current-password"), field(container, "new-password", 0), field(container, "new-password", 1)];
     for (const el of inputs) {
       expect(el.type).toBe("password");
@@ -109,7 +119,8 @@ describe("ChangePasswordPage (T23)", () => {
 
   it("nfr7_first_field_focused_and_form_submit_works", async () => {
     vi.mocked(api.changePassword).mockResolvedValue(undefined as never);
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     expect(document.activeElement).toBe(field(container, "current-password"));
     fill(container);
     const form = field(container, "current-password").form;
@@ -120,7 +131,8 @@ describe("ChangePasswordPage (T23)", () => {
   });
 
   it("nfr7_validation_error_focus_moves_to_alert_or_invalid_field", async () => {
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     fill(container, OLD, NEW, NEW + "x");
     fireEvent.click(submitButton(container));
     const alert = await screen.findByRole("alert");
@@ -133,7 +145,8 @@ describe("ChangePasswordPage (T23)", () => {
   it("double_submit_is_blocked_while_pending", async () => {
     const d = deferred<undefined>();
     vi.mocked(api.changePassword).mockReturnValue(d.promise as never);
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     fill(container);
     fireEvent.click(submitButton(container));
     fireEvent.submit(field(container, "current-password").form!);
@@ -146,14 +159,16 @@ describe("ChangePasswordPage (T23)", () => {
   });
 
   it("fr55_only_change_password_and_logout_are_available_no_links", () => {
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     expect(container.querySelectorAll("a[href]").length).toBe(0);
     expect(plainButtons(container).length).toBe(1); // выход
   });
 
   it("fr55_logout_button_calls_logout_and_goes_to_login", async () => {
     vi.mocked(api.logout).mockResolvedValue(undefined as never);
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     fireEvent.click(plainButtons(container)[0]!);
     await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/login"));
     expect(api.logout).toHaveBeenCalledTimes(1);
@@ -163,7 +178,8 @@ describe("ChangePasswordPage (T23)", () => {
   it("fr57_passwords_never_in_url_console_or_dom_text", async () => {
     const spies = (["log", "info", "warn", "error", "debug"] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => {}));
     vi.mocked(api.changePassword).mockRejectedValue(new ApiError(422, "password_reused", "x"));
-    const { container } = renderAt("/change-password", <ChangePasswordPage />);
+    renderAt("/change-password", <ChangePasswordPage />);
+    const container = screen.getByRole("dialog");
     fill(container);
     fireEvent.click(submitButton(container));
     await screen.findByRole("alert");
@@ -174,9 +190,16 @@ describe("ChangePasswordPage (T23)", () => {
     }
   });
 
-  it("route_change_password_via_app_routes", () => {
-    const { container } = renderAt("/change-password", <AppRoutes />, "*");
-    expect(field(container, "new-password", 1)).toBeTruthy();
+  it("route_change_password_via_app_routes", async () => {
+    // T103: the route renders the form as a modal dialog (forced change: /me answers 403).
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ detail: "x", code: "password_change_required" }), { status: 403, headers: { "Content-Type": "application/json" } })),
+    );
+    renderAt("/change-password", <AppRoutes />, "*");
+    const dialog = await screen.findByRole("dialog");
+    expect(field(dialog, "new-password", 1)).toBeTruthy();
+    vi.unstubAllGlobals();
   });
 });
 
@@ -197,5 +220,46 @@ describe("NoRolePage (T23, FR-66)", () => {
   it("route_no_role_via_app_routes", () => {
     const { container } = renderAt("/no-role", <AppRoutes />, "*");
     expect(container.textContent).toContain(errorMessage("no_role"));
+  });
+});
+
+// Spec 005-login-help, AC-6 (FR-7): the help block exists only on /login.
+describe("login help block is absent elsewhere (spec 005, AC-6)", () => {
+  const P1_PART = "трекер задач для команды";
+  const P2_PART = "выдаёт технический администратор";
+
+  function expectNoHelp() {
+    expect(screen.queryByRole("region", { name: "О системе" })).toBeNull();
+    expect(screen.queryByRole("complementary", { name: "О системе" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "О системе" })).toBeNull();
+    expect(document.body.textContent).not.toContain(P1_PART);
+    expect(document.body.textContent).not.toContain(P2_PART);
+    expect(document.body.textContent).not.toContain("GOSTracker — ");
+  }
+
+  it("ac6_change_password_page_has_no_help_block", () => {
+    renderAt("/change-password", <ChangePasswordPage />);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expectNoHelp();
+  });
+
+  it("ac6_no_role_page_has_no_help_block", () => {
+    const { container } = renderAt("/no-role", <NoRolePage />);
+    expect(container.textContent).toContain(errorMessage("no_role"));
+    expectNoHelp();
+  });
+
+  it("ac6_routes_change_password_and_no_role_have_no_help_block", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ detail: "x", code: "password_change_required" }), { status: 403, headers: { "Content-Type": "application/json" } })),
+    );
+    try {
+      renderAt("/change-password", <AppRoutes />, "*");
+      await screen.findByRole("dialog");
+      expectNoHelp();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

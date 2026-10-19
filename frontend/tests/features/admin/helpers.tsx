@@ -25,8 +25,9 @@
 //   403 no_role -> /no-role (по ошибке запроса me, не только по колбэку клиента).
 //   Нет нужной capability -> остаётся на маршруте и показывает role="alert" с
 //   errorMessage("forbidden"); запросов к /admin/* при этом нет.
-//   Главная ("/"): ссылки <a href="/admin/users"> и <a href="/admin/audit"> только при
-//   соответствующих capabilities (manage_accounts / view_audit).
+//   Ссылки разделов - в боковом меню экранов с ролью (003/FR-10; "/" не экран, а перенаправление):
+//   <a href="/admin/users"> и <a href="/admin/audit"> только при соответствующих capabilities
+//   (manage_accounts / view_audit).
 //
 // Разметка UsersPage:
 //   список: строки <tr data-user-id="<uuid>"> с ячейками [data-field="login"|"role"|"status"];
@@ -37,7 +38,7 @@
 //   действия строки (type="button"): [data-action="block"] (если не заблокирован) /
 //     [data-action="unblock"] (если заблокирован), [data-action="reset-password"],
 //     [data-action="revoke-sessions"]; роль: select[name="role"] (значения "", tech_admin,
-//     business_admin, mixed, user; "" = без роли) + [data-action="set-role"] - только при
+//     business_admin, user; "" = без роли; 002 FR-21: значения mixed нет) + [data-action="set-role"] - только при
 //     capability assign_roles; select и кнопки имеют доступное имя (label/aria-label);
 //   подтверждение: block, reset-password, revoke-sessions и снятие роли (select = "") открывают
 //     [role="alertdialog"] с логином пользователя, button[data-action="confirm"] и

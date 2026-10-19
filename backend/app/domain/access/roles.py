@@ -19,7 +19,6 @@ class Role(StrEnum):
 
     TECH_ADMIN = "tech_admin"
     BUSINESS_ADMIN = "business_admin"
-    MIXED = "mixed"
     USER = "user"
 
 
@@ -31,7 +30,8 @@ class Capability(StrEnum):
     VIEW_AUDIT = auto()  # FR-41
     BUSINESS_ACCESS = auto()  # раздел проектов и задач
     PROJECT_CREATE = auto()
-    PROJECT_MANAGE_ANY = auto()  # СМ: удаление, архив, владение, участники — в любом проекте
+    # БА: правка, участники (в т.ч. себя), владение, удаление, архив — любой проект (002/FR-8)
+    PROJECT_MANAGE_ANY = auto()
     TASK_ASSIGN_OTHERS = auto()  # «создание задачи другому», смена исполнителя (FR-19a)
     LABELS_MANAGE = auto()  # FR-18b
     CRM_READ = auto()
@@ -46,6 +46,7 @@ _BUSINESS_ADMIN_CAPS: Final = frozenset(
     {
         Capability.BUSINESS_ACCESS,
         Capability.PROJECT_CREATE,
+        Capability.PROJECT_MANAGE_ANY,
         Capability.TASK_ASSIGN_OTHERS,
         Capability.LABELS_MANAGE,
         Capability.CRM_READ,
@@ -58,13 +59,12 @@ ROLE_CAPABILITIES: Final[Mapping[Role, frozenset[Capability]]] = MappingProxyTyp
     {
         Role.TECH_ADMIN: _TECH_ADMIN_CAPS,
         Role.BUSINESS_ADMIN: _BUSINESS_ADMIN_CAPS,
-        Role.MIXED: _TECH_ADMIN_CAPS | _BUSINESS_ADMIN_CAPS | {Capability.PROJECT_MANAGE_ANY},
         Role.USER: frozenset({Capability.BUSINESS_ACCESS}),
     }
 )
 
 # Обладатели MANAGE_ACCOUNTS; для инварианта «всегда есть активный администратор» (FR-69).
-ACCOUNT_ADMIN_ROLES: Final = frozenset({Role.TECH_ADMIN, Role.MIXED})
+ACCOUNT_ADMIN_ROLES: Final = frozenset({Role.TECH_ADMIN})
 
 
 @dataclass(frozen=True, slots=True)

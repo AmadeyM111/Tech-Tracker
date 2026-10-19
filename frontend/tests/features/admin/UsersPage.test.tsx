@@ -220,6 +220,15 @@ describe("create user (FR-4, FR-55, FR-65, FR-73, OI-108)", () => {
     expect(DICT).toContain(hint?.textContent);
   });
 
+  it("t98_fr73a_login_hint_says_shown_as_entered_and_case_ignored_on_login", async () => {
+    const { container } = await open();
+    const hint = document.getElementById(loginInput(container).getAttribute("aria-describedby") ?? "");
+    expect(hint?.textContent).toBe(ru["admin.users.login_hint"]);
+    expect(hint?.textContent).toContain("показывается так, как введён");
+    expect(hint?.textContent).toContain("регистр не учитывается");
+    expect(hint?.textContent).not.toMatch(/\. Регистр не учитывается$/);
+  });
+
   it("fr4_create_without_role_sends_login_and_client_generated_password_only", async () => {
     const spy = fillBytes(3);
     const { container } = await open({ [CREATE]: () => j(201, created) });
@@ -465,7 +474,9 @@ describe("roles as a separate action (FR-4, FR-12, FR-66, FR-69)", () => {
       Array.from(sel.options)
         .map((o) => o.value)
         .sort(),
-    ).toEqual(["", "business_admin", "mixed", "tech_admin", "user"]);
+    ).toEqual(["", "business_admin", "tech_admin", "user"]);
+    // 002 AC-27, FR-21: "mixed" is not offered; role names are unchanged.
+    expect(Array.from(sel.options).map((o) => o.value)).not.toContain("mixed");
     for (const o of Array.from(sel.options)) expect(DICT).toContain(o.textContent);
     expect(sel.value).toBe("");
     expect(roleSelect(container, ID_PETROV).value).toBe("user");
@@ -484,11 +495,11 @@ describe("roles as a separate action (FR-4, FR-12, FR-66, FR-69)", () => {
 
   it("change_role_puts_new_role", async () => {
     const path = `PUT ${url(ID_PETROV, "role")}`;
-    const { container } = await open({ [path]: () => j(200, { ...U_PETROV, role: "mixed" }) });
-    fireEvent.change(roleSelect(container, ID_PETROV), { target: { value: "mixed" } });
+    const { container } = await open({ [path]: () => j(200, { ...U_PETROV, role: "business_admin" }) });
+    fireEvent.change(roleSelect(container, ID_PETROV), { target: { value: "business_admin" } });
     fireEvent.click(action(row(container, ID_PETROV), "set-role"));
     await waitFor(() => expect(f.count(path)).toBe(1));
-    expect(await f.last(path).clone().json()).toEqual({ role: "mixed" });
+    expect(await f.last(path).clone().json()).toEqual({ role: "business_admin" });
   });
 
   it("remove_role_requires_confirmation_then_puts_null", async () => {

@@ -1,11 +1,12 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t, type MessageKey } from "../../shared/i18n";
 import { ErrorAlert } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
 import { TextField } from "../../shared/ui/TextField";
+import { useFocusHeadingOnArrival } from "../auth/session";
 import { listAudit, type AuditEntry, type EntityType } from "./api";
 
 const ENTITY_TYPES: readonly EntityType[] = [
@@ -54,7 +55,10 @@ const ACTION_CODES: readonly string[] = [
   "user.role_assigned",
   "user.role_changed",
   "user.role_removed",
+  "project.ownership_transferred",
 ];
+// Field names with a readable text; any other name is shown as it is.
+const FIELD_CODES: readonly string[] = ["owner_id"];
 const ROLE_VALUES: readonly string[] = ["tech_admin", "business_admin", "mixed", "user"];
 
 // An unknown action code is shown as it is.
@@ -62,12 +66,18 @@ function actionText(code: string): string {
   return ACTION_CODES.includes(code) ? t(`admin.audit.action.${code}` as MessageKey) : code;
 }
 
+function fieldText(name: string): string {
+  return FIELD_CODES.includes(name) ? t(`admin.audit.field.${name}` as MessageKey) : name;
+}
+
 function roleName(value: string | null | undefined): string {
   if (value === null || value === undefined) return t("admin.role.none");
   return ROLE_VALUES.includes(value) ? t(`admin.role.${value}` as MessageKey) : value;
 }
 
-// Role names (never the raw keys) for the role events; empty for other actions.
+// Role names (never the raw keys) for the role events; empty for other actions. The audit API
+// gives no old/new owner for project.ownership_transferred (details exist only for user events,
+// changes are not exposed, BR-2), so that event shows just the action text.
 function detailsText(entry: AuditEntry): string {
   const from = entry.details?.["role_from"];
   const to = entry.details?.["role_to"];
@@ -95,7 +105,7 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
         {entry.entity_id}
         {entry.entity_deleted ? ` ${t("admin.audit.entity_deleted")}` : ""}
       </td>
-      <td data-field="changed_fields">{entry.changed_fields.join(", ")}</td>
+      <td data-field="changed_fields">{entry.changed_fields.map(fieldText).join(", ")}</td>
       <td data-field="details">{detailsText(entry)}</td>
     </tr>
   );
@@ -103,6 +113,8 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
 
 export function AuditPage() {
   const typeId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useFocusHeadingOnArrival(headingRef);
   const [page, setPage] = useState(1);
   const [draft, setDraft] = useState<Filters>(NO_FILTERS);
   const [applied, setApplied] = useState<Filters>(NO_FILTERS);
@@ -138,7 +150,9 @@ export function AuditPage() {
 
   return (
     <section className="ui-wide">
-      <h1>{t("admin.audit.title")}</h1>
+      <h1 ref={headingRef} tabIndex={-1}>
+        {t("admin.audit.title")}
+      </h1>
       <ErrorAlert message={error} seq={audit.errorUpdateCount} />
 
       <form onSubmit={onApply} noValidate aria-label={t("admin.audit.filters_title")}>

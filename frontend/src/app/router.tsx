@@ -1,22 +1,33 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, type ReactNode } from "react";
-import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 
 import { AuditPage } from "../features/admin/AuditPage";
 import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
-import { me, type MeResponse } from "../features/auth/api";
+import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
+import { MyTasksPage } from "../features/tasks/TaskList";
+import { TaskPage } from "../features/tasks/TaskPage";
+import { ProjectPage } from "../features/projects/ProjectPage";
+import { ProjectsPage } from "../features/projects/ProjectsPage";
+import { focusHeadingState, me, type MeResponse } from "../features/auth/session";
 import { useLogout } from "../features/auth/useLogout";
 import { ApiError, setNavigationHandlers } from "../shared/api/client";
 import { errorMessage, t } from "../shared/i18n";
 import { ErrorAlert, useAlertState } from "../shared/ui/ErrorAlert";
+import { Icon } from "../shared/ui/Icon";
 
 // Session check shared by the guards (not a polled query: key is its own).
 const SESSION_KEY = ["auth", "me"] as const;
 
-function useSession() {
+// A profile this young is not asked for again when the next screen mounts: the redirect from "/" to the
+// start screen must not cost a second `GET /me` (003/AC-36). Freshness is counted from `dataUpdatedAt` of the
+// last successful answer; a query that has only an error (no data) is never fresh and is re-asked on mount.
+const SESSION_FRESH_MS = 5_000;
+
+function useSession(staleTime: number = SESSION_FRESH_MS) {
   return useQuery({
     queryKey: SESSION_KEY,
     queryFn: () => me(),
@@ -24,6 +35,7 @@ function useSession() {
     // extend the session by itself on every window focus.
     retry: false,
     refetchOnWindowFocus: false,
+    staleTime,
   });
 }
 
@@ -36,9 +48,37 @@ function redirectFor(error: unknown): string | null {
   return null;
 }
 
+type Capability = MeResponse["capabilities"][number];
+
+/**
+ * Start screens (003/FR-3). `/no-role` is not returned here: a profile without a role
+ * answers 403 `no_role`, and `redirectFor` leads there.
+ */
+export type StartPath = "/change-password" | "/projects" | "/admin/users" | "/admin/audit";
+
+/** 003/FR-3 (items 1, 3-6) by the `GET /me` profile. Pure function, no requests. */
+export function startPath(profile: Pick<MeResponse, "must_change_password" | "capabilities">): StartPath {
+  const has = (capability: Capability) => profile.capabilities.includes(capability);
+  if (profile.must_change_password) return "/change-password";
+  if (has("business_access")) return "/projects";
+  if (has("manage_accounts")) return "/admin/users";
+  if (has("view_audit")) return "/admin/audit";
+  return "/admin/users";
+}
+
 // Inside the App shell the <main> already exists, so a plain wrapper is used.
-function Landmark({ insideMain, children }: { insideMain: boolean; children: ReactNode }) {
-  return insideMain ? <div>{children}</div> : <main>{children}</main>;
+// `shell` adds the two-column layout (left navigation panel, T90); the markup order stays the same.
+function Landmark({
+  insideMain,
+  shell = false,
+  children,
+}: {
+  insideMain: boolean;
+  shell?: boolean;
+  children: ReactNode;
+}) {
+  const className = shell ? "ui-shell" : undefined;
+  return insideMain ? <div className={className}>{children}</div> : <main className={className}>{children}</main>;
 }
 
 /**
@@ -53,13 +93,14 @@ function SessionGate({
   children: (profile: MeResponse) => ReactNode;
 }) {
   const session = useSession();
+  const { state } = useLocation();
   if (session.isPending) {
     // Not a landmark: the page content has not arrived yet.
     return <p role="status">{t("app.loading")}</p>;
   }
   if (session.isError) {
     const target = redirectFor(session.error);
-    if (target !== null) return <Navigate to={target} replace />;
+    if (target !== null) return <Navigate to={target} replace state={focusHeadingState(state)} />;
     const code = session.error instanceof ApiError ? session.error.code : "unknown";
     return (
       <Landmark insideMain={insideMain}>
@@ -73,87 +114,146 @@ function SessionGate({
   return <>{children(session.data)}</>;
 }
 
-function Home({ profile }: { profile: MeResponse }) {
-  const alert = useAlertState();
-  const logout = useLogout(alert);
+/** Menu items by capabilities (FR-10); the server checks access itself. */
+function MenuItems({ profile }: { profile: MeResponse }) {
+  const has = (capability: MeResponse["capabilities"][number]) => profile.capabilities.includes(capability);
   return (
     <>
-      <h1>{t("app.home_title")}</h1>
-      <ErrorAlert message={alert.message} seq={alert.seq} />
-      <nav>
-        {profile.capabilities.includes("manage_accounts") ? (
+      {has("business_access") ? (
+        <>
           <p>
-            <Link to="/admin/users">{t("admin.home_users_link")}</Link>
+            <NavLink to="/projects" end>
+              <Icon name="projects" />
+              {t("nav.projects")}
+            </NavLink>
           </p>
-        ) : null}
-        {profile.capabilities.includes("view_audit") ? (
           <p>
-            <Link to="/admin/audit">{t("admin.home_audit_link")}</Link>
+            <NavLink to="/my-tasks">
+              <Icon name="tasks" />
+              {t("nav.my_tasks")}
+            </NavLink>
           </p>
-        ) : null}
+        </>
+      ) : null}
+      {has("manage_accounts") ? (
         <p>
-          <Link to="/change-password">{t("app.change_password_link")}</Link>
+          <NavLink to="/admin/users">
+            <Icon name="users" />
+            {t("admin.home_users_link")}
+          </NavLink>
         </p>
-      </nav>
-      <button type="button" disabled={logout.pending} onClick={() => void logout.run()}>
-        {t("auth.logout")}
-      </button>
+      ) : null}
+      {has("view_audit") ? (
+        <p>
+          <NavLink to="/admin/audit">
+            <Icon name="audit" />
+            {t("admin.home_audit_link")}
+          </NavLink>
+        </p>
+      ) : null}
     </>
   );
 }
 
-function Root({ insideMain }: { insideMain: boolean }) {
+/** Sidebar (003/FR-10): items by capabilities, "Logout" at the bottom; makes no network requests itself. */
+function Sidebar({ profile }: { profile: MeResponse }) {
+  const alert = useAlertState();
+  const logout = useLogout(alert);
+  const navigate = useNavigate();
+  const projectMatch = useMatch("/projects/:projectId");
+  const createRef = useRef<HTMLButtonElement>(null);
+  // The Sidebar survives a move between role screens, the window must not: it is tied to the path it was opened on.
+  const { pathname } = useLocation();
+  const [createPath, setCreatePath] = useState<string | null>(null);
+  if (createPath !== null && createPath !== pathname) setCreatePath(null);
+  const createOpen = createPath !== null;
+  const canCreate = profile.capabilities.includes("business_access");
+  return (
+    <>
+      <div className="ui-sidebar">
+        <nav aria-label={t("app.menu_label")}>
+          <MenuItems profile={profile} />
+        </nav>
+        {canCreate ? (
+          <button
+            type="button"
+            data-action="create-task"
+            aria-haspopup="dialog"
+            ref={createRef}
+            onClick={() => setCreatePath(pathname)}
+          >
+            <Icon name="plus" />
+            {t("nav.create_task")}
+          </button>
+        ) : null}
+        <button type="button" data-action="logout" disabled={logout.pending} onClick={() => void logout.run()}>
+          <Icon name="logout" />
+          {t("auth.logout")}
+        </button>
+        <ErrorAlert message={alert.message} seq={alert.seq} />
+      </div>
+      {createOpen ? (
+        <CreateTaskDialog
+          currentProjectId={projectMatch?.params.projectId ?? null}
+          onClose={() => {
+            setCreatePath(null);
+            createRef.current?.focus();
+          }}
+          onCreated={(task) => {
+            setCreatePath(null);
+            navigate(`/tasks/${task.id}`);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * `/` and any path without a screen (003/FR-1, FR-6...FR-9): only the session check and a
+ * replacing redirect to the start screen. A failed check redirects as usual (`SessionGate`).
+ */
+function StartRedirect({ insideMain }: { insideMain: boolean }) {
+  const { state } = useLocation();
+  return (
+    <SessionGate insideMain={insideMain}>
+      {(profile) => <Navigate to={startPath(profile)} replace state={focusHeadingState(state)} />}
+    </SessionGate>
+  );
+}
+
+/**
+ * Screen with a role (003/FR-10, FR-11, FR-14): the session guard, the shell with the Sidebar,
+ * then the content or a refusal. Without the capability no section data is requested.
+ */
+function RoleScreen({
+  insideMain,
+  capability,
+  children,
+}: {
+  insideMain: boolean;
+  capability: Capability;
+  children: (profile: MeResponse) => ReactNode;
+}) {
   return (
     <SessionGate insideMain={insideMain}>
       {(profile) => (
-        <Landmark insideMain={insideMain}>
-          <Home profile={profile} />
+        <Landmark insideMain={insideMain} shell>
+          <Sidebar profile={profile} />
+          {profile.capabilities.includes(capability) ? (
+            children(profile)
+          ) : (
+            <ErrorAlert message={errorMessage("forbidden")} />
+          )}
         </Landmark>
       )}
     </SessionGate>
   );
 }
 
-/** Admin screen: the session guard plus a capability; without it no request is made. */
-function HomeLink() {
-  return (
-    <p>
-      <Link to="/">{t("app.home_link")}</Link>
-    </p>
-  );
-}
-
-function AdminScreen({
-  insideMain,
-  capability,
-  children,
-}: {
-  insideMain: boolean;
-  capability: MeResponse["capabilities"][number];
-  children: (profile: MeResponse) => ReactNode;
-}) {
-  return (
-    <SessionGate insideMain={insideMain}>
-      {(profile) =>
-        profile.capabilities.includes(capability) ? (
-          <Landmark insideMain={insideMain}>
-            <HomeLink />
-            {children(profile)}
-          </Landmark>
-        ) : (
-          <Landmark insideMain={insideMain}>
-            <HomeLink />
-            <ErrorAlert message={errorMessage("forbidden")} />
-          </Landmark>
-        )
-      }
-    </SessionGate>
-  );
-}
-
 /**
- * change-password and no-role stay reachable with any session state but 401:
- * the form is shown at once, the check only redirects to the login page.
+ * no-role stays reachable with any session state but 401: the page is shown at
+ * once, the check only redirects to the login page.
  */
 function NeedsSession({ children }: { children: ReactNode }) {
   const session = useSession();
@@ -163,9 +263,45 @@ function NeedsSession({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Forced password change (T103): a modal window over a blank substrate.
+ * Only a user who must change the password sees it; everybody else goes to their start screen.
+ */
+function ForcedPasswordChange() {
+  const session = useSession(0);
+  const { state } = useLocation();
+  // A cached answer may be stale (e.g. "no role" from before the redirect here): decide on the fresh one.
+  const [fresh, setFresh] = useState(false);
+  if (!fresh && !session.isFetching) setFresh(true);
+  if (session.isPending || !fresh) return <p role="status">{t("app.loading")}</p>;
+  if (session.isError) {
+    const error = session.error;
+    if (error instanceof ApiError && error.status === 403 && error.code === "password_change_required") {
+      return <PasswordModal />;
+    }
+    return <Navigate to={redirectFor(error) ?? "/"} replace state={focusHeadingState(state)} />;
+  }
+  if (!session.data.must_change_password) {
+    return <Navigate to={startPath(session.data)} replace state={focusHeadingState(state)} />;
+  }
+  return <PasswordModal />;
+}
+
+function PasswordModal() {
+  return (
+    <>
+      <div className="ui-shell" aria-hidden="true" />
+      <ChangePasswordPage />
+    </>
+  );
+}
+
 function GuestOnly({ children }: { children: ReactNode }) {
   const session = useSession();
-  if (session.data !== undefined) return <Navigate to="/" replace />;
+  const { state } = useLocation();
+  if (session.data !== undefined) {
+    return <Navigate to={startPath(session.data)} replace state={focusHeadingState(state)} />;
+  }
   return <>{children}</>;
 }
 
@@ -173,11 +309,13 @@ function GuestOnly({ children }: { children: ReactNode }) {
 function useClientHandlers(): void {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { pathname } = useLocation();
+  const { pathname, state } = useLocation();
   const pathRef = useRef(pathname);
+  const stateRef = useRef<unknown>(state);
   useEffect(() => {
     pathRef.current = pathname;
-  }, [pathname]);
+    stateRef.current = state;
+  }, [pathname, state]);
 
   useEffect(
     () =>
@@ -186,13 +324,17 @@ function useClientHandlers(): void {
           // On the login page there is no session data to drop and nothing to leave.
           if (pathRef.current === "/login") return;
           queryClient.clear();
-          navigate("/login", { replace: true });
+          navigate("/login", { replace: true, state: focusHeadingState(stateRef.current) });
         },
-        onPasswordChangeRequired: () => navigate("/change-password", { replace: true }),
+        onPasswordChangeRequired: () => {
+          // Already in the modal: a repeated 403 must not add a history step.
+          if (pathRef.current === "/change-password") return;
+          navigate("/change-password", { replace: true });
+        },
         onNoRole: () => {
-          // A user without a role may still change the password voluntarily (FR-56).
+          // A 403 no_role inside the password modal (a forced user without a role) keeps the modal on screen.
           if (pathRef.current === "/change-password" || pathRef.current === "/no-role") return;
-          navigate("/no-role", { replace: true });
+          navigate("/no-role", { replace: true, state: focusHeadingState(stateRef.current) });
         },
       }),
     [navigate, queryClient],
@@ -215,9 +357,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
       <Route
         path="/change-password"
         element={
-          <NeedsSession>
-            <ChangePasswordPage />
-          </NeedsSession>
+          <ForcedPasswordChange />
         }
       />
       <Route
@@ -228,24 +368,56 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           </NeedsSession>
         }
       />
-      <Route path="/" element={<Root insideMain={insideMain} />} />
+      <Route path="/" element={<StartRedirect insideMain={insideMain} />} />
       <Route
         path="/admin/users"
         element={
-          <AdminScreen insideMain={insideMain} capability="manage_accounts">
+          <RoleScreen insideMain={insideMain} capability="manage_accounts">
             {(profile) => <UsersPage canAssignRoles={profile.capabilities.includes("assign_roles")} />}
-          </AdminScreen>
+          </RoleScreen>
         }
       />
       <Route
         path="/admin/audit"
         element={
-          <AdminScreen insideMain={insideMain} capability="view_audit">
+          <RoleScreen insideMain={insideMain} capability="view_audit">
             {() => <AuditPage />}
-          </AdminScreen>
+          </RoleScreen>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route
+        path="/projects"
+        element={
+          <RoleScreen insideMain={insideMain} capability="business_access">
+            {(profile) => <ProjectsPage canCreate={profile.capabilities.includes("project_create")} />}
+          </RoleScreen>
+        }
+      />
+      <Route
+        path="/projects/:projectId"
+        element={
+          <RoleScreen insideMain={insideMain} capability="business_access">
+            {(profile) => <ProjectPage currentUserId={profile.id} currentRole={profile.role} />}
+          </RoleScreen>
+        }
+      />
+      <Route
+        path="/tasks/:taskId"
+        element={
+          <RoleScreen insideMain={insideMain} capability="business_access">
+            {() => <TaskPage />}
+          </RoleScreen>
+        }
+      />
+      <Route
+        path="/my-tasks"
+        element={
+          <RoleScreen insideMain={insideMain} capability="business_access">
+            {() => <MyTasksPage />}
+          </RoleScreen>
+        }
+      />
+      <Route path="*" element={<StartRedirect insideMain={insideMain} />} />
     </Routes>
   );
 }
