@@ -7,7 +7,7 @@ import { LoginPage } from "../../../src/features/auth/LoginPage";
 import * as api from "../../../src/features/auth/api";
 import { ApiError } from "../../../src/shared/api/client";
 import { errorMessage, ru, t } from "../../../src/shared/i18n";
-import { deferred, field, plainButtons, renderAt, submitButton } from "./helpers";
+import { deferred, field, plainButtons, pressKey, renderAt, revealButtons, submitButton } from "./helpers";
 
 vi.mock("../../../src/features/auth/api", () => ({
   login: vi.fn(),
@@ -147,7 +147,8 @@ describe("LoginPage (T23)", () => {
     expect(window.location.href).not.toContain(PASSWORD);
     for (const s of spies) expect(JSON.stringify(s.mock.calls)).not.toContain(PASSWORD);
     expect(container.textContent).not.toContain(PASSWORD);
-    expect(plainButtons(container).length).toBe(0);
+    // 006/AC-1: единственная кнопка type=button на экране входа - кнопка показа пароля.
+    expect(plainButtons(container).map((b) => b.getAttribute("aria-label"))).toEqual([(ru as Record<string, string>)["auth.show_password"]]);
   });
 
   it("route_login_renders_login_page_via_app_routes", () => {
@@ -282,7 +283,186 @@ describe("LoginPage help block (spec 005)", () => {
         'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
       ),
     ).filter((el) => !(el as HTMLButtonElement).disabled);
-    expect(focusable).toEqual([field(container, "username"), field(container, "current-password"), submitButton(container)]);
+    // 006/AC-6: между «Пароль» и «Войти» появилась кнопка показа пароля.
+    expect(focusable).toEqual([
+      field(container, "username"),
+      field(container, "current-password"),
+      revealButtons(container)[0],
+      submitButton(container),
+    ]);
+    expect(revealButtons(container)).toHaveLength(1);
     expect(focusable.some((el) => helpBlock().contains(el))).toBe(false);
+  });
+});
+
+// 006-bugreport-ch1, R6-T02: «глазок» на экране входа (AC-1, AC-3, AC-5, AC-6, AC-7, AC-8, AC-9, AC-10).
+const SECRET = "Secret-Pass-123";
+const SHOW = "Показать пароль";
+const pwd = (c: HTMLElement) => field(c, "current-password");
+const eye = (c: HTMLElement) => {
+  const b = revealButtons(c)[0];
+  if (!b) throw new Error("no reveal button");
+  return b;
+};
+
+describe("LoginPage password reveal (006)", () => {
+  beforeEach(() => {
+    vi.mocked(api.login).mockReset();
+  });
+
+  it("ac1_dictionary_has_show_password_key", () => {
+    expect((ru as Record<string, string>)["auth.show_password"]).toBe(SHOW);
+  });
+
+  it("ac1_exactly_one_reveal_button_next_to_password_and_two_buttons_total", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    const buttons = revealButtons(container);
+    expect(buttons).toHaveLength(1);
+    const b = buttons[0]!;
+    expect(b.getAttribute("type")).toBe("button");
+    expect(b.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: SHOW })).toBe(b);
+    expect(pwd(container).type).toBe("password");
+    expect(pwd(container).nextElementSibling).toBe(b);
+    // у «Логин» кнопки нет
+    expect(field(container, "username").parentElement?.querySelector("button")).toBeNull();
+    // на экране ровно две кнопки: «Войти» и показ пароля
+    const all = Array.from(container.querySelectorAll("button"));
+    expect(all).toHaveLength(2);
+    expect(all).toContain(submitButton(container));
+    expect(all).toContain(b);
+  });
+
+  it("ac3_mouse_toggles_type_keeps_value_focus_and_name", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    fireEvent.change(pwd(container), { target: { value: SECRET } });
+    const b = eye(container);
+    b.focus();
+    fireEvent.click(b);
+    expect(pwd(container).type).toBe("text");
+    expect(pwd(container).value).toBe(SECRET);
+    expect(b.getAttribute("aria-pressed")).toBe("true");
+    expect(document.activeElement).toBe(b);
+    expect(screen.getByRole("button", { name: SHOW })).toBe(b);
+    fireEvent.click(b);
+    expect(pwd(container).type).toBe("password");
+    expect(b.getAttribute("aria-pressed")).toBe("false");
+    expect(pwd(container).value).toBe(SECRET);
+  });
+
+  it.each([["Enter" as const], [" " as const]])("ac3_key_%j_toggles", (key) => {
+    const { container } = renderAt("/login", <LoginPage />);
+    fireEvent.change(pwd(container), { target: { value: SECRET } });
+    const b = eye(container);
+    b.focus();
+    pressKey(b, key);
+    expect(pwd(container).type).toBe("text");
+    expect(b.getAttribute("aria-pressed")).toBe("true");
+    pressKey(b, key);
+    expect(pwd(container).type).toBe("password");
+    expect(b.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("ac5_reveal_presses_do_not_submit_and_enter_in_field_sends_exactly_one_request", async () => {
+    vi.mocked(api.login).mockResolvedValue(user() as never);
+    const { container } = renderAt("/login", <LoginPage />);
+    fill(container, "ivanov", SECRET);
+    const b = eye(container);
+    fireEvent.click(b);
+    pressKey(b, "Enter");
+    pressKey(b, " ");
+    expect(api.login).not.toHaveBeenCalled();
+    expect(pwd(container).type).toBe("text"); // три нажатия: показан -> скрыт -> показан
+    fireEvent.submit(pwd(container).form!); // Enter в поле пароля
+    await waitFor(() => expect(api.login).toHaveBeenCalledTimes(1));
+    expect(api.login).toHaveBeenCalledWith({ login: "ivanov", password: SECRET });
+  });
+
+  it("ac6_icon_is_first_child_aria_hidden_and_differs_between_states", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    const b = eye(container);
+    const icon = () => b.firstElementChild!;
+    expect(icon().tagName.toLowerCase()).toBe("svg");
+    expect(icon().getAttribute("aria-hidden")).toBe("true");
+    const hidden = icon().innerHTML;
+    expect(hidden).not.toBe("");
+    fireEvent.click(b);
+    expect(icon().getAttribute("aria-hidden")).toBe("true");
+    expect(icon().innerHTML).not.toBe("");
+    expect(icon().innerHTML).not.toBe(hidden);
+  });
+
+  it("ac7_401_hides_password_keeps_values_and_shows_message", async () => {
+    vi.mocked(api.login).mockRejectedValue(new ApiError(401, "invalid_credentials", "x"));
+    const { container } = renderAt("/login", <LoginPage />);
+    fill(container, "ivanov", SECRET);
+    fireEvent.click(eye(container));
+    expect(pwd(container).type).toBe("text");
+    fireEvent.click(submitButton(container));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Неверный логин или пароль");
+    expect(pwd(container).type).toBe("password");
+    expect(eye(container).getAttribute("aria-pressed")).toBe("false");
+    expect(pwd(container).value).toBe(SECRET);
+    expect(field(container, "username").value).toBe("ivanov");
+  });
+
+  it("ac7_shown_password_is_hidden_even_when_client_validation_stops_submit", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    fireEvent.change(pwd(container), { target: { value: SECRET } }); // логин пуст
+    fireEvent.click(eye(container));
+    expect(pwd(container).type).toBe("text");
+    fireEvent.click(submitButton(container));
+    expect(api.login).not.toHaveBeenCalled();
+    expect(pwd(container).type).toBe("password");
+    expect(eye(container).getAttribute("aria-pressed")).toBe("false");
+    expect(pwd(container).value).toBe(SECRET);
+  });
+
+  it("ac8_remount_shows_password_hidden", () => {
+    const first = renderAt("/login", <LoginPage />);
+    fireEvent.click(eye(first.container));
+    expect(pwd(first.container).type).toBe("text");
+    first.unmount();
+    const second = renderAt("/login", <LoginPage />);
+    expect(pwd(second.container).type).toBe("password");
+    expect(eye(second.container).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("ac9_reveal_is_disabled_with_field_while_request_is_pending_and_still_present", async () => {
+    const d = deferred<ReturnType<typeof user>>();
+    vi.mocked(api.login).mockReturnValue(d.promise as never);
+    const { container } = renderAt("/login", <LoginPage />);
+    fill(container);
+    expect(eye(container).disabled).toBe(false);
+    fireEvent.click(submitButton(container));
+    expect(revealButtons(container)).toHaveLength(1);
+    expect(eye(container).disabled).toBe(true);
+    expect(pwd(container).disabled).toBe(true);
+    d.resolve(user());
+    await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/"));
+  });
+
+  it("ac10_shown_password_keeps_attributes_label_and_makes_no_requests", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const { container } = renderAt("/login", <LoginPage />);
+      fireEvent.change(pwd(container), { target: { value: SECRET } });
+      const b = eye(container);
+      fireEvent.click(b);
+      fireEvent.click(b);
+      fireEvent.click(b);
+      const p = pwd(container);
+      expect(p.type).toBe("text");
+      expect(p.getAttribute("autocomplete")).toBe("current-password");
+      expect(p.getAttribute("spellcheck")).toBe("false");
+      expect(p.getAttribute("autocapitalize")).toBe("off");
+      expect(p.labels?.[0]?.textContent).toBe(ru["auth.password_label"]);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(api.login).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

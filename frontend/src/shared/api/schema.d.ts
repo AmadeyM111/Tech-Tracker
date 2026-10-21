@@ -1123,10 +1123,19 @@ export interface components {
         };
         /**
          * TaskCreate
-         * @description Создание задачи и подзадачи.
+         * @description Создание задачи и подзадачи; в схеме обязательно только ``title``.
          *
-         *     ``assignee_id``: не передан — «Пользователь» назначается сам, БА — без исполнителя;
-         *     ``null`` — явно без исполнителя (различаются по ``model_fields_set``, FR-20).
+         *     Задача верхнего уровня (``POST /projects/{id}/tasks``): обязательны ``description``
+         *     (не пусто после обрезки пробелов; хранится как введено), ``due_date`` (не раньше сегодняшней
+         *     даты по Europe/Moscow) и исполнитель. ``assignee_id`` не передан — исполнитель создатель;
+         *     ``null`` — 422 ``validation_error`` («Пользователь» с ``null`` получает 403). Нет описания
+         *     или срока, пустое описание — 422 ``validation_error``; срок в прошлом — 422
+         *     ``due_date_in_past``. Права (403, 404) проверяются раньше полей.
+         *
+         *     Подзадача (``POST /tasks/{id}/subtasks``): достаточно ``title``; описание и срок
+         *     необязательны, срок в прошлом допустим. ``assignee_id`` не передан — «Пользователь»
+         *     назначается сам, БА — без исполнителя; ``null`` — явно без исполнителя (различаются по
+         *     ``model_fields_set``, FR-20).
          */
         TaskCreate: {
             /** Assignee Id */
@@ -1138,7 +1147,7 @@ export interface components {
             description: string;
             /** Due Date */
             due_date?: string | null;
-            /** @default base */
+            /** @default medium */
             priority: components["schemas"]["TaskPriority"];
             /** Title */
             title: string;
@@ -1232,7 +1241,7 @@ export interface components {
          * TaskPriority
          * @enum {string}
          */
-        TaskPriority: "base" | "high";
+        TaskPriority: "low" | "medium" | "high";
         /**
          * TaskStatus
          * @enum {string}
@@ -1244,6 +1253,14 @@ export interface components {
          *
          *     ``null`` допустим только у ``assignee_id`` и ``due_date`` (снимает значение). У остальных
          *     ``default_factory`` лишь делает поле необязательным без ``null``/``default`` в OpenAPI.
+         *
+         *     Задача верхнего уровня (не подзадача): проверяются только реально меняющиеся поля.
+         *     Снять исполнителя (``assignee_id: null``), снять срок (``due_date: null``) или сделать
+         *     описание пустым (после обрезки пробелов) нельзя — 422 ``validation_error``; срок раньше
+         *     сегодняшней даты по Europe/Moscow — 422 ``due_date_in_past`` (``validation_error``
+         *     проверяется раньше). Неизменённые поля не проверяются: у задачи с пустым значением
+         *     можно менять другие поля. Права (403, 404) проверяются раньше полей. У подзадачи
+         *     снятие исполнителя и срока и срок в прошлом допустимы.
          */
         TaskUpdate: {
             /** Assignee Id */

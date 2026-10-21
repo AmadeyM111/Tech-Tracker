@@ -10,6 +10,7 @@ import {
   createProject,
   deleteProject,
   getProject,
+  listAllMembers,
   listCreatableProjects,
   listMembers,
   listProjects,
@@ -32,6 +33,7 @@ import {
   REMOVE,
   ID_PETROV,
   M_OWNER,
+  M_PETROV,
   detail,
   err,
   installFetch,
@@ -214,5 +216,33 @@ describe("listCreatableProjects (004 R5-T01)", () => {
       },
     });
     await expect(listCreatableProjects()).rejects.toMatchObject({ status: 0, code: "network_error" });
+  });
+});
+
+describe("listAllMembers (006 FR-25, PD-15)", () => {
+  it("fr25_reads_pages_of_100_until_has_next_false_in_order", async () => {
+    const f = installFetch({
+      [MEMBERS]: (req) =>
+        new URL(req.url).searchParams.get("page") === "1"
+          ? j(200, page([M_OWNER], 1, true, 100))
+          : j(200, page([M_PETROV], 2, false, 100)),
+    });
+    const all = await listAllMembers(PID);
+    expect(all.map((m) => m.user.login)).toEqual([M_OWNER.user.login, M_PETROV.user.login]);
+    expect(f.count(MEMBERS)).toBe(2);
+    for (const r of f.calls.filter((c) => c.url.includes("/members"))) {
+      expect(new URL(r.url).searchParams.get("page_size")).toBe("100");
+    }
+  });
+
+  it("fr25_single_page_makes_one_request", async () => {
+    const f = installFetch({ [MEMBERS]: () => j(200, page([M_OWNER])) });
+    expect(await listAllMembers(PID)).toHaveLength(1);
+    expect(f.count(MEMBERS)).toBe(1);
+  });
+
+  it("fr25_server_error_rejects_with_api_error", async () => {
+    installFetch({ [MEMBERS]: () => err(500, "internal_error") });
+    await expect(listAllMembers(PID)).rejects.toMatchObject({ status: 500 });
   });
 });

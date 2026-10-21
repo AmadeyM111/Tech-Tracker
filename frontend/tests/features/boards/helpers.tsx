@@ -153,7 +153,7 @@ export function card(id: string, title: string, status: Status, position: number
     id,
     title,
     status,
-    priority: "base",
+    priority: "medium",
     due_date: null,
     assignee: null,
     progress: null,

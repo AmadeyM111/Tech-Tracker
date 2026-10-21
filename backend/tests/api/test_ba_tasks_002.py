@@ -19,6 +19,7 @@ from tests.roles002_support import (
     send,
     snapshot,
 )
+from tests.tasks_api_support import TASK_REQ
 
 TASKS = "/api/v1/tasks"
 COMMENTS = "/api/v1/comments"
@@ -230,21 +231,26 @@ async def test_002_ac13_ba_member_edits_foreign_task_t1_all_fields(api_env: ApiE
 
 
 async def test_002_ac13_ba_member_creates_tasks_and_subtasks(api_env: ApiEnv) -> None:
-    """AC-13 (FR-9): ba.member создаёт задачу без исполнителя и задачу для u1, создаёт к T3
-    подзадачу для u2 и подзадачу без исполнителя -> 201, всё создано."""
+    """AC-13 (FR-9): ba.member создаёт задачу (исполнитель по умолчанию - он сам, 006/AC-19) и
+    задачу для u1, создаёт к T3 подзадачу для u2 и подзадачу без исполнителя -> 201, всё создано.
+
+    006: задача верхнего уровня без исполнителя больше не создаётся (явный null - 422, 006/AC-20);
+    подзадача без исполнителя по-прежнему допустима."""
     env = api_env
     w = await make_world_002(env)
     tok = w.tok("ba.member")
 
-    r = await send(env, tok, "POST", f"{PROJECTS}/{w.project_id}/tasks", {"title": "free"})
+    r = await send(
+        env, tok, "POST", f"{PROJECTS}/{w.project_id}/tasks", {"title": "free", **TASK_REQ}
+    )
     assert r.status_code == 201, r.text
-    assert r.json()["assignee"] is None
+    assert r.json()["assignee"]["id"] == str(w.uid("ba.member"))
     r = await send(
         env,
         tok,
         "POST",
         f"{PROJECTS}/{w.project_id}/tasks",
-        {"title": "for u1", "assignee_id": str(w.uid("u1"))},
+        {"title": "for u1", **TASK_REQ, "assignee_id": str(w.uid("u1"))},
     )
     assert r.status_code == 201, r.text
     assert r.json()["assignee"]["id"] == str(w.uid("u1"))
@@ -271,7 +277,7 @@ async def test_002_ac13_ba_member_creates_tasks_and_subtasks(api_env: ApiEnv) ->
     )
     assert [(x.title, x.parent_id, x.assignee_id) for x in found] == [
         ("for u1", None, w.uid("u1")),
-        ("free", None, None),
+        ("free", None, w.uid("ba.member")),
         ("sub free", w.tasks["T3"], None),
         ("sub u2", w.tasks["T3"], w.uid("u2")),
     ]

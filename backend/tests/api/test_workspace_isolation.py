@@ -25,6 +25,7 @@ from tests.admin_support import (
 )
 from tests.conftest import ApiEnv
 from tests.db_support import BACKEND_DIR
+from tests.tasks_api_support import TASK_REQ
 
 ACTIONS = ("get", "block", "unblock", "reset", "revoke", "role_user", "role_none", "role_ta")
 
@@ -314,7 +315,7 @@ async def test_t77_ac21_foreign_task_is_invisible_and_untouched(api_env: ApiEnv)
         foreign.ba_token,
         "POST",
         f"/api/v1/projects/{foreign.project_id}/tasks",
-        {"title": "Чужая", "assignee_id": str(foreign.usr.id)},
+        {"title": "Чужая", **TASK_REQ, "assignee_id": str(foreign.usr.id)},
     )
     assert made.status_code == 201, made.text
     tid = made.json()["id"]
@@ -352,7 +353,7 @@ async def test_t77_ac21_foreign_user_as_assignee_is_user_not_found(api_env: ApiE
         w.tok("ba"),
         "POST",
         f"/api/v1/projects/{w.project_id}/tasks",
-        {"title": "Т", "assignee_id": str(foreign.usr.id)},
+        {"title": "Т", **TASK_REQ, "assignee_id": str(foreign.usr.id)},
     )
 
     assert error(r) == (422, "user_not_found")
@@ -373,7 +374,7 @@ async def test_t80_ac21_foreign_comments_are_invisible_and_untouched(api_env: Ap
         foreign.ba_token,
         "POST",
         f"/api/v1/projects/{foreign.project_id}/tasks",
-        {"title": "Чужая"},
+        {"title": "Чужая", **TASK_REQ},
     )
     tid = made.json()["id"]
     created = await send(

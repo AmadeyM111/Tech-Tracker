@@ -14,6 +14,7 @@ import pytest
 
 from tests.conftest import ApiEnv
 from tests.tasks_api_support import (
+    TASK_REQ,
     ApiWorld,
     add_member_row,
     add_project,
@@ -63,7 +64,7 @@ async def _call(env: ApiEnv, w: ApiWorld, entry: str, assignee: Any) -> tuple[An
             token,
             "POST",
             project_tasks_url(w.project_id),
-            {"title": "Т", "assignee_id": value},
+            {"title": "Т", **TASK_REQ, "assignee_id": value},
         )
         return r, None
     target = await mk(env, w, assignee="ba2", title="Цель")
@@ -150,7 +151,7 @@ async def test_owner_without_member_row_is_a_valid_assignee(api_env: ApiEnv) -> 
         w.tok("ba"),
         "POST",
         project_tasks_url(project),
-        {"title": "Владельцу", "assignee_id": str(w.uid("ba2"))},
+        {"title": "Владельцу", **TASK_REQ, "assignee_id": str(w.uid("ba2"))},
     )
 
     assert r.status_code == 201, r.text
@@ -180,25 +181,31 @@ async def test_recipient_check_comes_after_permission_403_for_user(api_env: ApiE
         w.tok("usr"),
         "POST",
         project_tasks_url(w.project_id),
-        {"title": "Т", "assignee_id": str(w.uid("ta"))},
+        {"title": "Т", **TASK_REQ, "assignee_id": str(w.uid("ta"))},
     )
 
     assert error(r) == (403, "forbidden")
 
 
-async def test_assignee_null_is_valid_for_ba_on_create_and_patch(api_env: ApiEnv) -> None:
+async def test_assignee_null_is_valid_for_ba_on_subtask_patch_only(api_env: ApiEnv) -> None:
+    """006/AC-20 (D-4), AC-27 (R6-T14): явный null исполнителя - 422 при создании задачи и при
+    PATCH задачи верхнего уровня (задача не меняется); PATCH подзадачи от БА - 200."""
     env = api_env
     w = await make_api_world(env)
     t = await mk(env, w, assignee="usr")
+    sub = await mk(env, w, assignee="usr", parent=t)
 
     created = await send(
         env,
         w.tok("ba"),
         "POST",
         project_tasks_url(w.project_id),
-        {"title": "Т", "assignee_id": None},
+        {"title": "Т", **TASK_REQ, "assignee_id": None},
     )
-    patched = await send(env, w.tok("ba"), "PATCH", task_url(t), {"assignee_id": None})
+    patched_top = await send(env, w.tok("ba"), "PATCH", task_url(t), {"assignee_id": None})
+    patched_sub = await send(env, w.tok("ba"), "PATCH", task_url(sub), {"assignee_id": None})
 
-    assert created.status_code == 201 and created.json()["assignee"] is None
-    assert patched.status_code == 200 and patched.json()["assignee"] is None
+    assert error(created) == (422, "validation_error")
+    assert error(patched_top) == (422, "validation_error")
+    assert (await task_db(env, t)).assignee_id == w.uid("usr")
+    assert patched_sub.status_code == 200 and patched_sub.json()["assignee"] is None

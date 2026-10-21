@@ -42,16 +42,28 @@
 //       change_assignee -> UserPicker (combobox, доступное имя ru["tasks.col_assignee"], allowedIds = участники
 //                          проекта из GET /projects/{pid}/members, page_size=100); в этом же [data-field="assignee"]
 //                          текущий исполнитель текстом (login / ru["tasks.assignee_none"]); выбор -> PATCH
-//                          {assignee_id: <id>}; button[data-action="clear-assignee"] (виден, если исполнитель
-//                          есть) -> PATCH {assignee_id: null}. Других ключей в этих PATCH нет.
+//                          {assignee_id: <id>}; button[data-action="clear-assignee"] (R6-T12, 006/FR-23, AC-56:
+//                          ТОЛЬКО у подзадачи, т.е. при parent_id !== null, и только если исполнитель есть; у задачи
+//                          верхнего уровня (parent_id === null) кнопки нет никогда, в т.ч. при исполнителе)
+//                          -> PATCH {assignee_id: null}. Других ключей в этих PATCH нет.
 //       edit            -> form[data-form="edit-task"] (ОДНА форма, внутри title input, description, due_date,
 //                          priority и submit ru["tasks.save"]; status/assignee могут быть внутри или снаружи):
 //                          input[name="title"] (в h1), textarea[name="description"], input[type="date"]
-//                          [name="due_date"], select[name="priority"] (base|high), каждый с доступным именем =
+//                          [name="due_date"], select[name="priority"] (low|medium|high), каждый с доступным именем =
 //                          подпись поля. Значения предзаполнены. Submit шлёт PATCH ТОЛЬКО с изменёнными
-//                          полями (title - trim); без изменений запроса нет; очищенный срок -> due_date:null;
-//                          ключа assignee_id/status в этом PATCH нет (UNSET). Пустое название -> запроса
-//                          нет, role="alert" errorMessage("validation_error").
+//                          полями (title - trim); без изменений запроса нет; ключа assignee_id/status в этом PATCH
+//                          нет (UNSET). Пустое название -> запроса нет, role="alert" errorMessage("validation_error").
+//                          R6-T12 (006/FR-23, AC-56; plan §4.8): очищенный срок -> due_date:null ТОЛЬКО у подзадачи.
+//                          У задачи верхнего уровня (parent_id === null) ИЗМЕНЁННЫЕ описание и срок проверяются
+//                          taskDraftErrors: пустое/пробельное описание -> «Введите описание задачи», пустой срок ->
+//                          «Укажите срок», срок раньше «сегодня» по Europe/Moscow -> «Срок не может быть раньше
+//                          сегодняшнего дня»; запроса нет, сообщение - role="alert" рядом с полем, на него указывает
+//                          aria-describedby поля, у поля aria-invalid="true", фокус на первом неверном поле
+//                          (описание, затем срок), ввод сохранён. Неизменённые поля не проверяются (старая задача без
+//                          срока/описания сохраняется одним PATCH только с названием). 422 due_date_in_past от
+//                          PATCH -> то же сообщение у срока, общего alert нет, ввод сохранён. Сообщения снимаются при
+//                          следующем сохранении. У подзадачи проверок нет: PATCH как раньше (due_date:null,
+//                          description:"").
 //       Без edit формы нет вовсе (form[data-form="edit-task"] отсутствует).
 //     delete          -> button[data-action="delete-task"] -> ConfirmDialog (alertdialog, shared/ui);
 //                        confirm -> DELETE /tasks/{id} -> переход на /projects/<project.id>; cancel -> запроса нет.
@@ -77,9 +89,15 @@
 //   (не "0%", FR-22).
 //   Создание: form[data-form="create-subtask"] - только при permissions.create_subtask И parent_id === null
 //   (FR-21); input[name="title"] (label ru["tasks.subtask_title_label"]), submit. POST /tasks/{id}/subtasks
-//   с телом {title (trim)} без ключа assignee_id (FR-20/FR-19b: сервер назначает сам). Пустое название ->
-//   запроса нет, alert validation_error. Успех -> поле очищено, карточка перечитана (подзадача и прогресс
-//   видны). Один POST при двойной отправке. Ошибка -> alert errorMessage(code), ввод сохраняется.
+//   с телом {title (trim)} без ключа assignee_id (FR-20/FR-19b: сервер назначает сам). Успех -> поле очищено
+//   и в фокусе, карточка перечитана (подзадача и прогресс видны). Один POST при двойной отправке.
+//   R6-T05 (006, FR-27/FR-28/FR-29, D-8; заменяет прежнее «alert validation_error» и «alert errorMessage(code)
+//   в общей области» для формы подзадачи - RK-7): сообщения формы подзадачи - ровно один role="alert" ВНУТРИ
+//   section[data-section="subtasks"], в общей области карточки их нет; поле с aria-invalid="true" и
+//   aria-describedby -> id сообщения. Пустое/пробельное название -> запроса нет, «Введите название подзадачи»;
+//   trim().length > 255 -> запроса нет, «Название подзадачи — не более 255 символов» (validation_error форма
+//   подзадачи не показывает). Ошибка сервера/сети -> errorMessage(code) в секции, ввод сохраняется, повтор
+//   шлёт новый запрос. busy защищает только POST (не перечитывание карточки).
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect } from "vitest";
 
@@ -129,7 +147,7 @@ export function sub(id: string, title: string, status = "todo") {
     id,
     title,
     status,
-    priority: "base",
+    priority: "medium",
     due_date: null,
     assignee: null,
   };
@@ -219,3 +237,100 @@ export function setValue(el: Element | null, value: string) {
   fireEvent.change(el!, { target: { value } });
 }
 export { fireEvent, TID2, TID3, ID_KUZNETSOV, taskItem };
+
+// ---- R6-T03: карточка подзадачи и маршрут родителя (только добавлено) ----
+export const PARENT_GET = `GET /api/v1/tasks/${TID2}`;
+export const PARENT_TITLE = "Отчёт за квартал";
+
+/** Карточка подзадачи «Шаг 1» (id = TID1, parent_id = TID2), права как у участника с правкой. */
+export function subCard(over: Record<string, unknown> = {}) {
+  return card({ title: "Шаг 1", parent_id: TID2, ...over });
+}
+
+/** Карточка родителя (id = TID2, верхнего уровня), без прав правки: h1 содержит текст. */
+export function parentCard(over: Record<string, unknown> = {}) {
+  return card({ id: TID2, title: PARENT_TITLE, parent_id: null, permissions: NO_PERMS, ...over });
+}
+
+/** Маршруты карточки подзадачи + чтение родителя (по умолчанию 200) и комментариев родителя. */
+export function subCardRoutes(
+  cardFn: () => Record<string, unknown> = () => subCard(),
+  parentFn: Handler = () => j(200, parentCard()),
+  over: Record<string, Handler> = {},
+): Record<string, Handler> {
+  return cardRoutes(cardFn, {
+    [PARENT_GET]: parentFn,
+    [`GET /api/v1/tasks/${TID2}/comments`]: () => j(200, page([])),
+    ...over,
+  });
+}
+
+// ---- R6-T04: подзадачи подряд (только добавлено) ----
+export interface SubtaskServer {
+  /** Маршруты для openCard: POST подзадачи -> 201, GET карточки -> накопленные подзадачи. */
+  routes: Record<string, Handler>;
+  /** Названия, с которыми пришли POST, в порядке прихода. */
+  posted: string[];
+  /** Следующие GET карточки (после первого) ждут этот шлюз; null - не задерживать. */
+  holdReads: (gate: Promise<unknown> | null) => void;
+}
+
+/** Сеть для сценариев AC-36/AC-37: каждый POST -> 201 и подзадача копится, каждый GET отдаёт накопленное. */
+export function subtaskServer(perms: Record<string, boolean> = ALL_PERMS): SubtaskServer {
+  const subs: ReturnType<typeof sub>[] = [];
+  const posted: string[] = [];
+  let reads = 0;
+  let gate: Promise<unknown> | null = null;
+  const snapshot = () => card({ permissions: perms, subtasks: [...subs], progress: subs.length === 0 ? null : 0 });
+  return {
+    posted,
+    holdReads: (g) => {
+      gate = g;
+    },
+    routes: {
+      [TASK]: async () => {
+        reads += 1;
+        const body = snapshot();
+        if (reads > 1 && gate !== null) await gate;
+        return j(200, body);
+      },
+      [SUB_POST]: async (r) => {
+        const b = (await r.clone().json()) as { title: string };
+        posted.push(b.title);
+        subs.push(sub(`d${subs.length + 1}d${subs.length + 1}d${subs.length + 1}d${subs.length + 1}-0000-4000-8000-00000000000${subs.length + 1}`, b.title));
+        return j(201, card());
+      },
+    },
+  };
+}
+
+/** Поле «Название подзадачи» в карточке. */
+export const subTitleField = (c: ParentNode) => subForm(c)!.querySelector<HTMLInputElement>('input[name="title"]')!;
+/** Названия подзадач в списке, в порядке показа. */
+export const subTitlesShown = (c: ParentNode) =>
+  Array.from(subSection(c)!.querySelectorAll<HTMLElement>('[data-subtask-id] [data-field="title"]')).map((e) => e.textContent);
+
+// ---- R6-T12: правила изменения задачи (только добавлено) ----
+/** Открывает карточку подзадачи (id = TID1, parent_id = TID2) через полный роутер. */
+export async function openSubCardPage(
+  cardFn: () => Record<string, unknown> = () => subCard(),
+  over: Record<string, Handler> = {},
+) {
+  const f = installFetch(subCardRoutes(cardFn, undefined, over));
+  const view = renderApp(`/tasks/${TID1}`);
+  await expectTitle("Шаг 1");
+  return { f, ...view };
+}
+
+/** Кнопка сброса исполнителя на карточке. */
+export const clearAssigneeBtn = (c: ParentNode) => c.querySelector<HTMLButtonElement>('button[data-action="clear-assignee"]');
+
+/** Сообщение (role=alert), на которое указывает aria-describedby поля; null, если такого нет. */
+export function describedMessage(field: Element | null): HTMLElement | null {
+  const ids = (field?.getAttribute("aria-describedby") ?? "").split(/\s+/).filter((x) => x !== "");
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el !== null && el.getAttribute("role") === "alert") return el;
+  }
+  return null;
+}

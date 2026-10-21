@@ -16,6 +16,7 @@ import pytest
 from tests.conftest import ApiEnv
 from tests.tasks_api_support import (
     DETAIL_FIELDS,
+    TASK_REQ,
     error,
     make_api_world,
     mk,
@@ -50,7 +51,7 @@ async def test_ac7_create_subtask_shape_parent_project_status_and_no_position(
     assert body["parent_id"] == str(parent)
     assert body["project"]["id"] == str(w.project_id)
     assert body["status"] == "todo"  # не наследует статус родителя
-    assert body["priority"] == "base"
+    assert body["priority"] == "medium"  # 006/AC-12
     assert body["position"] is None
     assert body["subtasks"] == []
     assert body["progress"] is None
@@ -181,7 +182,11 @@ async def test_user_creates_subtask_to_own_task_for_self_but_not_for_other(
     w = await make_api_world(env)
     parent = (
         await send(
-            env, w.tok("usr"), "POST", f"/api/v1/projects/{w.project_id}/tasks", {"title": "Т"}
+            env,
+            w.tok("usr"),
+            "POST",
+            f"/api/v1/projects/{w.project_id}/tasks",
+            {"title": "Т", **TASK_REQ},
         )
     ).json()["id"]
 
@@ -333,7 +338,8 @@ async def test_ac7_subtask_status_drives_parent_progress(api_env: ApiEnv) -> Non
     await send(env, w.tok("ba"), "PATCH", task_url(ids[0]), {"status": "done"})
     assert (await send(env, w.tok("ba"), "GET", task_url(parent))).json()["progress"] == 33
     await send(env, w.tok("ba"), "PATCH", task_url(ids[1]), {"status": "review"})
-    assert (await send(env, w.tok("ba"), "GET", task_url(parent))).json()["progress"] == 33
+    # AC-43 (006): Выполнена + На проверке + К выполнению = 150 // 3 = 50 (раньше 33)
+    assert (await send(env, w.tok("ba"), "GET", task_url(parent))).json()["progress"] == 50
     await send(env, w.tok("ba"), "PATCH", task_url(ids[1]), {"status": "done"})
     await send(env, w.tok("ba"), "PATCH", task_url(ids[2]), {"status": "done"})
     assert (await send(env, w.tok("ba"), "GET", task_url(parent))).json()["progress"] == 100

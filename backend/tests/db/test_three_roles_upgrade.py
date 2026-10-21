@@ -21,6 +21,7 @@ from sqlalchemy import text
 from tests.db_support import BACKEND_DIR
 from tests.upgrade002_support import (
     FAILURE_MARK,
+    HEAD_REVISION,
     PREFIX,
     alembic_ok,
     alembic_versions,
@@ -145,7 +146,7 @@ async def _assert_ac20_result(
     t0: datetime,
     t1: datetime,
 ) -> None:
-    assert await alembic_versions(env) == ["0006"]
+    assert await alembic_versions(env) == [HEAD_REVISION]
     roles = await roles_by_login(env)
     assert roles == _expected_roles(w, {"m1": None, "m2": None, "m3": None})
     await _assert_journal_added(
@@ -225,7 +226,7 @@ async def test_002_ac20_ownership_membership_assignee_author_block_otp_session(
     sessions = await env.execute(text("SELECT id, user_id FROM user_session"))
     assert sessions is not None
     assert [(bytes(r.id), r.user_id) for r in sessions] == [(session_id, m1)]
-    assert await alembic_versions(env) == ["0006"]
+    assert await alembic_versions(env) == [HEAD_REVISION]
 
 
 @pytest.mark.committed
@@ -238,7 +239,7 @@ async def test_002_ac20_migration_record_equals_manual_role_removed_record(
     env = committed_api_env
     w, _ = await make_ac20_world(env)
     await to_head(env)
-    assert await alembic_versions(env) == ["0006"]
+    assert await alembic_versions(env) == [HEAD_REVISION]
     migrated = [r for r in await audit_rows(env) if r.entity_id == w.uid("m1")][-1]
     assert migrated.action == "user.role_removed"
 
@@ -332,7 +333,7 @@ async def test_002_ac21_no_mixed_users_no_records_roles_unchanged(
 
     await to_head(env)
 
-    assert await alembic_versions(env) == ["0006"]
+    assert await alembic_versions(env) == [HEAD_REVISION]
     assert [tuple(r) for r in await audit_rows(env)] == [tuple(r) for r in before]
     assert await roles_by_login(env) == roles_before
     assert await data_fingerprint(env) == fingerprint
@@ -364,7 +365,7 @@ async def test_002_ac21_restart_after_upgrade_changes_nothing(committed_api_env:
         env.sessionmaker, env.settings, clock=env.clock, generate=lambda: "Zq7Lm2Vx9BootstrapPw"
     )
 
-    assert await alembic_versions(env) == ["0006"]
+    assert await alembic_versions(env) == [HEAD_REVISION]
     assert [tuple(r) for r in await audit_rows(env)] == [tuple(r) for r in journal]
     assert await roles_by_login(env) == roles
     assert await data_fingerprint(env, skip_updated=mixed_ids(w)) == fingerprint
@@ -390,7 +391,7 @@ async def test_002_ac22_no_active_tech_admin_active_former_mixed_become_tech_adm
     await to_head(env)
     t1 = await db_now(env)
 
-    assert await alembic_versions(env) == ["0006"]
+    assert await alembic_versions(env) == [HEAD_REVISION]
     assert await roles_by_login(env) == _expected_roles(
         w, {"m1": "tech_admin", "m2": None, "m3": "tech_admin"}
     )
@@ -438,7 +439,7 @@ async def test_002_ac22_active_tech_admin_with_unchanged_otp_means_roles_are_jus
     await to_head(env)
     t1 = await db_now(env)
 
-    assert await alembic_versions(env) == ["0006"]
+    assert await alembic_versions(env) == [HEAD_REVISION]
     assert await roles_by_login(env) == _expected_roles(w, {"m1": None, "m2": None, "m3": None})
     await _assert_journal_added(
         env,
@@ -557,7 +558,7 @@ async def test_002_ac22_migration_record_equals_manual_role_changed_record(
     env = committed_api_env
     w, _ = await make_ac22_world(env, with_active_ta=False)
     await to_head(env)
-    assert await alembic_versions(env) == ["0006"]
+    assert await alembic_versions(env) == [HEAD_REVISION]
     migrated = [r for r in await audit_rows(env) if r.entity_id == w.uid("m1")][-1]
     assert migrated.action == "user.role_changed"
 
@@ -643,7 +644,7 @@ async def test_002_ac2_upgraded_database_rejects_mixed_and_accepts_three_roles_a
     env = committed_api_env
     w, _ = await make_ac20_world(env)
     await to_head(env)
-    assert await alembic_versions(env) == ["0006"]
+    assert await alembic_versions(env) == [HEAD_REVISION]
     definition = await _check_def(env)
     assert "mixed" not in definition
     assert set(re.findall(r"'([a-z_]+)'", definition)) == {"tech_admin", "business_admin", "user"}

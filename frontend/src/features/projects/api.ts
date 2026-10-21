@@ -78,6 +78,16 @@ export async function listMembers(id: string, p: PageParams): Promise<Page<Proje
   return data;
 }
 
+/** Все участники проекта: страницы по 100 до has_next (006 PD-15). */
+export async function listAllMembers(projectId: string): Promise<ProjectMember[]> {
+  const all: ProjectMember[] = [];
+  for (let page = 1; ; page += 1) {
+    const chunk = await listMembers(projectId, { page, pageSize: CREATABLE_PAGE_SIZE });
+    all.push(...chunk.items);
+    if (!chunk.has_next) return all;
+  }
+}
+
 export async function addMember(id: string, userId: string): Promise<void> {
   await getAppClient().POST("/api/v1/projects/{project_id}/members", {
     params: { path: { project_id: id } },

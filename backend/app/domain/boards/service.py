@@ -80,6 +80,9 @@ async def get_board(db: AsyncSession, actor: Actor, project_id: UUID) -> BoardVi
             Task.parent_id.label("parent_id"),
             func.count().label("total"),
             func.count().filter(Task.status == TaskStatus.DONE.value).label("done"),
+            func.count()
+            .filter(Task.status.in_((TaskStatus.IN_PROGRESS.value, TaskStatus.REVIEW.value)))
+            .label("in_work"),
         )
         .where(
             Task.project_id == project_id,
@@ -103,6 +106,7 @@ async def get_board(db: AsyncSession, actor: Actor, project_id: UUID) -> BoardVi
                 Task.position,
                 func.coalesce(subs.c.total, 0).label("total"),
                 func.coalesce(subs.c.done, 0).label("done"),
+                func.coalesce(subs.c.in_work, 0).label("in_work"),
             )
             .outerjoin(subs, subs.c.parent_id == Task.id)
             .where(
@@ -133,7 +137,7 @@ async def get_board(db: AsyncSession, actor: Actor, project_id: UUID) -> BoardVi
                 assignee=None if r.assignee_id is None else refs[r.assignee_id],
                 position=int(r.position),
                 subtask_count=int(r.total),
-                progress=progress(int(r.done), int(r.total)),
+                progress=progress(done=int(r.done), in_work=int(r.in_work), total=int(r.total)),
             )
         )
     return BoardView(

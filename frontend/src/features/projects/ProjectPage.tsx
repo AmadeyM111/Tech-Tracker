@@ -12,7 +12,7 @@ import {
   changeOwner,
   deleteProject,
   getProject,
-  listMembers,
+  listAllMembers,
   removeMember,
   updateProject,
   type ProjectDetail,
@@ -31,18 +31,6 @@ const TAB_LABELS: Record<TabId, MessageKey> = {
   members: "projects.tab_members",
 };
 
-const MEMBERS_PAGE_SIZE = 100;
-
-/** All members of the project: the pages are read one after another by `has_next`. */
-async function listAllMembers(projectId: string): Promise<ProjectMember[]> {
-  const all: ProjectMember[] = [];
-  for (let page = 1; ; page += 1) {
-    const chunk = await listMembers(projectId, { page, pageSize: MEMBERS_PAGE_SIZE });
-    all.push(...chunk.items);
-    if (!chunk.has_next) return all;
-  }
-}
-
 const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : "unknown");
 
 /** An id that is not a uuid is answered with 422: for the user it is "no such project". */
@@ -57,9 +45,11 @@ function roleText(role: ProjectMember["role"]): string {
 
 export function ProjectPage({
   currentUserId,
+  currentLogin,
   currentRole = null,
 }: {
   currentUserId: string;
+  currentLogin: string;
   /** Role of the current user from /me (decides whether an assignee may be chosen). */
   currentRole?: string | null;
 }) {
@@ -75,6 +65,7 @@ export function ProjectPage({
         key={project.data.id}
         project={project.data}
         currentUserId={currentUserId}
+        currentLogin={currentLogin}
         currentRole={currentRole}
       />
     );
@@ -96,10 +87,12 @@ type Confirmation = "delete" | "leave";
 function ProjectCard({
   project,
   currentUserId,
+  currentLogin,
   currentRole,
 }: {
   project: ProjectDetail;
   currentUserId: string;
+  currentLogin: string;
   currentRole: string | null;
 }) {
   const baseId = useId();
@@ -335,6 +328,7 @@ function ProjectCard({
             members={all}
             canCreate={permissions.create_task}
             actorRole={currentRole}
+            currentUser={{ id: currentUserId, login: currentLogin }}
           />
         ) : null}
         {tab === "members" ? (

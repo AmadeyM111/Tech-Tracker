@@ -23,6 +23,7 @@ from app.core.config import get_settings
 from tests.conftest import FIXED_NOW
 from tests.db_support import ALEMBIC_INI
 from tests.upgrade002_support import (
+    HEAD_REVISION,
     alembic_versions,
     audit_rows,
     db_now,
@@ -59,10 +60,18 @@ async def _snapshot(env: ApiEnv) -> dict[str, Any]:
     snap: dict[str, Any] = {"app_user": [tuple(r) for r in users]}
     for table in SNAPSHOT_TABLES:
         order = "t.project_id, t.user_id" if table == "project_member" else "t.id"
+        # 006/PD-18: у task приоритет приводится по FR-10 (base -> medium), остальное - побайтно
+        row_text = (
+            "(to_jsonb(t) || jsonb_build_object('priority', "
+            "CASE t.priority WHEN 'base' THEN 'medium' ELSE t.priority END))::text"
+            if table == "task"
+            else "t::text"
+        )
         rows = await env.execute(
             text(
                 f"SELECT count(*) AS n, "  # noqa: S608
-                f"coalesce(md5(string_agg(t::text, '|' ORDER BY {order})), '') AS h FROM {table} t"
+                f"coalesce(md5(string_agg({row_text}, '|' ORDER BY {order})), '') AS h "
+                f"FROM {table} t"
             )
         )
         assert rows is not None
@@ -105,6 +114,8 @@ async def _build_previous_version_installation(
     with monkeypatch.context() as mp:
         mp.setattr(demo, "_USERS", previous_users)
         mp.setattr(demo, "_ALL_PROJECTS_BA", FORMER_MIXED)
+        # 006/PD-18: в прежней версии обычный приоритет демо-задач - base
+        mp.setattr(demo, "_REGULAR_PRIORITY", "base")
         await demo.load_demo_data(env.sessionmaker, settings, clock=clock, seed=1)
 
     passwords = {"admin": FIRST_ADMIN_PASSWORD}
@@ -196,7 +207,7 @@ async def test_002_ac30_demo_installation_upgrade_by_operator_bootstrap(
     assert code == 0, "gostracker bootstrap завершился с ошибкой"
 
     # --- версия схемы и роли ---
-    assert await alembic_versions(env) == ["0006"]
+    assert await alembic_versions(env) == [HEAD_REVISION]
     roles_after = await roles_by_login(env)
     assert roles_after[FORMER_MIXED] is None, "demo.mixed без роли"
     assert roles_after[FORMER_MIXED] != "tech_admin"

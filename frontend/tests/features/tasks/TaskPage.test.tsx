@@ -30,6 +30,9 @@ import {
   f_,
   j,
   openCard,
+  openSubCardPage,
+  clearAssigneeBtn,
+  subCard,
   page,
   prioritySelect,
   setValue,
@@ -285,21 +288,24 @@ describe("edit form sends only changed fields (FR-18, AC-46)", () => {
     const { container, f } = await openCard(() => card(), { [PATCH]: () => j(200, card()) });
     const form = editForm(container)!;
     setValue(descArea(), "Другое");
-    setValue(dueInput(), "2027-01-15");
-    setValue(prioritySelect(), "base");
+    setValue(dueInput(), "2099-01-15");
+    setValue(prioritySelect(), "medium");
     fireEvent.submit(form);
     await waitCount(f, PATCH, 1);
     const b = await bodyOf(f.last(PATCH));
-    expect(b).toEqual({ description: "Другое", due_date: "2027-01-15", priority: "base" });
+    expect(b).toEqual({ description: "Другое", due_date: "2099-01-15", priority: "medium" });
     expect("assignee_id" in b).toBe(false);
     expect("status" in b).toBe(false);
   });
 
-  it("fr18_cleared_due_date_is_sent_as_null", async () => {
-    const { container, f } = await openCard(() => card(), { [PATCH]: () => j(200, card({ due_date: null })) });
-    const form = editForm(container)!;
+  // R6-T12 (006/AC-56, FR-23): очистка срока -> due_date:null теперь только у подзадачи; у задачи верхнего уровня
+  // та же правка блокируется (TaskPageRules006.test.tsx::006_ac56_cleared_due_*). Тест перенесён, не ослаблен.
+  it("fr18_cleared_due_date_of_subtask_is_sent_as_null", async () => {
+    const { container, f } = await openSubCardPage(() => subCard(), {
+      [PATCH]: () => j(200, subCard({ due_date: null })),
+    });
     setValue(dueInput(), "");
-    fireEvent.submit(form);
+    fireEvent.submit(editForm(container)!);
     await waitCount(f, PATCH, 1);
     expect(await bodyOf(f.last(PATCH))).toEqual({ due_date: null });
   });
@@ -417,12 +423,22 @@ describe("assignee: UNSET vs null (FR-19a, AC-46)", () => {
     expect(await bodyOf(f.last(PATCH))).toEqual({ assignee_id: ID_KUZNETSOV });
   });
 
-  it("ac46_clear_assignee_sends_explicit_null", async () => {
-    const { container, f } = await openCard(() => card(), { [PATCH]: () => j(200, card({ assignee: null })) });
-    fireEvent.click(container.querySelector('button[data-action="clear-assignee"]')!);
+  // R6-T12 (006/AC-56): кнопка сброса есть только у подзадачи; тест перенесён на карточку подзадачи.
+  it("ac46_clear_assignee_of_subtask_sends_explicit_null", async () => {
+    const { container, f } = await openSubCardPage(() => subCard(), {
+      [PATCH]: () => j(200, subCard({ assignee: null })),
+    });
+    fireEvent.click(clearAssigneeBtn(container)!);
     await waitCount(f, PATCH, 1);
     expect(await bodyOf(f.last(PATCH))).toEqual({ assignee_id: null });
     await waitFor(() => expect(f_(container, "assignee")!.textContent).toContain(ru["tasks.assignee_none"]));
+  });
+
+  // AC-56 (первый пункт) / FR-23: у задачи верхнего уровня с исполнителем кнопки сброса нет.
+  it("006_ac56_top_level_task_with_assignee_has_no_clear_button", async () => {
+    const { container } = await openCard(() => card());
+    expect(f_(container, "assignee")!.textContent).toContain("kuznetsov");
+    expect(clearAssigneeBtn(container)).toBeNull();
   });
 
   it("ac46_clear_button_absent_when_no_assignee", async () => {
@@ -443,14 +459,14 @@ describe("polling (FR-29, NFR-6)", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let n = 0;
     const { f } = await openCard(() =>
-      n++ === 0 ? card() : card({ title: "Серверное имя", description: "Серверное описание", priority: "base" }),
+      n++ === 0 ? card() : card({ title: "Серверное имя", description: "Серверное описание", priority: "medium" }),
     );
     setValue(titleInput(), "Мой черновик");
     expect(f.last(TASK).headers.get("X-GT-Background")).toBeNull();
     await vi.advanceTimersByTimeAsync(15_000);
     await waitFor(() => expect(f.last(TASK).headers.get("X-GT-Background")).toBe("1"));
     await waitFor(() => expect(descArea()!.value).toBe("Серверное описание"));
-    expect(prioritySelect()!.value).toBe("base");
+    expect(prioritySelect()!.value).toBe("medium");
     expect(titleInput()!.value).toBe("Мой черновик");
   });
 
@@ -542,11 +558,12 @@ describe("T84 review gaps", () => {
     expect(document.activeElement).toBe(statusSelect());
   });
 
+  // R6-T12: перенесён на карточку подзадачи (у задачи верхнего уровня кнопки нет, AC-56).
   it("a11y_clear_assignee_moves_focus_to_assignee_picker", async () => {
-    const { container, f } = await openCard(() => card(), {
-      [PATCH]: () => j(200, card({ assignee: null })),
+    const { container, f } = await openSubCardPage(() => subCard(), {
+      [PATCH]: () => j(200, subCard({ assignee: null })),
     });
-    const btn = container.querySelector<HTMLButtonElement>('button[data-action="clear-assignee"]')!;
+    const btn = clearAssigneeBtn(container)!;
     btn.focus();
     fireEvent.click(btn);
     await waitCount(f, PATCH, 1);
@@ -628,14 +645,14 @@ describe("T84 review gaps", () => {
   });
 
   it("m01_patch_omits_title_when_edited_back_to_original", async () => {
-    const { container, f } = await openCard(() => card(), { [PATCH]: () => j(200, card({ priority: "base" })) });
+    const { container, f } = await openCard(() => card(), { [PATCH]: () => j(200, card({ priority: "medium" })) });
     const form = editForm(container)!;
     setValue(titleInput(), "Черновик");
     setValue(titleInput(), "Подготовить отчёт");
-    setValue(prioritySelect(), "base");
+    setValue(prioritySelect(), "medium");
     fireEvent.submit(form);
     await waitCount(f, PATCH, 1);
-    expect(await bodyOf(f.last(PATCH))).toEqual({ priority: "base" });
+    expect(await bodyOf(f.last(PATCH))).toEqual({ priority: "medium" });
   });
 
   it("m12_load_422_is_shown_as_not_found_single_alert_without_forms", async () => {

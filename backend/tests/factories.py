@@ -297,7 +297,7 @@ async def make_task(
     title: str = "Задача",
     description: str = "",
     status: str = "todo",
-    priority: str = "base",
+    priority: str = "medium",
     due_date: date | None = None,
     assignee_id: uuid.UUID | None = None,
     position: int | None | object = _UNSET,

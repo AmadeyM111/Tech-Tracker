@@ -45,6 +45,7 @@ __all__ = [
     "PAGE_FIELDS",
     "PERM_FIELDS",
     "TASKS",
+    "TASK_REQ",
     "USER_REF_FIELDS",
     "ApiWorld",
     "Person",
@@ -68,6 +69,9 @@ __all__ = [
 ]
 
 TASKS = "/api/v1/tasks"
+# 006/FR-15, FR-16: обязательные поля создания задачи верхнего уровня. Срок - «сегодня» по
+# Москве при ``fixed_clock`` по умолчанию (2026-10-13T09:00Z); тесты со сдвигом часов берут свой.
+TASK_REQ = {"description": "Описание", "due_date": "2026-10-13"}
 ME_TASKS = "/api/v1/me/tasks"
 ALL_STATUSES = ("todo", "in_progress", "review", "done")
 

@@ -1,47 +1,62 @@
-"""T73: прогресс подзадач, чистая функция (plan §4.8/progress.py; FR-22, AC-7).
+"""Прогресс подзадач, чистая функция (plan 006 §4.3, PD-10; spec 006 FR-30, AC-43).
 
-Ожидаемый интерфейс: ``app.domain.tasks.progress.progress(done: int, total: int) -> int | None``.
+Интерфейс: ``app.domain.tasks.progress.progress(*, done, in_work, total) -> int | None``
+= ``(100*done + 50*in_work) // total``; ``None`` при ``total == 0``.
 """
 
 from __future__ import annotations
+
+import inspect
 
 import pytest
 
 from app.domain.tasks.progress import progress
 
 
-def test_ac7_no_subtasks_progress_is_none_not_zero() -> None:
-    """FR-22: нет подзадач (0/0) — None, а не 0."""
-    assert progress(0, 0) is None
+def test_ac43_no_subtasks_progress_is_none_not_zero() -> None:
+    """FR-30: нет подзадач (total=0) - None, а не 0."""
+    assert progress(done=0, in_work=0, total=0) is None
 
 
-def test_ac7_one_of_three_done_is_33_rounded_down() -> None:
-    """AC-7: 1 из 3 — 33 (округление вниз)."""
-    assert progress(1, 3) == 33
+def test_pd10_counters_are_keyword_only() -> None:
+    """PD-10: ключевые аргументы исключают перепутывание счётчиков."""
+    params = inspect.signature(progress).parameters
+    assert list(params) == ["done", "in_work", "total"]
+    assert all(p.kind is inspect.Parameter.KEYWORD_ONLY for p in params.values())
+    with pytest.raises(TypeError):
+        progress(1, 0, 3)  # type: ignore[misc]
 
 
 @pytest.mark.parametrize(
-    ("done", "total", "expected"),
+    ("done", "in_work", "total", "expected"),
     [
-        (2, 3, 66),
-        (3, 3, 100),
-        (0, 4, 0),
-        (1, 1, 100),
-        (1, 7, 14),
-        (6, 7, 85),
-        (199, 200, 99),
-        (1, 1000, 0),
+        # таблица AC-43 (todo ×N -> 0 в счётчиках не участвует)
+        (0, 0, 3, 0),  # К выполнению ×3
+        (0, 1, 3, 16),  # В работе, К выполнению ×2
+        (0, 1, 3, 16),  # На проверке, К выполнению ×2
+        (1, 0, 3, 33),  # Выполнена, К выполнению ×2
+        (1, 2, 3, 66),  # В работе, На проверке, Выполнена
+        (2, 1, 3, 83),  # Выполнена ×2, На проверке
+        (0, 3, 3, 50),  # В работе ×3
+        (1, 1, 2, 75),  # На проверке, Выполнена
+        (0, 1, 1, 50),  # одна подзадача на проверке
+        (3, 0, 3, 100),  # Выполнена ×3
+        # округление вниз
+        (1, 0, 7, 14),
+        (6, 0, 7, 85),
+        (199, 0, 200, 99),
+        (0, 1, 1000, 0),
     ],
 )
-def test_fr22_floor_percent(done: int, total: int, expected: int) -> None:
-    result = progress(done, total)
+def test_ac43_weights_100_50_0_floor(done: int, in_work: int, total: int, expected: int) -> None:
+    result = progress(done=done, in_work=in_work, total=total)
     assert result == expected
     assert isinstance(result, int)
     assert not isinstance(result, bool)
 
 
-def test_fr22_zero_done_with_subtasks_is_zero_not_none() -> None:
-    """Есть подзадачи, ни одна не готова — 0 (отличается от None)."""
-    result = progress(0, 5)
+def test_fr30_zero_with_subtasks_is_zero_not_none() -> None:
+    """Есть подзадачи, все «К выполнению» - 0 (отличается от None)."""
+    result = progress(done=0, in_work=0, total=5)
     assert result == 0
     assert result is not None

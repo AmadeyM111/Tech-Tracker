@@ -333,3 +333,53 @@ describe("T103 review follow-ups", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 });
+
+// 006-bugreport-ch1, R6-T02 (AC-2, AC-6): «глазки» в окне, открытом через роутер.
+describe("006 password reveal in the modal", () => {
+  it("ac2_ac6_dialog_buttons_are_exactly_eyes_submit_and_logout_in_tab_order", async () => {
+    const { dialog } = await openDialog();
+    const buttons = Array.from(dialog.querySelectorAll("button"));
+    const label = (b: HTMLElement) => b.getAttribute("aria-label") ?? b.textContent?.trim();
+    expect(buttons.map(label)).toEqual([
+      "Показать текущий пароль",
+      "Показать новый пароль",
+      "Показать повтор нового пароля",
+      ru["auth.change_password_submit"],
+      ru["auth.logout"],
+    ]);
+    expect(buttons.slice(0, 3).map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "false", "false"]);
+    const cur = input(dialog, "current-password");
+    const n0 = input(dialog, "new-password", 0);
+    const n1 = input(dialog, "new-password", 1);
+    expect(focusables(dialog)).toEqual([cur, buttons[0], n0, buttons[1], n1, buttons[2], buttons[3], buttons[4]]);
+  });
+
+  it("ac6_tab_wraps_from_logout_to_current_password_and_shift_tab_back", async () => {
+    const { dialog } = await openDialog();
+    const items = focusables(dialog);
+    expect(items).toHaveLength(8);
+    const last = items[7]!;
+    last.focus();
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(document.activeElement).toBe(input(dialog, "current-password"));
+    fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
+  it("ac7_server_422_hides_all_three_fields_and_keeps_values", async () => {
+    installFetch({ [ME]: FORCED, [PWD]: () => err(422, "password_too_common") });
+    renderApp("/change-password");
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(input(dialog, "current-password"), { target: { value: OLD } });
+    fireEvent.change(input(dialog, "new-password", 0), { target: { value: NEW } });
+    fireEvent.change(input(dialog, "new-password", 1), { target: { value: NEW } });
+    for (const b of dialog.querySelectorAll<HTMLElement>("button[aria-pressed]")) fireEvent.click(b);
+    expect(input(dialog, "current-password").type).toBe("text");
+    fireEvent.click(within(dialog).getByRole("button", { name: ru["auth.change_password_submit"] }));
+    expect((await screen.findByRole("alert")).textContent).toContain(ru["error.password_too_common"]);
+    expect(input(dialog, "current-password").type).toBe("password");
+    expect(input(dialog, "new-password", 0).type).toBe("password");
+    expect(input(dialog, "new-password", 1).type).toBe("password");
+    expect(input(dialog, "new-password", 0).value).toBe(NEW);
+  });
+});

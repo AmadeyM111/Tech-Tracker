@@ -32,3 +32,13 @@ export function ErrorAlert({ message, seq = 0 }: { message: string | null; seq?:
     </p>
   );
 }
+
+/** Message next to a field: role="alert", never takes focus (006/FR-19, FR-28). */
+export function FieldError({ id, message }: { id: string; message: string | null }) {
+  if (message === null) return null;
+  return (
+    <p id={id} role="alert" className="ui-error">
+      {message}
+    </p>
+  );
+}

@@ -11,6 +11,10 @@
 ``World.users`` - короткое имя из spec (``"m1"``).
 
 Сбой AC-29 внедряется триггерами БД (plan D-8), в коде поставки крючков нет.
+
+006/PD-18: данные «предыдущей версии» (схема 0005) пишутся с приоритетом ``base`` явно (CHECK
+схемы 0005 другого значения не принимает), а отпечаток таблицы ``task`` приводит приоритет по
+FR-10 (``base`` -> ``medium``) в обоих снимках; остальные поля сравниваются побайтно.
 """
 
 from __future__ import annotations
@@ -36,6 +40,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "FAILURE_MARK",
+    "HEAD_REVISION",
     "PREFIX",
     "World",
     "alembic_ok",
@@ -59,6 +64,7 @@ __all__ = [
 ]
 
 PREFIX = "u002."
+HEAD_REVISION = "0007"  # голова цепочки миграций (006: три приоритета)
 FAILURE_MARK = "gt_test_injected_failure"
 _FAIL_FUNCTION = "gt_test_fail_0006"
 _PAST = datetime(2026, 10, 1, 8, 0, 0, tzinfo=UTC)
@@ -286,6 +292,7 @@ async def _project_data(
             created_by=task_author.id,
             assignee_id=task_assignee.id,
             title="T2",
+            priority="base",  # 006/PD-18: схема 0005 принимает только base/high
         )
         c = await make_comment(
             s, task_id=t2.id, workspace_id=ws.id, created_by=comment_author.id, body="c"
@@ -430,8 +437,15 @@ async def data_fingerprint(
     ``updated_at``, plan §4.5; их ``updated_at`` проверяется отдельно)."""
     result: dict[str, list[str]] = {}
     for table in UNTOUCHED_TABLES:
+        # 006/PD-18: приоритет задачи приводится по FR-10 (base -> medium), остальное - побайтно
+        row_text = (
+            "(to_jsonb(t) || jsonb_build_object('priority', "
+            "CASE t.priority WHEN 'base' THEN 'medium' ELSE t.priority END))::text"
+            if table == "task"
+            else "t::text"
+        )
         rows = await env.execute(
-            text(f"SELECT t::text FROM {table} t ORDER BY t::text")  # noqa: S608
+            text(f"SELECT {row_text} AS r FROM {table} t ORDER BY 1")  # noqa: S608
         )
         assert rows is not None
         result[table] = [str(r[0]) for r in rows]

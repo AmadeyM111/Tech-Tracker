@@ -21,6 +21,9 @@ export function ChangePasswordPage() {
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [pending, setPending] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNext, setShowNext] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     currentRef.current?.focus();
@@ -28,6 +31,9 @@ export function ChangePasswordPage() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    setShowCurrent(false);
+    setShowNext(false);
+    setShowConfirm(false);
     if (busy.current) return;
     if (current === "" || next === "" || confirm === "") {
       alert.show(errorMessage("validation_error"));
@@ -99,6 +105,7 @@ export function ChangePasswordPage() {
             autoComplete="current-password"
             inputRef={currentRef}
             disabled={busyAny}
+            reveal={{ label: t("auth.show_current_password"), shown: showCurrent, onToggle: () => setShowCurrent((v) => !v) }}
           />
           <TextField
             label={t("auth.new_password_label")}
@@ -108,6 +115,7 @@ export function ChangePasswordPage() {
             autoComplete="new-password"
             hint={t("auth.password_min_length_hint", { min: PASSWORD_MIN_LENGTH })}
             disabled={busyAny}
+            reveal={{ label: t("auth.show_new_password"), shown: showNext, onToggle: () => setShowNext((v) => !v) }}
           />
           <TextField
             label={t("auth.confirm_password_label")}
@@ -116,6 +124,7 @@ export function ChangePasswordPage() {
             onChange={setConfirm}
             autoComplete="new-password"
             disabled={busyAny}
+            reveal={{ label: t("auth.show_confirm_password"), shown: showConfirm, onToggle: () => setShowConfirm((v) => !v) }}
           />
           <button type="submit" disabled={busyAny}>
             {t("auth.change_password_submit")}

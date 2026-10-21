@@ -451,6 +451,7 @@ def test_t04_error_code_is_str_enum_with_catalog() -> None:
         "account_deleted",
         "permanent_delete_not_allowed",
         "search_query_too_short",
+        "due_date_in_past",  # 006/D-5, plan PD-9
     }
     for name in names:
         assert ErrorCode[name].value == name

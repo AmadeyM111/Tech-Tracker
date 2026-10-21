@@ -15,7 +15,7 @@ AC-106, AC-108, AC-109; FR-18...FR-21, FR-28a; заметки ревью T69/T70
         UNSET                     # сентинел «исполнитель не передан»
         @dataclass(frozen=True) TaskCreateData(title: str, description: str = "",
             assignee: UUID | None | Unset = UNSET, due_date: date | None = None,
-            priority: TaskPriority | str = "base")
+            priority: TaskPriority | str = "medium")
         create_task(db, actor, project_id, data: TaskCreateData) -> UUID
         create_subtask(db, actor, parent_id, data: TaskCreateData) -> UUID
 
@@ -73,7 +73,16 @@ def ctx_mod() -> Any:
     return module
 
 
+# 006/FR-15, FR-16: задача верхнего уровня создаётся с описанием и сроком не раньше «сегодня».
+# ``fixed_clock`` (2026-10-13T09:00Z) задаёт «сегодня» по Москве = 2026-10-13, чтобы результат не
+# зависел от реальной даты.
+pytestmark = pytest.mark.usefixtures("fixed_clock")
+TODAY = date(2026, 10, 13)
+
+
 def _data(svc: Any, title: str = "Задача", **kw: Any) -> Any:
+    kw.setdefault("description", "Описание")
+    kw.setdefault("due_date", TODAY)
     return svc.TaskCreateData(title=title, **kw)
 
 
@@ -241,18 +250,26 @@ async def test_ac9_user_assigns_self_ok_other_403(db: AsyncSession, svc: Any) ->
 
 
 @pytest.mark.parametrize("who", ["ba", "ba3"])
-async def test_ac56_ba_owner_and_ba_member_without_assignee_gets_null(
+async def test_ac56_ba_owner_and_ba_member_without_assignee_gets_self(
     db: AsyncSession, svc: Any, who: str
 ) -> None:
+    """006/AC-19, AC-20 (D-4); раньше (001/AC-56) БА без исполнителя и с None получал None."""
     w = await make_world(db)
     await add_member_row(db, w, w.project_id, w.ba3)
     await db.commit()
     actor = actor_of(getattr(w, who))
-    for data in (_data(svc), _data(svc, assignee=None)):
-        tid = await svc.create_task(db, actor, w.project_id, data)
-        row = await task_row(db, tid)
-        assert row.assignee_id is None
-        assert row.created_by == actor.user_id
+
+    tid = await svc.create_task(db, actor, w.project_id, _data(svc))
+    row = await task_row(db, tid)
+    assert row.assignee_id == actor.user_id
+    assert row.created_by == actor.user_id
+    await db.commit()  # fails() делает rollback: созданную задачу сохраняем
+    await fails(
+        db,
+        svc.create_task(db, actor, w.project_id, _data(svc, assignee=None)),
+        "validation_error",
+    )
+    assert await _count_tasks(db, w.project_id) == 1
 
 
 @pytest.mark.parametrize("who", ["ba", "ba3", "ba2"])
@@ -419,12 +436,12 @@ async def test_ac24_ac49_fr28a_insert_defaults(db: AsyncSession, svc: Any) -> No
     tid = await svc.create_task(db, actor_of(w.ba), w.project_id, _data(svc, "Новая"))
     row = await task_row(db, tid)
     assert row.status == "todo"  # AC-24
-    assert row.priority == "base"  # AC-49
+    assert row.priority == "medium"  # AC-49, 006/AC-12
     assert row.position == 1024  # пустая колонка
     assert row.title == "Новая"
-    assert row.description == ""
-    assert row.due_date is None
-    assert row.assignee_id is None
+    assert row.description == "Описание"  # 006/FR-15: обязательное, из _data
+    assert row.due_date == TODAY  # 006/FR-16
+    assert row.assignee_id == w.ba.id  # 006/FR-17, D-4: не передан - создатель (было None)
     assert row.parent_id is None
     assert row.created_by == w.ba.id
     assert row.workspace_id == w.ws.id
@@ -443,7 +460,7 @@ async def test_ac49_priority_high_saved_invalid_422(db: AsyncSession, svc: Any) 
     assert row.priority == "high"
     assert row.due_date == date(2026, 10, 20)
     await db.commit()
-    for bad in ("urgent", "", "HIGH", 1):
+    for bad in ("urgent", "", "HIGH", "base", 1):
         await fails(
             db,
             svc.create_task(db, actor_of(w.ba), w.project_id, _data(svc, priority=bad)),
@@ -529,7 +546,7 @@ async def test_ac108_ac68_create_task_invalid_input_is_422(
     w = await make_world(db)
     await fails(
         db,
-        svc.create_task(db, actor_of(w.ba), w.project_id, svc.TaskCreateData(**bad)),
+        svc.create_task(db, actor_of(w.ba), w.project_id, _data(svc, **bad)),
         "validation_error",
     )
     assert await _count_tasks(db, w.project_id) == 0

@@ -149,9 +149,37 @@ select:disabled {
   margin-bottom: 12px;
 }
 
+/* 006 (plan 4.4): password field with a show/hide button right after it. */
+.ui-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ui-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ui-reveal {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 4px 10px;
+}
+
+.ui-reveal .ui-icon {
+  margin-right: 0;
+}
+
 .ui-hint {
   color: var(--text-muted);
   font-size: 1.125rem;
+}
+
+/* 006 (PD-12): visible mark of a required field. */
+.ui-required {
+  color: var(--danger);
+  margin-left: 4px;
 }
 
 .ui-error {

@@ -44,6 +44,8 @@ const API_CODES = [
   "invalid_neighbors",
   "project_deleted",
   "parent_task_deleted",
+  // 006 (FR-21): срок в прошлом при создании
+  "due_date_in_past",
 ];
 const CLIENT_CODES = ["network_error", "invalid_response"];
 // Коды из общего обработчика HTTP-ошибок backend (core/errors.py, _HTTP_STATUS_MAP).
@@ -561,5 +563,65 @@ describe("no UI strings outside the dictionary (AC-98, NFR-6)", () => {
     );
     expect(ruPath).toBeDefined();
     expect(CYRILLIC.test(files[ruPath!]!)).toBe(true);
+  });
+});
+
+describe("006 R6-T10 dictionary keys (PD-12, PD-13, FR-21)", () => {
+  it("006_fr21_due_date_in_past_message", () => {
+    expect(errorMessage("due_date_in_past")).toBe("Срок не может быть раньше сегодняшнего дня");
+    expect(dict["error.due_date_in_past"]).toBe(dict["tasks.error_due_past"]);
+  });
+
+  it("006_pd12_pd13_required_mark_and_fixed_assignee_keys", () => {
+    expect(dict["tasks.required_mark"]).toBe("*");
+    expect(dict["tasks.assignee_fixed"]).toBe("Исполнитель: {login}");
+    expect(t("tasks.assignee_fixed" as keyof typeof ru, { login: "petrov" })).toBe("Исполнитель: petrov");
+  });
+});
+
+// R6-T12: spec 006 AC-52 (NFR-2). Тексты - литералы из spec, а не из словаря.
+describe("006 AC-52 dictionary strings (NFR-2)", () => {
+  const FIXED: Record<string, string> = {
+    "tasks.priority.low": "Низкий",
+    "tasks.priority.medium": "Средний",
+    "tasks.priority.high": "Высокий",
+    "tasks.error_title_required": "Введите название задачи",
+    "tasks.error_description_required": "Введите описание задачи",
+    "tasks.error_due_required": "Укажите срок",
+    "tasks.error_due_past": "Срок не может быть раньше сегодняшнего дня",
+    "tasks.error_assignee_required": "Выберите исполнителя",
+    "tasks.subtask_error_title_required": "Введите название подзадачи",
+    "tasks.subtask_error_title_too_long": "Название подзадачи — не более 255 символов",
+    "tasks.assignee_fixed": "Исполнитель: {login}",
+    "tasks.parent_label": "Родительская задача",
+    "tasks.parent_open": "Открыть родительскую задачу",
+    "error.due_date_in_past": "Срок не может быть раньше сегодняшнего дня",
+  };
+
+  it("006_ac52_all_nfr2_strings_present_with_spec_texts", () => {
+    for (const [key, text] of Object.entries(FIXED)) expect(dict[key], key).toBe(text);
+  });
+
+  it("006_ac52_password_reveal_names_present", () => {
+    for (const key of [
+      "auth.show_password",
+      "auth.show_current_password",
+      "auth.show_new_password",
+      "auth.show_confirm_password",
+    ]) {
+      expect(typeof dict[key], key).toBe("string");
+      expect(dict[key]!.trim().length, key).toBeGreaterThan(0);
+    }
+  });
+
+  it("006_ac52_no_ordinary_priority_and_no_base_key", () => {
+    expect("tasks.priority.base" in dict).toBe(false);
+    expect(Object.values(dict)).not.toContain("Обычный");
+  });
+
+  it("006_ac52_due_date_in_past_error_has_own_text", () => {
+    expect(errorMessage("due_date_in_past")).toBe("Срок не может быть раньше сегодняшнего дня");
+    expect(errorMessage("due_date_in_past")).not.toBe(errorMessage("definitely_not_a_code"));
+    expect(errorMessage("due_date_in_past")).not.toBe(dict["error.unknown"]);
   });
 });

@@ -48,6 +48,10 @@ _DEMO_LOCK_KEY: Final = 0x474F535400000002
 # БА - участник обоих демо-проектов, не владелец (002/FR-22, D-13)
 _ALL_PROJECTS_BA: Final = "demo.ba4"
 
+# приоритет обычных демо-задач; читается как глобальное имя модуля во время вызова
+# (подмена в тесте обновления с 002, plan 006 PD-18)
+_REGULAR_PRIORITY: Final[str] = TaskPriority.MEDIUM.value
+
 # читается как глобальное имя модуля во время вызова (подмена в тесте AC-30, plan D-13)
 _USERS: Final[tuple[tuple[str, str], ...]] = (
     ("demo.ta", "tech_admin"),
@@ -182,7 +186,7 @@ def _add_subtasks(
                     title=f"{parent.title}: шаг {step}",
                     description="Демо-подзадача.",
                     status=rng.choice(_STATUSES),
-                    priority=TaskPriority.BASE.value,
+                    priority=_REGULAR_PRIORITY,
                     due_date=None,
                     assignee_id=rng.choice(members),
                     position=None,
@@ -254,7 +258,7 @@ def _build_content(
                     title=title,
                     description=f"Демо-задача проекта «{name}».",
                     status=status,
-                    priority=(TaskPriority.HIGH if index in high else TaskPriority.BASE).value,
+                    priority=TaskPriority.HIGH.value if index in high else _REGULAR_PRIORITY,
                     due_date=due,
                     assignee_id=assignee_id,
                     position=STEP * counters[status],

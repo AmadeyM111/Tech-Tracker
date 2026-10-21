@@ -353,3 +353,25 @@ describe("UserPicker review T81 fixes (NFR-7)", () => {
     expect(active.style.outline).not.toMatch(/^none|^0(px)?\b/);
   });
 });
+
+describe("UserPicker field attributes (006 NFR-3, FR-19)", () => {
+  it("nfr3_required_invalid_describedby_set_aria_attributes", () => {
+    const { input } = setup({ required: true, invalid: true, describedBy: "err-1" });
+    expect(input.getAttribute("aria-required")).toBe("true");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBe("err-1");
+  });
+
+  it("nfr3_no_props_no_attributes", () => {
+    const { input } = setup();
+    expect(input.hasAttribute("aria-required")).toBe(false);
+    expect(input.hasAttribute("aria-invalid")).toBe(false);
+    expect(input.hasAttribute("aria-describedby")).toBe(false);
+  });
+
+  it("nfr3_false_props_do_not_set_true_attributes", () => {
+    const { input } = setup({ required: false, invalid: false });
+    expect(input.getAttribute("aria-required")).not.toBe("true");
+    expect(input.getAttribute("aria-invalid")).not.toBe("true");
+  });
+});

@@ -9,6 +9,7 @@ D-46, D-52, D-55, D-56).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
@@ -17,7 +18,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import select, update
 
-from app.core.clock import utcnow
+from app.core.clock import today_msk, utcnow
 from app.core.errors import ErrorCode, Forbidden, NotFound, Unprocessable
 from app.domain.access.policy import (
     ProjectFacts,
@@ -65,7 +66,7 @@ class TaskCreateData:
     description: str = ""
     assignee: UUID | None | Unset = UNSET
     due_date: date | None = None
-    priority: str | TaskPriority = TaskPriority.BASE.value
+    priority: str | TaskPriority = TaskPriority.MEDIUM.value
 
 
 def _invalid(message: str) -> Unprocessable:
@@ -87,15 +88,36 @@ def _validate(data: TaskCreateData) -> TaskPriority:
     try:
         return TaskPriority(data.priority)
     except ValueError:
-        raise _invalid("Приоритет: base или high") from None
+        raise _invalid("Приоритет: low, medium или high") from None
 
 
-def _effective_assignee(actor: Actor, data: TaskCreateData) -> UUID | None:
-    """Не передан: «Пользователь» — сам, БА — без исполнителя (AC-109)."""
+def _effective_assignee(actor: Actor, data: TaskCreateData, *, top_level: bool) -> UUID | None:
+    """Не передан: задача — создатель (006/FR-17, D-4); подзадача — «Пользователь» сам,
+    БА — без исполнителя (AC-109). Передан (в т.ч. ``None``) — как передан."""
     if data.assignee is UNSET:
-        return actor.user_id if actor.role == Role.USER else None
+        if top_level or actor.role == Role.USER:
+            return actor.user_id
+        return None
     assert not isinstance(data.assignee, Unset)
     return data.assignee
+
+
+def _check_top_level(values: Mapping[str, Any], today: date) -> None:
+    """006/FR-15…FR-17, FR-23: проверяет только присутствующие ключи ``description``,
+    ``due_date``, ``assignee_id``. Сначала ``validation_error``, затем срок в прошлом."""
+    if "description" in values and (
+        not isinstance(values["description"], str) or not values["description"].strip()
+    ):
+        raise _invalid("Описание задачи обязательно")
+    if "due_date" in values and values["due_date"] is None:
+        raise _invalid("Срок задачи обязателен")
+    if "assignee_id" in values and values["assignee_id"] is None:
+        raise _invalid("Исполнитель задачи обязателен")
+    due = values.get("due_date")
+    if due is not None and due < today:
+        raise Unprocessable(
+            "Срок не может быть раньше сегодняшнего дня", code=ErrorCode.due_date_in_past
+        )
 
 
 async def _check_assignee(
@@ -127,12 +149,16 @@ async def _check_assignee(
 async def create_task(
     db: AsyncSession, actor: Actor, project_id: UUID, data: TaskCreateData
 ) -> UUID:
-    """Новая задача в конце колонки «К выполнению» (AC-24, AC-49, AC-61)."""
+    """Новая задача в конце колонки «К выполнению» (AC-24, AC-49, AC-61; 006/FR-15…FR-18)."""
     project = await load_project_facts(db, actor, project_id, lock="share")
-    assignee_id = _effective_assignee(actor, data)
+    assignee_id = _effective_assignee(actor, data, top_level=True)
     if not can_create_task(actor, project, assignee_id):
         raise Forbidden()
     priority = _validate(data)
+    _check_top_level(
+        {"description": data.description, "due_date": data.due_date, "assignee_id": assignee_id},
+        today_msk(),
+    )
     await _check_assignee(db, actor, project, assignee_id)
     await lock_columns(db, project_id, TaskStatus.TODO)
     task = Task(
@@ -157,7 +183,7 @@ async def create_subtask(
 ) -> UUID:
     """Подзадача: без позиции, статус ``todo``, проект родителя; глубина — один уровень."""
     ctx = await load_task_context(db, actor, parent_id, lock_project="share")
-    assignee_id = _effective_assignee(actor, data)
+    assignee_id = _effective_assignee(actor, data, top_level=False)
     if not can_create_subtask(actor, ctx.project, ctx.task, assignee_id):
         raise Forbidden()
     priority = _validate(data)
@@ -263,7 +289,9 @@ def _changes(task: Task, patch: TaskPatch) -> dict[str, Any]:
 
 
 def _authorize(actor: Actor, project: ProjectFacts, task: Task, changed: dict[str, Any]) -> None:
-    """Права по реально меняющимся полям (FR-19) и проверка входных данных (422)."""
+    """Права по реально меняющимся полям (FR-19) и проверка входных данных (422).
+
+    Для задачи верхнего уровня после ``_validate`` — правила 006/FR-23 по меняющимся полям."""
     facts = TaskFacts(
         created_by=task.created_by, assignee_id=task.assignee_id, parent_id=task.parent_id
     )
@@ -283,6 +311,8 @@ def _authorize(actor: Actor, project: ProjectFacts, task: Task, changed: dict[st
             priority=changed.get("priority", task.priority),
         )
     )
+    if task.parent_id is None:
+        _check_top_level(changed, today_msk())
     if "status" in changed:
         _status(changed["status"])
 

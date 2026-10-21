@@ -47,10 +47,19 @@ class TaskListQuery(PageParams):
 
 
 class TaskCreate(BaseModel):
-    """Создание задачи и подзадачи.
+    """Создание задачи и подзадачи; в схеме обязательно только ``title``.
 
-    ``assignee_id``: не передан — «Пользователь» назначается сам, БА — без исполнителя;
-    ``null`` — явно без исполнителя (различаются по ``model_fields_set``, FR-20).
+    Задача верхнего уровня (``POST /projects/{id}/tasks``): обязательны ``description``
+    (не пусто после обрезки пробелов; хранится как введено), ``due_date`` (не раньше сегодняшней
+    даты по Europe/Moscow) и исполнитель. ``assignee_id`` не передан — исполнитель создатель;
+    ``null`` — 422 ``validation_error`` («Пользователь» с ``null`` получает 403). Нет описания
+    или срока, пустое описание — 422 ``validation_error``; срок в прошлом — 422
+    ``due_date_in_past``. Права (403, 404) проверяются раньше полей.
+
+    Подзадача (``POST /tasks/{id}/subtasks``): достаточно ``title``; описание и срок
+    необязательны, срок в прошлом допустим. ``assignee_id`` не передан — «Пользователь»
+    назначается сам, БА — без исполнителя; ``null`` — явно без исполнителя (различаются по
+    ``model_fields_set``, FR-20).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -59,7 +68,7 @@ class TaskCreate(BaseModel):
     description: TaskDescription = ""
     assignee_id: UUID | None = None
     due_date: DueDate | None = None
-    priority: TaskPriority = TaskPriority.BASE
+    priority: TaskPriority = TaskPriority.MEDIUM
 
 
 class TaskUpdate(BaseModel):
@@ -67,6 +76,14 @@ class TaskUpdate(BaseModel):
 
     ``null`` допустим только у ``assignee_id`` и ``due_date`` (снимает значение). У остальных
     ``default_factory`` лишь делает поле необязательным без ``null``/``default`` в OpenAPI.
+
+    Задача верхнего уровня (не подзадача): проверяются только реально меняющиеся поля.
+    Снять исполнителя (``assignee_id: null``), снять срок (``due_date: null``) или сделать
+    описание пустым (после обрезки пробелов) нельзя — 422 ``validation_error``; срок раньше
+    сегодняшней даты по Europe/Moscow — 422 ``due_date_in_past`` (``validation_error``
+    проверяется раньше). Неизменённые поля не проверяются: у задачи с пустым значением
+    можно менять другие поля. Права (403, 404) проверяются раньше полей. У подзадачи
+    снятие исполнителя и срока и срок в прошлом допустимы.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -75,7 +92,7 @@ class TaskUpdate(BaseModel):
     description: TaskDescription = Field(default_factory=str)
     assignee_id: UUID | None = None
     due_date: DueDate | None = None
-    priority: TaskPriority = Field(default_factory=lambda: TaskPriority.BASE)
+    priority: TaskPriority = Field(default_factory=lambda: TaskPriority.MEDIUM)
     status: TaskStatus = Field(default_factory=lambda: TaskStatus.TODO)
 
 
