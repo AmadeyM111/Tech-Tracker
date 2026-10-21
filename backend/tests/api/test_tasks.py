@@ -46,6 +46,9 @@ from tests.tasks_api_support import (
 
 REPO_ROOT = BACKEND_DIR.parent
 SOME_ID = "6f9619ff-8b86-4d11-b42d-00c04fc964ff"
+# 006/FR-15, FR-16: задача создаётся с описанием и сроком не раньше «сегодня»; fixed_clock по
+# умолчанию - 2026-10-13T09:00Z, «сегодня» по Москве = 2026-10-13.
+REQ = {"description": "Описание", "due_date": "2026-10-13"}
 
 
 async def _count(env: ApiEnv, project_id: Any) -> int:
@@ -64,19 +67,20 @@ async def test_ac49_ac24_create_minimal_body_defaults_and_shape(api_env: ApiEnv)
     env = api_env
     w = await make_api_world(env)
 
-    r = await _create(env, w, "ba", {"title": "Первая"})
+    r = await _create(env, w, "ba", {"title": "Первая", **REQ})
 
     assert r.status_code == 201, r.text
     assert r.headers["content-type"].startswith("application/json")
     body = r.json()
     assert set(body) == DETAIL_FIELDS
     assert body["title"] == "Первая"
-    assert body["description"] == ""
+    assert body["description"] == "Описание"  # 006/FR-15: описание обязательно
     assert body["status"] == "todo"  # AC-24
     assert body["priority"] == "medium"  # AC-49, 006/AC-12
-    assert body["due_date"] is None
+    assert body["due_date"] == "2026-10-13"  # 006/FR-16: срок обязателен
     assert body["parent_id"] is None
-    assert body["assignee"] is None  # БА не передал исполнителя (AC-56)
+    # 006/AC-19 (было: None, AC-56): не переданный исполнитель - создатель, в т.ч. БА
+    assert body["assignee"] == {"id": str(w.uid("ba")), "login": w.login("ba")}
     assert body["subtasks"] == []
     assert body["progress"] is None
     assert isinstance(body["position"], int)
@@ -125,8 +129,8 @@ async def test_ac81_new_task_goes_to_end_of_todo_column(api_env: ApiEnv) -> None
     first = await mk(env, w, position=5000)
     await mk(env, w, status="in_progress", position=9000)  # другая колонка не влияет
 
-    r1 = await _create(env, w, "ba", {"title": "A"})
-    r2 = await _create(env, w, "ba", {"title": "B"})
+    r1 = await _create(env, w, "ba", {"title": "A", **REQ})
+    r2 = await _create(env, w, "ba", {"title": "B", **REQ})
 
     assert r1.json()["position"] > (await task_db(env, first)).position
     assert r2.json()["position"] > r1.json()["position"]
@@ -137,7 +141,9 @@ async def test_title_and_description_are_stored_as_entered_d52(api_env: ApiEnv) 
     w = await make_api_world(env)
     title = "  Задача с пробелами  "
 
-    r = await _create(env, w, "ba", {"title": title, "description": "  d  "})
+    r = await _create(
+        env, w, "ba", {"title": title, "description": "  d  ", "due_date": REQ["due_date"]}
+    )
 
     assert r.status_code == 201, r.text
     assert r.json()["title"] == title
@@ -148,7 +154,9 @@ async def test_ac108_boundary_lengths_are_accepted(api_env: ApiEnv) -> None:
     env = api_env
     w = await make_api_world(env)
 
-    r = await _create(env, w, "ba", {"title": "Я" * 255, "description": "д" * 10_000})
+    r = await _create(
+        env, w, "ba", {"title": "Я" * 255, "description": "д" * 10_000, "due_date": REQ["due_date"]}
+    )
 
     assert r.status_code == 201, r.text
     row = await task_db(env, r.json()["id"])
@@ -162,7 +170,7 @@ async def test_ac109_user_without_assignee_gets_himself_and_can_edit_title(api_e
     env = api_env
     w = await make_api_world(env)
 
-    r = await _create(env, w, "usr", {"title": "Моя"})
+    r = await _create(env, w, "usr", {"title": "Моя", **REQ})
 
     assert r.status_code == 201, r.text
     me = {"id": str(w.uid("usr")), "login": w.login("usr")}
@@ -182,7 +190,7 @@ async def test_ac109_user_explicit_null_assignee_is_403_and_nothing_created(
     w = await make_api_world(env)
     before = await _count(env, w.project_id)
 
-    r = await _create(env, w, "usr", {"title": "Без исполнителя", "assignee_id": None})
+    r = await _create(env, w, "usr", {"title": "Без исполнителя", **REQ, "assignee_id": None})
 
     assert error(r) == (403, "forbidden")
     assert await _count(env, w.project_id) == before
@@ -193,8 +201,10 @@ async def test_ac9_user_assigning_other_is_403_himself_is_201(api_env: ApiEnv) -
     w = await make_api_world(env)
     before = await _count(env, w.project_id)
 
-    other = await _create(env, w, "usr", {"title": "Другому", "assignee_id": str(w.uid("ba2"))})
-    own = await _create(env, w, "usr", {"title": "Себе", "assignee_id": str(w.uid("usr"))})
+    other = await _create(
+        env, w, "usr", {"title": "Другому", **REQ, "assignee_id": str(w.uid("ba2"))}
+    )
+    own = await _create(env, w, "usr", {"title": "Себе", **REQ, "assignee_id": str(w.uid("usr"))})
 
     assert error(other) == (403, "forbidden")
     assert own.status_code == 201, own.text
@@ -202,22 +212,30 @@ async def test_ac9_user_assigning_other_is_403_himself_is_201(api_env: ApiEnv) -
 
 
 @pytest.mark.parametrize("who", ["ba", "ba2"])
-async def test_ac109_ac56_ba_without_assignee_or_with_null_get_null(
+async def test_ac109_ac56_ba_without_assignee_gets_himself_and_null_is_422(
     api_env: ApiEnv, who: str
 ) -> None:
-    """AC 002 AC-13: БА-участник (владелец ``ba``, не владелец ``ba2``; прежде и ``sm_m``)."""
+    """002/AC-13 + 006/AC-19, AC-20 (D-4): БА без поля - сам; null - 422; другой - ок.
+
+    Раньше: без поля и с null - исполнитель None (001/AC-109); теперь для задачи верхнего уровня
+    исполнитель обязателен.
+    """
     env = api_env
     w = await make_api_world(env)
+    before = await _count(env, w.project_id)
 
-    omitted = await _create(env, w, who, {"title": "Без поля"})
-    explicit = await _create(env, w, who, {"title": "Явный null", "assignee_id": None})
-    other = await _create(env, w, who, {"title": "Другому", "assignee_id": str(w.uid("usr"))})
+    omitted = await _create(env, w, who, {"title": "Без поля", **REQ})
+    explicit = await _create(env, w, who, {"title": "Явный null", **REQ, "assignee_id": None})
+    other = await _create(
+        env, w, who, {"title": "Другому", **REQ, "assignee_id": str(w.uid("usr"))}
+    )
 
-    for r in (omitted, explicit):
-        assert r.status_code == 201, r.text
-        assert r.json()["assignee"] is None
+    assert omitted.status_code == 201, omitted.text
+    assert omitted.json()["assignee"] == {"id": str(w.uid(who)), "login": w.login(who)}
+    assert error(explicit) == (422, "validation_error")
     assert other.status_code == 201, other.text
     assert other.json()["assignee"]["id"] == str(w.uid("usr"))
+    assert await _count(env, w.project_id) == before + 2
 
 
 @pytest.mark.parametrize("who", ["ba3", "usr2"])
@@ -242,7 +260,7 @@ async def test_ac103_ba_non_member_becomes_member_and_creates(api_env: ApiEnv) -
 
     await add_member_row(env, w, w.people["ba3"].user)
 
-    assert (await _create(env, w, "ba3", {"title": "x"})).status_code == 201
+    assert (await _create(env, w, "ba3", {"title": "x", **REQ})).status_code == 201
 
 
 # --- GET /tasks/{id}: карточка ----------------------------------------------------------------
@@ -568,7 +586,7 @@ async def test_ac47_assignee_changes_status_with_full_form_but_not_title(api_env
 async def test_ac46_user_own_task_title_status_ok_assignee_403(api_env: ApiEnv) -> None:
     env = api_env
     w = await make_api_world(env)
-    created = await _create(env, w, "usr", {"title": "Своя"})
+    created = await _create(env, w, "usr", {"title": "Своя", **REQ})
     t = created.json()["id"]
 
     ok = await send(
@@ -592,7 +610,7 @@ async def test_ac46_user_own_task_title_status_ok_assignee_403(api_env: ApiEnv) 
 async def test_ac46_ba_owner_changes_assignee_of_user_task(api_env: ApiEnv) -> None:
     env = api_env
     w = await make_api_world(env)
-    t = (await _create(env, w, "usr", {"title": "Своя"})).json()["id"]
+    t = (await _create(env, w, "usr", {"title": "Своя", **REQ})).json()["id"]
 
     r = await send(env, w.tok("ba"), "PATCH", task_url(t), {"assignee_id": str(w.uid("ba2"))})
 
@@ -684,7 +702,7 @@ async def test_ac68_d51_create_with_non_date_due_date_is_422_nothing_created(
     w = await make_api_world(env)
     before = await _count(env, w.project_id)
 
-    r = await _create(env, w, "ba", {"title": "Срок", "due_date": due})
+    r = await _create(env, w, "ba", {**REQ, "title": "Срок", "due_date": due})
 
     assert error(r) == (422, "validation_error")
     assert await _count(env, w.project_id) == before
@@ -704,12 +722,12 @@ async def test_ac68_d51_patch_with_non_date_due_date_is_422_unchanged(
     assert str((await task_db(env, t)).due_date) == "2026-01-02"
 
 
-@pytest.mark.parametrize("due", ["2026-10-20", "2000-02-29", "2026-12-31"])
+@pytest.mark.parametrize("due", ["2026-10-20", "2028-02-29", "2026-12-31"])
 async def test_ac68_d51_valid_dates_round_trip(api_env: ApiEnv, due: str) -> None:
     env = api_env
     w = await make_api_world(env)
 
-    r = await _create(env, w, "ba", {"title": "Срок", "due_date": due})
+    r = await _create(env, w, "ba", {"title": "Срок", "description": "d", "due_date": due})
 
     assert r.status_code == 201, r.text
     assert r.json()["due_date"] == due
@@ -749,7 +767,8 @@ async def test_ac108_create_invalid_payload_is_422_and_nothing_created(
     w = await make_api_world(env)
     before = await _count(env, w.project_id)
 
-    r = await _create(env, w, "ba", payload)
+    # 006: тело дополнено обязательными полями: 422 даёт проверяемая причина, а не их отсутствие
+    r = await _create(env, w, "ba", {**REQ, **payload})
 
     assert error(r) == (422, "validation_error")
     assert await _count(env, w.project_id) == before
@@ -954,10 +973,10 @@ async def test_ac75_ac4_gates_on_every_task_route(api_env: ApiEnv) -> None:
 async def test_project_deleted_makes_create_404(api_env: ApiEnv) -> None:
     env = api_env
     w = await make_api_world(env)
-    assert (await _create(env, w, "ba", {"title": "До удаления"})).status_code == 201
+    assert (await _create(env, w, "ba", {"title": "До удаления", **REQ})).status_code == 201
     assert (await send(env, w.tok("ba"), "DELETE", pj(w.project_id))).status_code == 204
 
-    r = await _create(env, w, "ba", {"title": "В удалённый"})
+    r = await _create(env, w, "ba", {"title": "В удалённый", **REQ})
 
     assert error(r) == (404, "not_found")
 

@@ -420,7 +420,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (APPROVE; отложено: порядок фокуса при двух ошибках в карточке — описание→срок против DOM срок→описание, alert.clear() в onSave, регресс-тест опроса)
 
 ## R6-T13 — Сервер: обязательные поля при создании задачи, код `due_date_in_past`
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-19, AC-20, AC-21, AC-22, AC-23, AC-24, AC-25, AC-41; FR-14…FR-18, FR-24, D-4, D-5
 - **Файлы:** `backend/app/domain/tasks/service.py`, `backend/app/core/errors.py`, `backend/app/api/v1/schemas/tasks.py`;
   тесты: `backend/tests/api/test_required_fields_006.py` (новый), `backend/tests/api/test_tasks.py`,
@@ -431,7 +431,8 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   `backend/tests/api/test_workspace_isolation.py`, `backend/tests/api/test_db_busy_errors.py`,
   `backend/tests/domain/test_tasks_queries.py`, `backend/tests/domain/test_tasks_update_delete.py`,
   `backend/tests/domain/test_auth_service.py`, `backend/tests/cli/test_maintenance.py`,
-  `backend/tests/tasks_api_support.py` — только дополнение тел создания обязательными полями и
+  `backend/tests/tasks_api_support.py`, `backend/tests/api/test_comments.py`,
+  `backend/tests/api/test_login_display.py`, `backend/tests/db/test_three_roles_after_upgrade.py` — только дополнение тел создания обязательными полями и
   фиксированными часами)
 - **Зависит от:** R6-T10, R6-T11 (формы уже шлют полные тела), R6-T07
 - **Описание:** По plan §4.2, PD-6…PD-9: `ErrorCode.due_date_in_past`;
@@ -453,7 +454,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   зелёный; проверки бэкенда зелёные; фронтенд не тронут (кроме перегенерированного `schema.d.ts`,
   изменения только в комментариях); `cd frontend && npm run typecheck` зелёный;
   `python scripts/task_scope.py R6-T13` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (CHANGES_REQUESTED: тела тестов 002/AC-23 и ac68/ac108 без обязательных полей — исправлено оркестратором, прогон tests/db целиком + api/domain зелёные; отложено: 2000-02-29 вернуть через подзадачу, доменный тест подзадачи «только название»)
 
 ## R6-T14 — Сервер: изменение задачи не снимает исполнителя и срок, не очищает описание (FR-23)
 - **Статус:** TODO

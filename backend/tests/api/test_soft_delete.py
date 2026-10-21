@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from tests.conftest import ApiEnv
 from tests.tasks_api_support import (
+    TASK_REQ,
     comment_rows,
     error,
     make_api_world,
@@ -22,7 +23,11 @@ async def test_ac99_user_deletes_own_task_204_then_404_everywhere(api_env: ApiEn
     env = api_env
     w = await make_api_world(env)
     created = await send(
-        env, w.tok("usr"), "POST", f"/api/v1/projects/{w.project_id}/tasks", {"title": "Своя"}
+        env,
+        w.tok("usr"),
+        "POST",
+        f"/api/v1/projects/{w.project_id}/tasks",
+        {"title": "Своя", **TASK_REQ},
     )
     t = created.json()["id"]
 

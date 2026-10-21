@@ -31,6 +31,7 @@ from tests.projects_api_support import (
     pj,
     send,
 )
+from tests.tasks_api_support import TASK_REQ
 
 
 def _calls(project_id: Any, user_id: Any) -> list[tuple[str, str, str, Any]]:
@@ -223,7 +224,13 @@ async def test_t77_ac94_unknown_deleted_foreign_task_is_404_with_same_body(
     dead_project = await add_project(env, w.ws, w.people["ba"].user, name="Удалён", deleted=True)
     in_dead = await mk(env, w, project_id=dead_project)
     foreign_task = (
-        await send(env, foreign.ba_token, "POST", f"{pj(foreign.project_id)}/tasks", {"title": "Ч"})
+        await send(
+            env,
+            foreign.ba_token,
+            "POST",
+            f"{pj(foreign.project_id)}/tasks",
+            {"title": "Ч", **TASK_REQ},
+        )
     ).json()["id"]
 
     for who in ("ba", "ba2", "ba3", "usr", "usr2"):

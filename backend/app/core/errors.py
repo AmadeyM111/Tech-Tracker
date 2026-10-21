@@ -80,6 +80,8 @@ class ErrorCode(StrEnum):
     permanent_delete_not_allowed = "permanent_delete_not_allowed"
     # [1]
     search_query_too_short = "search_query_too_short"
+    # [006]
+    due_date_in_past = "due_date_in_past"
 
 
 class AppError(Exception):

@@ -16,6 +16,7 @@ import pytest
 from tests.conftest import ApiEnv
 from tests.tasks_api_support import (
     DETAIL_FIELDS,
+    TASK_REQ,
     error,
     make_api_world,
     mk,
@@ -181,7 +182,11 @@ async def test_user_creates_subtask_to_own_task_for_self_but_not_for_other(
     w = await make_api_world(env)
     parent = (
         await send(
-            env, w.tok("usr"), "POST", f"/api/v1/projects/{w.project_id}/tasks", {"title": "Т"}
+            env,
+            w.tok("usr"),
+            "POST",
+            f"/api/v1/projects/{w.project_id}/tasks",
+            {"title": "Т", **TASK_REQ},
         )
     ).json()["id"]
 

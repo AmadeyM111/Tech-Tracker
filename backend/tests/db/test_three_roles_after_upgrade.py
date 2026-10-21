@@ -18,6 +18,7 @@ from sqlalchemy import text
 from tests.admin_support import ADMIN_USERS, code_of
 from tests.factories import DEFAULT_PASSWORD, make_domain_event
 from tests.projects_api_support import PROJECTS, pj, send
+from tests.tasks_api_support import TASK_REQ
 from tests.upgrade002_support import (
     PREFIX,
     World,
@@ -331,7 +332,7 @@ async def test_002_ac23_ownership_task_reassign_and_wrong_role_assignee(
         token,
         "POST",
         f"{pj(w.project_p)}/tasks",
-        {"title": "Для бывшего СМ", "assignee_id": str(w.uid("m1"))},
+        {**TASK_REQ, "title": "Для бывшего СМ", "assignee_id": str(w.uid("m1"))},
     )
     assert refused.status_code == 422, refused.text
     assert code_of(refused) == "recipient_wrong_role"

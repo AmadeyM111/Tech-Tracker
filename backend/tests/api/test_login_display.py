@@ -27,6 +27,7 @@ from tests.projects_api_support import (
     members_url,
     pj,
 )
+from tests.tasks_api_support import TASK_REQ
 
 ADMIN = "Admin.Main"
 IVANOV = "Ivanov.Petr"
@@ -132,7 +133,7 @@ async def test_ac129_display_login_is_shown_everywhere_in_projects_tasks_comment
         env,
         ivanov,
         f"{PROJECTS}/{project_id}/tasks",
-        {"title": "Задача с исполнителем", "assignee_id": sidorova_id},
+        {"title": "Задача с исполнителем", **TASK_REQ, "assignee_id": sidorova_id},
     )
     task_id = task["id"]
     assert task["assignee"]["login"] == SIDOROVA

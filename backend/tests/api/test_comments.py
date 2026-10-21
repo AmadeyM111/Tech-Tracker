@@ -18,6 +18,7 @@ from tests.conftest import ApiEnv
 from tests.factories import make_comment
 from tests.tasks_api_support import (
     PAGE_FIELDS,
+    TASK_REQ,
     USER_REF_FIELDS,
     ApiWorld,
     busy_database,
@@ -367,7 +368,7 @@ async def test_ac21_foreign_workspace_task_and_comment_are_404_untouched(api_env
         foreign.ba_token,
         "POST",
         f"/api/v1/projects/{foreign.project_id}/tasks",
-        {"title": "Чужая"},
+        {"title": "Чужая", **TASK_REQ},
     )
     tid = made.json()["id"]
     cm = await send(env, foreign.ba_token, "POST", _list_url(tid), {"body": "секрет"})
