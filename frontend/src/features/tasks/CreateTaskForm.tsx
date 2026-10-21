@@ -6,8 +6,8 @@ import { ApiError } from "../../shared/api/client";
 import { errorMessage, t, type MessageKey } from "../../shared/i18n";
 import { ErrorAlert, FieldError, useAlertState } from "../../shared/ui/ErrorAlert";
 import { UserPicker } from "../../shared/ui/UserPicker";
-import { listCreatableProjects, type CreatableProject } from "../projects/api";
-import { createTask, type TaskCreate, type TaskDetail, type TaskPriority } from "./api";
+import { listAllMembers, listCreatableProjects, type CreatableProject } from "../projects/api";
+import { createTask, type TaskCreate, type TaskCreateInput, type TaskDetail, type TaskPriority } from "./api";
 
 const PRIORITIES: readonly TaskPriority[] = ["low", "medium", "high"];
 
@@ -264,16 +264,29 @@ export function CreateTaskForm({ projectId, canPickAssignee, assigneeIds, curren
 export interface CreateTaskDialogProps {
   /** id проекта из пути `/projects/:projectId` (любая вкладка) или null. */
   currentProjectId: string | null;
+  /** 006/FR-20: исполнитель по умолчанию; строка «Исполнитель: <логин>» у «Пользователя». */
+  currentUser: { id: string; login: string };
+  /** 006/FR-20: выбор исполнителя только у БА. */
+  canPickAssignee: boolean;
   /** Закрытие без создания: Escape, «Отмена», «Закрыть». Фокус возвращает вызывающий. */
   onClose: () => void;
   /** 201: задача создана, кэши инвалидированы. Вызывающий закрывает диалог и открывает карточку. */
   onCreated: (task: TaskDetail) => void;
 }
 
-const DIALOG_FOCUSABLE = 'input, select, button, [tabindex]:not([tabindex="-1"])';
+const DIALOG_FOCUSABLE = 'input, select, textarea, button, [tabindex]:not([tabindex="-1"])';
 
-/** 004/FR-8..FR-12, FR-19, FR-20: modal "new task" (project + title), submit per FR-13..FR-18. */
-export function CreateTaskDialog({ currentProjectId, onClose, onCreated }: CreateTaskDialogProps) {
+/**
+ * 004/FR-8..FR-12, FR-19, FR-20; 006/FR-20: modal "new task" (project, title, description, due date,
+ * assignee), submit per FR-13..FR-18.
+ */
+export function CreateTaskDialog({
+  currentProjectId,
+  currentUser,
+  canPickAssignee,
+  onClose,
+  onCreated,
+}: CreateTaskDialogProps) {
   const id = useId();
   const queryClient = useQueryClient();
   const alert = useAlertState();
@@ -284,10 +297,19 @@ export function CreateTaskDialog({ currentProjectId, onClose, onCreated }: Creat
   const dialogRef = useRef<HTMLDivElement>(null);
   const projectRef = useRef<HTMLSelectElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const dueRef = useRef<HTMLInputElement>(null);
+  const assigneeBoxRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const focusMoved = useRef(false);
   const [choice, setChoice] = useState<string | null>(null); // null: not touched, "": placeholder
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState(() => todayMsk());
+  const [assignee, setAssignee] = useState<{ id: string; login: string } | null>(currentUser);
+  const [errors, setErrors] = useState<DraftErrors>({});
+  // A new key empties the picker's own text field.
+  const [pickerKey, setPickerKey] = useState(0);
 
   const query = useQuery({
     queryKey: ["projects", "creatable"],
@@ -351,25 +373,81 @@ export function CreateTaskDialog({ currentProjectId, onClose, onCreated }: Creat
   const loading = projects === undefined && !query.isError;
   const selected = choice ?? (projects === undefined ? null : preselectProject(projects, currentProjectId)) ?? "";
 
+  // 006/FR-25: candidates are the members of the chosen project; asked only for a business admin.
+  const members = useQuery({
+    queryKey: ["projects", selected, "members-all"],
+    queryFn: () => listAllMembers(selected),
+    enabled: canPickAssignee && selected !== "",
+    retry: false,
+  });
+  const assigneeIds =
+    selected === "" || members.data === undefined
+      ? []
+      : members.data.filter((m) => !m.is_blocked && m.role !== null).map((m) => m.user.id);
+
+  const errorId = (field: DraftField): string => `${id}-${field}-error`;
+  const fieldProps = (field: DraftField) =>
+    errors[field] === undefined
+      ? { "aria-required": true as const }
+      : { "aria-required": true as const, "aria-invalid": true as const, "aria-describedby": errorId(field) };
+  const errorText = (field: DraftField): string | null => {
+    const key = errors[field];
+    return key === undefined ? null : t(key);
+  };
+
+  function focusField(field: DraftField): void {
+    if (field === "title") titleRef.current?.focus();
+    else if (field === "description") descriptionRef.current?.focus();
+    else if (field === "due_date") dueRef.current?.focus();
+    else assigneeBoxRef.current?.querySelector("input")?.focus();
+  }
+
+  // 006/PD-13: another project means another candidates list, the assignee is the current user again.
+  function chooseProject(value: string): void {
+    setChoice(value);
+    setAssignee(currentUser);
+    setPickerKey((k) => k + 1);
+    setErrors((prev) => ({ ...prev, assignee: undefined }));
+  }
+
+  function clearAssignee(): void {
+    setAssignee(null);
+    setPickerKey((k) => k + 1);
+  }
+
   // 004/FR-13..FR-17: one request at a time; the list must be there; input is kept on any failure.
   function onSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (busy.current || created.current || loading) return;
-    const name = title.trim();
-    if (name === "" || selected === "") {
+    alert.clear();
+    const found = taskDraftErrors(
+      { title, description, dueDate, assigneeId: canPickAssignee ? (assignee?.id ?? null) : undefined },
+      todayMsk(),
+    );
+    setErrors(found);
+    const first = DRAFT_FIELDS.find((field) => found[field] !== undefined);
+    if (first !== undefined) {
+      focusField(first);
+      return;
+    }
+    if (selected === "") {
       alert.show(errorMessage("validation_error"));
       return;
     }
     const projectId = selected;
+    // The date is sent exactly as the field holds it: YYYY-MM-DD, no time zone (NFR-5).
+    const input: TaskCreateInput = { title: title.trim(), description, due_date: dueDate };
+    if (canPickAssignee && assignee !== null) input.assignee_id = assignee.id;
     busy.current = true;
     setPending(true);
-    alert.clear();
     void (async () => {
       let task: TaskDetail;
       try {
-        task = await createTask(projectId, { title: name });
+        task = await createTask(projectId, input);
       } catch (e) {
-        alert.show(errorMessage(e instanceof ApiError ? e.code : "unknown"));
+        const code = e instanceof ApiError ? e.code : "unknown";
+        if (code === "due_date_in_past") setErrors({ due_date: "tasks.error_due_past" });
+        else alert.show(errorMessage(code));
         busy.current = false;
         setPending(false);
         return;
@@ -398,19 +476,80 @@ export function CreateTaskDialog({ currentProjectId, onClose, onCreated }: Creat
       {t("admin.cancel")}
     </button>
   );
-  const titleField = (
-    <div className="ui-field">
-      <label htmlFor={`${id}-title-input`}>{t("tasks.title_label")}</label>
-      <input
-        id={`${id}-title-input`}
-        ref={titleRef}
-        type="text"
-        name="title"
-        autoComplete="off"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-    </div>
+  const taskFields = (
+    <>
+      <div className="ui-field">
+        <label htmlFor={`${id}-title-input`}>{t("tasks.title_label")}</label>
+        <input
+          id={`${id}-title-input`}
+          ref={titleRef}
+          type="text"
+          name="title"
+          autoComplete="off"
+          {...fieldProps("title")}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <FieldError id={errorId("title")} message={errorText("title")} />
+      </div>
+      <div className="ui-field">
+        <label htmlFor={`${id}-description`}>
+          {t("tasks.description_label")}
+          <RequiredMark />
+        </label>
+        <textarea
+          id={`${id}-description`}
+          ref={descriptionRef}
+          name="description"
+          {...fieldProps("description")}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+        <FieldError id={errorId("description")} message={errorText("description")} />
+      </div>
+      <div className="ui-field">
+        <label htmlFor={`${id}-due`}>
+          {t("tasks.due_label")}
+          <RequiredMark />
+        </label>
+        <input
+          id={`${id}-due`}
+          ref={dueRef}
+          type="date"
+          name="due_date"
+          {...fieldProps("due_date")}
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+        />
+        <FieldError id={errorId("due_date")} message={errorText("due_date")} />
+      </div>
+      {canPickAssignee ? (
+        <div ref={assigneeBoxRef}>
+          <UserPicker
+            key={pickerKey}
+            label={t("tasks.assignee_label")}
+            labelMark={<RequiredMark />}
+            allowedIds={assigneeIds}
+            quietError
+            required
+            invalid={errors.assignee !== undefined}
+            describedBy={errors.assignee === undefined ? undefined : errorId("assignee")}
+            onSelect={(user) => setAssignee({ id: user.id, login: user.login })}
+          />
+          <FieldError id={errorId("assignee")} message={errorText("assignee")} />
+          {assignee === null ? null : (
+            <p>
+              {t("tasks.assignee_selected")}: <strong data-field="selected-assignee">{assignee.login}</strong>{" "}
+              <button type="button" data-action="clear-assignee" onClick={clearAssignee}>
+                {t("tasks.assignee_clear")}
+              </button>
+            </p>
+          )}
+        </div>
+      ) : (
+        <p data-field="fixed-assignee">{t("tasks.assignee_fixed", { login: currentUser.login })}</p>
+      )}
+    </>
   );
 
   let body;
@@ -438,7 +577,7 @@ export function CreateTaskDialog({ currentProjectId, onClose, onCreated }: Creat
               ref={projectRef}
               name="project"
               value={selected}
-              onChange={(e) => setChoice(e.target.value)}
+              onChange={(e) => chooseProject(e.target.value)}
             >
               <option value="">{t("tasks.project_placeholder")}</option>
               {projects.map((p) => (
@@ -449,7 +588,7 @@ export function CreateTaskDialog({ currentProjectId, onClose, onCreated }: Creat
             </select>
           </div>
         )}
-        {titleField}
+        {taskFields}
         <button type="submit" disabled={loading} aria-busy={pending ? "true" : undefined}>
           {t("tasks.create_submit")}
         </button>{" "}

@@ -1,20 +1,91 @@
 // 004 / R5-T02: помощники тестов диалога «Новая задача» (plan §5; фикстуры spec §5).
 //
-// КОНТРАКТ ДЛЯ ИСПОЛНИТЕЛЯ: CreateTaskDialog({ currentProjectId, onClose, onCreated }) из
-// src/features/tasks/CreateTaskForm.tsx; разметка и поведение - plan §4.2.
+// КОНТРАКТ ДЛЯ ИСПОЛНИТЕЛЯ: CreateTaskDialog({ currentProjectId, currentUser, canPickAssignee, onClose,
+// onCreated }) из src/features/tasks/CreateTaskForm.tsx; разметка и поведение - plan §4.2 и (006, R6-T11) §4.7.
+// 006: в состоянии «готово» строка выбранного исполнителя - [data-field="selected-assignee"], кнопка
+// «Сбросить» - [data-action="clear-assignee"], строка «Пользователя» - [data-field="fixed-assignee"]
+// (те же атрибуты, что у CreateTaskForm); участники проекта - GET /projects/{id}/members (listAllMembers).
 // Диалог читает GET /api/v1/projects (page_size=100) и GET /api/v1/projects/{id} (permissions.create_task).
 // Роли: BA (business_admin) видит P1, P2, P3, право создания у P1 и P3; U (user) видит P1, P3.
 // Диалог от роли не зависит напрямую: роль определяет только то, что отвечает сервер.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 
 import { CreateTaskDialog } from "../../../src/features/tasks/CreateTaskForm";
-import { LIST, PERM_READ, PID, PID2, detail, j, listItem, page, type Handler } from "../projects/helpers";
+import {
+  ADMIN_ID,
+  ID_IVANOV,
+  ID_KUZNETSOV,
+  ID_SIDOROV,
+  LIST,
+  M_KUZNETSOV,
+  M_ME,
+  M_OWNER,
+  M_SIDOROV,
+  PERM_READ,
+  PID,
+  PID2,
+  detail,
+  j,
+  listItem,
+  member,
+  page,
+  ref,
+  type Handler,
+} from "../projects/helpers";
 import { taskDetail } from "./helpers";
 
 export { deferred, err, installFetch, j, page } from "../admin/helpers";
+export { ADMIN_ID, ID_KUZNETSOV };
+
+// --- 006 / R6-T11: время, роли, участники ---
+
+/** 2026-10-19T21:30:00Z = 2026-10-20 00:30 по Москве при любом поясе среды (как freezeTime в CreateTaskForm.test.tsx). */
+export const NOW = new Date("2026-10-19T21:30:00Z");
+export const TODAY = "2026-10-20";
+export const YESTERDAY = "2026-10-19";
+
+/** Фиксирует Date на NOW для каждого теста файла (таймеры не трогаем: only Date). Вызывать на верхнем уровне. */
+export function freezeDateForFile(): void {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+}
+
+export const ID_UB = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+export const ID_PETROV_NM = "ffffffff-ffff-4fff-8fff-ffffffffffff"; // не участник проекта
+/** Сессия BA (login «admin») и сессия U (login «ivanov»): пропсы currentUser/canPickAssignee диалога. */
+export const BA = { currentUser: { id: ADMIN_ID, login: "admin" }, canPickAssignee: true } as const;
+export const U = { currentUser: { id: ID_IVANOV, login: "ivanov" }, canPickAssignee: false } as const;
+
+export const MEMBERS_OF = (id: string) => `GET /api/v1/projects/${id}/members`;
+export const USERS_DIR = "GET /api/v1/users";
+
+const M_UB = member(ref(ID_UB, "ub"), { role: "user", is_blocked: true });
+/** P1/P2: admin, kuznetsov, заблокированный ub, участник без роли sidorov; petrov - не участник. P3: admin, ivanov. */
+export const MEMBERS_P1 = [M_OWNER, M_ME, M_KUZNETSOV, M_UB, M_SIDOROV];
+export const MEMBERS_P3 = [M_OWNER, M_ME];
+
+const DIRECTORY = [
+  { id: ADMIN_ID, login: "admin", role: "business_admin" },
+  { id: ID_IVANOV, login: "ivanov", role: "business_admin" },
+  { id: ID_KUZNETSOV, login: "kuznetsov", role: "business_admin" },
+  { id: ID_UB, login: "ub", role: "user" },
+  { id: ID_SIDOROV, login: "sidorov", role: "user" },
+  { id: ID_PETROV_NM, login: "petrov", role: "user" },
+];
+
+/** GET /users?q=...: справочник, отфильтрованный по подстроке логина (как делает сервер). */
+const directory: Handler = (r) => {
+  const q = (new URL(r.url).searchParams.get("q") ?? "").toLowerCase();
+  return j(200, page(DIRECTORY.filter((u) => u.login.includes(q)), 1, false, 50));
+};
 
 export const P1 = PID; // «Альфа»
 export const P2 = PID2; // «Бета»
@@ -50,6 +121,10 @@ export function dialogRoutes(
     [CREATE_IN(P1)]: () => j(201, T_NEW),
     [CREATE_IN(P2)]: () => j(201, T_NEW),
     [CREATE_IN(P3)]: () => j(201, T_NEW),
+    [MEMBERS_OF(P1)]: () => j(200, page(MEMBERS_P1, 1, false, 100)),
+    [MEMBERS_OF(P2)]: () => j(200, page(MEMBERS_P1, 1, false, 100)),
+    [MEMBERS_OF(P3)]: () => j(200, page(MEMBERS_P3, 1, false, 100)),
+    [USERS_DIR]: directory,
   };
   for (const it of items) routes[CARD(it.id)] = () => j(200, projectCard(it.id, it.name, perms[it.id] ?? true));
   return { ...routes, ...over };
@@ -81,6 +156,8 @@ export interface RenderOpts {
   currentProjectId?: string | null;
   /** Общий QueryClient: позволяет смонтировать диалог повторно с тем же кэшем. */
   qc?: QueryClient;
+  /** 006: сессия диалога; по умолчанию U (login «ivanov», без выбора исполнителя). */
+  session?: { currentUser: { id: string; login: string }; canPickAssignee: boolean };
 }
 
 export function renderDialog(opts: RenderOpts = {}) {
@@ -90,7 +167,13 @@ export function renderDialog(opts: RenderOpts = {}) {
   const out = render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
-        <CreateTaskDialog currentProjectId={opts.currentProjectId ?? null} onClose={onClose} onCreated={onCreated} />
+        <CreateTaskDialog
+          currentProjectId={opts.currentProjectId ?? null}
+          currentUser={(opts.session ?? U).currentUser}
+          canPickAssignee={(opts.session ?? U).canPickAssignee}
+          onClose={onClose}
+          onCreated={onCreated}
+        />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -106,3 +189,7 @@ export const readBody = async (r: Request) => (await r.clone().json()) as Record
 export const networkFail = (): Response => {
   throw new TypeError("Failed to fetch");
 };
+
+/** Подпись обязательного поля содержит знак «*» (006/PD-12): сравнение точное с учётом знака. */
+export const exactLabel = (text: string): RegExp =>
+  new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\*?$`);

@@ -9,6 +9,15 @@
 // AC: 9, 10, 11, 12, 13, 14 (вне nav), 19 (кнопка видна, фокус после Escape), 20 (вкладки), 21, 26, 27, 28 (путь
 // не изменился), 29 (401 -> /login), 31 (путь после 201), 32 (фокус на «Задача»), 35, 36, 41, 42 (разметка);
 // FR-5, FR-6, FR-7, FR-15, FR-20..FR-22. Фикстуры BA/U/TA/NR/PWD - spec §5.
+//
+// 006 / R6-T11, правки по spec 006 §9.2 («Спек 004»); Date зафиксирован (freezeDateForFile, 2026-10-19T21:30:00Z):
+//   - 004/AC-14 («полей описания, срока, исполнителя нет») -> 006/AC-33: описание и срок есть, приоритета и
+//     выбора исполнителя у «Пользователя» нет;
+//   - 004/AC-26, AC-27, AC-28, AC-29, AC-31, R5-T03-1: смысл прежний, в сценариях заполняется описание, срок
+//     стоит по умолчанию (функция `fill`);
+//   - 004/AC-28: тело повторной отправки - название, описание, срок (вместо ровно { title }), 006/AC-33;
+//   - 004/AC-35: «каждое открытие с чистого листа» дополнено описанием, сроком и исполнителем;
+//   - новый блок «006 Sidebar passes currentUser and canPickAssignee» (PD-14): профиль -> пропсы диалога.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useNavigate, type NavigateFunction } from "react-router-dom";
@@ -32,7 +41,9 @@ import {
 } from "../features/admin/helpers";
 import { emptyBoard } from "../features/projects/helpers";
 import {
+  ADMIN_ID,
   CREATE_IN,
+  ID_KUZNETSOV,
   LIST_BA,
   LIST_ONE,
   P1,
@@ -40,12 +51,15 @@ import {
   P3,
   T_NEW,
   T_NEW_ID,
+  TODAY,
   dialogRoutes,
   networkFail,
   readBody,
   renderDialog,
   routesBA,
   routesU,
+  freezeDateForFile,
+  exactLabel,
 } from "../features/tasks/create-dialog-helpers";
 import { taskItem } from "../features/tasks/helpers";
 
@@ -60,6 +74,8 @@ const ROLES = [
   ["U", "user", U_CAPS],
 ] as const;
 const OLD_TASK = "a1a1a1a1-0000-4000-8000-000000000001";
+
+freezeDateForFile(); // 006: Date = 2026-10-19T21:30:00Z (срок по умолчанию 2026-10-20)
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -154,6 +170,14 @@ async function openDialog() {
 const loaded = () => screen.findByLabelText(ru["tasks.project_label"]);
 const pick = (id: string) => fireEvent.change(projectSelect(), { target: { value: id } });
 const type = (v: string) => fireEvent.change(titleInput(), { target: { value: v } });
+const descInput = () => within(dlg()).getByLabelText(exactLabel(ru["tasks.description_label"])) as HTMLTextAreaElement;
+const dueInput = () => within(dlg()).getByLabelText(exactLabel(ru["tasks.due_label"])) as HTMLInputElement;
+const DESC = "Собрать данные за квартал";
+/** 006: название + описание; срок уже стоит по умолчанию. */
+const fill = (title: string, description = DESC) => {
+  type(title);
+  fireEvent.change(descInput(), { target: { value: description } });
+};
 const press = (key: string) => fireEvent.keyDown(document.activeElement as HTMLElement, { key });
 
 /** Нажатие Tab как в браузере по ВСЕМУ документу: если обработчик не отменил событие, фокус идёт к соседу. */
@@ -353,9 +377,16 @@ describe("AC-14 dialog opened from the sidebar", () => {
     expect(titleInput().tagName).toBe("INPUT");
     expect(submitBtn().getAttribute("type")).toBe("submit");
     expect(cancelBtn().getAttribute("type")).toBe("button");
-    for (const key of ["tasks.description_label", "tasks.due_label", "tasks.priority_label", "tasks.assignee_label"]) {
+    // Изменено по spec 006 §9.2 (004/AC-14 -> 006/AC-33): описание и срок есть; приоритета и выбора исполнителя
+    // у «Пользователя» нет (вместо него строка «Исполнитель: <логин>»).
+    expect(descInput().tagName).toBe("TEXTAREA");
+    expect(dueInput().type).toBe("date");
+    expect(dueInput().value).toBe(TODAY);
+    for (const key of ["tasks.priority_label", "tasks.assignee_label"]) {
       expect(within(d).queryByLabelText(ru[key as keyof typeof ru])).toBeNull();
     }
+    expect(within(d).queryByRole("combobox", { name: ru["tasks.assignee_label"] })).toBeNull();
+    expect(d.querySelector('[data-field="fixed-assignee"]')!.textContent).toBe("Исполнитель: admin");
   });
 });
 
@@ -463,7 +494,7 @@ describe("AC-26 / AC-31 success opens the task card", () => {
     await openDialog();
     await loaded();
     pick(P1);
-    type("Отчёт");
+    fill("Отчёт");
     fireEvent.click(submitBtn());
     await expectAt(`/tasks/${T_NEW_ID}`);
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -485,7 +516,7 @@ describe("AC-26 / AC-31 success opens the task card", () => {
     await openDialog();
     await loaded();
     pick(P1);
-    type("Отчёт");
+    fill("Отчёт");
     fireEvent.click(submitBtn());
     await waitFor(() => expect(submitBtn().getAttribute("aria-busy")).toBe("true"));
     press("Escape");
@@ -532,7 +563,7 @@ describe("AC-27 the new task is in lists on the next open, without a poll tick",
     await openDialog();
     await loaded();
     pick(P1);
-    type("Отчёт");
+    fill("Отчёт");
     fireEvent.click(submitBtn());
     await expectAt(`/tasks/${T_NEW_ID}`);
     await screen.findByRole("heading", { level: 1 });
@@ -566,19 +597,21 @@ describe("AC-28 create errors keep the dialog and the path", () => {
     await openDialog();
     await loaded();
     pick(P3);
-    type("Отчёт");
+    fill("Отчёт");
     fireEvent.click(submitBtn());
     await waitFor(() => expect(within(dlg()).getAllByRole("alert")).toHaveLength(1));
     expect(within(dlg()).getByRole("alert").textContent).toBe(errorMessage(code));
     expect(where()).toBe("/my-tasks");
     expect(projectSelect().value).toBe(P3);
     expect(titleInput().value).toBe("Отчёт");
+    expect(descInput().value).toBe(DESC);
+    expect(dueInput().value).toBe(TODAY);
     expect(posts(f.f)).toHaveLength(1);
     await waitFor(() => expect((submitBtn() as HTMLButtonElement).getAttribute("aria-busy")).not.toBe("true"));
     fireEvent.click(submitBtn());
     await waitFor(() => expect(posts(f.f)).toHaveLength(2));
     expect(where()).toBe("/my-tasks");
-    expect(await readBody(posts(f.f)[1]!)).toEqual({ title: "Отчёт" });
+    expect(await readBody(posts(f.f)[1]!)).toEqual({ title: "Отчёт", description: DESC, due_date: TODAY });
   });
 });
 
@@ -595,7 +628,7 @@ describe("AC-29 401 on create", () => {
     await openDialog();
     await loaded();
     pick(P1);
-    type("Отчёт");
+    fill("Отчёт");
     fireEvent.click(submitBtn());
     await expectAt("/login");
     expect(posts(f.f)).toHaveLength(1);
@@ -612,6 +645,7 @@ describe("R5-T03-1 no onCreated after unmount", () => {
     const { unmount, onCreated, onClose } = renderDialog({ currentProjectId: P1 });
     await loaded();
     fireEvent.change(screen.getByLabelText(ru["tasks.title_label"]), { target: { value: "Отчёт" } });
+    fireEvent.change(screen.getByLabelText(exactLabel(ru["tasks.description_label"])), { target: { value: DESC } });
     fireEvent.click(screen.getByRole("button", { name: ru["tasks.create_submit"] }));
     await settle(30);
     unmount();
@@ -627,7 +661,7 @@ describe("R5-T03-1 no onCreated after unmount", () => {
     await openDialog();
     await loaded();
     pick(P1);
-    type("Отчёт");
+    fill("Отчёт");
     fireEvent.click(submitBtn());
     await waitFor(() => expect(submitBtn().getAttribute("aria-busy")).toBe("true"));
     fireEvent.click(within(await menu()).getByRole("link", { name: ru["nav.my_tasks"] }));
@@ -670,7 +704,8 @@ describe("AC-35 every open starts afresh", () => {
     await openDialog();
     await loaded();
     expect(f.f.calls.filter((c) => `${c.method} ${new URL(c.url).pathname}` === LIST)).toHaveLength(1);
-    type("Черновик");
+    fill("Черновик", "Черновик описания");
+    fireEvent.change(dueInput(), { target: { value: "2026-12-31" } });
     pick(P3);
     expect(projectSelect().value).toBe(P3);
     press("Escape");
@@ -678,6 +713,8 @@ describe("AC-35 every open starts afresh", () => {
     await openDialog();
     await loaded();
     expect(titleInput().value).toBe("");
+    expect(descInput().value).toBe(""); // 006: описание, срок и исполнитель тоже с чистого листа
+    expect(dueInput().value).toBe(TODAY);
     expect(projectSelect().value).toBe(P1);
     expect(within(dlg()).queryByRole("alert")).toBeNull();
     expect(f.f.calls.filter((c) => `${c.method} ${new URL(c.url).pathname}` === LIST)).toHaveLength(2);
@@ -688,15 +725,16 @@ describe("AC-35 every open starts afresh", () => {
     boot(dialogFor(ROLES[1]), "/my-tasks");
     await openDialog();
     await loaded();
-    type("   ");
+    fill("   "); // 006: пустое название -> сообщение у поля (одно, описание заполнено)
     fireEvent.submit(dlg().querySelector("form")!);
-    await within(dlg()).findByRole("alert");
+    expect((await within(dlg()).findByRole("alert")).textContent).toBe("Введите название задачи");
     press("Escape");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await openDialog();
     await loaded();
     expect(within(dlg()).queryByRole("alert")).toBeNull();
     expect(titleInput().value).toBe("");
+    expect(descInput().value).toBe("");
   });
 });
 
@@ -730,5 +768,74 @@ describe("AC-42 markup of the button", () => {
     expect(b.children).toHaveLength(1);
     expect(b.querySelectorAll("button, a, [role], input, select, [tabindex]")).toHaveLength(0);
     expect(b.querySelector("hr, [aria-expanded]")).toBeNull();
+  });
+});
+
+// ------------------------------------------------------------------------------ 006 R6-T11 (PD-14)
+
+describe("006 Sidebar passes currentUser and canPickAssignee (PD-14)", () => {
+  const picker = () => within(dlg()).queryByRole("combobox", { name: ru["tasks.assignee_label"] });
+  const selected = () => dlg().querySelector<HTMLElement>('[data-field="selected-assignee"]');
+
+  it("006_ac33_BA_dialog_has_picker_default_assignee_is_the_profile_and_body_has_assignee_id", async () => {
+    const app = boot(dialogFor(ROLES[0]), `/projects/${P1}`);
+    await openDialog();
+    await loaded();
+    expect(picker()).toBeTruthy();
+    expect(selected()!.textContent).toBe("admin"); // login профиля из GET /me
+    expect(dlg().querySelector('[data-field="fixed-assignee"]')).toBeNull();
+    fill("Отчёт");
+    fireEvent.click(submitBtn());
+    await expectAt(`/tasks/${T_NEW_ID}`);
+    expect(await readBody(posts(app.f)[0]!)).toStrictEqual({
+      title: "Отчёт",
+      description: DESC,
+      due_date: TODAY,
+      assignee_id: ADMIN_ID,
+    });
+  });
+
+  it("006_ac33_U_dialog_has_fixed_line_no_picker_and_body_without_assignee_id", async () => {
+    const app = boot(dialogFor(ROLES[1]), "/my-tasks");
+    await openDialog();
+    await loaded();
+    expect(picker()).toBeNull();
+    expect(dlg().querySelector('[data-field="fixed-assignee"]')!.textContent).toBe("Исполнитель: admin");
+    pick(P1);
+    fill("Отчёт");
+    fireEvent.click(submitBtn());
+    await expectAt(`/tasks/${T_NEW_ID}`);
+    expect(await readBody(posts(app.f)[0]!)).toStrictEqual({ title: "Отчёт", description: DESC, due_date: TODAY });
+  });
+
+  it("006_pd14_picker_is_decided_by_the_capability_task_assign_others_not_by_the_role", async () => {
+    // роль user, но capability есть -> выбор исполнителя; у БА без capability его нет
+    const withCap = [ROLES[1][0], ROLES[1][1], [...U_CAPS, "task_assign_others"]] as unknown as Role;
+    boot(dialogFor(withCap), "/my-tasks");
+    await openDialog();
+    await loaded();
+    expect(picker()).toBeTruthy();
+  });
+
+  it("006_pd14_without_the_capability_a_business_admin_role_gets_no_picker", async () => {
+    const noCap = [ROLES[0][0], ROLES[0][1], ["business_access", "project_create"]] as unknown as Role;
+    boot(dialogFor(noCap), "/my-tasks");
+    await openDialog();
+    await loaded();
+    expect(picker()).toBeNull();
+    expect(dlg().querySelector('[data-field="fixed-assignee"]')).toBeTruthy();
+  });
+
+  it("006_fr25_BA_picks_member_kuznetsov_through_the_app_and_id_goes_to_the_body", async () => {
+    const app = boot(dialogFor(ROLES[0]), `/projects/${P1}`);
+    await openDialog();
+    await loaded();
+    fireEvent.change(picker()!, { target: { value: "kuz" } });
+    fireEvent.click((await within(await screen.findByRole("listbox")).findAllByRole("option"))[0]!);
+    await waitFor(() => expect(selected()!.textContent).toBe("kuznetsov"));
+    fill("Отчёт");
+    fireEvent.click(submitBtn());
+    await expectAt(`/tasks/${T_NEW_ID}`);
+    expect((await readBody(posts(app.f)[0]!)).assignee_id).toBe(ID_KUZNETSOV);
   });
 });

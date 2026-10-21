@@ -366,7 +366,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (CHANGES_REQUESTED по замораживанию времени в 2 тестах — исправлено оркестратором, проверено прогоном; отложено: тест на описание без trim, тест снятия старого alert, TZ=UTC stubEnv)
 
 ## R6-T11 — Диалог «Новая задача» (004): описание, срок, исполнитель
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-32 (диалог), AC-33, AC-34 (диалог); FR-20, FR-21, FR-25; 004/AC-14, AC-22…AC-25, AC-28 в редакции spec 006 §9.2
 - **Файлы:** `frontend/src/features/tasks/CreateTaskForm.tsx`, `frontend/src/app/router.tsx`;
   тесты: `frontend/tests/features/tasks/CreateTaskDialog.test.tsx`, `frontend/tests/features/tasks/CreateTaskDialogSubmit.test.tsx`,
@@ -391,7 +391,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   сценарии «только название» — дополняются описанием и сроком, смысл прежний.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/tasks tests/app` зелёный;
   проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R6-T11` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (APPROVE; тест-фиксы оркестратором: exactLabel, offered(); отложено: * у «Название задачи», тест на участника без роли, статус ошибки загрузки участников)
 
 ## R6-T12 — Карточка задачи: нельзя снять исполнителя, срок и описание (FR-23); словарь 006
 - **Статус:** TODO

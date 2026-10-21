@@ -195,6 +195,8 @@ function Sidebar({ profile }: { profile: MeResponse }) {
       {createOpen ? (
         <CreateTaskDialog
           currentProjectId={projectMatch?.params.projectId ?? null}
+          currentUser={{ id: profile.id, login: profile.login }}
+          canPickAssignee={profile.capabilities.includes("task_assign_others")}
           onClose={() => {
             setCreatePath(null);
             createRef.current?.focus();
