@@ -440,9 +440,12 @@ async def test_patch_partial_changes_only_given_field(api_env: ApiEnv) -> None:
 
 
 async def test_patch_null_due_date_and_null_assignee_clear_the_values(api_env: ApiEnv) -> None:
+    """006/AC-27 (R6-T14): у ПОДЗАДАЧИ null снимает срок и исполнителя; у задачи верхнего уровня
+    то же самое - 422 (api/test_task_update_006.py)."""
     env = api_env
     w = await make_api_world(env)
-    t = await mk(env, w, assignee="usr", due_date=date(2026, 10, 20))
+    parent = await mk(env, w, assignee="usr", due_date=date(2026, 10, 20))
+    t = await mk(env, w, assignee="usr", due_date=date(2026, 10, 20), parent=parent)
 
     r = await send(env, w.tok("ba"), "PATCH", task_url(t), {"due_date": None, "assignee_id": None})
 

@@ -58,6 +58,11 @@ if TYPE_CHECKING:
     from tests.factories import UserRow
 
 
+# 006/FR-23 (R6-T14): срок задачи верхнего уровня не раньше «сегодня»; ``fixed_clock``
+# (2026-10-13T09:00Z) делает результат независимым от реальной даты.
+pytestmark = pytest.mark.usefixtures("fixed_clock")
+
+
 @pytest.fixture
 def svc() -> Any:
     import app.domain.tasks.service as module
@@ -181,10 +186,18 @@ async def test_ac46_user_cannot_change_assignee_even_of_own_task(
 async def test_ac46_owner_ba_changes_assignee_in_own_project(db: AsyncSession, svc: Any) -> None:
     w = await make_world(db)
     tid = await _own(db, w, w.usr)
+    # 006/AC-27 (R6-T14): снять исполнителя у задачи верхнего уровня нельзя; снятие
+    # проверяется на подзадаче (test_fr20_ba_owner_and_ba_member_may_clear_assignee)
+    # и в api/test_task_update_006.py. Отказ идёт первым: ``fails`` откатывает сессию, а с ней
+    # и успешные изменения до него.
+    await fails(
+        db,
+        svc.update_task(db, actor_of(w.ba), tid, _patch(svc, assignee_id=None)),
+        "validation_error",
+    )
+    assert (await task_row(db, tid)).assignee_id == w.usr.id
     await svc.update_task(db, actor_of(w.ba), tid, _patch(svc, assignee_id=w.ba2.id))
     assert (await task_row(db, tid)).assignee_id == w.ba2.id
-    await svc.update_task(db, actor_of(w.ba), tid, _patch(svc, assignee_id=None))
-    assert (await task_row(db, tid)).assignee_id is None
 
 
 @pytest.mark.parametrize("fields", _EDIT_FIELDS, ids=lambda f: next(iter(f)))
@@ -310,6 +323,14 @@ async def test_ac48_ba_not_owner_edits_own_task_but_not_assignee(
     меняет исполнителя (другой, снятие, владелец)."""
     w = await make_world(db)
     tid = await mk_task(db, w, created_by=w.ba2.id, assignee_id=w.ba2.id)
+    # 006/AC-27 (R6-T14): снятие (None) у задачи верхнего уровня отклоняется, исполнитель прежний.
+    # Отказ идёт первым: ``fails`` откатывает сессию вместе с успешными изменениями до него.
+    await fails(
+        db,
+        svc.update_task(db, actor_of(w.ba2), tid, _patch(svc, assignee_id=None)),
+        "validation_error",
+    )
+    assert (await task_row(db, tid)).assignee_id == w.ba2.id
     await svc.update_task(
         db,
         actor_of(w.ba2),
@@ -331,9 +352,13 @@ async def test_ac48_ba_not_owner_edits_own_task_but_not_assignee(
         "high",
         "done",
     )
-    for target in (w.usr.id, None, w.ba.id):
+    for target in (w.usr.id, w.ba.id):
         await svc.update_task(db, actor_of(w.ba2), tid, _patch(svc, assignee_id=target))
         assert (await task_row(db, tid)).assignee_id == target
+    # у подзадачи снятие по-прежнему разрешено
+    sub = await mk_task(db, w, created_by=w.ba2.id, parent_id=tid, assignee_id=w.usr.id)
+    await svc.update_task(db, actor_of(w.ba2), sub, _patch(svc, assignee_id=None))
+    assert (await task_row(db, sub)).assignee_id is None
 
 
 async def test_ac48_owner_ba_changes_any_task_incl_foreign_author(
@@ -502,9 +527,30 @@ async def test_fr20_ba_owner_and_ba_member_may_clear_assignee(
 ) -> None:
     w = await make_world(db)
     await add_member_row(db, w, w.project_id, w.ba3)
-    tid = await mk_task(db, w, assignee_id=w.usr.id)
+    parent = await mk_task(db, w, assignee_id=w.usr.id)
+    tid = await mk_task(db, w, parent_id=parent, assignee_id=w.usr.id)
     await svc.update_task(db, actor_of(getattr(w, who)), tid, _patch(svc, assignee_id=None))
     assert (await task_row(db, tid)).assignee_id is None
+
+
+@pytest.mark.parametrize("who", ["ba", "ba3"])
+async def test_ac27_fr23_top_level_assignee_cannot_be_cleared(
+    db: AsyncSession, svc: Any, who: str
+) -> None:
+    """006/AC-27 (FR-23): прежняя проверка FR-20 «БА снимает исполнителя» теперь относится
+    только к подзадаче; у задачи верхнего уровня - 422, задача не меняется."""
+    w = await make_world(db)
+    await add_member_row(db, w, w.project_id, w.ba3)
+    tid = await mk_task(db, w, assignee_id=w.usr.id)
+    before = await _snapshot(db, tid)
+    await fails(
+        db,
+        svc.update_task(
+            db, actor_of(getattr(w, who)), tid, _patch(svc, title="Новое", assignee_id=None)
+        ),
+        "validation_error",
+    )
+    assert await _snapshot(db, tid) == before
 
 
 async def test_fr20_user_cannot_set_null_assignee(db: AsyncSession, svc: Any) -> None:
@@ -644,15 +690,19 @@ async def test_ac108_update_boundaries_ok(db: AsyncSession, svc: Any) -> None:
         db,
         actor_of(w.ba),
         tid,
-        _patch(svc, title=LONG_NAME_255, description=LONG_DESC_10000, due_date=None),
+        _patch(svc, title=LONG_NAME_255, description=LONG_DESC_10000, due_date=date(2027, 2, 2)),
     )
     r = await task_row(db, tid)
     assert r.title == LONG_NAME_255
     assert r.description == LONG_DESC_10000
-    assert r.due_date is None
-    await svc.update_task(db, actor_of(w.ba), tid, _patch(svc, title="Я", description=""))
-    r = await task_row(db, tid)
-    assert (r.title, r.description) == ("Я", "")
+    assert r.due_date == date(2027, 2, 2)
+    # 006/AC-27 (R6-T14): снятие срока и очистка описания - только у подзадачи
+    sub = await mk_task(db, w, parent_id=tid, due_date=date(2027, 1, 1), description="д")
+    await svc.update_task(
+        db, actor_of(w.ba), sub, _patch(svc, title="Я", description="", due_date=None)
+    )
+    r = await task_row(db, sub)
+    assert (r.title, r.description, r.due_date) == ("Я", "", None)
 
 
 @pytest.mark.parametrize(

@@ -289,7 +289,9 @@ def _changes(task: Task, patch: TaskPatch) -> dict[str, Any]:
 
 
 def _authorize(actor: Actor, project: ProjectFacts, task: Task, changed: dict[str, Any]) -> None:
-    """Права по реально меняющимся полям (FR-19) и проверка входных данных (422)."""
+    """Права по реально меняющимся полям (FR-19) и проверка входных данных (422).
+
+    Для задачи верхнего уровня после ``_validate`` — правила 006/FR-23 по меняющимся полям."""
     facts = TaskFacts(
         created_by=task.created_by, assignee_id=task.assignee_id, parent_id=task.parent_id
     )
@@ -309,6 +311,8 @@ def _authorize(actor: Actor, project: ProjectFacts, task: Task, changed: dict[st
             priority=changed.get("priority", task.priority),
         )
     )
+    if task.parent_id is None:
+        _check_top_level(changed, today_msk())
     if "status" in changed:
         _status(changed["status"])
 

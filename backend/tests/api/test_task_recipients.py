@@ -187,11 +187,13 @@ async def test_recipient_check_comes_after_permission_403_for_user(api_env: ApiE
     assert error(r) == (403, "forbidden")
 
 
-async def test_assignee_null_is_valid_for_ba_on_patch_but_not_on_create(api_env: ApiEnv) -> None:
-    """006/AC-20 (D-4): создание задачи с явным null - 422; PATCH (до R6-T14) прежний."""
+async def test_assignee_null_is_valid_for_ba_on_subtask_patch_only(api_env: ApiEnv) -> None:
+    """006/AC-20 (D-4), AC-27 (R6-T14): явный null исполнителя - 422 при создании задачи и при
+    PATCH задачи верхнего уровня (задача не меняется); PATCH подзадачи от БА - 200."""
     env = api_env
     w = await make_api_world(env)
     t = await mk(env, w, assignee="usr")
+    sub = await mk(env, w, assignee="usr", parent=t)
 
     created = await send(
         env,
@@ -200,7 +202,10 @@ async def test_assignee_null_is_valid_for_ba_on_patch_but_not_on_create(api_env:
         project_tasks_url(w.project_id),
         {"title": "Т", **TASK_REQ, "assignee_id": None},
     )
-    patched = await send(env, w.tok("ba"), "PATCH", task_url(t), {"assignee_id": None})
+    patched_top = await send(env, w.tok("ba"), "PATCH", task_url(t), {"assignee_id": None})
+    patched_sub = await send(env, w.tok("ba"), "PATCH", task_url(sub), {"assignee_id": None})
 
     assert error(created) == (422, "validation_error")
-    assert patched.status_code == 200 and patched.json()["assignee"] is None
+    assert error(patched_top) == (422, "validation_error")
+    assert (await task_db(env, t)).assignee_id == w.uid("usr")
+    assert patched_sub.status_code == 200 and patched_sub.json()["assignee"] is None

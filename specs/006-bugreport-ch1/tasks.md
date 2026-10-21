@@ -457,12 +457,12 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (CHANGES_REQUESTED: тела тестов 002/AC-23 и ac68/ac108 без обязательных полей — исправлено оркестратором, прогон tests/db целиком + api/domain зелёные; отложено: 2000-02-29 вернуть через подзадачу, доменный тест подзадачи «только название»)
 
 ## R6-T14 — Сервер: изменение задачи не снимает исполнителя и срок, не очищает описание (FR-23)
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-26, AC-27; FR-22, FR-23 (сервер), Q-2 б)
 - **Файлы:** `backend/app/domain/tasks/service.py`, `backend/app/api/v1/schemas/tasks.py`;
   тесты: `backend/tests/api/test_task_update_006.py` (новый), `backend/tests/api/test_tasks.py`,
   `backend/tests/domain/test_tasks_update_delete.py`
-  (+ `backend/tests/api/test_ba_tasks_002.py`, `backend/tests/api/test_task_permissions.py`,
+  (+ `backend/tests/api/test_task_recipients.py` (PATCH assignee null на верхнем уровне → 422; на подзадаче → 200), `backend/tests/api/test_ba_tasks_002.py`, `backend/tests/api/test_task_permissions.py`,
   `backend/tests/api/test_reassign_blocked.py`, `backend/tests/api/test_project_members.py`,
   `backend/tests/api/test_personal_tasks.py` — только если тест снимал исполнителя или срок у
   задачи верхнего уровня изменением)
@@ -483,7 +483,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   `test_tasks_update_delete.py` → AC-27.
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/api/test_task_update_006.py backend/tests/api backend/tests/domain`
   зелёный; проверки бэкенда и фронтенда зелёные; `python scripts/task_scope.py R6-T14` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (CHANGES_REQUESTED: доменные тесты зависели от реальной даты — pytestmark fixed_clock, исправлено оркестратором; отложено: уточнить docstring TaskUpdate про порядок проверок)
 
 ## R6-T15 — Документы: модель данных, чек-лист приёмки, ADR-0014
 - **Статус:** TODO
