@@ -199,6 +199,8 @@ export const ru = {
   "tasks.empty": "Задач нет",
   "tasks.col_title": "Название",
   "tasks.col_project": "Проект",
+  "tasks.parent_label": "Родительская задача",
+  "tasks.parent_open": "Открыть родительскую задачу",
   "tasks.col_status": "Статус",
   "tasks.col_priority": "Приоритет",
   "tasks.col_assignee": "Исполнитель",

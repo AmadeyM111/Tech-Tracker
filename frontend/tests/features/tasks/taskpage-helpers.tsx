@@ -219,3 +219,30 @@ export function setValue(el: Element | null, value: string) {
   fireEvent.change(el!, { target: { value } });
 }
 export { fireEvent, TID2, TID3, ID_KUZNETSOV, taskItem };
+
+// ---- R6-T03: карточка подзадачи и маршрут родителя (только добавлено) ----
+export const PARENT_GET = `GET /api/v1/tasks/${TID2}`;
+export const PARENT_TITLE = "Отчёт за квартал";
+
+/** Карточка подзадачи «Шаг 1» (id = TID1, parent_id = TID2), права как у участника с правкой. */
+export function subCard(over: Record<string, unknown> = {}) {
+  return card({ title: "Шаг 1", parent_id: TID2, ...over });
+}
+
+/** Карточка родителя (id = TID2, верхнего уровня), без прав правки: h1 содержит текст. */
+export function parentCard(over: Record<string, unknown> = {}) {
+  return card({ id: TID2, title: PARENT_TITLE, parent_id: null, permissions: NO_PERMS, ...over });
+}
+
+/** Маршруты карточки подзадачи + чтение родителя (по умолчанию 200) и комментариев родителя. */
+export function subCardRoutes(
+  cardFn: () => Record<string, unknown> = () => subCard(),
+  parentFn: Handler = () => j(200, parentCard()),
+  over: Record<string, Handler> = {},
+): Record<string, Handler> {
+  return cardRoutes(cardFn, {
+    [PARENT_GET]: parentFn,
+    [`GET /api/v1/tasks/${TID2}/comments`]: () => j(200, page([])),
+    ...over,
+  });
+}

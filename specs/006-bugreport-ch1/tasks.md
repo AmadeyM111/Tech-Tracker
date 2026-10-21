@@ -115,7 +115,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (APPROVE)
 
 ## R6-T03 — Ссылка «Родительская задача» в карточке подзадачи
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-47, AC-48, AC-49, AC-50, AC-51; FR-32…FR-37
 - **Файлы:** `frontend/src/features/tasks/TaskPage.tsx`, `frontend/src/shared/i18n/ru.ts`;
   тесты: `frontend/tests/features/tasks/ParentLink.test.tsx` (новый),
@@ -139,7 +139,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   при необходимости — только маршрут родителя в `cardRoutes`, RK-8).
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/tasks` зелёный; проверки
   фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R6-T03` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (APPROVE; желательное: тест AC-50 не ловит лишний GET /tasks/null при enabled:true, retry без паузы — отложено)
 
 ## R6-T04 — Подзадачи подряд: тест воспроизведения (только тесты)
 - **Статус:** TODO

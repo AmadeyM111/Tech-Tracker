@@ -101,6 +101,16 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
     (field ?? headingRef.current)?.focus();
   }, [pickerFocus]);
 
+  // PD-1: the parent's title only; an error here never reaches the card's alert region.
+  const parentId = task.parent_id;
+  const parent = useQuery({
+    queryKey: ["tasks", "parent", parentId],
+    queryFn: () => getTask(parentId as string),
+    enabled: parentId !== null,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   const members = useQuery({
     queryKey: ["tasks", "assignee-candidates", task.project.id],
     queryFn: () => listAllMembers(task.project.id),
@@ -328,6 +338,15 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
         <dd data-field="project">
           <Link to={`/projects/${task.project.id}`}>{task.project.name}</Link>
         </dd>
+
+        {parentId !== null && (
+          <>
+            <dt>{t("tasks.parent_label")}</dt>
+            <dd data-field="parent">
+              <Link to={`/tasks/${parentId}`}>{parent.data?.title ?? t("tasks.parent_open")}</Link>
+            </dd>
+          </>
+        )}
 
         <dt>{label("description", "tasks.field_description")}</dt>
         <dd data-field="description" className="ui-pre">
