@@ -16,7 +16,7 @@
 //   Поля находятся по autocomplete (username / current-password / new-password), кнопки по
 //   type: type="submit" — отправка, type="button" — выход. Тексты — только из словаря.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
@@ -64,4 +64,22 @@ export function deferred<T>() {
     reject = rej;
   });
   return { promise, resolve, reject };
+}
+
+// 006/R6-T02: user-event в проекте нет; Enter/Space на кнопке имитируются как в браузере:
+// Enter - keydown, Space - keydown + keyup, затем click, если события не отменены.
+export function pressKey(el: HTMLElement, key: "Enter" | " ") {
+  const code = key === " " ? "Space" : "Enter";
+  if (key === "Enter") {
+    if (fireEvent.keyDown(el, { key, code })) fireEvent.click(el);
+  } else {
+    const ok = fireEvent.keyDown(el, { key, code });
+    const ok2 = fireEvent.keyUp(el, { key, code });
+    if (ok && ok2) fireEvent.click(el);
+  }
+}
+
+/** Кнопки показа пароля: у них (и только у них) есть aria-pressed. */
+export function revealButtons(container: ParentNode): HTMLButtonElement[] {
+  return Array.from(container.querySelectorAll<HTMLButtonElement>("button[aria-pressed]"));
 }

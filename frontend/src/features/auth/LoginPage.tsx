@@ -18,6 +18,7 @@ export function LoginPage() {
   const [loginValue, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
+  const [shown, setShown] = useState(false);
 
   useEffect(() => {
     loginRef.current?.focus();
@@ -25,6 +26,7 @@ export function LoginPage() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    setShown(false);
     if (busy.current) return;
     if (loginValue.trim() === "" || password === "") {
       alert.show(errorMessage("validation_error"));
@@ -71,6 +73,7 @@ export function LoginPage() {
           onChange={setPassword}
           autoComplete="current-password"
           disabled={pending}
+          reveal={{ label: t("auth.show_password"), shown, onToggle: () => setShown((v) => !v) }}
         />
         <button type="submit" disabled={pending}>
           {t("auth.login_submit")}

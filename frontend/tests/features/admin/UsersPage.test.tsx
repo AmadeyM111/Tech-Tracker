@@ -651,3 +651,42 @@ describe("password panel login and stale rows (review T24 attempt 2)", () => {
     await waitFor(() => expect(action(row(container, ID_IVANOV), "unblock").disabled).toBe(false));
   });
 });
+
+// 006-bugreport-ch1, R6-T02, AC-2 (вторая часть): у ТА в создании и сбросе пароля кнопок показа нет.
+describe("no password reveal on admin screens (006/AC-2)", () => {
+  const REVEAL_NAMES = [
+    "auth.show_password",
+    "auth.show_current_password",
+    "auth.show_new_password",
+    "auth.show_confirm_password",
+  ].map((k) => (ru as Record<string, string>)[k]);
+
+  function expectNoReveal() {
+    expect(document.querySelectorAll("button[aria-pressed].ui-reveal, .ui-reveal").length).toBe(0);
+    expect(document.querySelectorAll('input[type="password"]').length).toBe(0);
+    for (const b of Array.from(document.querySelectorAll("button"))) {
+      expect(REVEAL_NAMES).not.toContain(b.getAttribute("aria-label"));
+    }
+  }
+
+  it("ac2_create_form_and_generated_password_panel_have_no_reveal", async () => {
+    const created = { id: ID_PETROV, login: "sidorov", role: null, is_blocked: false, must_change_password: true };
+    const { container } = await open({ [CREATE]: () => j(201, created) });
+    expect(loginInput(container)).toBeTruthy();
+    expectNoReveal();
+    submitCreate(container, "sidorov");
+    await waitFor(() => expect(shownPassword()).not.toBeNull());
+    expectNoReveal();
+  });
+
+  it("ac2_reset_confirmation_and_password_panel_have_no_reveal", async () => {
+    const path = `POST ${url(ID_PETROV, "reset-password")}`;
+    const { container } = await open({ [path]: NO_CONTENT });
+    fireEvent.click(action(row(container, ID_PETROV), "reset-password"));
+    const dialog = await screen.findByRole("alertdialog");
+    expectNoReveal();
+    fireEvent.click(action(dialog, "confirm"));
+    await waitFor(() => expect(shownPassword()).not.toBeNull());
+    expectNoReveal();
+  });
+});

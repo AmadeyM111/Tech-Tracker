@@ -80,12 +80,13 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (APPROVE)
 
 ## R6-T02 — «Глазок» на экране входа и в окне смены пароля
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7, AC-8, AC-9, AC-10; FR-1…FR-7, D-6, D-7
 - **Файлы:** `frontend/src/features/auth/LoginPage.tsx`, `frontend/src/features/auth/ChangePasswordPage.tsx`,
   `frontend/src/shared/i18n/ru.ts`;
   тесты: `frontend/tests/features/auth/LoginPage.test.tsx`, `frontend/tests/features/auth/ChangePasswordPage.test.tsx`,
-  `frontend/tests/app/password-modal.test.tsx`, `frontend/tests/features/admin/UsersPage.test.tsx`
+  `frontend/tests/app/password-modal.test.tsx`, `frontend/tests/features/admin/UsersPage.test.tsx`,
+  `frontend/tests/features/auth/helpers.tsx` (общие помощники pressKey/revealButtons)
   (+ `frontend/tests/app/start-screen.test.tsx`, `frontend/tests/app/welcome.test.tsx`,
   `frontend/tests/shared/i18n.test.ts` — только если тест перечисляет все кнопки экрана или
   ключи словаря: дополнить кнопками показа, не ослабляя)
@@ -111,7 +112,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   сохраняется, а не заменяется на «не меньше»).
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/auth tests/app tests/features/admin tests/shared`
   зелёный; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R6-T02` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (APPROVE)
 
 ## R6-T03 — Ссылка «Родительская задача» в карточке подзадачи
 - **Статус:** TODO
