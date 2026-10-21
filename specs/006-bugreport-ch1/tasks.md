@@ -200,7 +200,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (APPROVE совместно с T04; желательное: setTitle("") после 201 стирает уже введённое следующее название — отложено, см. отчёт ревьюера)
 
 ## R6-T06 — Прогресс с весами 100/50/0 (бэкенд)
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-43, AC-44, AC-45, AC-46; FR-30, FR-31
 - **Файлы:** `backend/app/domain/tasks/progress.py`, `backend/app/domain/tasks/queries.py`,
   `backend/app/domain/boards/service.py`;
@@ -229,7 +229,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   зелёный; `cd frontend && npx vitest run tests/features/tasks/progress-006.test.tsx` зелёный;
   проверки бэкенда и фронтенда зелёные; `git diff --stat HEAD -- docs/api frontend/src` пуст;
   `python scripts/task_scope.py R6-T06` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (APPROVE; желательное: единые имена тестов 006_acN — решить до финальной приёмки)
 
 ## R6-T07 — Три приоритета: модель, миграция 0007, умолчания, демо, OpenAPI (бэкенд)
 - **Статус:** TODO

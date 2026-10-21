@@ -314,11 +314,14 @@ async def test_ac7_progress_floor_deleted_excluded_and_review_not_closed(api_env
     gone = await mk(env, w, parent=parent, status="todo")
 
     r = await send(env, w.tok("ba"), "GET", task_url(parent))
-    assert r.json()["progress"] == 25  # 1 из 4, «На проверке» не закрыта
+    # AC-43 (006): Выполнена 100 + На проверке 50 + 2 x К выполнению 0 = 150 // 4 = 37
+    assert r.json()["progress"] == 37
 
     assert (await send(env, w.tok("ba"), "DELETE", task_url(gone))).status_code == 204
     r = await send(env, w.tok("ba"), "GET", task_url(parent))
-    assert r.json()["progress"] == 33  # пересчитано по оставшимся (1 из 3, вниз)
+    # AC-44 (006): пересчёт по оставшимся: (100 + 50 + 0) // 3 = 50;
+    # «На проверке» всё ещё не закрыта (FR-31)
+    assert r.json()["progress"] == 50
     assert len(r.json()["subtasks"]) == 3
     assert str(gone) not in r.text
 

@@ -333,7 +333,8 @@ async def test_ac7_subtask_status_drives_parent_progress(api_env: ApiEnv) -> Non
     await send(env, w.tok("ba"), "PATCH", task_url(ids[0]), {"status": "done"})
     assert (await send(env, w.tok("ba"), "GET", task_url(parent))).json()["progress"] == 33
     await send(env, w.tok("ba"), "PATCH", task_url(ids[1]), {"status": "review"})
-    assert (await send(env, w.tok("ba"), "GET", task_url(parent))).json()["progress"] == 33
+    # AC-43 (006): Выполнена + На проверке + К выполнению = 150 // 3 = 50 (раньше 33)
+    assert (await send(env, w.tok("ba"), "GET", task_url(parent))).json()["progress"] == 50
     await send(env, w.tok("ba"), "PATCH", task_url(ids[1]), {"status": "done"})
     await send(env, w.tok("ba"), "PATCH", task_url(ids[2]), {"status": "done"})
     assert (await send(env, w.tok("ba"), "GET", task_url(parent))).json()["progress"] == 100

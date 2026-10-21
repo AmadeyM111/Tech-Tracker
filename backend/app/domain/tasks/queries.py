@@ -151,6 +151,7 @@ async def get_task(db: AsyncSession, actor: Actor, task_id: UUID) -> TaskView:
         user_ids.add(task.assignee_id)
     refs = await user_refs(db, actor.workspace_id, [u for u in user_ids if u is not None])
     done = sum(1 for s in subs if s.status == TaskStatus.DONE)
+    in_work = sum(1 for s in subs if s.status in (TaskStatus.IN_PROGRESS, TaskStatus.REVIEW))
     return TaskView(
         id=task.id,
         project=TaskProjectRef(id=task.project_id, name=row.project_name),
@@ -174,7 +175,7 @@ async def get_task(db: AsyncSession, actor: Actor, task_id: UUID) -> TaskView:
             )
             for s in subs
         ],
-        progress=progress(done, len(subs)),
+        progress=progress(done=done, in_work=in_work, total=len(subs)),
         created_at=task.created_at,
         updated_at=task.updated_at,
         permissions=TaskPermissions(

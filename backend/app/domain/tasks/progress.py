@@ -1,10 +1,10 @@
-"""Прогресс по подзадачам (plan §4.8/progress.py; FR-22, AC-7)."""
+"""Прогресс по подзадачам (plan 006 §4.3, PD-10; FR-30, AC-43)."""
 
 from __future__ import annotations
 
 
-def progress(done: int, total: int) -> int | None:
-    """Процент готовых подзадач, округление вниз; ``None``, если подзадач нет (FR-22)."""
+def progress(*, done: int, in_work: int, total: int) -> int | None:
+    """006/FR-30: ⌊(100·done + 50·in_work) / total⌋; ``None``, если подзадач нет."""
     if total == 0:
         return None
-    return done * 100 // total
+    return (100 * done + 50 * in_work) // total
