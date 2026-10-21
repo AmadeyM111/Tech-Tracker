@@ -172,6 +172,10 @@ describe("AC-16: поля выбора приоритета (FR-12, FR-9)", () =
     fireEvent.change(form.querySelector('input[name="title"]')!, {
       target: { value: "Новая" },
     });
+    // 006/FR-19: описание обязательно
+    fireEvent.change(form.querySelector('[name="description"]')!, {
+      target: { value: "Описание" },
+    });
     fireEvent.change(sel, { target: { value: "low" } });
     expect(sel.value).toBe("low");
     fireEvent.submit(form);

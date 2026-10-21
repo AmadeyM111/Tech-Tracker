@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent 
 
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t, type MessageKey } from "../../shared/i18n";
-import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
+import { ErrorAlert, FieldError, useAlertState } from "../../shared/ui/ErrorAlert";
 import { UserPicker } from "../../shared/ui/UserPicker";
 import { listCreatableProjects, type CreatableProject } from "../projects/api";
 import { createTask, type TaskCreate, type TaskDetail, type TaskPriority } from "./api";
@@ -67,57 +67,94 @@ export interface CreateTaskFormProps {
   canPickAssignee: boolean;
   /** Ids the assignee may be chosen from (project members). */
   assigneeIds: readonly string[];
+  /** 006/FR-19: исполнитель по умолчанию; строка «Исполнитель: <логин>» у «Пользователя». */
+  currentUser: { id: string; login: string };
 }
 
-export function CreateTaskForm({ projectId, canPickAssignee, assigneeIds }: CreateTaskFormProps) {
+function RequiredMark() {
+  return (
+    <span className="ui-required" aria-hidden="true">
+      {t("tasks.required_mark")}
+    </span>
+  );
+}
+
+export function CreateTaskForm({ projectId, canPickAssignee, assigneeIds, currentUser }: CreateTaskFormProps) {
   const baseId = useId();
   const queryClient = useQueryClient();
   const alert = useAlertState();
   const busy = useRef(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const dueRef = useRef<HTMLInputElement>(null);
+  const assigneeBoxRef = useRef<HTMLDivElement>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState(() => todayMsk());
   const [priority, setPriority] = useState<TaskPriority>("medium");
-  const [assignee, setAssignee] = useState<{ id: string; login: string } | null>(null);
+  const [assignee, setAssignee] = useState<{ id: string; login: string } | null>(currentUser);
+  const [errors, setErrors] = useState<DraftErrors>({});
   // A new key empties the picker's own text field.
   const [pickerKey, setPickerKey] = useState(0);
   const [pending, setPending] = useState(false);
+
+  const errorId = (field: DraftField): string => `${baseId}-${field}-error`;
+  const fieldProps = (field: DraftField) =>
+    errors[field] === undefined
+      ? { "aria-required": true as const }
+      : { "aria-required": true as const, "aria-invalid": true as const, "aria-describedby": errorId(field) };
+  const errorText = (field: DraftField): string | null => {
+    const key = errors[field];
+    return key === undefined ? null : t(key);
+  };
 
   function clearAssignee(): void {
     setAssignee(null);
     setPickerKey((k) => k + 1);
   }
 
+  function focusField(field: DraftField): void {
+    if (field === "title") titleRef.current?.focus();
+    else if (field === "description") descriptionRef.current?.focus();
+    else if (field === "due_date") dueRef.current?.focus();
+    else assigneeBoxRef.current?.querySelector("input")?.focus();
+  }
+
   function onSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (busy.current) return;
-    const name = title.trim();
-    if (name === "") {
-      alert.show(errorMessage("validation_error"));
+    alert.clear();
+    const found = taskDraftErrors(
+      { title, description, dueDate, assigneeId: canPickAssignee ? (assignee?.id ?? null) : undefined },
+      todayMsk(),
+    );
+    setErrors(found);
+    const first = DRAFT_FIELDS.find((field) => found[field] !== undefined);
+    if (first !== undefined) {
+      focusField(first);
       return;
     }
-    const body: TaskCreate = { title: name, priority };
-    if (description !== "") body.description = description;
     // The date is sent exactly as the field holds it: YYYY-MM-DD, no time zone (NFR-5).
-    if (dueDate !== "") body.due_date = dueDate;
+    const body: TaskCreate = { title: title.trim(), description, due_date: dueDate, priority };
     if (canPickAssignee && assignee !== null) body.assignee_id = assignee.id;
 
     busy.current = true;
     setPending(true);
-    alert.clear();
     void (async () => {
       try {
         await createTask(projectId, body);
         setTitle("");
         setDescription("");
-        setDueDate("");
+        setDueDate(todayMsk());
         setPriority("medium");
-        clearAssignee();
+        setAssignee(currentUser);
+        setPickerKey((k) => k + 1);
         titleRef.current?.focus();
         await queryClient.invalidateQueries({ queryKey: ["tasks", "project", projectId] });
       } catch (e) {
-        alert.show(errorMessage(e instanceof ApiError ? e.code : "unknown"));
+        const code = e instanceof ApiError ? e.code : "unknown";
+        if (code === "due_date_in_past") setErrors({ due_date: "tasks.error_due_past" });
+        else alert.show(errorMessage(code));
       }
       busy.current = false;
       setPending(false);
@@ -130,45 +167,67 @@ export function CreateTaskForm({ projectId, canPickAssignee, assigneeIds }: Crea
       <ErrorAlert message={alert.message} seq={alert.seq} />
       <form data-form="create-task" onSubmit={onSubmit} noValidate aria-busy={pending ? "true" : undefined}>
         <div className="ui-field">
-          <label htmlFor={`${baseId}-name`}>{t("tasks.title_label")}</label>
+          <label htmlFor={`${baseId}-name`}>
+            {t("tasks.title_label")}
+            <RequiredMark />
+          </label>
           <input
             id={`${baseId}-name`}
             ref={titleRef}
             type="text"
             name="title"
             autoComplete="off"
+            {...fieldProps("title")}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
+          <FieldError id={errorId("title")} message={errorText("title")} />
         </div>
         <div className="ui-field">
-          <label htmlFor={`${baseId}-description`}>{t("tasks.description_label")}</label>
+          <label htmlFor={`${baseId}-description`}>
+            {t("tasks.description_label")}
+            <RequiredMark />
+          </label>
           <textarea
             id={`${baseId}-description`}
+            ref={descriptionRef}
             name="description"
+            {...fieldProps("description")}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
+          <FieldError id={errorId("description")} message={errorText("description")} />
         </div>
         <div className="ui-field">
-          <label htmlFor={`${baseId}-due`}>{t("tasks.due_label")}</label>
+          <label htmlFor={`${baseId}-due`}>
+            {t("tasks.due_label")}
+            <RequiredMark />
+          </label>
           <input
             id={`${baseId}-due`}
+            ref={dueRef}
             type="date"
             name="due_date"
+            {...fieldProps("due_date")}
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
           />
+          <FieldError id={errorId("due_date")} message={errorText("due_date")} />
         </div>
         {canPickAssignee ? (
-          <>
+          <div ref={assigneeBoxRef}>
             <UserPicker
               key={pickerKey}
               label={t("tasks.assignee_label")}
+              labelMark={<RequiredMark />}
               allowedIds={assigneeIds}
               quietError
+              required
+              invalid={errors.assignee !== undefined}
+              describedBy={errors.assignee === undefined ? undefined : errorId("assignee")}
               onSelect={(user) => setAssignee({ id: user.id, login: user.login })}
             />
+            <FieldError id={errorId("assignee")} message={errorText("assignee")} />
             {assignee === null ? null : (
               <p>
                 {t("tasks.assignee_selected")}: <strong data-field="selected-assignee">{assignee.login}</strong>{" "}
@@ -177,8 +236,10 @@ export function CreateTaskForm({ projectId, canPickAssignee, assigneeIds }: Crea
                 </button>
               </p>
             )}
-          </>
-        ) : null}
+          </div>
+        ) : (
+          <p data-field="fixed-assignee">{t("tasks.assignee_fixed", { login: currentUser.login })}</p>
+        )}
         <div className="ui-field">
           <label htmlFor={`${baseId}-priority`}>{t("tasks.priority_label")}</label>
           <select

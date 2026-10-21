@@ -176,6 +176,12 @@ select:disabled {
   font-size: 1.125rem;
 }
 
+/* 006 (PD-12): visible mark of a required field. */
+.ui-required {
+  color: var(--danger);
+  margin-left: 4px;
+}
+
 .ui-error {
   color: var(--danger);
   margin: 0 0 12px;

@@ -111,10 +111,12 @@ export interface ProjectTaskListProps {
   canCreate: boolean;
   /** The actor's role from /me: only a business admin may choose an assignee (FR-9). */
   actorRole: string | null;
+  /** 006/FR-19: исполнитель по умолчанию в форме создания. */
+  currentUser: { id: string; login: string };
 }
 
 /** Content of the "Tasks" tab (without the tab heading). */
-export function ProjectTaskList({ projectId, members, canCreate, actorRole }: ProjectTaskListProps) {
+export function ProjectTaskList({ projectId, members, canCreate, actorRole, currentUser }: ProjectTaskListProps) {
   const baseId = useId();
   const [page, setPage] = useState(1);
   const [assigneeId, setAssigneeId] = useState("");
@@ -140,7 +142,12 @@ export function ProjectTaskList({ projectId, members, canCreate, actorRole }: Pr
   return (
     <>
       {canCreate ? (
-        <CreateTaskForm projectId={projectId} canPickAssignee={canPickAssignee} assigneeIds={assigneeIds} />
+        <CreateTaskForm
+          projectId={projectId}
+          canPickAssignee={canPickAssignee}
+          assigneeIds={assigneeIds}
+          currentUser={currentUser}
+        />
       ) : null}
       <div className="ui-actions">
         <div className="ui-field">

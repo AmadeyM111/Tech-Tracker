@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 
 import { listDirectory, type DirectoryUser } from "../../features/users/api";
 import { ApiError } from "../api/client";
@@ -23,6 +23,8 @@ export interface UserPickerProps {
   invalid?: boolean;
   /** aria-describedby у combobox (сообщение об ошибке поля). */
   describedBy?: string;
+  /** Признак обязательности внутри собственной подписи (006/PD-12), напр. `<span class="ui-required">`. */
+  labelMark?: ReactNode;
 }
 
 const DEBOUNCE_MS = 300;
@@ -38,7 +40,7 @@ const ACTIVE_STYLE: CSSProperties = {
 const MAX_QUERY_LENGTH = 64;
 
 /** Combobox over the users directory: search by login, keyboard and click selection. */
-export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietError, labelledBy, required, invalid, describedBy }: UserPickerProps) {
+export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietError, labelledBy, required, invalid, describedBy, labelMark }: UserPickerProps) {
   const baseId = useId();
   const inputId = `${baseId}-input`;
   const listId = `${baseId}-list`;
@@ -147,7 +149,12 @@ export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietE
 
   return (
     <div className="ui-field">
-      {labelledBy === undefined ? <label htmlFor={inputId}>{label}</label> : null}
+      {labelledBy === undefined ? (
+        <label htmlFor={inputId}>
+          {label}
+          {labelMark}
+        </label>
+      ) : null}
       <input
         id={inputId}
         ref={inputRef}

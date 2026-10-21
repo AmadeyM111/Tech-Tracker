@@ -330,11 +330,13 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (тест-фикс оркестратором: импорт M_PETROV; проверка прогоном; ревью не проводилось — чистые функции, ускоренный режим)
 
 ## R6-T10 — Форма вкладки «Задачи»: обязательные поля, умолчания, сообщения у полей
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-28, AC-29, AC-30, AC-31, AC-32 (форма), AC-34 (без регрессии); FR-19, FR-21, FR-25, PD-12, PD-13
 - **Файлы:** `frontend/src/features/tasks/CreateTaskForm.tsx`, `frontend/src/features/tasks/TaskList.tsx`,
   `frontend/src/features/projects/ProjectPage.tsx`, `frontend/src/app/router.tsx`,
-  `frontend/src/shared/i18n/ru.ts`, `frontend/src/shared/ui/ui.css`;
+  `frontend/src/shared/i18n/ru.ts`, `frontend/src/shared/ui/ui.css`,
+  `frontend/src/shared/ui/UserPicker.tsx` (проп labelMark для знака обязательности внутри подписи),
+  `frontend/tests/features/tasks/priority-006.test.tsx`, `frontend/tests/features/boards/BoardCreate.test.tsx` (добавлено описание — FR-19);
   тесты: `frontend/tests/features/tasks/CreateTaskForm.test.tsx`, `frontend/tests/features/tasks/TaskList.test.tsx`,
   `frontend/tests/features/projects/ProjectPage.test.tsx`, `frontend/tests/shared/i18n.test.ts`
   (+ `frontend/tests/features/tasks/helpers.tsx`, `frontend/tests/features/projects/helpers.tsx` — только помощники)
@@ -361,7 +363,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   `ProjectPage.test.tsx` — создание с только названием → тела по AC-31.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/tasks tests/features/projects tests/shared`
   зелёный; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R6-T10` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (CHANGES_REQUESTED по замораживанию времени в 2 тестах — исправлено оркестратором, проверено прогоном; отложено: тест на описание без trim, тест снятия старого alert, TZ=UTC stubEnv)
 
 ## R6-T11 — Диалог «Новая задача» (004): описание, срок, исполнитель
 - **Статус:** TODO

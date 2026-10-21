@@ -177,6 +177,8 @@ describe("004 AC-7: создание через вкладку «Задачи»,
     await waitFor(() => expect(createForm(container)).toBeTruthy());
     const form = createForm(container)!;
     fireEvent.change(form.querySelector<HTMLInputElement>('input[name="title"]')!, { target: { value: "Проверка" } });
+    // 006/FR-19: описание обязательно
+    fireEvent.change(form.querySelector('[name="description"]')!, { target: { value: "Описание" } });
     fireEvent.submit(form);
     await waitFor(() => expect(taskRow(container, TN)).toBeTruthy());
     expect(f.count(PROJ_CREATE)).toBe(1);

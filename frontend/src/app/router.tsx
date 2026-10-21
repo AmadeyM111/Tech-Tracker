@@ -397,7 +397,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/projects/:projectId"
         element={
           <RoleScreen insideMain={insideMain} capability="business_access">
-            {(profile) => <ProjectPage currentUserId={profile.id} currentRole={profile.role} />}
+            {(profile) => <ProjectPage currentUserId={profile.id} currentLogin={profile.login} currentRole={profile.role} />}
           </RoleScreen>
         }
       />
