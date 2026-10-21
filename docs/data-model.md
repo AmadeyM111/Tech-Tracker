@@ -147,7 +147,7 @@
 | `title` | varchar(255) | нет | название; `CHECK` `ck_task_title_length`: `char_length(title) BETWEEN 1 AND 255` |
 | `description` | text | нет | описание, `''` если пусто; `CHECK` `ck_task_description_length`: не больше 10000 символов |
 | `status` | text | нет | `todo`, `in_progress`, `review`, `done`; `CHECK` `ck_task_status_valid` |
-| `priority` | text | нет | `base`, `high`; `CHECK` `ck_task_priority_valid` |
+| `priority` | text | нет | `low`, `medium`, `high` (если не передан при создании, API ставит `medium`; значения по умолчанию в БД нет); `CHECK` `ck_task_priority_valid`; миграция 0007: `base` → `medium`, `high` без изменений |
 | `due_date` | date | да | срок |
 | `assignee_id` | uuid | да | исполнитель; FK → `app_user.id`, `RESTRICT` |
 | `position` | bigint | да | позиция в колонке доски; только у задач верхнего уровня: `CHECK` `ck_task_position_top_level`: `(parent_id IS NULL) = (position IS NOT NULL)` |

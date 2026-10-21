@@ -486,7 +486,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (CHANGES_REQUESTED: доменные тесты зависели от реальной даты — pytestmark fixed_clock, исправлено оркестратором; отложено: уточнить docstring TaskUpdate про порядок проверок)
 
 ## R6-T15 — Документы: модель данных, чек-лист приёмки, ADR-0014
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-11, AC-35, AC-42, AC-55 (*ручные*: пункты чек-листа); NFR-1 (документация); plan PD-20
 - **Файлы:** `docs/data-model.md`, `docs/acceptance/mvp-demo.md`, `docs/adr/0014-task-rules-006.md` (новый)
 - **Зависит от:** R6-T14, R6-T06
@@ -505,7 +505,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Готово, когда:** `source .venv/bin/activate && pytest -q -m infra_static backend/tests/infra/test_docs_static.py`
   зелёный без правок теста; в чек-листе по одному пункту `006/AC-11`, `006/AC-35`, `006/AC-42`,
   `006/AC-55`; код не тронут; `python scripts/task_scope.py R6-T15` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (docs; test_docs_static 246 passed; ревью не проводилось — ускоренный режим)
 
 ## R6-T16 — Спецификации 001 (v0.20) и 004 (v0.3)
 - **Статус:** TODO
