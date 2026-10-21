@@ -142,7 +142,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (APPROVE; желательное: тест AC-50 не ловит лишний GET /tasks/null при enabled:true, retry без паузы — отложено)
 
 ## R6-T04 — Подзадачи подряд: тест воспроизведения (только тесты)
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-36, AC-37 (написание; исполнение — R6-T05); NFR-5
 - **Файлы:** тесты: `frontend/tests/features/tasks/SubtaskSequence.test.tsx` (новый)
   (+ `frontend/tests/features/tasks/taskpage-helpers.tsx` — только добавить помощники)
@@ -165,10 +165,10 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   выполнен, отчёт содержит список красных и зелёных тестов и диагноз (или `NOT_REPRODUCED`);
   `npm run lint && npm run typecheck` зелёные; `git diff --stat HEAD -- frontend/src backend` пуст;
   `python scripts/task_scope.py R6-T04` → 0. Коммит — вместе с R6-T05.
-- **Попытки:** 0
+- **Попытки:** 1 (воспроизведено: 4 красных на HEAD)
 
 ## R6-T05 — Подзадачи подряд: исправление и сообщения формы подзадачи
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-36, AC-37 (зелёные), AC-38, AC-39, AC-40; FR-26…FR-29, D-8
 - **Файлы:** `frontend/src/features/tasks/SubtaskList.tsx`, `frontend/src/features/tasks/TaskPage.tsx`,
   `frontend/src/shared/ui/ErrorAlert.tsx`, `frontend/src/shared/i18n/ru.ts`;
@@ -197,7 +197,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/tasks` зелёный, включая
   `SubtaskSequence.test.tsx` из R6-T04 без правок; проверки фронтенда зелёные; бэкенд не тронут;
   `python scripts/task_scope.py R6-T05` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (APPROVE совместно с T04; желательное: setTitle("") после 201 стирает уже введённое следующее название — отложено, см. отчёт ревьюера)
 
 ## R6-T06 — Прогресс с весами 100/50/0 (бэкенд)
 - **Статус:** TODO

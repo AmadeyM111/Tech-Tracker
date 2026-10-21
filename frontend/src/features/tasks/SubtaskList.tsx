@@ -4,48 +4,69 @@ import { Link } from "react-router-dom";
 
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
-import type { AlertState } from "../../shared/ui/ErrorAlert";
+import { FieldError } from "../../shared/ui/ErrorAlert";
 import { createSubtask, type TaskDetail } from "./api";
+
+const MAX_TITLE = 255;
 
 export interface SubtaskListProps {
   task: TaskDetail;
-  /** The card's single alert region: this list shows no alert of its own. */
-  alert: AlertState;
   /** Called after a subtask was created: the card is re-read (subtask and progress). */
   onCreated: () => Promise<unknown>;
 }
 
-export function SubtaskList({ task, alert, onCreated }: SubtaskListProps) {
+export function SubtaskList({ task, onCreated }: SubtaskListProps) {
   const baseId = useId();
   const busy = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [pending, setPending] = useState(false);
+  // The form's own message, inside the "Subtasks" section (006/FR-28, D-8).
+  const [message, setMessage] = useState<string | null>(null);
+  const errorId = `${baseId}-error`;
 
   // One level only (FR-21): a subtask has no create form even with the right.
   const canCreate = task.permissions.create_subtask && task.parent_id === null;
 
+  function fail(text: string): void {
+    setMessage(text);
+    inputRef.current?.focus();
+  }
+
   function onSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (busy.current) return;
+    setMessage(null);
     const name = title.trim();
     if (name === "") {
-      alert.show(errorMessage("validation_error"));
+      fail(t("tasks.subtask_error_title_required"));
       return;
     }
+    if (name.length > MAX_TITLE) {
+      fail(t("tasks.subtask_error_title_too_long"));
+      return;
+    }
+    // busy covers the POST only: re-reading the card never blocks the next submit (FR-29).
     busy.current = true;
     setPending(true);
-    alert.clear();
     void (async () => {
+      let created = false;
       try {
         // No assignee key: the server assigns it itself (FR-20, FR-19b).
         await createSubtask(task.id, { title: name });
-        setTitle("");
-        await onCreated();
+        created = true;
       } catch (e) {
-        alert.show(errorMessage(e instanceof ApiError ? e.code : "unknown"));
+        fail(errorMessage(e instanceof ApiError ? e.code : "unknown"));
       }
       busy.current = false;
       setPending(false);
+      if (created) {
+        setTitle("");
+        setMessage(null);
+        inputRef.current?.focus();
+        // A re-read failure is not a creation failure: it is not shown here.
+        onCreated().catch(() => undefined);
+      }
     })();
   }
 
@@ -81,12 +102,16 @@ export function SubtaskList({ task, alert, onCreated }: SubtaskListProps) {
             <label htmlFor={`${baseId}-name`}>{t("tasks.subtask_title_label")}</label>
             <input
               id={`${baseId}-name`}
+              ref={inputRef}
               type="text"
               name="title"
               autoComplete="off"
+              aria-invalid={message !== null ? "true" : undefined}
+              aria-describedby={message !== null ? errorId : undefined}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
+            <FieldError id={errorId} message={message} />
           </div>
           <button type="submit">{t("tasks.subtask_create_submit")}</button>
         </form>

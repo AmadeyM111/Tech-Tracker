@@ -380,7 +380,6 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
 
       <SubtaskList
         task={task}
-        alert={alert}
         onCreated={() => queryClient.invalidateQueries({ queryKey: cardKey })}
       />
 

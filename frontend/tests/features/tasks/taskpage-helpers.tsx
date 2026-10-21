@@ -77,9 +77,15 @@
 //   (не "0%", FR-22).
 //   Создание: form[data-form="create-subtask"] - только при permissions.create_subtask И parent_id === null
 //   (FR-21); input[name="title"] (label ru["tasks.subtask_title_label"]), submit. POST /tasks/{id}/subtasks
-//   с телом {title (trim)} без ключа assignee_id (FR-20/FR-19b: сервер назначает сам). Пустое название ->
-//   запроса нет, alert validation_error. Успех -> поле очищено, карточка перечитана (подзадача и прогресс
-//   видны). Один POST при двойной отправке. Ошибка -> alert errorMessage(code), ввод сохраняется.
+//   с телом {title (trim)} без ключа assignee_id (FR-20/FR-19b: сервер назначает сам). Успех -> поле очищено
+//   и в фокусе, карточка перечитана (подзадача и прогресс видны). Один POST при двойной отправке.
+//   R6-T05 (006, FR-27/FR-28/FR-29, D-8; заменяет прежнее «alert validation_error» и «alert errorMessage(code)
+//   в общей области» для формы подзадачи - RK-7): сообщения формы подзадачи - ровно один role="alert" ВНУТРИ
+//   section[data-section="subtasks"], в общей области карточки их нет; поле с aria-invalid="true" и
+//   aria-describedby -> id сообщения. Пустое/пробельное название -> запроса нет, «Введите название подзадачи»;
+//   trim().length > 255 -> запроса нет, «Название подзадачи — не более 255 символов» (validation_error форма
+//   подзадачи не показывает). Ошибка сервера/сети -> errorMessage(code) в секции, ввод сохраняется, повтор
+//   шлёт новый запрос. busy защищает только POST (не перечитывание карточки).
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect } from "vitest";
 
@@ -246,3 +252,48 @@ export function subCardRoutes(
     ...over,
   });
 }
+
+// ---- R6-T04: подзадачи подряд (только добавлено) ----
+export interface SubtaskServer {
+  /** Маршруты для openCard: POST подзадачи -> 201, GET карточки -> накопленные подзадачи. */
+  routes: Record<string, Handler>;
+  /** Названия, с которыми пришли POST, в порядке прихода. */
+  posted: string[];
+  /** Следующие GET карточки (после первого) ждут этот шлюз; null - не задерживать. */
+  holdReads: (gate: Promise<unknown> | null) => void;
+}
+
+/** Сеть для сценариев AC-36/AC-37: каждый POST -> 201 и подзадача копится, каждый GET отдаёт накопленное. */
+export function subtaskServer(perms: Record<string, boolean> = ALL_PERMS): SubtaskServer {
+  const subs: ReturnType<typeof sub>[] = [];
+  const posted: string[] = [];
+  let reads = 0;
+  let gate: Promise<unknown> | null = null;
+  const snapshot = () => card({ permissions: perms, subtasks: [...subs], progress: subs.length === 0 ? null : 0 });
+  return {
+    posted,
+    holdReads: (g) => {
+      gate = g;
+    },
+    routes: {
+      [TASK]: async () => {
+        reads += 1;
+        const body = snapshot();
+        if (reads > 1 && gate !== null) await gate;
+        return j(200, body);
+      },
+      [SUB_POST]: async (r) => {
+        const b = (await r.clone().json()) as { title: string };
+        posted.push(b.title);
+        subs.push(sub(`d${subs.length + 1}d${subs.length + 1}d${subs.length + 1}d${subs.length + 1}-0000-4000-8000-00000000000${subs.length + 1}`, b.title));
+        return j(201, card());
+      },
+    },
+  };
+}
+
+/** Поле «Название подзадачи» в карточке. */
+export const subTitleField = (c: ParentNode) => subForm(c)!.querySelector<HTMLInputElement>('input[name="title"]')!;
+/** Названия подзадач в списке, в порядке показа. */
+export const subTitlesShown = (c: ParentNode) =>
+  Array.from(subSection(c)!.querySelectorAll<HTMLElement>('[data-subtask-id] [data-field="title"]')).map((e) => e.textContent);

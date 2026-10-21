@@ -242,6 +242,8 @@ export const ru = {
   "tasks.progress_value": "{percent}%",
   "tasks.subtask_title_label": "Название подзадачи",
   "tasks.subtask_create_submit": "Добавить подзадачу",
+  "tasks.subtask_error_title_required": "Введите название подзадачи",
+  "tasks.subtask_error_title_too_long": "Название подзадачи — не более 255 символов",
   "tasks.description_none": "Описание не указано",
   "tasks.edit_title": "Правка задачи",
   "tasks.save": "Сохранить",
