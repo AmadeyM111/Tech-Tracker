@@ -42,16 +42,28 @@
 //       change_assignee -> UserPicker (combobox, доступное имя ru["tasks.col_assignee"], allowedIds = участники
 //                          проекта из GET /projects/{pid}/members, page_size=100); в этом же [data-field="assignee"]
 //                          текущий исполнитель текстом (login / ru["tasks.assignee_none"]); выбор -> PATCH
-//                          {assignee_id: <id>}; button[data-action="clear-assignee"] (виден, если исполнитель
-//                          есть) -> PATCH {assignee_id: null}. Других ключей в этих PATCH нет.
+//                          {assignee_id: <id>}; button[data-action="clear-assignee"] (R6-T12, 006/FR-23, AC-56:
+//                          ТОЛЬКО у подзадачи, т.е. при parent_id !== null, и только если исполнитель есть; у задачи
+//                          верхнего уровня (parent_id === null) кнопки нет никогда, в т.ч. при исполнителе)
+//                          -> PATCH {assignee_id: null}. Других ключей в этих PATCH нет.
 //       edit            -> form[data-form="edit-task"] (ОДНА форма, внутри title input, description, due_date,
 //                          priority и submit ru["tasks.save"]; status/assignee могут быть внутри или снаружи):
 //                          input[name="title"] (в h1), textarea[name="description"], input[type="date"]
 //                          [name="due_date"], select[name="priority"] (low|medium|high), каждый с доступным именем =
 //                          подпись поля. Значения предзаполнены. Submit шлёт PATCH ТОЛЬКО с изменёнными
-//                          полями (title - trim); без изменений запроса нет; очищенный срок -> due_date:null;
-//                          ключа assignee_id/status в этом PATCH нет (UNSET). Пустое название -> запроса
-//                          нет, role="alert" errorMessage("validation_error").
+//                          полями (title - trim); без изменений запроса нет; ключа assignee_id/status в этом PATCH
+//                          нет (UNSET). Пустое название -> запроса нет, role="alert" errorMessage("validation_error").
+//                          R6-T12 (006/FR-23, AC-56; plan §4.8): очищенный срок -> due_date:null ТОЛЬКО у подзадачи.
+//                          У задачи верхнего уровня (parent_id === null) ИЗМЕНЁННЫЕ описание и срок проверяются
+//                          taskDraftErrors: пустое/пробельное описание -> «Введите описание задачи», пустой срок ->
+//                          «Укажите срок», срок раньше «сегодня» по Europe/Moscow -> «Срок не может быть раньше
+//                          сегодняшнего дня»; запроса нет, сообщение - role="alert" рядом с полем, на него указывает
+//                          aria-describedby поля, у поля aria-invalid="true", фокус на первом неверном поле
+//                          (описание, затем срок), ввод сохранён. Неизменённые поля не проверяются (старая задача без
+//                          срока/описания сохраняется одним PATCH только с названием). 422 due_date_in_past от
+//                          PATCH -> то же сообщение у срока, общего alert нет, ввод сохранён. Сообщения снимаются при
+//                          следующем сохранении. У подзадачи проверок нет: PATCH как раньше (due_date:null,
+//                          description:"").
 //       Без edit формы нет вовсе (form[data-form="edit-task"] отсутствует).
 //     delete          -> button[data-action="delete-task"] -> ConfirmDialog (alertdialog, shared/ui);
 //                        confirm -> DELETE /tasks/{id} -> переход на /projects/<project.id>; cancel -> запроса нет.
@@ -297,3 +309,28 @@ export const subTitleField = (c: ParentNode) => subForm(c)!.querySelector<HTMLIn
 /** Названия подзадач в списке, в порядке показа. */
 export const subTitlesShown = (c: ParentNode) =>
   Array.from(subSection(c)!.querySelectorAll<HTMLElement>('[data-subtask-id] [data-field="title"]')).map((e) => e.textContent);
+
+// ---- R6-T12: правила изменения задачи (только добавлено) ----
+/** Открывает карточку подзадачи (id = TID1, parent_id = TID2) через полный роутер. */
+export async function openSubCardPage(
+  cardFn: () => Record<string, unknown> = () => subCard(),
+  over: Record<string, Handler> = {},
+) {
+  const f = installFetch(subCardRoutes(cardFn, undefined, over));
+  const view = renderApp(`/tasks/${TID1}`);
+  await expectTitle("Шаг 1");
+  return { f, ...view };
+}
+
+/** Кнопка сброса исполнителя на карточке. */
+export const clearAssigneeBtn = (c: ParentNode) => c.querySelector<HTMLButtonElement>('button[data-action="clear-assignee"]');
+
+/** Сообщение (role=alert), на которое указывает aria-describedby поля; null, если такого нет. */
+export function describedMessage(field: Element | null): HTMLElement | null {
+  const ids = (field?.getAttribute("aria-describedby") ?? "").split(/\s+/).filter((x) => x !== "");
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el !== null && el.getAttribute("role") === "alert") return el;
+  }
+  return null;
+}

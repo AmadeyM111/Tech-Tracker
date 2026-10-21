@@ -8,16 +8,16 @@ import { usePolledQuery } from "../../shared/api/polling";
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
-import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
+import { ErrorAlert, FieldError, useAlertState } from "../../shared/ui/ErrorAlert";
 import { UserPicker } from "../../shared/ui/UserPicker";
 import { Comments } from "../comments/Comments";
-import { listMembers, type ProjectMember } from "../projects/api";
+import { listAllMembers } from "../projects/api";
 import { deleteTask, getTask, updateTask, type TaskDetail, type TaskPriority, type TaskStatus, type TaskUpdate } from "./api";
+import { DRAFT_FIELDS, taskDraftErrors, todayMsk, type DraftErrors, type DraftField } from "./CreateTaskForm";
 import { SubtaskList } from "./SubtaskList";
 
 const STATUSES: readonly TaskStatus[] = ["todo", "in_progress", "review", "done"];
 const PRIORITIES: readonly TaskPriority[] = ["low", "medium", "high"];
-const MEMBERS_PAGE_SIZE = 100;
 const YMD = /^(\d{4})-(\d{2})-(\d{2})/;
 
 /** A calendar date is re-ordered as text: no Date object, so no time zone (NFR-5). */
@@ -30,16 +30,6 @@ const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : "unknow
 
 /** An id that is not a uuid is answered with 422: for the user it is "no such task". */
 const loadCodeOf = (e: unknown): string => (e instanceof ApiError && e.status === 422 ? "not_found" : codeOf(e));
-
-/** All members of the project (the assignee candidates): pages are read by `has_next`. */
-async function listAllMembers(projectId: string): Promise<ProjectMember[]> {
-  const all: ProjectMember[] = [];
-  for (let page = 1; ; page += 1) {
-    const chunk = await listMembers(projectId, { page, pageSize: MEMBERS_PAGE_SIZE });
-    all.push(...chunk.items);
-    if (!chunk.has_next) return all;
-  }
-}
 
 /** Fields of the edit form the user has changed and not saved yet (due_date: "" = cleared). */
 interface Edits {
@@ -86,9 +76,14 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
   // Bumped after the assignee was cleared: the effect then moves the focus to the picker (NFR-7).
   const [pickerFocus, setPickerFocus] = useState(0);
   const pickerRef = useRef<HTMLDivElement>(null);
+  // 006/FR-23: messages at the fields of a top-level task; they live until the next save.
+  const [fieldErrors, setFieldErrors] = useState<DraftErrors>({});
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const dueRef = useRef<HTMLInputElement>(null);
 
   const { permissions } = task;
   const cardKey = ["tasks", "card", task.id] as const;
+  const topLevel = task.parent_id === null;
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -128,7 +123,10 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
     try {
       await action();
     } catch (e) {
-      alert.show(errorMessage(codeOf(e)));
+      const code = codeOf(e);
+      // 006/FR-23: the past due date of a top-level task is shown at the due date field.
+      if (code === "due_date_in_past" && topLevel) setFieldErrors({ due_date: "tasks.error_due_past" });
+      else alert.show(errorMessage(code));
     }
     setConfirmation(null);
     busy.current = false;
@@ -157,9 +155,18 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
     });
   }
 
+  const errorId = (name: DraftField): string => `${baseId}-${name}-error`;
+  const invalidProps = (name: DraftField) =>
+    fieldErrors[name] === undefined ? {} : { "aria-invalid": true as const, "aria-describedby": errorId(name) };
+  const errorText = (name: DraftField): string | null => {
+    const key = fieldErrors[name];
+    return key === undefined ? null : t(key);
+  };
+
   function onSave(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (busy.current) return;
+    setFieldErrors({});
     const body: TaskUpdate = {};
     if (edits.title !== undefined) {
       const name = edits.title.trim();
@@ -168,6 +175,25 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
         return;
       }
       if (name !== task.title) body.title = name;
+    }
+    if (topLevel) {
+      // 006/FR-23: only the changed fields are checked, so an old task without them still saves.
+      const found = taskDraftErrors(
+        {
+          ...(edits.description !== undefined && edits.description !== task.description
+            ? { description: edits.description }
+            : {}),
+          ...(edits.due_date !== undefined && edits.due_date !== (task.due_date ?? "")
+            ? { dueDate: edits.due_date }
+            : {}),
+        },
+        todayMsk(),
+      );
+      setFieldErrors(found);
+      const first = DRAFT_FIELDS.find((name) => found[name] !== undefined);
+      if (first === "description") descriptionRef.current?.focus();
+      else if (first === "due_date") dueRef.current?.focus();
+      if (first !== undefined) return;
     }
     if (edits.description !== undefined && edits.description !== task.description) {
       body.description = edits.description;
@@ -304,7 +330,7 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
                 quietError
                 onSelect={(user) => void patch({ assignee_id: user.id })}
               />
-              {task.assignee === null ? null : (
+              {task.assignee === null || topLevel ? null : (
                 <button type="button" data-action="clear-assignee" aria-busy={pending ? "true" : undefined} onClick={onClearAssignee}>
                   {t("tasks.assignee_clear")}
                 </button>
@@ -324,6 +350,8 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
               id={field("due_date")}
               type="date"
               name="due_date"
+              ref={dueRef}
+              {...invalidProps("due_date")}
               value={edits.due_date ?? task.due_date ?? ""}
               onChange={(e) => setEdits((p) => ({ ...p, due_date: e.target.value }))}
             />
@@ -332,6 +360,7 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
           ) : (
             <time dateTime={task.due_date}>{formatDate(task.due_date)}</time>
           )}
+          <FieldError id={errorId("due_date")} message={errorText("due_date")} />
         </dd>
 
         <dt>{t("tasks.col_project")}</dt>
@@ -354,6 +383,8 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
             <textarea
               id={field("description")}
               name="description"
+              ref={descriptionRef}
+              {...invalidProps("description")}
               value={edits.description ?? task.description}
               onChange={(e) => setEdits((p) => ({ ...p, description: e.target.value }))}
             />
@@ -362,6 +393,7 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
           ) : (
             task.description
           )}
+          <FieldError id={errorId("description")} message={errorText("description")} />
         </dd>
       </dl>
     </>

@@ -394,7 +394,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (APPROVE; тест-фиксы оркестратором: exactLabel, offered(); отложено: * у «Название задачи», тест на участника без роли, статус ошибки загрузки участников)
 
 ## R6-T12 — Карточка задачи: нельзя снять исполнителя, срок и описание (FR-23); словарь 006
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-56; AC-52; FR-23 (интерфейс), NFR-2
 - **Файлы:** `frontend/src/features/tasks/TaskPage.tsx`, `frontend/src/shared/i18n/ru.ts`;
   тесты: `frontend/tests/features/tasks/TaskPageRules006.test.tsx` (новый), `frontend/tests/features/tasks/TaskPage.test.tsx`,
@@ -417,7 +417,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   сброса «видна, если исполнитель есть») уточняется: только у подзадачи.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/tasks tests/shared` зелёный;
   проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R6-T12` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (APPROVE; отложено: порядок фокуса при двух ошибках в карточке — описание→срок против DOM срок→описание, alert.clear() в onSave, регресс-тест опроса)
 
 ## R6-T13 — Сервер: обязательные поля при создании задачи, код `due_date_in_past`
 - **Статус:** TODO
