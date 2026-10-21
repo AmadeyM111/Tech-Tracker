@@ -17,6 +17,12 @@ export interface UserPickerProps {
   quietError?: boolean;
   /** Id of an element that already shows the caption (e.g. a <dt>): no own <label>, the input points to it. */
   labelledBy?: string;
+  /** aria-required у combobox (006/FR-19). */
+  required?: boolean;
+  /** aria-invalid у combobox. */
+  invalid?: boolean;
+  /** aria-describedby у combobox (сообщение об ошибке поля). */
+  describedBy?: string;
 }
 
 const DEBOUNCE_MS = 300;
@@ -32,7 +38,7 @@ const ACTIVE_STYLE: CSSProperties = {
 const MAX_QUERY_LENGTH = 64;
 
 /** Combobox over the users directory: search by login, keyboard and click selection. */
-export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietError, labelledBy }: UserPickerProps) {
+export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietError, labelledBy, required, invalid, describedBy }: UserPickerProps) {
   const baseId = useId();
   const inputId = `${baseId}-input`;
   const listId = `${baseId}-list`;
@@ -148,6 +154,9 @@ export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietE
         type="text"
         role="combobox"
         aria-labelledby={labelledBy}
+        aria-required={required === true ? true : undefined}
+        aria-invalid={invalid === true ? "true" : undefined}
+        aria-describedby={describedBy}
         maxLength={MAX_QUERY_LENGTH}
         autoComplete="off"
         autoCapitalize="off"

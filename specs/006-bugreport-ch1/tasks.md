@@ -302,7 +302,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (проверка оркестратором: vitest 1293, lint, typecheck; ревью не проводилось — ускоренный режим, замена перечисления)
 
 ## R6-T09 — Общие правила черновика задачи, участники проекта, пропсы `UserPicker`
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** FR-19 (правила проверки), D-11 — на уровне функций; FR-25 (`listAllMembers`); NFR-3
   (атрибуты поля исполнителя)
 - **Файлы:** `frontend/src/features/tasks/CreateTaskForm.tsx`, `frontend/src/features/projects/api.ts`,
@@ -327,7 +327,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Старые тесты → AC:** нет.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/tasks/draft-rules.test.ts tests/features/projects tests/shared/UserPicker.test.tsx`
   зелёный; проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R6-T09` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (тест-фикс оркестратором: импорт M_PETROV; проверка прогоном; ревью не проводилось — чистые функции, ускоренный режим)
 
 ## R6-T10 — Форма вкладки «Задачи»: обязательные поля, умолчания, сообщения у полей
 - **Статус:** TODO

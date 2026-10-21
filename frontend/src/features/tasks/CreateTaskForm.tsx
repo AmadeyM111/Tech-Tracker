@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { ApiError } from "../../shared/api/client";
-import { errorMessage, t } from "../../shared/i18n";
+import { errorMessage, t, type MessageKey } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { UserPicker } from "../../shared/ui/UserPicker";
 import { listCreatableProjects, type CreatableProject } from "../projects/api";
@@ -21,6 +21,44 @@ export function preselectProject(
   if (currentProjectId !== null && projects.some((p) => p.id === currentProjectId)) return currentProjectId;
   const [only] = projects;
   return projects.length === 1 && only !== undefined ? only.id : null;
+}
+
+/** 006/D-11: «сегодня» по Europe/Moscow, YYYY-MM-DD; не зависит от пояса браузера. */
+export function todayMsk(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Moscow",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+export type DraftField = "title" | "description" | "due_date" | "assignee";
+/** Порядок полей в формах: первое неверное получает фокус (FR-19). */
+export const DRAFT_FIELDS: readonly DraftField[] = ["title", "description", "due_date", "assignee"];
+export type DraftErrors = Partial<Record<DraftField, MessageKey>>;
+
+/**
+ * 006/FR-19, FR-23. Проверяет только переданные ключи; срок сравнивается со строкой today
+ * (YYYY-MM-DD); assigneeId undefined не проверяется, null — ошибка.
+ */
+export function taskDraftErrors(
+  draft: { title?: string; description?: string; dueDate?: string; assigneeId?: string | null },
+  today: string,
+): DraftErrors {
+  const errors: DraftErrors = {};
+  if (draft.title !== undefined && draft.title.trim() === "") errors.title = "tasks.error_title_required";
+  if (draft.description !== undefined && draft.description.trim() === "") {
+    errors.description = "tasks.error_description_required";
+  }
+  if (draft.dueDate !== undefined) {
+    if (draft.dueDate === "") errors.due_date = "tasks.error_due_required";
+    else if (draft.dueDate < today) errors.due_date = "tasks.error_due_past";
+  }
+  if (draft.assigneeId === null) errors.assignee = "tasks.error_assignee_required";
+  return errors;
 }
 
 export interface CreateTaskFormProps {
