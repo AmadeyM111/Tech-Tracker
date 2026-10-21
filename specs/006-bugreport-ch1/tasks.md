@@ -53,7 +53,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 ---
 
 ## R6-T01 — `TextField`: кнопка показа пароля (компонент, иконки, стили)
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-3, AC-6 (иконки), AC-9, AC-10 — на уровне компонента; NFR-3 (статически: размер, токены)
 - **Файлы:** `frontend/src/shared/ui/TextField.tsx`, `frontend/src/shared/ui/Icon.tsx`, `frontend/src/shared/ui/ui.css`;
   тесты: `frontend/tests/shared/TextField.test.tsx` (новый), `frontend/tests/shared/reveal-css.test.ts` (новый)
@@ -77,7 +77,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   `typography.test.ts` должны остаться зелёными без правок).
 - **Готово, когда:** `cd frontend && npx vitest run tests/shared tests/app/icons.test.tsx` зелёный;
   проверки фронтенда зелёные; бэкенд не тронут; `python scripts/task_scope.py R6-T01` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (APPROVE)
 
 ## R6-T02 — «Глазок» на экране входа и в окне смены пароля
 - **Статус:** TODO
