@@ -47,7 +47,7 @@
 //       edit            -> form[data-form="edit-task"] (ОДНА форма, внутри title input, description, due_date,
 //                          priority и submit ru["tasks.save"]; status/assignee могут быть внутри или снаружи):
 //                          input[name="title"] (в h1), textarea[name="description"], input[type="date"]
-//                          [name="due_date"], select[name="priority"] (base|high), каждый с доступным именем =
+//                          [name="due_date"], select[name="priority"] (low|medium|high), каждый с доступным именем =
 //                          подпись поля. Значения предзаполнены. Submit шлёт PATCH ТОЛЬКО с изменёнными
 //                          полями (title - trim); без изменений запроса нет; очищенный срок -> due_date:null;
 //                          ключа assignee_id/status в этом PATCH нет (UNSET). Пустое название -> запроса
@@ -135,7 +135,7 @@ export function sub(id: string, title: string, status = "todo") {
     id,
     title,
     status,
-    priority: "base",
+    priority: "medium",
     due_date: null,
     assignee: null,
   };

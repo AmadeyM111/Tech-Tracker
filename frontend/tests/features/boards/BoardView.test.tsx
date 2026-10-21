@@ -77,7 +77,7 @@ describe("rendering", () => {
     expect(link.getAttribute("href")).toBe(`/tasks/${TA}`);
     expect(link.textContent).toBe(CA.title);
     expect(f_(a, "priority")!.textContent).toBe(ru["tasks.priority.high"]);
-    expect(f_(cardEl(container, TB)!, "priority")!.textContent).toBe(ru["tasks.priority.base"]);
+    expect(f_(cardEl(container, TB)!, "priority")!.textContent).toBe(ru["tasks.priority.medium"]);
     const time = f_(a, "due_date")!.querySelector("time")!;
     expect(time.getAttribute("datetime")).toBe("2026-12-31");
     expect(time.textContent).toBe("31.12.2026");

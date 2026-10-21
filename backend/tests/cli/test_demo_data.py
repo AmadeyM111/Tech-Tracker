@@ -420,6 +420,28 @@ async def test_fr49_tasks_counts_statuses_positions_subtasks(
 
 
 @pytest.mark.committed
+async def test_006_ac17_demo_priorities_only_medium_and_high(
+    loaded: tuple[async_sessionmaker[AsyncSession], Settings, Any],
+) -> None:
+    """006/AC-17 (FR-13): у всех задач (и подзадач) ``medium`` или ``high``; ``high`` ровно
+    столько же, сколько до фичи (3 на проект, 2 проекта, seed=1); ``low`` и ``base`` нет;
+    состав демо прежний (001/FR-49: 30 задач, из них 6 подзадач)."""
+    from app.domain.ops import demo
+
+    assert demo._REGULAR_PRIORITY == "medium"
+    sm, _, _ = loaded
+    tasks = await _rows(sm, "SELECT parent_id, priority FROM task")
+    assert len(tasks) == 30
+    assert sum(1 for t in tasks if t["parent_id"] is not None) == 6
+    counts = Counter(t["priority"] for t in tasks)
+    assert set(counts) <= {"medium", "high"}, counts
+    assert counts["high"] == 6, counts
+    assert counts["medium"] == 24, counts
+    # подзадачи - всегда обычного приоритета
+    assert {t["priority"] for t in tasks if t["parent_id"] is not None} == {"medium"}
+
+
+@pytest.mark.committed
 async def test_fr49_due_dates_window_around_today(
     loaded: tuple[async_sessionmaker[AsyncSession], Settings, Any],
 ) -> None:

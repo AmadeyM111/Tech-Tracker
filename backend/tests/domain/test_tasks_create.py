@@ -15,7 +15,7 @@ AC-106, AC-108, AC-109; FR-18...FR-21, FR-28a; заметки ревью T69/T70
         UNSET                     # сентинел «исполнитель не передан»
         @dataclass(frozen=True) TaskCreateData(title: str, description: str = "",
             assignee: UUID | None | Unset = UNSET, due_date: date | None = None,
-            priority: TaskPriority | str = "base")
+            priority: TaskPriority | str = "medium")
         create_task(db, actor, project_id, data: TaskCreateData) -> UUID
         create_subtask(db, actor, parent_id, data: TaskCreateData) -> UUID
 
@@ -419,7 +419,7 @@ async def test_ac24_ac49_fr28a_insert_defaults(db: AsyncSession, svc: Any) -> No
     tid = await svc.create_task(db, actor_of(w.ba), w.project_id, _data(svc, "Новая"))
     row = await task_row(db, tid)
     assert row.status == "todo"  # AC-24
-    assert row.priority == "base"  # AC-49
+    assert row.priority == "medium"  # AC-49, 006/AC-12
     assert row.position == 1024  # пустая колонка
     assert row.title == "Новая"
     assert row.description == ""
@@ -443,7 +443,7 @@ async def test_ac49_priority_high_saved_invalid_422(db: AsyncSession, svc: Any) 
     assert row.priority == "high"
     assert row.due_date == date(2026, 10, 20)
     await db.commit()
-    for bad in ("urgent", "", "HIGH", 1):
+    for bad in ("urgent", "", "HIGH", "base", 1):
         await fails(
             db,
             svc.create_task(db, actor_of(w.ba), w.project_id, _data(svc, priority=bad)),

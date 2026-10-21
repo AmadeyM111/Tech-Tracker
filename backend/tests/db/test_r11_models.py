@@ -256,7 +256,7 @@ def test_t69_task_enums_are_strenums_with_values() -> None:
     assert issubclass(TaskStatus, StrEnum)
     assert issubclass(TaskPriority, StrEnum)
     assert {m.value for m in TaskStatus} == {"todo", "in_progress", "review", "done"}
-    assert {m.value for m in TaskPriority} == {"base", "high"}
+    assert {m.value for m in TaskPriority} == {"low", "medium", "high"}
 
 
 def test_t69_domain_event_model_has_entity_type_check_over_all_entity_types() -> None:
@@ -467,7 +467,7 @@ async def test_t69_task_status_rejects_unknown(db: AsyncSession, status: str) ->
     )
 
 
-@pytest.mark.parametrize("priority", ["base", "high"])
+@pytest.mark.parametrize("priority", ["low", "medium", "high"])
 async def test_t69_task_priority_accepts_known_values(db: AsyncSession, priority: str) -> None:
     b = await _base(db)
     await make_task(
@@ -479,7 +479,7 @@ async def test_t69_task_priority_accepts_known_values(db: AsyncSession, priority
     )
 
 
-@pytest.mark.parametrize("priority", ["", "low", "normal", "HIGH"])
+@pytest.mark.parametrize("priority", ["", "base", "normal", "HIGH"])
 async def test_t69_task_priority_rejects_unknown(db: AsyncSession, priority: str) -> None:
     b = await _base(db)
     await assert_integrity(

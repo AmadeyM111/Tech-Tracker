@@ -9,7 +9,7 @@ import { UserPicker } from "../../shared/ui/UserPicker";
 import { listCreatableProjects, type CreatableProject } from "../projects/api";
 import { createTask, type TaskCreate, type TaskDetail, type TaskPriority } from "./api";
 
-const PRIORITIES: readonly TaskPriority[] = ["base", "high"];
+const PRIORITIES: readonly TaskPriority[] = ["low", "medium", "high"];
 
 /**
  * 004/FR-12: проект страницы, если он доступен; иначе единственный доступный; иначе null.
@@ -40,7 +40,7 @@ export function CreateTaskForm({ projectId, canPickAssignee, assigneeIds }: Crea
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [priority, setPriority] = useState<TaskPriority>("base");
+  const [priority, setPriority] = useState<TaskPriority>("medium");
   const [assignee, setAssignee] = useState<{ id: string; login: string } | null>(null);
   // A new key empties the picker's own text field.
   const [pickerKey, setPickerKey] = useState(0);
@@ -74,7 +74,7 @@ export function CreateTaskForm({ projectId, canPickAssignee, assigneeIds }: Crea
         setTitle("");
         setDescription("");
         setDueDate("");
-        setPriority("base");
+        setPriority("medium");
         clearAssignee();
         titleRef.current?.focus();
         await queryClient.invalidateQueries({ queryKey: ["tasks", "project", projectId] });

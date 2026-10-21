@@ -50,7 +50,7 @@ async def test_ac7_create_subtask_shape_parent_project_status_and_no_position(
     assert body["parent_id"] == str(parent)
     assert body["project"]["id"] == str(w.project_id)
     assert body["status"] == "todo"  # не наследует статус родителя
-    assert body["priority"] == "base"
+    assert body["priority"] == "medium"  # 006/AC-12
     assert body["position"] is None
     assert body["subtasks"] == []
     assert body["progress"] is None

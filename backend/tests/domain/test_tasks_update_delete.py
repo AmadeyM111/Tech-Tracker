@@ -298,7 +298,7 @@ async def test_ac48_ba_not_owner_cannot_change_foreign_or_assigned_tasks(
     outsider = await make_user(db, workspace=w.ws, role="business_admin", login="w.ba.outsider")
     for tid in (foreign, for_other, unassigned, reassigned):
         before = await _snapshot(db, tid)
-        for fields in ({"title": "Y"}, {"status": "review"}, {"priority": "base"}):
+        for fields in ({"title": "Y"}, {"status": "review"}, {"priority": "medium"}):
             await forbidden(db, svc.update_task(db, actor_of(outsider), tid, _patch(svc, **fields)))
         assert await _snapshot(db, tid) == before
 

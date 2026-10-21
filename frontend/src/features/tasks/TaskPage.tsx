@@ -16,7 +16,7 @@ import { deleteTask, getTask, updateTask, type TaskDetail, type TaskPriority, ty
 import { SubtaskList } from "./SubtaskList";
 
 const STATUSES: readonly TaskStatus[] = ["todo", "in_progress", "review", "done"];
-const PRIORITIES: readonly TaskPriority[] = ["base", "high"];
+const PRIORITIES: readonly TaskPriority[] = ["low", "medium", "high"];
 const MEMBERS_PAGE_SIZE = 100;
 const YMD = /^(\d{4})-(\d{2})-(\d{2})/;
 

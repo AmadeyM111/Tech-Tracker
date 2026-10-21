@@ -933,8 +933,8 @@ ENV_PY = BACKEND_DIR / "migrations" / "env.py"
 
 
 def test_002_migration_0006_file_chain_and_single_head() -> None:
-    """002/AC-21: файл 0006 на месте, цепочка 0005 -> 0006, голова одна и это 0006; миграция
-    не импортирует код приложения (D-6)."""
+    """002/AC-21: файл 0006 на месте, цепочка 0005 -> 0006, голова одна; миграция 0006
+    не импортирует код приложения (D-6). С 006 голова - 0007 (цепочка 0006 -> 0007)."""
     from alembic.script import ScriptDirectory
 
     assert MIGRATION_0006.is_file(), "нет backend/migrations/versions/0006_three_roles.py"
@@ -959,7 +959,7 @@ def test_002_migration_0006_file_chain_and_single_head() -> None:
         if isinstance(node, ast.ImportFrom):
             assert not (node.module or "").startswith("app"), "миграция импортирует app.*"
     script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
-    assert script.get_heads() == ["0006"]
+    assert script.get_heads() == ["0007"]  # 006: голова теперь 0007 (цепочка 0006 -> 0007)
     revision = script.get_revision("0006")
     assert revision is not None and revision.down_revision == "0005"
 
@@ -993,7 +993,7 @@ async def _version(maker: Any) -> list[str]:
 async def test_002_alembic_check_clean_at_head(committed: Any, test_database_url: str) -> None:
     """002/AC-2, plan §4.5 («alembic check чист»): на head=0006 модель (CHECK из трёх значений)
     и миграция не расходятся; CHECK в БД - без `mixed`."""
-    assert await _version(committed) == ["0006"], "голова БД должна быть 0006"
+    assert await _version(committed) == ["0007"], "голова БД должна быть 0007"
     assert "mixed" not in await _role_check_def(committed)
     await _alembic_ok(test_database_url, "check")
 
@@ -1007,7 +1007,7 @@ async def test_002_downgrade_0005_restores_four_value_check_and_keeps_data_then_
     ставит CHECK из трёх значений, версия 0006, ``alembic check`` чист."""
     from tests.factories import make_domain_event, make_user
 
-    assert await _version(committed) == ["0006"]
+    assert await _version(committed) == ["0007"]
     async with committed() as s, s.begin():
         ta = await make_user(s, role="tech_admin")
         ba = await make_user(s, role="business_admin", workspace=None)
@@ -1057,7 +1057,7 @@ async def test_002_downgrade_0005_restores_four_value_check_and_keeps_data_then_
 
     await _alembic_ok(test_database_url, "upgrade", "head")
     await db_engine.dispose()
-    assert await _version(committed) == ["0006"]
+    assert await _version(committed) == ["0007"]
     assert "mixed" not in await _role_check_def(committed)
     assert await snapshot() == before
     await _alembic_ok(test_database_url, "check")

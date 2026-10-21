@@ -286,11 +286,11 @@ describe("edit form sends only changed fields (FR-18, AC-46)", () => {
     const form = editForm(container)!;
     setValue(descArea(), "Другое");
     setValue(dueInput(), "2027-01-15");
-    setValue(prioritySelect(), "base");
+    setValue(prioritySelect(), "medium");
     fireEvent.submit(form);
     await waitCount(f, PATCH, 1);
     const b = await bodyOf(f.last(PATCH));
-    expect(b).toEqual({ description: "Другое", due_date: "2027-01-15", priority: "base" });
+    expect(b).toEqual({ description: "Другое", due_date: "2027-01-15", priority: "medium" });
     expect("assignee_id" in b).toBe(false);
     expect("status" in b).toBe(false);
   });
@@ -443,14 +443,14 @@ describe("polling (FR-29, NFR-6)", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let n = 0;
     const { f } = await openCard(() =>
-      n++ === 0 ? card() : card({ title: "Серверное имя", description: "Серверное описание", priority: "base" }),
+      n++ === 0 ? card() : card({ title: "Серверное имя", description: "Серверное описание", priority: "medium" }),
     );
     setValue(titleInput(), "Мой черновик");
     expect(f.last(TASK).headers.get("X-GT-Background")).toBeNull();
     await vi.advanceTimersByTimeAsync(15_000);
     await waitFor(() => expect(f.last(TASK).headers.get("X-GT-Background")).toBe("1"));
     await waitFor(() => expect(descArea()!.value).toBe("Серверное описание"));
-    expect(prioritySelect()!.value).toBe("base");
+    expect(prioritySelect()!.value).toBe("medium");
     expect(titleInput()!.value).toBe("Мой черновик");
   });
 
@@ -628,14 +628,14 @@ describe("T84 review gaps", () => {
   });
 
   it("m01_patch_omits_title_when_edited_back_to_original", async () => {
-    const { container, f } = await openCard(() => card(), { [PATCH]: () => j(200, card({ priority: "base" })) });
+    const { container, f } = await openCard(() => card(), { [PATCH]: () => j(200, card({ priority: "medium" })) });
     const form = editForm(container)!;
     setValue(titleInput(), "Черновик");
     setValue(titleInput(), "Подготовить отчёт");
-    setValue(prioritySelect(), "base");
+    setValue(prioritySelect(), "medium");
     fireEvent.submit(form);
     await waitCount(f, PATCH, 1);
-    expect(await bodyOf(f.last(PATCH))).toEqual({ priority: "base" });
+    expect(await bodyOf(f.last(PATCH))).toEqual({ priority: "medium" });
   });
 
   it("m12_load_422_is_shown_as_not_found_single_alert_without_forms", async () => {

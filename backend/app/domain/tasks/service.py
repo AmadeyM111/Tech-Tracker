@@ -65,7 +65,7 @@ class TaskCreateData:
     description: str = ""
     assignee: UUID | None | Unset = UNSET
     due_date: date | None = None
-    priority: str | TaskPriority = TaskPriority.BASE.value
+    priority: str | TaskPriority = TaskPriority.MEDIUM.value
 
 
 def _invalid(message: str) -> Unprocessable:
@@ -87,7 +87,7 @@ def _validate(data: TaskCreateData) -> TaskPriority:
     try:
         return TaskPriority(data.priority)
     except ValueError:
-        raise _invalid("Приоритет: base или high") from None
+        raise _invalid("Приоритет: low, medium или high") from None
 
 
 def _effective_assignee(actor: Actor, data: TaskCreateData) -> UUID | None:

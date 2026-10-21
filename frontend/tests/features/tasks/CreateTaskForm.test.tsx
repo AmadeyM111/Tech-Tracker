@@ -63,8 +63,8 @@ describe("create task form", () => {
     expect(form.querySelector('textarea[name="description"]')).toBeTruthy();
     expect(input(form, 'input[type="date"][name="due_date"]')).toBeTruthy();
     const prio = form.querySelector<HTMLSelectElement>('select[name="priority"]')!;
-    expect(Array.from(prio.options).map((o) => o.value)).toEqual(["base", "high"]);
-    expect(prio.value).toBe("base");
+    expect(Array.from(prio.options).map((o) => o.value)).toEqual(["low", "medium", "high"]);
+    expect(prio.value).toBe("medium");
     // нет меток (plan §11)
     expect(form.querySelector('[name="labels"]')).toBeNull();
     for (const el of Array.from(form.querySelectorAll("input,select,textarea"))) {
@@ -87,7 +87,7 @@ describe("create task form", () => {
     const b = await body(f.last(PROJ_CREATE));
     expect("assignee_id" in b).toBe(false);
     expect(b.title).toBe("Моя задача");
-    expect(b.priority).toBe("base");
+    expect(b.priority).toBe("medium");
   });
 
   it("fr20_ba_without_choice_sends_no_assignee_or_null_never_self", async () => {

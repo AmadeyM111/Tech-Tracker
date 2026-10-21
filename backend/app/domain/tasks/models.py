@@ -35,7 +35,8 @@ class TaskStatus(StrEnum):
 
 
 class TaskPriority(StrEnum):
-    BASE = "base"
+    LOW = "low"
+    MEDIUM = "medium"
     HIGH = "high"
 
 
@@ -45,7 +46,7 @@ class Task(UUIDPkMixin, TimestampMixin, WorkspaceMixin, SoftDeleteMixin, Base):
         CheckConstraint("char_length(title) BETWEEN 1 AND 255", name="title_length"),
         CheckConstraint("char_length(description) <= 10000", name="description_length"),
         CheckConstraint("status IN ('todo','in_progress','review','done')", name="status_valid"),
-        CheckConstraint("priority IN ('base','high')", name="priority_valid"),
+        CheckConstraint("priority IN ('low','medium','high')", name="priority_valid"),
         CheckConstraint("(parent_id IS NULL) = (position IS NOT NULL)", name="position_top_level"),
     )
 

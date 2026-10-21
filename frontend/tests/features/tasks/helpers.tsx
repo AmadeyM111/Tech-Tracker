@@ -27,8 +27,8 @@
 //   ошибка загрузки: ровно один role="alert" с errorMessage(code).
 //   Форма создания - form[data-form="create-task"], только при permissions.create_task:
 //     input[name="title"] (label), textarea[name="description"] (label),
-//     input[type="date"][name="due_date"] (label), select[name="priority"] (base|high, по умолчанию
-//     base), button[type="submit"]; UserPicker (combobox, allowedIds = участники проекта) -
+//     input[type="date"][name="due_date"] (label), select[name="priority"] (low|medium|high, по умолчанию
+//     medium), button[type="submit"]; UserPicker (combobox, allowedIds = участники проекта) -
 //     ТОЛЬКО если роль актора business_admin (me.role; 002 FR-9); у роли user поля исполнителя
 //     нет. Выбранный исполнитель показан в [data-field="selected-assignee"] (login) и сбрасывается
 //     button[data-action="clear-assignee"].
@@ -87,7 +87,7 @@ export function taskItem(id: string, title: string, over: Record<string, unknown
     parent_id: null,
     title,
     status: "todo",
-    priority: "base",
+    priority: "medium",
     due_date: null,
     assignee: null,
     created_at: "2026-10-05T08:00:00Z",

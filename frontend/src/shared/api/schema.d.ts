@@ -1138,7 +1138,7 @@ export interface components {
             description: string;
             /** Due Date */
             due_date?: string | null;
-            /** @default base */
+            /** @default medium */
             priority: components["schemas"]["TaskPriority"];
             /** Title */
             title: string;
@@ -1232,7 +1232,7 @@ export interface components {
          * TaskPriority
          * @enum {string}
          */
-        TaskPriority: "base" | "high";
+        TaskPriority: "low" | "medium" | "high";
         /**
          * TaskStatus
          * @enum {string}

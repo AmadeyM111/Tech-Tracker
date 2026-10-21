@@ -73,7 +73,7 @@ async def test_ac49_ac24_create_minimal_body_defaults_and_shape(api_env: ApiEnv)
     assert body["title"] == "Первая"
     assert body["description"] == ""
     assert body["status"] == "todo"  # AC-24
-    assert body["priority"] == "base"  # AC-49
+    assert body["priority"] == "medium"  # AC-49, 006/AC-12
     assert body["due_date"] is None
     assert body["parent_id"] is None
     assert body["assignee"] is None  # БА не передал исполнителя (AC-56)
@@ -554,7 +554,7 @@ async def test_ac47_assignee_changes_status_with_full_form_but_not_title(api_env
     for field, value in (
         ("title", "Другое"),
         ("description", "Другое"),
-        ("priority", "base"),
+        ("priority", "low"),  # 006/AC-12: «base» больше не значение; «low» отличается от «high»
         ("due_date", "2026-12-01"),
     ):
         r = await send(
@@ -1142,7 +1142,9 @@ async def test_t77_response_schemas_match_plan_11_4_and_nulls_only_where_allowed
         for field in ("status", "priority"):
             if field in schema["properties"]:
                 enum = _resolve(spec, schema["properties"][field])["enum"]
-                assert set(enum) == (set(ALL_STATUSES) if field == "status" else {"base", "high"})
+                assert set(enum) == (
+                    set(ALL_STATUSES) if field == "status" else {"low", "medium", "high"}
+                )
 
 
 @pytest.mark.parametrize("name", ["TaskCreate", "TaskUpdate"])

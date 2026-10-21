@@ -1263,7 +1263,7 @@
           },
           "priority": {
             "$ref": "#/components/schemas/TaskPriority",
-            "default": "base"
+            "default": "medium"
           },
           "title": {
             "maxLength": 255,
@@ -1551,7 +1551,8 @@
       },
       "TaskPriority": {
         "enum": [
-          "base",
+          "low",
+          "medium",
           "high"
         ],
         "title": "TaskPriority",

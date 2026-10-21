@@ -59,7 +59,7 @@ class TaskCreate(BaseModel):
     description: TaskDescription = ""
     assignee_id: UUID | None = None
     due_date: DueDate | None = None
-    priority: TaskPriority = TaskPriority.BASE
+    priority: TaskPriority = TaskPriority.MEDIUM
 
 
 class TaskUpdate(BaseModel):
@@ -75,7 +75,7 @@ class TaskUpdate(BaseModel):
     description: TaskDescription = Field(default_factory=str)
     assignee_id: UUID | None = None
     due_date: DueDate | None = None
-    priority: TaskPriority = Field(default_factory=lambda: TaskPriority.BASE)
+    priority: TaskPriority = Field(default_factory=lambda: TaskPriority.MEDIUM)
     status: TaskStatus = Field(default_factory=lambda: TaskStatus.TODO)
 
 

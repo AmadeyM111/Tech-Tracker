@@ -232,7 +232,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Попытки:** 1 (APPROVE; желательное: единые имена тестов 006_acN — решить до финальной приёмки)
 
 ## R6-T07 — Три приоритета: модель, миграция 0007, умолчания, демо, OpenAPI (бэкенд)
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-12, AC-13, AC-14, AC-15, AC-17, AC-18, AC-54; FR-8…FR-11, FR-13; NFR-4
 - **Файлы:** `backend/app/domain/tasks/models.py`, `backend/migrations/versions/0007_three_priorities.py` (новый),
   `backend/app/domain/tasks/service.py`, `backend/app/api/v1/schemas/tasks.py`, `backend/app/domain/ops/demo.py`;
@@ -240,7 +240,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   `backend/tests/factories.py`, `backend/tests/upgrade002_support.py`, `backend/tests/db/test_three_roles_demo_upgrade.py`,
   `backend/tests/db/test_r11_models.py`, `backend/tests/cli/test_demo_data.py`, `backend/tests/api/test_tasks.py`,
   `backend/tests/api/test_subtasks.py`, `backend/tests/domain/test_tasks_create.py`, `backend/tests/domain/test_tasks_update_delete.py`
-  (+ `backend/tests/db/test_three_roles_upgrade.py`, `backend/tests/db/test_three_roles_after_upgrade.py`,
+  (+ `backend/tests/db/test_migrations.py` (версия головы 0007), `backend/tests/db/test_three_roles_upgrade.py`, `backend/tests/db/test_three_roles_after_upgrade.py`,
   `backend/tests/db/test_login_display_upgrade.py` — только если падают из-за 0007, по plan PD-18)
 - **Зависит от:** R6-T06 (общие тестовые файлы)
 - **Описание:** Пять файлов кода — минимальная сквозная единица: перечисление приоритета
@@ -274,10 +274,10 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
   `env DATABASE_URL=$TEST_DATABASE_URL ENV=test alembic -c backend/alembic.ini check` без
   расхождений; `bash scripts/gen-api.sh` повторно не меняет файлы; `git diff --stat HEAD -- frontend/src`
   показывает только `schema.d.ts`; `python scripts/task_scope.py R6-T07` → 0.
-- **Попытки:** 0
+- **Попытки:** 1 (APPROVE; желательное: тест test_priority_upgrade_006 поправлен оркестратором — дата в _insert_task, не ослабление)
 
 ## R6-T08 — Три приоритета во фронтенде
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-16; FR-9 (форма), FR-12; NFR-2 (часть AC-52: нет «Обычный» и `tasks.priority.base`)
 - **Файлы:** `frontend/src/features/tasks/CreateTaskForm.tsx`, `frontend/src/features/tasks/TaskPage.tsx`,
   `frontend/src/shared/i18n/ru.ts`;
@@ -299,7 +299,7 @@ R6-T14. Задачи, меняющие `TaskPage.tsx` (R6-T03, R6-T05, R6-T08, R
 - **Старые тесты → AC:** все строки plan §6.2 с задачей R6-T08 → AC-16.
 - **Готово, когда:** проверки фронтенда зелёные; проверки бэкенда зелёные (связка с R6-T07);
   `python scripts/task_scope.py R6-T08` → 0. Коммит R6-T07 + R6-T08 — один.
-- **Попытки:** 0
+- **Попытки:** 1 (проверка оркестратором: vitest 1293, lint, typecheck; ревью не проводилось — ускоренный режим, замена перечисления)
 
 ## R6-T09 — Общие правила черновика задачи, участники проекта, пропсы `UserPicker`
 - **Статус:** TODO
