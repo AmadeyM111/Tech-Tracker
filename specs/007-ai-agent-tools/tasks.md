@@ -250,7 +250,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T07 — Учётная запись агента: создание, роль, сброс пароля, вход, блокировка (сервис)
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **Заметка ревью R7-T05/T06:** если `create_agent` создаёт агента через ORM и в том же запросе вызываются `list_members`/`list_accounts` (читают `is_agent` из `select(AppUser)`+`load_only`), добавить проверку identity map (`reviews/R7-T05-T06-1.md` п.1).
 - **AC:** AC-1, AC-2 (уровень домена), AC-4 (отзыв ключей при блокировке); FR-1, FR-2, FR-4; plan §4.5, PD-4, PD-7, PD-8
 - **Файлы:** `backend/app/domain/users/service.py`, `backend/app/domain/auth/service.py`;
@@ -618,7 +618,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T17 — MCP: протокол stdio, транспорт, конфигурация (без инструментов)
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **AC:** FR-37, FR-38 (ключ из окружения, отказ без ключа), NFR-3, NFR-6; AC-38 (stderr инструментов); plan §4.9, PD-12, PD-14, PD-15
 - **Файлы:** `backend/app/agent_mcp.py` (новый);
   тесты: `backend/tests/unit/test_agent_mcp_protocol_007.py` (новый), `backend/tests/unit/test_agent_mcp_transport_007.py` (новый),
@@ -652,6 +652,7 @@ R7-T21 → R7-T22).
 
 ## R7-T18 — MCP: 11 инструментов агента и сквозные тесты
 - **Статус:** TODO
+- **Заметки ревью R7-T17 (обязательно учесть, `reviews/R7-T17-1.md`):** (1) ключ недопустимого формата → 401 `not_authenticated` без сети (`McpServer(None)`), `config_error` только для URL/CA (AC-45); (2) `Retry-After` из очень длинной строки не должен давать -32603 (try/except); (3) регрессионные тесты: системные прокси игнорируются, нечитаемый `GOSTRACKER_CA_FILE`, ключ с `\r\n`/пробелом, обходы URL; (4) снять skip в `test_agent_mcp_stdio_007.py:162`, тест утечки через `connection_error`; (5) по возможности лимит длины строки stdin.
 - **AC:** AC-42, AC-43, AC-44, AC-45, AC-38 (результаты и логи инструментов); FR-35, FR-36, FR-37, FR-38; plan §4.9, PD-13, PD-14
 - **Файлы:** `backend/app/agent_mcp.py`, `backend/pyproject.toml` (только `[project.scripts] gostracker-mcp`);
   тесты: `backend/tests/api/test_agent_mcp_tools_007.py` (новый), `backend/tests/mcp_support.py` (новый)
