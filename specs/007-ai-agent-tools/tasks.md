@@ -329,7 +329,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T09 — Ключи: выпуск, перечень, отзыв (сервис)
-- **Статус:** TODO
+- **Статус:** DONE
 - **Заметка ревью R7-T07 (обязательно, `reviews/R7-T07-1.md`):** выпуск и отзыв ключа вызывают `users.service.lock_for_account_change(db, ws, agent_id, actor_id)`, затем читают `is_blocked`/`is_agent` через `load_account`; иначе гонка с блокировкой оставит действующий ключ у заблокированного агента (PD-8). Проверить отдельным тестом/ревью.
 - **AC:** AC-6, AC-8, AC-9, AC-11, AC-12 (уровень домена); FR-5…FR-11; plan §4.6, PD-1, PD-6, PD-8
 - **Файлы:** `backend/app/domain/api_keys/service.py` (новый);
@@ -360,6 +360,7 @@ R7-T21 → R7-T22).
 
 ## R7-T10 — Ключи: API техадминистратора
 - **Статус:** TODO
+- **Заметка ревью R7-T09 (обязательно, `reviews/R7-T09-1.md`):** `IssuedApiKeyResponse` собирать явно из `issued.key` и `issued.secret`, без `asdict`/`model_dump` и без логирования тела ответа; `Cache-Control: no-store` на выпуске; срок по умолчанию 90 суток подставляет API (сервис принимает `ttl_days` обязательным); добавить сценарий `agent.ba` по ключу (AC-7) и актора без роли.
 - **AC:** AC-6, AC-7 (люди и 422), AC-8, AC-9, AC-11, AC-12; FR-5…FR-10, FR-40 (API); plan §4.6, PD-6
 - **Файлы:** `backend/app/api/v1/schemas/admin.py`, `backend/app/api/v1/admin_agents.py`;
   тесты: `backend/tests/api/test_api_keys_admin_007.py` (новый), `backend/tests/agents007_support.py` (только добавить помощники)
