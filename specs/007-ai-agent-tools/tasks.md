@@ -250,7 +250,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T07 — Учётная запись агента: создание, роль, сброс пароля, вход, блокировка (сервис)
-- **Статус:** IN_PROGRESS
+- **Статус:** DONE
 - **Заметка ревью R7-T05/T06:** если `create_agent` создаёт агента через ORM и в том же запросе вызываются `list_members`/`list_accounts` (читают `is_agent` из `select(AppUser)`+`load_only`), добавить проверку identity map (`reviews/R7-T05-T06-1.md` п.1).
 - **AC:** AC-1, AC-2 (уровень домена), AC-4 (отзыв ключей при блокировке); FR-1, FR-2, FR-4; plan §4.5, PD-4, PD-7, PD-8
 - **Файлы:** `backend/app/domain/users/service.py`, `backend/app/domain/auth/service.py`;
@@ -325,6 +325,7 @@ R7-T21 → R7-T22).
 
 ## R7-T09 — Ключи: выпуск, перечень, отзыв (сервис)
 - **Статус:** TODO
+- **Заметка ревью R7-T07 (обязательно, `reviews/R7-T07-1.md`):** выпуск и отзыв ключа вызывают `users.service.lock_for_account_change(db, ws, agent_id, actor_id)`, затем читают `is_blocked`/`is_agent` через `load_account`; иначе гонка с блокировкой оставит действующий ключ у заблокированного агента (PD-8). Проверить отдельным тестом/ревью.
 - **AC:** AC-6, AC-8, AC-9, AC-11, AC-12 (уровень домена); FR-5…FR-11; plan §4.6, PD-1, PD-6, PD-8
 - **Файлы:** `backend/app/domain/api_keys/service.py` (новый);
   тесты: `backend/tests/domain/test_api_keys_service_007.py` (новый)
@@ -383,6 +384,7 @@ R7-T21 → R7-T22).
 
 ## R7-T11 — Аутентификация по ключу: проверка, срок, лимит частоты (домен)
 - **Статус:** TODO
+- **Заметка ревью R7-T07:** аутентификация по ключу не зависит от `failed_login_count`/`login_locked_until` (перебором паролей нельзя заблокировать ключ); дополнительно проверять `app_user.is_blocked`, а не только `revoked_at`.
 - **AC:** AC-10, AC-40 (уровень домена); FR-9, FR-13 (домен), FR-16, FR-33; plan §4.7, PD-5
 - **Файлы:** `backend/app/domain/api_keys/auth.py` (новый), `backend/app/domain/access/roles.py`,
   `backend/app/domain/auth/service.py`;

@@ -46,10 +46,12 @@ from app.core.pagination import PageParams, paginate
 from app.core.security.passwords import (
     PasswordHasher,
     PasswordPolicyError,
+    generate_password,
     hash_in_thread,
     validate_new_password,
 )
 from app.domain.access.roles import ACCOUNT_ADMIN_ROLES, Actor, Capability, Role
+from app.domain.api_keys.models import ApiKey
 from app.domain.auth.provider import normalize_login
 from app.domain.auth.sessions import SessionStore
 from app.domain.events.catalog import EventAction
@@ -233,6 +235,19 @@ async def _lock_for_account_change(
     raise Forbidden()
 
 
+async def lock_for_account_change(
+    db: AsyncSession, workspace_id: UUID, target_id: UUID, actor_id: UUID
+) -> None:
+    """Публичная форма протокола блокировок для других доменных сервисов (plan 007 §4.5)."""
+    await _lock_for_account_change(db, workspace_id, target_id, actor_id)
+
+
+async def load_account(db: AsyncSession, workspace_id: UUID, user_id: UUID) -> UserAccount:
+    """Учётная запись в пространстве; чужая и несуществующая — ``NotFound`` (plan 007 §4.5)."""
+    target = await _load_target(db, workspace_id, user_id)
+    return target.to_account(role=target.role)
+
+
 async def ensure_account_admin_remains(db: AsyncSession, workspace_id: UUID) -> None:
     """FR-69: в пространстве остался хотя бы один активный обладатель MANAGE_ACCOUNTS.
 
@@ -341,6 +356,100 @@ async def create_user(
     )
 
 
+async def create_agent(
+    db: AsyncSession,
+    actor: Actor,
+    hasher: PasswordHasher,
+    *,
+    login: str,
+    role: Role | None,
+) -> UserAccount:
+    """Создаёт учётную запись агента (007 FR-1, FR-2, FR-4, AC-1, AC-2; plan §4.5, PD-4).
+
+    Порядок проверок: права (``MANAGE_ACCOUNTS``; при ``role is not None`` ещё
+    ``ASSIGN_ROLES``) -> роль «технический администратор» (``agent_role_not_allowed``) ->
+    ``login_invalid`` -> ``login_taken``. Пароля у агента нет: хешируется случайное значение,
+    которое нигде не сохраняется, не возвращается и не логируется, поэтому войти по паролю
+    нельзя. ``must_change_password = false``. Запись ``app_user`` — Core-вставка с явным
+    ``is_agent = true`` (plan §4.1: ORM-атрибут у нового объекта не читаем). Одно событие
+    ``user.agent_created`` с ``details={"role_to": ...}``.
+    """
+    _require(actor, Capability.MANAGE_ACCOUNTS)
+    new_role = _parse_role(role)
+    if new_role is not None:
+        _require(actor, Capability.ASSIGN_ROLES)
+    if new_role is Role.TECH_ADMIN:
+        raise Unprocessable(
+            "Агенту нельзя назначить роль технического администратора",
+            code=ErrorCode.agent_role_not_allowed,
+        )
+    normalized = normalize_login(login)
+    if normalized is None:
+        raise Unprocessable("Недопустимый логин", code=ErrorCode.login_invalid)
+    taken = (
+        await db.execute(select(AppUser.id).where(AppUser.login == normalized))
+    ).scalar_one_or_none()
+    if taken is not None:
+        raise Unprocessable("Логин уже занят", code=ErrorCode.login_taken)
+
+    # случайное значение хешируется и выбрасывается: угадать пароль агента невозможно
+    password_hash = await hash_in_thread(hasher, generate_password())
+    await _lock_for_account_change(db, actor.workspace_id, actor.user_id, actor.user_id)
+
+    user_id = uuid4()
+    now = utcnow()
+    inserted = (
+        await db.execute(
+            pg_insert(AppUser)
+            .values(
+                id=user_id,
+                login=normalized,
+                login_display=login,
+                password_hash=password_hash,
+                must_change_password=False,
+                is_blocked=False,
+                is_agent=True,
+                failed_login_count=0,
+                password_changed_at=now,
+                created_at=now,
+                updated_at=now,
+                created_by=actor.user_id,
+            )
+            .on_conflict_do_nothing(index_elements=[AppUser.login])
+            .returning(AppUser.created_at)
+        )
+    ).one_or_none()
+    if inserted is None:  # параллельное создание того же логина
+        raise Unprocessable("Логин уже занят", code=ErrorCode.login_taken)
+    await db.execute(
+        pg_insert(WorkspaceMember).values(
+            workspace_id=actor.workspace_id,
+            user_id=user_id,
+            role=None if new_role is None else new_role.value,
+            created_at=now,
+            updated_at=now,
+            created_by=actor.user_id,
+        )
+    )
+    await record_event(
+        db,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.user_id,
+        action=EventAction.USER_AGENT_CREATED,
+        entity_id=user_id,
+        details=UserEventDetails(role_to=None if new_role is None else new_role.value),
+    )
+    return UserAccount(
+        id=user_id,
+        login=login,
+        role=new_role,
+        is_blocked=False,
+        must_change_password=False,
+        created_at=inserted.created_at,
+        is_agent=True,
+    )
+
+
 async def block_user(
     db: AsyncSession, actor: Actor, sessions: SessionStore, user_id: UUID, /
 ) -> None:
@@ -362,6 +471,20 @@ async def block_user(
     )
     if target.is_active_account_admin:
         await ensure_account_admin_remains(db, actor.workspace_id)
+    if target.is_agent:
+        # PD-7: действующие ключи агента отзываются в той же транзакции; истёкшие и уже
+        # отозванные не трогаются, разблокировка отзыв не отменяет
+        now = utcnow()
+        await db.execute(
+            update(ApiKey)
+            .where(
+                ApiKey.user_id == target.id,
+                ApiKey.revoked_at.is_(None),
+                ApiKey.expires_at > now,
+            )
+            .values(revoked_at=now, revoked_by=actor.user_id)
+            .execution_options(synchronize_session=False)
+        )
     await sessions.delete_all_for_user(db, target.id)
     await record_event(
         db,
@@ -419,7 +542,12 @@ async def reset_password(
     счётчик неудач и блокировка входа сброшены; все сессии пользователя завершены.
     """
     _require(actor, Capability.MANAGE_ACCOUNTS)
-    await _load_target(db, actor.workspace_id, user_id)  # 404 раньше политики пароля
+    # 404 раньше agent_password_not_allowed и политики пароля
+    if (await _load_target(db, actor.workspace_id, user_id)).is_agent:
+        raise Unprocessable(
+            "У агента нет пароля: доступ — по ключу API",
+            code=ErrorCode.agent_password_not_allowed,
+        )
     password = one_time_password.get_secret_value()
     _check_one_time_password(password)
     # медленный Argon2 — до протокола блокировок: ничего не удерживается на время хеширования
@@ -479,6 +607,11 @@ async def set_role(
     new_role = _parse_role(role)
     await _lock_for_account_change(db, actor.workspace_id, user_id, actor.user_id)
     target = await _load_target(db, actor.workspace_id, user_id)
+    if target.is_agent and new_role is Role.TECH_ADMIN:
+        raise Unprocessable(
+            "Агенту нельзя назначить роль технического администратора",
+            code=ErrorCode.agent_role_not_allowed,
+        )
     if target.role == new_role:
         return target.to_account(role=new_role)
 

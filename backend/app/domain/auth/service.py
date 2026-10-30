@@ -92,8 +92,8 @@ async def login(
 
     Логин нормализуется для поиска учётной записи; в результате — отображаемый логин (FR-73a);
     логин вне шаблона отклоняется без обращения
-    к БД. Заблокированный пользователь и пользователь без членства в пространстве получают тот
-    же отказ (FR-5, FR-61). Роль ``NULL`` вход не запрещает (FR-66).
+    к БД. Заблокированный пользователь, агент (007 FR-1) и пользователь без членства в
+    пространстве получают тот же отказ (FR-5, FR-61). Роль ``NULL`` вход не запрещает (FR-66).
     """
     normalized = normalize_login(login)
     if normalized is None:
@@ -115,6 +115,7 @@ async def login(
             select(
                 AppUser.login_display,
                 AppUser.is_blocked,
+                AppUser.is_agent,
                 AppUser.must_change_password,
                 WorkspaceMember.workspace_id,
                 WorkspaceMember.role,
@@ -125,7 +126,8 @@ async def login(
             .limit(1)
         )
     ).one_or_none()
-    if row is None or row.is_blocked:
+    if row is None or row.is_blocked or row.is_agent:
+        # агент отклоняется тем же ответом, что неверный пароль (не раскрываем тип записи)
         await commit_durably(db)
         raise InvalidCredentials()
 
