@@ -28,6 +28,8 @@ from typing import Any
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.core.security.api_keys import API_KEY_LEAK_PATTERN, API_KEY_PREFIX
+
 MASK = "***"
 
 _SECRET_WORDS = r"password|secret|token|cookie|authorization"
@@ -152,13 +154,16 @@ def _strip_unicode_reprs(text: str) -> str:
 
 
 def redact_text(text: str) -> str:
-    """Заменяет значения запрещённых ключей, пароли в DSN и repr ``UnicodeError`` в тексте."""
+    """Заменяет значения запрещённых ключей, пароли в DSN, ключи агента (``gtk_…``) и repr
+    ``UnicodeError`` в тексте."""
     if not text:
         return text
     text = _mask_input_values(text)
     text = _strip_unicode_reprs(text)
     if "://" in text and "@" in text:
         text = _DSN_RE.sub(rf"\g<scheme>\g<user>:{MASK}@", text)
+    if API_KEY_PREFIX in text:  # ключ агента (007, PD-11): голое значение, без имени ключа
+        text = API_KEY_LEAK_PATTERN.sub(MASK, text)
     if _SECRET_KEY_RE.search(text) is None:
         return text
     return _TEXT_SECRET_RE.sub(_mask_match, text)

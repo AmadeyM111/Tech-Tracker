@@ -843,3 +843,115 @@ def test_alternative_separators_are_masked(logs: LogReader, text: str, leaked: s
     assert len(recs) == 2
     assert leaked not in json.dumps(recs, ensure_ascii=False)
     assert "event" in str(_pick(recs[0], _MESSAGE_KEYS))
+
+
+# ------------------------------------------------------- ключ агента (007, R7-T03)
+# Ключ собирается из байтов в рантайме: литералов настоящих ключей в репозитории нет.
+# Значение не попадает в сообщения assert: булевы вычисляются до assert.
+
+
+def _agent_key(raw: bytes = bytes(range(32))) -> str:
+    import base64
+
+    return "gtk_" + base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _key_fragments(key: str, size: int = 8) -> list[str]:
+    return [key[i : i + size] for i in range(len(key) - size + 1)]
+
+
+def _leaks_key(text: str, key: str) -> bool:
+    return any(frag in text for frag in _key_fragments(key))
+
+
+def test_ac38_agent_key_in_message_is_masked(logs: LogReader) -> None:
+    """AC-38 / FR-32: ключ в тексте сообщения заменён на ***."""
+    key = _agent_key()
+    logging.getLogger("tests.key").info("issued " + key + " done")
+    text = logs.text()
+    leaked = _leaks_key(text, key)
+    assert not leaked, "ключ или его подстрока ≥ 8 в логе (сообщение)"
+    assert "***" in text
+    assert "issued" in text and "done" in text
+
+
+def test_ac38_agent_key_in_extra_path_is_masked(logs: LogReader) -> None:
+    key = _agent_key()
+    logging.getLogger("tests.key").info(
+        "event", extra={"path": "/api/v1/" + key, "login": "alice-v"}
+    )
+    text = logs.text()
+    leaked = _leaks_key(text, key)
+    assert not leaked, "ключ или его подстрока ≥ 8 в логе (extra.path)"
+    assert "alice-v" in text
+
+
+def test_ac38_agent_key_in_percent_args_is_masked(logs: LogReader) -> None:
+    key = _agent_key()
+    logging.getLogger("tests.key").warning("auth failed for %s (%d)", key, 401)
+    text = logs.text()
+    leaked = _leaks_key(text, key)
+    assert not leaked, "ключ или его подстрока ≥ 8 в логе (аргументы %s)"
+    assert "401" in text
+
+
+def test_ac38_agent_key_in_exception_text_is_masked(logs: LogReader) -> None:
+    key = _agent_key()
+    try:
+        raise ValueError("bad credential " + key)
+    except ValueError:
+        logging.getLogger("tests.key").exception("operation failed")
+    text = logs.text()
+    leaked = _leaks_key(text, key)
+    assert not leaked, "ключ или его подстрока ≥ 8 в логе (исключение)"
+    assert "ValueError" in text
+    assert len([ln for ln in text.splitlines() if ln.strip()]) == 1
+
+
+def test_ac38_mutated_agent_key_is_still_masked(logs: LogReader) -> None:
+    """Ключ с изменённым символом тоже маскируется (шаблон, а не точное значение)."""
+    key = _agent_key()
+    mutated = key[:20] + ("A" if key[20] != "A" else "B") + key[21:]
+    logging.getLogger("tests.key").info("got " + mutated)
+    text = logs.text()
+    leaked = _leaks_key(text, mutated)
+    assert not leaked, "изменённый ключ не замаскирован"
+
+
+def test_ac38_key_adjacent_to_punctuation_is_masked(logs: LogReader) -> None:
+    key = _agent_key()
+    logging.getLogger("tests.key").info("url=https://h/x?k=" + key + "&a=1; (" + key + "),")
+    text = logs.text()
+    leaked = _leaks_key(text, key)
+    assert not leaked, "ключ рядом со знаками препинания не замаскирован"
+
+
+def test_ac38_redact_text_masks_key_and_keeps_rest() -> None:
+    from app.core.logging import redact_text
+
+    key = _agent_key()
+    result = redact_text("before " + key + " after")
+    leaked = _leaks_key(result, key)
+    assert not leaked
+    exact = result == "before *** after"
+    assert exact, "результат redact_text не равен ожидаемому"
+
+
+def test_ac38_redact_text_leaves_short_gtk_text_alone() -> None:
+    from app.core.logging import redact_text
+
+    assert redact_text("gtk_abc and gtk_ prefix") == "gtk_abc and gtk_ prefix"
+
+
+async def test_ac38_agent_key_in_access_log_path_is_masked(
+    logs: LogReader, app_client: tuple[FastAPI, httpx.AsyncClient]
+) -> None:
+    """AC-38: путь access-лога с ключом не раскрывает ключ."""
+    key = _agent_key()
+    _, client = app_client
+    r = await client.get("/api/v1/no-such-route/" + key)
+    assert r.status_code == 404
+    text = logs.text()
+    leaked = _leaks_key(text, key)
+    assert not leaked, "ключ или его подстрока ≥ 8 в access-логе"
+    assert "no-such-route" in text

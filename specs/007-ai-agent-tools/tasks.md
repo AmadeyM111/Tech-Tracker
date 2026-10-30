@@ -122,7 +122,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T03 — Формат и секрет ключа, маскирование ключа в логах
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-41; NFR-3; FR-32 (логи), FR-6; plan §4.2, PD-1, PD-11
 - **Файлы:** `backend/app/core/security/api_keys.py` (новый), `backend/app/core/logging.py`;
   тесты: `backend/tests/unit/test_api_key_secret_007.py` (новый), `backend/tests/unit/test_logging.py`
@@ -405,6 +405,7 @@ R7-T21 → R7-T22).
 
 ## R7-T12 — Аутентификация по ключу: `get_actor`, объём доступа FR-17, гейты, лимит
 - **Статус:** TODO
+- **Заметка ревью R7-T03:** `api_key_digest` вызывать вне блока `except` с исключением, содержащим заголовок `Authorization` (иначе `__context__` несёт чужое исключение).
 - **AC:** AC-4, AC-5, AC-6 («кто я» по секрету), AC-7 (агент по ключу), AC-8 (по реальному запросу), AC-9 (401 после отзыва), AC-10, AC-13, AC-14, AC-15, AC-17, AC-33, AC-40; FR-12…FR-15, FR-17, FR-18, FR-33; plan §4.7, PD-2, PD-3, PD-5
 - **Файлы:** `backend/app/api/deps.py`, `backend/app/main.py`;
   тесты: `backend/tests/api/test_api_key_auth_007.py` (новый), `backend/tests/api/test_agent_scope_007.py` (новый),
@@ -586,6 +587,7 @@ R7-T21 → R7-T22).
 
 ## R7-T16 — Секрет не утекает: логи, ответы, журнал, события, БД, access-лог web
 - **Статус:** TODO
+- **Заметки ревью R7-T03 (обязательно учесть):** `reviews/R7-T03-1.md` п.1–3: имена ключей в `extra`/Mapping не маскируются в `core/logging.py`; в сквозной AC-38 добавить ключ с `/` или `+` внутри (путь и заголовок), при находке — вернуться к plan PD-11; nginx `log_format` без `$request`.
 - **AC:** AC-38 (API, журнал, события), AC-39; FR-32, FR-6; plan PD-1, PD-11
 - **Файлы:** `deploy/web/default.conf.template`;
   тесты: `backend/tests/api/test_api_key_leaks_007.py` (новый), `backend/tests/infra/test_web_hardening.py`
