@@ -66,6 +66,7 @@ COLUMNS = {
     "in_audit",
     "changes",
     "details",
+    "api_key_id",
 }
 
 
@@ -146,6 +147,7 @@ async def test_t07_table_columns_types_and_nullability(db: AsyncSession) -> None
         "in_audit": ("boolean", "NO"),
         "changes": ("jsonb", "YES"),
         "details": ("jsonb", "YES"),
+        "api_key_id": ("uuid", "YES"),
     }
     for name, (data_type, nullable) in expected.items():
         assert (cols[name].data_type, cols[name].is_nullable) == (data_type, nullable), name
@@ -175,7 +177,7 @@ async def test_t07_model_is_registered_in_metadata() -> None:
 
 
 async def test_t07_only_workspace_and_actor_foreign_keys(db: AsyncSession) -> None:
-    """D-8: FK только на workspace и app_user, на доменные сущности FK нет."""
+    """D-8: FK только на workspace, app_user и (007/FR-30) api_key; на доменные сущности FK нет."""
     rows = await db.execute(
         text(
             "SELECT a.attname AS col, c.confrelid::regclass::text AS target "
@@ -185,7 +187,7 @@ async def test_t07_only_workspace_and_actor_foreign_keys(db: AsyncSession) -> No
         )
     )
     fks = {r.col: r.target.split(".")[-1] for r in rows}
-    assert fks == {"workspace_id": "workspace", "actor_id": "app_user"}
+    assert fks == {"workspace_id": "workspace", "actor_id": "app_user", "api_key_id": "api_key"}
 
 
 async def test_t07_workspace_foreign_key_is_enforced(db: AsyncSession) -> None:

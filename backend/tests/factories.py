@@ -12,10 +12,13 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import itertools
+import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from app.core.clock import utcnow
@@ -47,6 +50,7 @@ class UserRow:
     role: str | None
     is_blocked: bool
     must_change_password: bool
+    is_agent: bool = False
 
 
 def get_table(name: str) -> Table:
@@ -96,6 +100,7 @@ async def make_user(
     password_hash: str | None = None,
     blocked: bool = False,
     must_change_password: bool = False,
+    is_agent: bool = False,
 ) -> UserRow:
     """Пользователь + строка ``workspace_member`` (роль ``None`` = «без роли», FR-66).
 
@@ -110,10 +115,13 @@ async def make_user(
     user_id = uuid.uuid4()
     the_hash = password_hash or _hash_password(password)
     the_login = login or next_login()
+    # is_agent пишется только для агента: у остальных работает server_default false (007/FR-1)
+    agent_flag: dict[str, object] = {"is_agent": True} if is_agent else {}
     await db.execute(
         get_table("app_user")
         .insert()
         .values(
+            **agent_flag,
             id=user_id,
             login=the_login.lower(),
             login_display=the_login,
@@ -150,6 +158,7 @@ async def make_user(
         role=role,
         is_blocked=blocked,
         must_change_password=must_change_password,
+        is_agent=is_agent,
     )
 
 
@@ -168,15 +177,18 @@ async def make_domain_event(
     changes: list[dict[str, object]] | None = None,
     details: dict[str, object] | None = None,
     occurred_at: datetime | None = None,
+    api_key_id: uuid.UUID | None = None,
 ) -> int:
     """Строка ``domain_event`` напрямую (в обход ``record_event``); возвращает ``id`` (T07).
 
     Для тестов представлений (лента, история, аудит) и проверок триггеров append-only.
     """
+    key_column: dict[str, object] = {"api_key_id": api_key_id} if api_key_id is not None else {}
     result = await db.execute(
         get_table("domain_event")
         .insert()
         .values(
+            **key_column,
             workspace_id=workspace_id,
             occurred_at=occurred_at or utcnow(),
             actor_id=actor_id,
@@ -193,6 +205,59 @@ async def make_domain_event(
         .returning(get_table("domain_event").c.id)
     )
     return int(result.scalar_one())
+
+
+# --- 007: ключи агентов (R7-T02) ------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ApiKeyRow:
+    id: uuid.UUID
+    secret: str
+
+
+def _local_secret() -> str:
+    """Секрет формата ``gtk_`` + base64url(32 байта) без ``=``; не зависит от кода приложения."""
+    return "gtk_" + base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("ascii").rstrip("=")
+
+
+async def make_api_key(
+    db: AsyncSession,
+    *,
+    user: UserRow,
+    created_by: UserRow,
+    secret: str | None = None,
+    name: str = "Ключ агента",
+    created_at: datetime | None = None,
+    expires_at: datetime | None = None,
+    revoked_at: datetime | None = None,
+    revoked_by: UserRow | None = None,
+    last_used_at: datetime | None = None,
+) -> ApiKeyRow:
+    """Строка ``api_key`` напрямую; в БД пишется только ``sha256`` секрета (007/FR-6)."""
+    the_secret = secret or _local_secret()
+    created = created_at or utcnow()
+    key_id = uuid.uuid4()
+    await db.execute(
+        get_table("api_key")
+        .insert()
+        .values(
+            id=key_id,
+            workspace_id=user.workspace_id,
+            user_id=user.id,
+            name=name,
+            secret_digest=hashlib.sha256(the_secret.encode("ascii")).digest(),
+            created_at=created,
+            created_by=created_by.id,
+            expires_at=expires_at or created + timedelta(days=90),
+            revoked_at=revoked_at,
+            revoked_by=revoked_by.id if revoked_by is not None else None,
+            last_used_at=last_used_at,
+            rate_window_start=None,
+            rate_count=0,
+        )
+    )
+    return ApiKeyRow(id=key_id, secret=the_secret)
 
 
 # --- MVP (T69, plan §11.6): проекты, участники, задачи, комментарии -----------------------

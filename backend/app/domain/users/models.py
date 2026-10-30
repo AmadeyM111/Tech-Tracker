@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, Text, false
 from sqlalchemy.engine.default import DefaultExecutionContext
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,6 +28,9 @@ def _login_display_default(context: DefaultExecutionContext) -> str:
 
 class AppUser(UUIDPkMixin, TimestampMixin, AuthoredMixin, Base):
     __tablename__ = "app_user"
+    # is_agent (007) задаёт server_default: без RETURNING вставка работает и на схеме ниже 0008
+    # (тесты обновления собирают «прежнюю установку» кодом текущей версии).
+    __mapper_args__ = {"eager_defaults": False}
     __table_args__ = (
         # Шаблон логина (FR-73); заодно гарантирует нижний регистр, поэтому UNIQUE(login)
         # регистронезависим (D-39).
@@ -46,6 +49,10 @@ class AppUser(UUIDPkMixin, TimestampMixin, AuthoredMixin, Base):
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False)
     is_blocked: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    # Учётная запись ИИ-агента (spec 007 FR-1): без пароля для входа, доступ по ключу API.
+    # Без Python-default: вставка не упоминает столбец, значение задаёт БД (server_default), и
+    # код работает на схеме ниже 0008 (тесты обновления подготавливают данные старой схемы).
+    is_agent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
     blocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     login_locked_until: Mapped[datetime | None] = mapped_column(

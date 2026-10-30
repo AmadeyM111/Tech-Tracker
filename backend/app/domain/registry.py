@@ -4,6 +4,7 @@
 дописывает сюда импорт своего модуля.
 """
 
+from app.domain.api_keys import models as api_keys_models  # noqa: F401
 from app.domain.auth import models as auth_models  # noqa: F401
 from app.domain.comments import models as comments_models  # noqa: F401
 from app.domain.events import models as events_models  # noqa: F401

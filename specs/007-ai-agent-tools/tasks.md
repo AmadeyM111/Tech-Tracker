@@ -84,7 +84,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T02 — Миграция 0008: признак агента, таблица ключей, ключ в событиях
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** FR-1 (признак), FR-6 (хранится только дайджест), FR-30 (столбец события), NFR-7 (модель данных); plan §4.1, PD-1, PD-9
 - **Файлы:** `backend/app/domain/users/models.py`, `backend/app/domain/api_keys/models.py` (новый),
   `backend/app/domain/api_keys/__init__.py` (новый, пустой), `backend/app/domain/events/models.py`,
@@ -93,7 +93,9 @@ R7-T21 → R7-T22).
   тесты: `backend/tests/db/test_agent_keys_schema_007.py` (новый), `backend/tests/factories.py`,
   `backend/tests/db/test_migrations.py`
   (+ `backend/tests/db/test_identity_models.py`, `backend/tests/db/test_r11_models.py`,
-  `backend/tests/db/test_event_log.py` — только если перечисляют столбцы таблиц)
+  `backend/tests/db/test_event_log.py` — только если перечисляют столбцы таблиц;
+  `backend/tests/upgrade002_support.py` — константы `HEAD_REVISION` `0007` → `0008` и `data_fingerprint` (для `app_user` исключить `is_agent`), иначе красными
+  становятся тесты апгрейда 002/006; добавлено оркестратором по отчёту test-writer, 2026-10-30)
 - **Зависит от:** —
 - **Описание:** Модель и миграция — одна неделимая единица (`alembic check`). По plan §4.1:
   `AppUser.is_agent` (`server_default false`), модель `ApiKey` с CHECK, UNIQUE и индексом,
@@ -184,16 +186,25 @@ R7-T21 → R7-T22).
   `UserRef` в `comments/service.py` — `is_agent=False`. Схемы `UserRef`, `DirectoryUser` —
   `is_agent: bool`. Логика выборок (фильтры, порядок) не меняется. **OpenAPI и типы
   перегенерирует R7-T06; коммит — вместе с R7-T06.**
+  **Правило чтения `is_agent` (plan §4.1):** у `AppUser` нет Python-умолчания и
+  `eager_defaults=False`, поэтому у ORM-объекта, созданного без явного `is_agent`, после `flush()`
+  атрибут не загружен (обращение → `MissingGreenlet`). Признак читать только выборкой столбца
+  (`select(..., AppUser.is_agent)`) или из сущности, загруженной `select(AppUser)`; не читать
+  `user.is_agent` у объекта, только что добавленного через `db.add(...)`. Модель `AppUser` не менять.
   Test-writer (`test_agent_flag_007.py`, данные через фабрики уровня БД, `make_user(is_agent=True)`):
   AC-36 — `ba1` через обычный API: карточка задачи, автор и исполнитель которой `agent.u` (и
   подзадача с исполнителем `agent.u`), комментарии с автором `agent.u`, участники P, справочник
   `/users`, список проектов (владелец `ba1`), доска P (исполнитель карточки) — у ссылок на
   `agent.u` `is_agent: true`, на `ba1` и `u1` — `false`; набор ключей ссылки — ровно `{id, login,
-  is_agent}`, у элемента справочника — `{id, login, role, is_agent}`.
+  is_agent}`, у элемента справочника — `{id, login, role, is_agent}`. Плюс: агент и человек,
+  вставленные фабриками в том же тесте непосредственно перед запросом (без `refresh`), сразу
+  видны в справочнике `/users` с верными `is_agent` (`true`/`false`).
 - **Старые тесты → AC:** проверки точного набора полей `UserRef`/`DirectoryUser` → + `is_agent`
   (AC-36, plan §6.2).
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/api/test_agent_flag_007.py backend/tests/api backend/tests/domain`
-  зелёный; mypy и ruff зелёные; «Фронтенд не тронут». Допустимо красные до R7-T06 только
+  зелёный (ни одного `MissingGreenlet`); `is_agent` во всех изменённых местах читается выборкой
+  столбца или из загруженной `select` сущности (сверяет ревьюер, plan §4.1); mypy и ruff
+  зелёные; «Фронтенд не тронут». Допустимо красные до R7-T06 только
   `backend/tests/cli/test_openapi.py::test_fr44_committed_openapi_json_matches_generation` и
   `backend/tests/infra/test_frontend_api_types.py`; `python scripts/task_scope.py R7-T05` → 0.
 - **Попытки:** 0
@@ -214,15 +225,26 @@ R7-T21 → R7-T22).
   `UserAccount.is_agent`, `_Target.is_agent` (выборки `list_accounts`, `_load_target`);
   `AdminUser.is_agent`. Затем `bash scripts/gen-api.sh`; фронтенд-код не меняется, только
   фикстуры тестов. Логику гейтов не менять.
+  **Правило `is_agent` (plan §4.1):** у `AppUser` нет Python-умолчания и `eager_defaults=False` —
+  у ORM-объекта, созданного без явного `is_agent`, после `flush()` атрибут не загружен
+  (`MissingGreenlet`). `get_actor`, `list_accounts`, `get_account`, `_load_target` читают признак
+  выборкой столбца; `create_user` (Core-вставка без `is_agent`, значение задаёт БД) возвращает
+  `UserAccount(..., is_agent=False)` литералом, не читая ORM-атрибут. Модель `AppUser` не менять.
   Test-writer (дополнить `test_agent_flag_007.py`): `GET /me` человека — `is_agent: false`;
   `GET /admin/users` и `GET /admin/users/{id}` у `ta1` — `is_agent: true` у агента (БД) и `false`
-  у людей; набор полей `AdminUser` — прежние шесть + `is_agent`.
+  у людей; набор полей `AdminUser` — прежние шесть + `is_agent`. Сразу после записи:
+  `POST /admin/users` → 201, в теле ответа `is_agent: false`, затем `GET /admin/users/{id}` того же
+  пользователя — `false`; домен (`test_user_admin_service.py` или `test_agent_flag_007.py`):
+  результат `create_user(...)` в той же сессии, без `refresh`/коммита, — `is_agent is False`.
 - **Старые тесты → AC:** точные наборы полей `AdminUser` (`test_admin_users.py`, «ровно шесть
   полей») и `MeResponse` → + `is_agent` (FR-31, FR-18); фикстуры фронтенда — только новое поле.
 - **Готово, когда:** проверки бэкенда зелёные (весь `pytest -q backend/tests`, включая
   `test_fr44_*`, `infra/test_frontend_api_types.py`, `test_api_compat_007.py`); проверки фронтенда
   зелёные; `bash scripts/gen-api.sh` повторно не меняет файлы; `git diff --stat HEAD -- frontend/src`
-  показывает только `schema.d.ts`; `python scripts/task_scope.py R7-T06` → 0. Коммит R7-T05 + R7-T06 — один.
+  показывает только `schema.d.ts`; ни одного `MissingGreenlet`, в т.ч. в проверке ответа
+  `POST /admin/users` и результата `create_user` сразу после записи; `is_agent` читается только
+  выборкой столбца или литералом (сверяет ревьюер, plan §4.1);
+  `python scripts/task_scope.py R7-T06` → 0. Коммит R7-T05 + R7-T06 — один.
 - **Попытки:** 0
 
 ## R7-T07 — Учётная запись агента: создание, роль, сброс пароля, вход, блокировка (сервис)
@@ -240,9 +262,20 @@ R7-T21 → R7-T22).
   в `block_user` — отзыв действующих ключей агента (PD-7, `revoked_by` = актор), событие одно.
   `auth.service.login`: `AppUser.is_agent` в выборке, агент → `InvalidCredentials` (как
   заблокированный).
-  Test-writer (домен, `db` + фабрики): AC-1 — `create_agent(role=USER)`: `is_agent`, роль П,
-  `must_change_password=false`, ровно одно новое событие аудита `user.agent_created` с
-  `role_to="user"`; вход агента с любым паролем и с «угаданным» — `InvalidCredentials`
+  **Правило `is_agent` (plan §4.1):** у `AppUser` нет Python-умолчания и `eager_defaults=False` —
+  у ORM-объекта, созданного без явного `is_agent`, после `flush()` атрибут не загружен (обращение →
+  `MissingGreenlet`). Поэтому `create_agent` вставляет `app_user` Core-вставкой
+  `pg_insert(AppUser).values(..., is_agent=True, must_change_password=False, ...)` по образцу
+  `create_user` (не `AppUser(...)` + `db.add`) и возвращает `UserAccount(..., is_agent=True)`
+  литералом; `set_role`, `reset_password`, `block_user`, `login` читают признак выборкой столбца
+  (`_load_target`, `select(..., AppUser.is_agent)`). Если всё же нужен ORM-объект — `is_agent=`
+  передаётся явно либо `await db.refresh(obj)` перед чтением. Модель `AppUser` не менять.
+  Test-writer (домен, `db` + фабрики): AC-1 — `create_agent(role=USER)`: результат проверяется
+  сразу, в той же сессии без `refresh`/`expire`/коммита (`result.is_agent is True`, роль П,
+  `must_change_password is False`), затем повторно выборкой `load_account` и
+  `select(AppUser.is_agent)` — `True`; ровно одно новое событие аудита `user.agent_created` с
+  `role_to="user"`; в том же тесте `create_user(...)` человека сразу после записи —
+  `is_agent is False`; вход агента с любым паролем и с «угаданным» — `InvalidCredentials`
   (совпадает с неверным паролем человека); `reset_password` агента → 422
   `agent_password_not_allowed`, событий нет. AC-2 — `create_agent(role=TECH_ADMIN)` → 422
   `agent_role_not_allowed`, записи нет; `set_role(agent, TECH_ADMIN)` → 422, роль П, событий нет;
@@ -253,7 +286,10 @@ R7-T21 → R7-T22).
 - **Старые тесты → AC:** нет (существующие тесты `users/service`, `test_admin_roles.py` с подменой
   `_lock_for_account_change` зелёные без правок).
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/domain/test_agent_accounts_007.py backend/tests/domain backend/tests/api/test_admin_users.py backend/tests/api/test_admin_roles.py backend/tests/api/test_auth_login.py`
-  зелёный; проверки бэкенда зелёные; «Фронтенд не тронут»; `python scripts/task_scope.py R7-T07` → 0.
+  зелёный (ни одного `MissingGreenlet`, в т.ч. в проверке результата `create_agent`/`create_user`
+  сразу после записи); `create_agent` пишет `app_user` Core-вставкой с явным `is_agent=True`, ORM-
+  атрибут `is_agent` нигде не читается у объекта без явного значения (сверяет ревьюер, plan §4.1);
+  проверки бэкенда зелёные; «Фронтенд не тронут»; `python scripts/task_scope.py R7-T07` → 0.
 - **Попытки:** 0
 
 ## R7-T08 — API создания учётной записи агента

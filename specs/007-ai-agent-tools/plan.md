@@ -134,7 +134,8 @@ ML-кода, датасетов, обучения и GPU нет (NFR-5).
 
 ```python
 # backend/app/domain/users/models.py — AppUser
-is_agent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
+__mapper_args__ = {"eager_defaults": False}
+is_agent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())  # без Python default
 
 # backend/app/domain/api_keys/models.py
 class ApiKey(UUIDPkMixin, Base):
@@ -163,6 +164,29 @@ class ApiKey(UUIDPkMixin, Base):
 # backend/app/domain/events/models.py — DomainEvent
 api_key_id: Mapped[UUID | None]        # FK api_key.id RESTRICT deferrable, NULL
 ```
+
+**`app_user.is_agent`: только `server_default`, без Python `default=False`, `eager_defaults=False`
+(принято по ревью R7-T02, `reviews/R7-T02-1.md`).** Столбец `boolean NOT NULL`, значение по
+умолчанию задаёт БД (`server_default=false()`). Причина: тесты апгрейда 002/006 (D-13) создают
+пользователей кодом текущей версии на схеме 0005/0006, где столбца ещё нет. С Python
+`default=False` ORM вставляет `is_agent` явно — падают 26 тестов апгрейда; с одним
+`server_default` при `eager_defaults` по умолчанию ORM добавляет `RETURNING is_agent` к INSERT —
+падает `test_002_ac30_demo_installation_upgrade_by_operator_bootstrap`. С `eager_defaults=False`
+вставка столбец не упоминает и не возвращает.
+
+Последствие: после `flush()` атрибут `is_agent` у ORM-объекта `AppUser`, созданного без явного
+значения, **не загружен**; обращение к нему в асинхронной сессии — `MissingGreenlet` (ошибка
+громкая, не тихая). Правило для кода 007 (R7-T05…R7-T08 и далее):
+- создавать `AppUser` Core-вставкой `pg_insert(AppUser).values(..., is_agent=<явно>)`, как
+  `users.service.create_user` (агент — `is_agent=True`; человек — значение не нужно, ответ
+  строится без чтения ORM-атрибута, `UserAccount(..., is_agent=False)`);
+- либо ORM-объект с явным `AppUser(..., is_agent=...)`, либо `await db.refresh(user)` перед
+  чтением `user.is_agent`;
+- читать признак выборкой столбца (`select(AppUser.is_agent)`, `select(AppUser)` после
+  коммита/в новой выборке) — безопасно.
+Существующие ORM-вставки (`system/bootstrap.py`, `ops/demo.py`) `is_agent` не читают и не
+меняются. Ответ любого пути создания пользователя (агента и человека) тесты проверяют сразу после
+записи, в той же сессии/запросе — так `MissingGreenlet` обнаруживается.
 
 `0008_agent_api_keys.py`: `revision="0008"`, `down_revision="0007"`. Upgrade: `ADD COLUMN is_agent
 … DEFAULT false NOT NULL` → `CREATE TABLE api_key` → `ALTER TABLE domain_event ADD COLUMN
@@ -234,7 +258,8 @@ async def record_event(db, *, workspace_id, actor_id, action, entity_id, changed
 # api/v1/schemas/common.py:  UserRef.is_agent: bool;  DirectoryUser.is_agent: bool
 # api/v1/schemas/auth.py:    MeResponse.is_agent: bool
 # api/v1/schemas/admin.py:   AdminUser.is_agent: bool
-# domain/users/service.py:   UserAccount.is_agent: bool (list_accounts, get_account, _Target)
+# domain/users/service.py:   UserAccount.is_agent: bool (list_accounts, get_account, _Target);
+#                            create_user -> UserAccount(..., is_agent=False) литералом (§4.1: ORM-атрибут не читать)
 # domain/access/roles.py:    Actor.is_agent: bool = False  (get_actor читает AppUser.is_agent)
 ```
 
@@ -245,7 +270,8 @@ async def record_event(db, *, workspace_id, actor_id, action, entity_id, changed
 async def create_agent(db, actor, hasher, *, login: str, role: Role | None) -> UserAccount:
     """403 (MANAGE_ACCOUNTS; при role is not None ещё ASSIGN_ROLES) -> role == TECH_ADMIN:
     422 agent_role_not_allowed -> login_invalid -> login_taken -> Argon2 случайного значения ->
-    lock_for_account_change -> INSERT app_user(is_agent=True, must_change_password=False) +
+    lock_for_account_change -> Core pg_insert app_user(is_agent=True явно, must_change_password=False;
+    ответ UserAccount(is_agent=True) без чтения ORM-атрибута, §4.1) +
     workspace_member(role) -> одно событие USER_AGENT_CREATED, details={"role_to": role|None}."""
 async def lock_for_account_change(db, workspace_id: UUID, target_id: UUID, actor_id: UUID) -> None
 async def load_account(db, workspace_id: UUID, user_id: UUID) -> UserAccount   # 404 NotFound

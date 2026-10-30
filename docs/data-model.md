@@ -41,7 +41,7 @@
 
 ### app_user
 
-Учётная запись (миграция 0001; `login_display` — миграция 0005).
+Учётная запись (миграция 0001; `login_display` — миграция 0005; `is_agent` — миграция 0008).
 
 | Столбец | Тип | NULL | Описание |
 |---|---|---|---|
@@ -51,6 +51,7 @@
 | `password_hash` | text | нет | хеш Argon2id (пароль в открытом виде не хранится) |
 | `must_change_password` | boolean | нет | требуется смена пароля при входе |
 | `is_blocked` | boolean | нет | учётная запись заблокирована |
+| `is_agent` | boolean | нет | учётная запись ИИ-агента (007/FR-1); `DEFAULT false` (`server_default`), у существующих строк `false`; при откате 0008 признак теряется |
 | `blocked_at` | timestamptz | да | момент блокировки |
 | `failed_login_count` | integer | нет | подряд неудачных входов (значение по умолчанию 0 задаёт приложение) |
 | `login_locked_until` | timestamptz | да | вход временно заблокирован до этого момента |
@@ -221,6 +222,38 @@
 применится, а удалить строку нельзя: журнал append-only. В установке, созданной этим репозиторием,
 пишется только `entity_type = user`, поэтому на практике это недостижимо.
 
+## Ключи API агентов
+
+### api_key
+
+Ключ API ИИ-агента (миграция 0008, spec 007 FR-6). **Секрет ключа не хранится: в БД только
+`SHA-256` секрета** (`secret_digest`, 32 байта); ни секрета, ни его префикса, ни любой его части
+в БД нет. Ключи не удаляются (все FK `RESTRICT`): отзыв — `revoked_at` + `revoked_by`. При
+откате 0008 таблица `api_key` и все ключи теряются.
+
+| Столбец | Тип | NULL | Описание |
+|---|---|---|---|
+| `id` | uuid | нет | первичный ключ `pk_api_key`; по нему ключ опознаётся в интерфейсе и событиях |
+| `workspace_id` | uuid | нет | FK `fk_api_key_workspace_id_workspace` → `workspace.id`, `RESTRICT` |
+| `user_id` | uuid | нет | агент-владелец ключа; FK `fk_api_key_user_id_app_user` → `app_user.id`, `RESTRICT` |
+| `name` | text | нет | название ключа; `CHECK` `ck_api_key_name_length`: `char_length(name) BETWEEN 1 AND 100` |
+| `secret_digest` | bytea | нет | `SHA-256` секрета; `UNIQUE` (`uq_api_key_secret_digest`); `CHECK` `ck_api_key_digest_length`: `octet_length(secret_digest) = 32` |
+| `created_at` | timestamptz | нет | момент выпуска (значение задаёт приложение) |
+| `created_by` | uuid | нет | технический администратор, выпустивший ключ; FK `fk_api_key_created_by_app_user` → `app_user.id`, `RESTRICT` |
+| `expires_at` | timestamptz | нет | конец срока действия; `CHECK` `ck_api_key_expires_after_created`: `expires_at > created_at` |
+| `revoked_at` | timestamptz | да | момент отзыва; `NULL` — не отозван |
+| `revoked_by` | uuid | да | кто отозвал; FK `fk_api_key_revoked_by_app_user` → `app_user.id`, `RESTRICT`; `CHECK` `ck_api_key_revoked_pair`: `(revoked_at IS NULL) = (revoked_by IS NULL)` |
+| `last_used_at` | timestamptz | да | момент последнего использования |
+| `rate_window_start` | timestamptz | да | начало текущего окна ограничения частоты |
+| `rate_count` | integer | нет | запросов в текущем окне; `DEFAULT 0`; `CHECK` `ck_api_key_rate_count_nonnegative`: `rate_count >= 0` |
+
+#### Индексы
+
+| Индекс | Столбцы | Назначение |
+|---|---|---|
+| `uq_api_key_secret_digest` | `(secret_digest)`, `UNIQUE` | поиск ключа по дайджесту при каждом запросе |
+| `ix_api_key_workspace_id_user_id` | `(workspace_id, user_id)` | ключи агента в пространстве |
+
 ## Журнал событий
 
 ### domain_event
@@ -243,6 +276,7 @@
 | `in_audit` | boolean | нет | событие попадает в журнал аудита |
 | `changes` | jsonb | да | список `{field, old, new}` (с R1.1); в API аудита не отдаётся |
 | `details` | jsonb | да | только для `entity_type = user`: `role_from`, `role_to`; паролей и секретов нет |
+| `api_key_id` | uuid | да | ключ API, по которому выполнено действие (007/FR-30; миграция 0008); FK `fk_domain_event_api_key_id_api_key` → `api_key.id`, `RESTRICT`, deferrable; `NULL` — действие человека или системы; без `DEFAULT` |
 
 #### Индексы
 
@@ -317,6 +351,7 @@ TRUNCATE` — в бэклоге (plan D-8).
 | `0004` | `project`, `project_member`, `task`, `comment`, их индексы; `CHECK` `ck_domain_event_entity_type_valid` на `domain_event.entity_type` (откат удаляет таблицы и `CHECK`) |
 | `0005` | `app_user.login_display` (заполняется `login`) и `CHECK` `ck_app_user_login_display_lower` (откат удаляет столбец и `CHECK`; написание теряется) |
 | `0006` | три роли (ADR-0013): у всех пользователей с ролью `mixed` роль снимается (`NULL`), а если в пространстве нет активного ТА, активные бывшие СМ получают `tech_admin` (FR-16); на каждого бывшего СМ одна запись `domain_event` от «системы» (`actor_id = NULL`); `CHECK` `ck_workspace_member_role_valid` пересоздаётся с тремя значениями; всё в одной транзакции (откат `downgrade 0005` возвращает прежний `CHECK`, но роли `mixed` не возвращает и журнал не меняет) |
+| `0008` | агенты и ключи API (spec 007): `app_user.is_agent` (`DEFAULT false`), таблица `api_key` (только `SHA-256` секрета) с `CHECK`, `UNIQUE` и индексом, `domain_event.api_key_id` (FK `RESTRICT`); откат `downgrade 0007` в обратном порядке, ключи и признак агента теряются (ADR-0015) |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия
 моделей миграциям — `alembic -c backend/alembic.ini check` (входит в `scripts/check.sh` и CI).

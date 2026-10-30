@@ -64,7 +64,7 @@ __all__ = [
 ]
 
 PREFIX = "u002."
-HEAD_REVISION = "0007"  # голова цепочки миграций (006: три приоритета)
+HEAD_REVISION = "0008"  # голова цепочки миграций (007: ключи агентов)
 FAILURE_MARK = "gt_test_injected_failure"
 _FAIL_FUNCTION = "gt_test_fail_0006"
 _PAST = datetime(2026, 10, 1, 8, 0, 0, tzinfo=UTC)
@@ -442,6 +442,8 @@ async def data_fingerprint(
             "(to_jsonb(t) || jsonb_build_object('priority', "
             "CASE t.priority WHEN 'base' THEN 'medium' ELSE t.priority END))::text"
             if table == "task"
+            else "(to_jsonb(t) - 'is_agent')::text"
+            if table == "app_user"
             else "t::text"
         )
         rows = await env.execute(

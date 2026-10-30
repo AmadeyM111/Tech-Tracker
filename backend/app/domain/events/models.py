@@ -1,8 +1,8 @@
 """Модель ``domain_event`` — append-only журнал событий (plan §4.3, D-7, D-8, D-26).
 
 Нет ``created_at``/``updated_at``: строка не изменяется, время события — ``occurred_at``.
-FK только на ``workspace`` и ``app_user``; на доменные сущности FK нет (``entity_id``,
-``project_id``, ``deal_id`` переживают окончательное удаление объекта, FR-25b).
+FK только на ``workspace``, ``app_user`` и ``api_key`` (007); на доменные сущности FK нет
+(``entity_id``, ``project_id``, ``deal_id`` переживают окончательное удаление объекта, FR-25b).
 Неизменяемость обеспечивают триггеры БД (миграция 0002).
 """
 
@@ -66,6 +66,12 @@ class DomainEvent(Base):
         JSONB(none_as_null=True), nullable=True
     )
     details: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
+    # Ключ API, по которому выполнено действие (spec 007 FR-30); NULL — человек или система.
+    api_key_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("api_key.id", ondelete="RESTRICT", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
 
 
 # Лента проекта (FR-38), история и лента сделки (FR-35), аудит (FR-41), события объекта.
