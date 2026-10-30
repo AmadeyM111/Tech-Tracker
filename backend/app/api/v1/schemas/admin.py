@@ -14,7 +14,14 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.v1.schemas.auth import MAX_CREDENTIAL_LENGTH, Password
+from app.api.v1.schemas.common import UserRef
 from app.domain.access.roles import Role
+from app.domain.api_keys.service import (
+    DEFAULT_TTL_DAYS,
+    MAX_NAME_LENGTH,
+    MAX_TTL_DAYS,
+    ApiKeyState,
+)
 
 
 class AdminUser(BaseModel):
@@ -63,3 +70,38 @@ class SetRoleRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     role: Role | None
+
+
+class ApiKeyInfo(BaseModel):
+    """Ключ агента в перечне и в ответе выпуска: ровно восемь полей, секрета и дайджеста нет
+    (007 FR-7, plan §4.6)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    created_at: datetime
+    created_by: UserRef | None
+    expires_at: datetime
+    last_used_at: datetime | None
+    revoked_at: datetime | None
+    state: ApiKeyState
+
+
+class IssueApiKeyRequest(BaseModel):
+    """``POST /admin/agents/{user_id}/api-keys``: срок в сутках 1…365, по умолчанию 90 (FR-5, FR-9).
+
+    Срок — строго целое число: строка ``"30"`` и дробное значение отклоняются с 422.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: Annotated[str, Field(min_length=1, max_length=MAX_NAME_LENGTH, pattern=r"^[^\x00]*$")]
+    expires_in_days: Annotated[int, Field(ge=1, le=MAX_TTL_DAYS, strict=True)] = DEFAULT_TTL_DAYS
+
+
+class IssuedApiKeyResponse(BaseModel):
+    """Ответ выпуска — единственное место, где есть секрет ключа (FR-6)."""
+
+    key: ApiKeyInfo
+    secret: Annotated[str, Field(description="Показывается один раз", repr=False)]

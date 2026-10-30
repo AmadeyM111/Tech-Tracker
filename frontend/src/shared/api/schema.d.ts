@@ -24,6 +24,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/agents/{user_id}/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Api Keys
+         * @description Ключи агента: ``created_at DESC, id DESC``; у не агента — пустая страница (FR-7).
+         */
+        get: operations["list_api_keys"];
+        put?: never;
+        /**
+         * Issue Api Key
+         * @description Выпускает ключ агенту; секрет возвращается один раз и не кэшируется (FR-5, FR-6, FR-9).
+         */
+        post: operations["issue_api_key"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/agents/{user_id}/api-keys/{key_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Api Key
+         * @description Отзывает ключ; повтор и отзыв истёкшего — 204 без изменений (FR-8).
+         */
+        post: operations["revoke_api_key"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/audit": {
         parameters: {
             query?: never;
@@ -669,6 +713,41 @@ export interface components {
             role: components["schemas"]["Role"] | null;
         };
         /**
+         * ApiKeyInfo
+         * @description Ключ агента в перечне и в ответе выпуска: ровно восемь полей, секрета и дайджеста нет
+         *     (007 FR-7, plan §4.6).
+         */
+        ApiKeyInfo: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["UserRef"] | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Name */
+            name: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            state: components["schemas"]["ApiKeyState"];
+        };
+        /**
+         * ApiKeyState
+         * @enum {string}
+         */
+        ApiKeyState: "active" | "expired" | "revoked";
+        /**
          * AuditActor
          * @description Автор действия; ``kind = system`` при ``actor_id IS NULL`` (id и login — ``null``).
          */
@@ -874,6 +953,33 @@ export interface components {
             detail: string | components["schemas"]["ErrorDetail"][];
         };
         /**
+         * IssueApiKeyRequest
+         * @description ``POST /admin/agents/{user_id}/api-keys``: срок в сутках 1…365, по умолчанию 90 (FR-5, FR-9).
+         *
+         *     Срок — строго целое число: строка ``"30"`` и дробное значение отклоняются с 422.
+         */
+        IssueApiKeyRequest: {
+            /**
+             * Expires In Days
+             * @default 90
+             */
+            expires_in_days: number;
+            /** Name */
+            name: string;
+        };
+        /**
+         * IssuedApiKeyResponse
+         * @description Ответ выпуска — единственное место, где есть секрет ключа (FR-6).
+         */
+        IssuedApiKeyResponse: {
+            key: components["schemas"]["ApiKeyInfo"];
+            /**
+             * Secret
+             * @description Показывается один раз
+             */
+            secret: string;
+        };
+        /**
          * LoginRequest
          * @description ``POST /auth/login``: логин нормализуется и проверяется сервисом (FR-73).
          */
@@ -932,6 +1038,17 @@ export interface components {
             has_next: boolean;
             /** Items */
             items: components["schemas"]["AdminUser"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** Page[ApiKeyInfo] */
+        Page_ApiKeyInfo_: {
+            /** Has Next */
+            has_next: boolean;
+            /** Items */
+            items: components["schemas"]["ApiKeyInfo"][];
             /** Page */
             page: number;
             /** Page Size */
@@ -1372,6 +1489,195 @@ export interface operations {
             };
             /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_api_keys: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ApiKeyInfo_"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    issue_api_key: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueApiKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedApiKeyResponse"];
+                };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    revoke_api_key: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

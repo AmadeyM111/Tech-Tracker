@@ -6,12 +6,12 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from tests.conftest import ApiEnv
-    from tests.factories import UserRow, WorkspaceRow
+    from tests.factories import ApiKeyRow, UserRow, WorkspaceRow
 
 # 2026-11-02 07:00 UTC = 10:00 по Москве (spec §5, plan §5)
 CLOCK = datetime(2026, 11, 2, 7, 0, tzinfo=UTC)
@@ -34,3 +34,41 @@ async def make_agent(
 
     kwargs: dict[str, object] = {"password": secrets.token_urlsafe(32)}
     return await env.new_user(workspace=workspace, login=login, role=role, is_agent=True, **kwargs)
+
+
+async def make_key(
+    env: ApiEnv,
+    user: UserRow,
+    *,
+    created_by: UserRow,
+    name: str = "k",
+    created_at: datetime = CLOCK,
+    ttl: timedelta = timedelta(days=90),
+    revoked_at: datetime | None = None,
+    last_used_at: datetime | None = None,
+    secret: str | None = None,
+) -> ApiKeyRow:
+    """Ключ агента напрямую в БД (с фиксацией): ``expires_at = created_at + ttl``; при
+    ``revoked_at`` отозвавшим записывается ``created_by``. В БД попадает только ``sha256``."""
+    from tests.factories import make_api_key
+
+    async with env.sessionmaker() as session:
+        row = await make_api_key(
+            session,
+            user=user,
+            created_by=created_by,
+            secret=secret,
+            name=name,
+            created_at=created_at,
+            expires_at=created_at + ttl,
+            revoked_at=revoked_at,
+            revoked_by=created_by if revoked_at is not None else None,
+            last_used_at=last_used_at,
+        )
+        await session.commit()
+    return row
+
+
+def bearer(secret: str) -> dict[str, str]:
+    """Заголовок ``Authorization: Bearer <ключ>`` (cookie не нужна)."""
+    return {"Authorization": f"Bearer {secret}"}

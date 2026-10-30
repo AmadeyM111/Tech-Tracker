@@ -359,11 +359,12 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T10 — Ключи: API техадминистратора
-- **Статус:** TODO
+- **Статус:** DONE
 - **Заметка ревью R7-T09 (обязательно, `reviews/R7-T09-1.md`):** `IssuedApiKeyResponse` собирать явно из `issued.key` и `issued.secret`, без `asdict`/`model_dump` и без логирования тела ответа; `Cache-Control: no-store` на выпуске; срок по умолчанию 90 суток подставляет API (сервис принимает `ttl_days` обязательным); добавить сценарий `agent.ba` по ключу (AC-7) и актора без роли.
 - **AC:** AC-6, AC-7 (люди и 422), AC-8, AC-9, AC-11, AC-12; FR-5…FR-10, FR-40 (API); plan §4.6, PD-6
 - **Файлы:** `backend/app/api/v1/schemas/admin.py`, `backend/app/api/v1/admin_agents.py`;
-  тесты: `backend/tests/api/test_api_keys_admin_007.py` (новый), `backend/tests/agents007_support.py` (только добавить помощники)
+  тесты: `backend/tests/api/test_api_keys_admin_007.py` (новый), `backend/tests/agents007_support.py` (только добавить помощники),
+  `backend/tests/cli/test_openapi.py` (только дополнение: `BODY_ROUTES_400` += `POST /api/v1/admin/agents/{user_id}/api-keys`; добавлено оркестратором по отчёту implementer, 2026-10-31)
 - **Зависит от:** R7-T08, R7-T09
 - **Описание:** По plan §4.6: схемы `ApiKeyInfo`, `IssueApiKeyRequest`, `IssuedApiKeyResponse`;
   маршруты `list_api_keys`, `issue_api_key` (201, заголовок `Cache-Control: no-store`),
@@ -416,6 +417,7 @@ R7-T21 → R7-T22).
 
 ## R7-T12 — Аутентификация по ключу: `get_actor`, объём доступа FR-17, гейты, лимит
 - **Статус:** TODO
+- **Заметка ревью R7-T10 (обязательно, `reviews/R7-T10-1.md`):** сценарии AC-6 («кто я» по выпущенному секрету), AC-7 (`agent.ba` по `K_ba` → точный 403 на перечне, выпуске, отзыве; тест Bearer в `test_api_keys_admin_007.py` ужесточить с «401 или 403» до точного значения), AC-8 (`last_used_at` после реального запроса), AC-9 (401 после отзыва).
 - **Заметка ревью R7-T05/T06:** `Actor.is_agent` при аутентификации по ключу заполнять из `app_user.is_agent`, не по умолчанию `False`; `/me` агента с `is_agent: true` покрыть тестом (`reviews/R7-T05-T06-1.md` п.3).
 - **Заметка ревью R7-T03:** `api_key_digest` вызывать вне блока `except` с исключением, содержащим заголовок `Authorization` (иначе `__context__` несёт чужое исключение).
 - **AC:** AC-4, AC-5, AC-6 («кто я» по секрету), AC-7 (агент по ключу), AC-8 (по реальному запросу), AC-9 (401 после отзыва), AC-10, AC-13, AC-14, AC-15, AC-17, AC-33, AC-40; FR-12…FR-15, FR-17, FR-18, FR-33; plan §4.7, PD-2, PD-3, PD-5
@@ -600,6 +602,7 @@ R7-T21 → R7-T22).
 
 ## R7-T16 — Секрет не утекает: логи, ответы, журнал, события, БД, access-лог web
 - **Статус:** TODO
+- **Заметка ревью R7-T10:** AC-39 — искать секрет и в `bytea`-столбцах (декодировать или искать hex-кодировку подстрок ≥ 8), а не только `x::text LIKE`.
 - **Заметки ревью R7-T03 (обязательно учесть):** `reviews/R7-T03-1.md` п.1–3: имена ключей в `extra`/Mapping не маскируются в `core/logging.py`; в сквозной AC-38 добавить ключ с `/` или `+` внутри (путь и заголовок), при находке — вернуться к plan PD-11; nginx `log_format` без `$request`.
 - **AC:** AC-38 (API, журнал, события), AC-39; FR-32, FR-6; plan PD-1, PD-11
 - **Файлы:** `deploy/web/default.conf.template`;
@@ -756,6 +759,7 @@ R7-T21 → R7-T22).
 
 ## R7-T22 — Интерфейс ТА: ключи агента (перечень, выпуск с однократным показом, отзыв); журнал аудита
 - **Статус:** TODO
+- **Заметка ревью R7-T10:** форма выпуска отправляет `expires_in_days` целым числом JSON (на сервере `strict=True`, строка `"30"` → 422); решить, обрезает ли интерфейс пробелы в названии ключа (сервер принимает строки из одних пробелов).
 - **AC:** FR-40, FR-6 (интерфейс), FR-7, FR-11 (подписи журнала); AC-37 (автотесты компонентов); plan §4.10, PD-17, З-7
 - **Файлы:** `frontend/src/features/admin/api.ts`, `frontend/src/features/admin/UsersPage.tsx`,
   `frontend/src/features/admin/AuditPage.tsx`, `frontend/src/shared/i18n/ru.ts`;

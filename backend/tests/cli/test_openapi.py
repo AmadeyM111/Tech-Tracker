@@ -392,6 +392,7 @@ BODY_ROUTES_400 = {
     ("POST", "/api/v1/auth/password"),
     ("POST", "/api/v1/admin/users"),
     ("POST", "/api/v1/admin/agents"),
+    ("POST", "/api/v1/admin/agents/{user_id}/api-keys"),
     ("POST", "/api/v1/admin/users/{user_id}/reset-password"),
     ("PUT", "/api/v1/admin/users/{user_id}/role"),
     ("POST", "/api/v1/projects"),
