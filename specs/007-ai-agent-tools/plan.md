@@ -597,33 +597,38 @@ ML-кода, датасетов, обучения и GPU нет (NFR-5). Уте�
 
 ### 6.1. AC → реализация → тест
 
+Имена тестовых файлов уникальны по базовому имени во всём `backend/tests`: в каталогах тестов
+нет `__init__.py`, и одинаковые имена в разных каталогах ломают сбор pytest. Если доменный и
+API-тест одной темы, API-файл получает суффикс `_api` (`test_agent_accounts_api_007.py`,
+`test_api_key_auth_api_007.py`).
+
 | AC | Где реализуется | Тест (уровень) | Задача |
 |---|---|---|---|
-| AC-1 | `users.service.create_agent`, `reset_password`, `auth.service.login`; `POST /admin/agents` | `backend/tests/domain/test_agent_accounts_007.py::test_007_ac1_*` (домен); `backend/tests/api/test_agent_accounts_007.py::test_007_ac1_*` (API) | R7-T07, R7-T08 |
+| AC-1 | `users.service.create_agent`, `reset_password`, `auth.service.login`; `POST /admin/agents` | `backend/tests/domain/test_agent_accounts_007.py::test_007_ac1_*` (домен); `backend/tests/api/test_agent_accounts_api_007.py::test_007_ac1_*` (API) | R7-T07, R7-T08 |
 | AC-2 | `create_agent`, `set_role` | те же файлы, `test_007_ac2_*` | R7-T07, R7-T08 |
-| AC-3 | без изменений (существующие маршруты) + `is_agent` | `test_agent_accounts_007.py::test_007_ac3_*` (API) | R7-T08 |
-| AC-4 | `block_user` (PD-7), `authenticate_api_key` | `test_agent_accounts_007.py` (домен: отзыв при блокировке); `backend/tests/api/test_api_key_auth_007.py::test_007_ac4_*` | R7-T07, R7-T12 |
-| AC-5 | `get_active_actor` для `Actor` по ключу | `test_api_key_auth_007.py::test_007_ac5_*` (все 10 маршрутов) | R7-T12 |
-| AC-6 | `issue_api_key`, `ApiKeyInfo` | `backend/tests/domain/test_api_keys_service_007.py`, `backend/tests/api/test_api_keys_admin_007.py::test_007_ac6_*`; «кто я» по секрету — `test_api_key_auth_007.py::test_007_ac6_*` | R7-T09, R7-T10, R7-T12 |
-| AC-7 | гейт `MANAGE_ACCOUNTS`; `require_agent_scope`; правила выпуска | `test_api_keys_admin_007.py::test_007_ac7_*` (`ba1`, `u1`, 422); `test_api_key_auth_007.py::test_007_ac7_*` (`agent.ba` по ключу) | R7-T10, R7-T12 |
-| AC-8 | `list_api_keys`, `key_state`, `last_used_at` | `test_api_keys_admin_007.py::test_007_ac8_*` (время использования записано в БД); `test_api_key_auth_007.py::test_007_ac8_*` (по реальному запросу) | R7-T10, R7-T12 |
-| AC-9 | `revoke_api_key` | `test_api_keys_admin_007.py::test_007_ac9_*`; 401 после отзыва — `test_api_key_auth_007.py` | R7-T10, R7-T12 |
-| AC-10 | `expires_at > now` | `backend/tests/domain/test_api_key_auth_007.py::test_007_ac10_*` (домен); API — `test_api_key_auth_007.py` | R7-T11, R7-T12 |
+| AC-3 | без изменений (существующие маршруты) + `is_agent` | `test_agent_accounts_api_007.py::test_007_ac3_*` (API) | R7-T08 |
+| AC-4 | `block_user` (PD-7), `authenticate_api_key` | `backend/tests/domain/test_agent_accounts_007.py` (домен: отзыв при блокировке); `backend/tests/api/test_api_key_auth_api_007.py::test_007_ac4_*` | R7-T07, R7-T12 |
+| AC-5 | `get_active_actor` для `Actor` по ключу | `test_api_key_auth_api_007.py::test_007_ac5_*` (все 10 маршрутов) | R7-T12 |
+| AC-6 | `issue_api_key`, `ApiKeyInfo` | `backend/tests/domain/test_api_keys_service_007.py`, `backend/tests/api/test_api_keys_admin_007.py::test_007_ac6_*`; «кто я» по секрету — `test_api_key_auth_api_007.py::test_007_ac6_*` | R7-T09, R7-T10, R7-T12 |
+| AC-7 | гейт `MANAGE_ACCOUNTS`; `require_agent_scope`; правила выпуска | `test_api_keys_admin_007.py::test_007_ac7_*` (`ba1`, `u1`, 422); `test_api_key_auth_api_007.py::test_007_ac7_*` (`agent.ba` по ключу) | R7-T10, R7-T12 |
+| AC-8 | `list_api_keys`, `key_state`, `last_used_at` | `test_api_keys_admin_007.py::test_007_ac8_*` (время использования записано в БД); `test_api_key_auth_api_007.py::test_007_ac8_*` (по реальному запросу) | R7-T10, R7-T12 |
+| AC-9 | `revoke_api_key` | `test_api_keys_admin_007.py::test_007_ac9_*`; 401 после отзыва — `test_api_key_auth_api_007.py` | R7-T10, R7-T12 |
+| AC-10 | `expires_at > now` | `backend/tests/domain/test_api_key_auth_007.py::test_007_ac10_*` (домен); API — `test_api_key_auth_api_007.py` | R7-T11, R7-T12 |
 | AC-11, AC-12 | `IssueApiKeyRequest`, `issue_api_key` | `test_api_keys_admin_007.py::test_007_ac11_*`, `test_007_ac12_*` | R7-T10 |
-| AC-13…AC-15 | `get_actor` (ключ), FR-15 | `test_api_key_auth_007.py::test_007_ac13…15_*` | R7-T12 |
+| AC-13…AC-15 | `get_actor` (ключ), FR-15 | `test_api_key_auth_api_007.py::test_007_ac13…15_*` | R7-T12 |
 | AC-16 | фильтры `workspace_id` (без изменений) | `backend/tests/api/test_agent_reads_007.py::test_007_ac16_*` | R7-T13 |
-| AC-17 | `MeResponse.is_agent` | `test_api_key_auth_007.py::test_007_ac17_*` | R7-T12 |
+| AC-17 | `MeResponse.is_agent` | `test_api_key_auth_api_007.py::test_007_ac17_*` | R7-T12 |
 | AC-18 | `list_projects` по ключу | `test_agent_reads_007.py::test_007_ac18_*` | R7-T13 |
 | AC-19…AC-21 | существующие запросы; `permissions` | `test_agent_reads_007.py::test_007_ac19…21_*` | R7-T13 |
 | AC-22…AC-27, AC-29…AC-32, AC-34 | существующие сервисы задач и комментариев | `backend/tests/api/test_agent_writes_007.py::test_007_acN_*` (только тесты) | R7-T15 |
 | AC-28 | `update_task` (D-46: пустой `changed` — без события) | `test_agent_writes_007.py::test_007_ac28_*` (422, статус); «новых событий нет» — `backend/tests/api/test_agent_events_007.py::test_007_ac28_*` | R7-T15, R7-T14 |
-| AC-33 | `require_agent_scope`, `policy.py` | `test_api_key_auth_007.py::test_007_ac33_*` (14 действий + люди); обход всех маршрутов — `backend/tests/api/test_agent_scope_007.py` | R7-T12 |
+| AC-33 | `require_agent_scope`, `policy.py` | `test_api_key_auth_api_007.py::test_007_ac33_*` (14 действий + люди); обход всех маршрутов — `backend/tests/api/test_agent_scope_007.py` | R7-T12 |
 | AC-35 | `record_event(api_key_id)` в сервисах (PD-9) | `test_agent_events_007.py::test_007_ac35_*` | R7-T14 |
 | AC-36 | `UserRef`/`DirectoryUser.is_agent` | `backend/tests/api/test_agent_flag_007.py::test_007_ac36_*` (данные агента вставлены в БД) | R7-T05/R7-T06 |
 | AC-37 | `UserName`, `UsersPage`, `AgentKeys` | *ручной*: пункт `007/AC-37` в `docs/acceptance/mvp-demo.md`; автотесты компонентов — `frontend/tests/features/tasks/AgentMark.test.tsx`, `frontend/tests/features/boards/AgentMarkBoard.test.tsx`, `frontend/tests/features/admin/UsersPageAgents.test.tsx`, `frontend/tests/features/admin/AgentKeys.test.tsx` (`007_fr31_*`, `007_fr40_*`) | R7-T19…R7-T22, R7-T24 |
 | AC-38 | PD-11, PD-15 | API, журнал, события: `backend/tests/api/test_api_key_leaks_007.py::test_007_ac38_*`; инструменты: `backend/tests/api/test_agent_mcp_tools_007.py::test_007_ac38_*`, `backend/tests/cli/test_agent_mcp_stdio_007.py` (stderr) | R7-T16, R7-T17, R7-T18 |
 | AC-39 | PD-1 | `test_api_key_leaks_007.py::test_007_ac39_*` (выгрузка всех таблиц) | R7-T16 |
-| AC-40 | PD-5 | `backend/tests/domain/test_api_key_auth_007.py` (счётчик, окно); `test_api_key_auth_007.py::test_007_ac40_*` (API) | R7-T11, R7-T12 |
+| AC-40 | PD-5 | `backend/tests/domain/test_api_key_auth_007.py` (счётчик, окно); `test_api_key_auth_api_007.py::test_007_ac40_*` (API) | R7-T11, R7-T12 |
 | AC-41 | `generate_api_key` | `backend/tests/unit/test_api_key_secret_007.py::test_007_ac41_*` | R7-T03 |
 | AC-42 | `TOOLS` | `test_agent_mcp_tools_007.py::test_007_ac42_*` (ровно 11 имён по §4.9) | R7-T18 |
 | AC-43…AC-45 | `McpServer`, `TOOLS`; события AC-43 — сервисы FR-42 (PD-9) | `test_agent_mcp_tools_007.py::test_007_ac43…45_*`; протокол — `backend/tests/unit/test_agent_mcp_protocol_007.py` | R7-T14 (события), R7-T17, R7-T18 |
@@ -656,6 +661,7 @@ plan 001 D-55, — R7-T25), FR-42 (AC-49…AC-53, R7-T14).
 | `backend/tests/api/test_errors.py` | каталог кодов +4, `TooManyRequests` | R7-T04 |
 | тесты с точным набором полей ответов (`UserRef`, `DirectoryUser`, `AdminUser`, `MeResponse`), например `test_users_directory.py`, `test_admin_users.py`, `test_auth_login.py`/`test_sessions.py` (`/me`), `test_projects.py`, `test_tasks.py`, `test_comments.py` | + `is_agent` | R7-T05, R7-T06 |
 | фронтенд: фикстуры, типизированные `UserRef`/`AdminUser`/`MeResponse` | + `is_agent: false` — только где требует `npm run typecheck` | R7-T06 |
+| `backend/tests/cli/test_openapi.py` (`BODY_ROUTES_400`), `backend/tests/cli/test_openapi_roles.py` (перечень полей-ролей) | + `POST /api/v1/admin/agents`; + поле `role` схемы `CreateAgentRequest` | R7-T08 |
 | `backend/tests/unit/test_event_catalog.py` (`EXPECTED["task.updated"]`) | `fields` и `value_fields` + `priority` (AC-47 v0.4, PD-22) | R7-T14 |
 | `backend/tests/db/test_event_log.py::test_ac65_changed_field_outside_whitelist_is_rejected` | недопустимое поле `priority` → `position` (нет в перечне FR-42): `changed_fields=["status", "position"]`, в тексте ошибки `position` (AC-47 v0.4) | R7-T14 |
 | `backend/tests/db/test_event_log.py::test_br2_exception_text_has_no_values_for_invalid_changed_field` | `changed_fields=["priority"]` → `["position"]`, прочее без изменений (иначе запись проходит и тест теряет смысл) | R7-T14 |

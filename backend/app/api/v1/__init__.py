@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    admin_agents,
     admin_users,
     audit,
     auth,
@@ -20,6 +21,7 @@ router.include_router(health.router)
 router.include_router(auth.router)
 router.include_router(me.router)
 router.include_router(admin_users.router)
+router.include_router(admin_agents.router)
 router.include_router(audit.router)
 router.include_router(users.router)
 router.include_router(projects.router)

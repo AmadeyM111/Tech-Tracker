@@ -442,6 +442,33 @@
         "title": "CommentUpdate",
         "type": "object"
       },
+      "CreateAgentRequest": {
+        "additionalProperties": false,
+        "description": "``POST /admin/agents``: пароля нет; ``role`` обязателен, ``null`` = «без роли» (007 FR-1).",
+        "properties": {
+          "login": {
+            "maxLength": 1024,
+            "title": "Login",
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "login",
+          "role"
+        ],
+        "title": "CreateAgentRequest",
+        "type": "object"
+      },
       "CreateUserRequest": {
         "additionalProperties": false,
         "description": "``POST /admin/users``: роль не передаётся, назначается отдельным действием (FR-4).",
@@ -1667,6 +1694,78 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/agents": {
+      "post": {
+        "description": "Создаёт учётную запись агента с указанной ролью или без неё (FR-1, FR-2).",
+        "operationId": "create_agent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Create Agent",
+        "tags": [
+          "admin-agents"
+        ]
+      }
+    },
     "/api/v1/admin/audit": {
       "get": {
         "description": "Страница журнала пространства: ``id DESC``, фильтры ``entity_type`` и ``actor_id``.",

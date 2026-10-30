@@ -28,6 +28,7 @@ ROLE_FIELDS = [
     ("MeResponse", "role", "профиль"),
     ("AdminUser", "role", "учётные записи"),
     ("SetRoleRequest", "role", "запрос на назначение роли"),
+    ("CreateAgentRequest", "role", "создание учётной записи агента"),
     ("ProjectMember", "role", "участники проекта"),
     ("DirectoryUser", "role", "справочник пользователей"),
 ]

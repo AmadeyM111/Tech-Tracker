@@ -40,6 +40,15 @@ class CreateUserRequest(BaseModel):
     one_time_password: Password
 
 
+class CreateAgentRequest(BaseModel):
+    """``POST /admin/agents``: пароля нет; ``role`` обязателен, ``null`` = «без роли» (007 FR-1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    login: Annotated[str, Field(max_length=MAX_CREDENTIAL_LENGTH)]
+    role: Role | None
+
+
 class ResetPasswordRequest(BaseModel):
     """``POST /admin/users/{user_id}/reset-password`` (FR-65)."""
 

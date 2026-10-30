@@ -296,11 +296,14 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T08 — API создания учётной записи агента
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-1, AC-2, AC-3; FR-1, FR-2; plan §4.5, PD-4
 - **Файлы:** `backend/app/api/v1/schemas/admin.py`, `backend/app/api/v1/admin_agents.py` (новый),
   `backend/app/api/v1/__init__.py`;
-  тесты: `backend/tests/api/test_agent_accounts_007.py` (новый), `backend/tests/agents007_support.py` (новый)
+  тесты: `backend/tests/api/test_agent_accounts_api_007.py` (новый; суффикс `_api` — базовое имя
+  должно отличаться от доменного файла R7-T07, иначе ломается сбор pytest), `backend/tests/agents007_support.py` (новый)
+  (+ только дополнение: `backend/tests/cli/test_openapi.py` — `BODY_ROUTES_400` += `POST /api/v1/admin/agents`;
+  `backend/tests/cli/test_openapi_roles.py` — перечень полей-ролей += поле `role` схемы `CreateAgentRequest`)
 - **Зависит от:** R7-T07
 - **Описание:** По plan §4.5: `CreateAgentRequest`; роутер `admin_agents.py` (префикс
   `/admin/agents`, гейт `MANAGE_ACCOUNTS`, маршрут `create_agent` → 201 `AdminUser`); подключение
@@ -316,9 +319,11 @@ R7-T21 → R7-T22).
   `agent.new` в P, создаёт задачу с исполнителем `agent.new` (полное тело 006) → 201; справочник
   `/users` у `ba1` содержит `agent.new` с `is_agent: true`). Граничные: лишнее поле → 422;
   `role` отсутствует → 422; БА, П → 403.
-- **Старые тесты → AC:** нет (обход маршрутов `test_route_guards.py` автоматически включает новый
-  маршрут и должен остаться зелёным без правок).
-- **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/api/test_agent_accounts_007.py backend/tests/api/test_route_guards.py backend/tests/api/test_api_compat_007.py`
+- **Старые тесты → AC:** `test_openapi.py::BODY_ROUTES_400` и перечень полей-ролей в
+  `test_openapi_roles.py` — только новый элемент (новый маршрут с телом и новое поле `role`, FR-1,
+  plan §6.2); обход маршрутов `test_route_guards.py` автоматически включает новый маршрут и
+  должен остаться зелёным без правок.
+- **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/api/test_agent_accounts_api_007.py backend/tests/api/test_route_guards.py backend/tests/api/test_api_compat_007.py backend/tests/cli/test_openapi.py backend/tests/cli/test_openapi_roles.py`
   зелёный; проверки бэкенда и фронтенда зелёные; `bash scripts/gen-api.sh` повторно не меняет
   файлы; `python scripts/task_scope.py R7-T08` → 0.
 - **Попытки:** 0
@@ -414,7 +419,7 @@ R7-T21 → R7-T22).
 - **Заметка ревью R7-T03:** `api_key_digest` вызывать вне блока `except` с исключением, содержащим заголовок `Authorization` (иначе `__context__` несёт чужое исключение).
 - **AC:** AC-4, AC-5, AC-6 («кто я» по секрету), AC-7 (агент по ключу), AC-8 (по реальному запросу), AC-9 (401 после отзыва), AC-10, AC-13, AC-14, AC-15, AC-17, AC-33, AC-40; FR-12…FR-15, FR-17, FR-18, FR-33; plan §4.7, PD-2, PD-3, PD-5
 - **Файлы:** `backend/app/api/deps.py`, `backend/app/main.py`;
-  тесты: `backend/tests/api/test_api_key_auth_007.py` (новый), `backend/tests/api/test_agent_scope_007.py` (новый),
+  тесты: `backend/tests/api/test_api_key_auth_api_007.py` (новый), `backend/tests/api/test_agent_scope_007.py` (новый),
   `backend/tests/agents007_support.py` (только добавить помощники)
 - **Зависит от:** R7-T10, R7-T11
 - **Описание:** По plan §4.7: `AGENT_OPERATIONS`, `presented_api_key`, `require_agent_scope`
@@ -427,7 +432,7 @@ R7-T21 → R7-T22).
   Test-writer: `test_agent_scope_007.py` — каждое имя из `AGENT_OPERATIONS` есть среди маршрутов
   приложения; обход всех маршрутов `/api/v1` (как `test_route_guards.py`): вне перечня с
   действующим `K_ba` → 403 `forbidden`, в т.ч. `/auth/login`, `/health`, `/auth/logout`. 
-  `test_api_key_auth_007.py`: AC-4, AC-5 (все 10 операций → 403 `no_role`; затем роль П → «кто
+  `test_api_key_auth_api_007.py`: AC-4, AC-5 (все 10 операций → 403 `no_role`; затем роль П → «кто
   я» 200), AC-6 («кто я» по только что выпущенному через API секрету → 200, `agent.u`), AC-7
   (`agent.ba` по `K_ba`: выпуск, отзыв `K_u`, перечень ключей `agent.u` → 403, журнал не изменился),
   AC-8 (запрос по ключу в 10:00 MSK → перечень показывает `last_used_at` 07:00Z), AC-9 (после
@@ -441,7 +446,7 @@ R7-T21 → R7-T22).
   по cookie → 200; `+60 с` → 200).
 - **Старые тесты → AC:** нет (`test_route_guards.py`, `test_deps_gates.py`, `test_sessions.py`
   зелёные без правок — поведение cookie не изменилось, FR-41).
-- **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/api/test_api_key_auth_007.py backend/tests/api/test_agent_scope_007.py backend/tests/api/test_route_guards.py backend/tests/api/test_deps_gates.py backend/tests/api/test_sessions.py`
+- **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/api/test_api_key_auth_api_007.py backend/tests/api/test_agent_scope_007.py backend/tests/api/test_route_guards.py backend/tests/api/test_deps_gates.py backend/tests/api/test_sessions.py`
   зелёный; проверки бэкенда зелёные; «Фронтенд не тронут»; `python scripts/task_scope.py R7-T12` → 0.
 - **Попытки:** 0
 
@@ -723,6 +728,7 @@ R7-T21 → R7-T22).
 
 ## R7-T21 — Интерфейс ТА: создание учётной записи агента, метка в «Учётных записях»
 - **Статус:** TODO
+- **Заметка ревью R7-T08:** `CreateAgentRequest.role` в OpenAPI допускает `tech_admin` (сервер отвечает 422 `agent_role_not_allowed`); в форме создания агента роль ТА не предлагать — только «Пользователь», «Бизнес-админ» и «без роли» (`reviews/R7-T08-1.md` п.3).
 - **AC:** FR-40 (создание агента), FR-31 («Учётные записи»), FR-2 (нет роли ТА у агента в выборе), FR-1 (нет сброса пароля); AC-37 (автотесты); plan §4.10
 - **Файлы:** `frontend/src/features/admin/api.ts`, `frontend/src/features/admin/UsersPage.tsx`,
   `frontend/src/shared/i18n/ru.ts`;
