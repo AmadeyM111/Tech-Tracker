@@ -22,6 +22,10 @@ USER_ACTIONS = {
     "user.role_assigned",
     "user.role_changed",
     "user.role_removed",
+    # 007/FR-11, plan §4.3 (R7-T04): аудит агентов и ключей
+    "user.agent_created",
+    "user.api_key_issued",
+    "user.api_key_revoked",
 }
 
 F = frozenset
@@ -171,3 +175,19 @@ def test_t30_project_feed_actions_are_exactly_the_r11_non_user_set() -> None:
     feed_project: Any = {a.value for a, s in EVENT_CATALOG.items() if s.feed == "project"}
     assert feed_project == set(EXPECTED)
     assert all(s.feed is None for a, s in EVENT_CATALOG.items() if a.value in USER_ACTIONS)
+
+
+@pytest.mark.parametrize(
+    "action", ["user.agent_created", "user.api_key_issued", "user.api_key_revoked"]
+)
+def test_007_fr11_agent_user_actions_in_catalog(action: str) -> None:
+    """FR-11: три действия user.* — entity_type=user, audit=True, feed=None (_USER_AUDITED)."""
+    members = {m.value: m for m in EventAction}
+    assert action in members
+    spec = EVENT_CATALOG[members[action]]
+    assert spec.entity_type == EntityType.USER
+    assert spec.audit is True
+    assert spec.feed is None
+    assert spec.deal_history is False
+    assert spec.fields == frozenset()
+    assert spec.value_fields == frozenset()

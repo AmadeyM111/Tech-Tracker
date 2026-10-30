@@ -28,6 +28,7 @@ from sqlalchemy.exc import DBAPIError
 from tests.db_support import BACKEND_DIR, run_alembic
 from tests.factories import (
     get_table,
+    make_api_key,
     make_domain_event,
     make_user,
     make_workspace,
@@ -51,6 +52,9 @@ USER_ACTIONS = {
     "user.role_assigned",
     "user.role_changed",
     "user.role_removed",
+    "user.agent_created",  # 007/FR-11
+    "user.api_key_issued",
+    "user.api_key_revoked",
 }
 COLUMNS = {
     "id",
@@ -970,3 +974,78 @@ async def test_t07_downgrade_to_base_leaves_no_function(
     tables, fn = await _public_objects(committed)
     assert tables <= {"alembic_version"}
     assert fn == 0
+
+
+# --- 007 R7-T04: api_key_id (FR-30, FR-11, plan §4.3, PD-9) ------------------------------
+
+
+async def test_007_fr30_api_key_id_defaults_to_null(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    event_id = await _record(db, ws.id, action=_action("user.blocked"))
+    assert (await _row(db, event_id))["api_key_id"] is None
+
+
+async def test_007_fr30_api_key_id_is_written(db: AsyncSession, fixed_clock: FixedClock) -> None:
+    ws = await make_workspace(db)
+    admin = await make_user(db, workspace=ws, role="tech_admin")
+    agent = await make_user(db, workspace=ws, login="agent.ev", is_agent=True)
+    key = await make_api_key(db, user=agent, created_by=admin)
+    event_id = await _record(
+        db, ws.id, actor_id=admin.id, action=_action("user.blocked"), api_key_id=key.id
+    )
+    assert (await _row(db, event_id))["api_key_id"] == key.id
+
+
+@pytest.mark.parametrize(
+    "value", ["user.agent_created", "user.api_key_issued", "user.api_key_revoked"]
+)
+async def test_007_fr11_agent_actions_record_key_details(
+    db: AsyncSession, fixed_clock: FixedClock, value: str
+) -> None:
+    ws = await make_workspace(db)
+    admin = await make_user(db, workspace=ws, role="tech_admin")
+    agent = await make_user(db, workspace=ws, login="agent.dt", is_agent=True)
+    key = await make_api_key(db, user=agent, created_by=admin)
+    details = {"api_key_id": str(key.id), "api_key_name": "Ключ агента"}
+    event_id = await _record(
+        db, ws.id, actor_id=admin.id, action=_action(value), entity_id=agent.id, details=details
+    )
+    row = await _row(db, event_id)
+    assert row["details"] == details
+    assert (row["entity_type"], row["in_audit"], row["entity_id"]) == ("user", True, agent.id)
+
+
+async def test_007_fr11_details_with_key_fields_and_roles_together(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    details = {"role_to": "user", "api_key_id": None, "api_key_name": "n"}
+    event_id = await _record(db, ws.id, action=_action("user.role_assigned"), details=details)
+    assert (await _row(db, event_id))["details"] == details
+
+
+async def test_007_fr11_key_details_rejected_for_task_entity(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    await _assert_rejected(
+        db,
+        ws.id,
+        action=_action("task.updated"),
+        project_id=uuid.uuid4(),
+        details={"api_key_id": str(uuid.uuid4()), "api_key_name": "n"},
+    )
+
+
+async def test_007_fr11_unknown_details_key_still_rejected(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    ws = await make_workspace(db)
+    await _assert_rejected(
+        db,
+        ws.id,
+        action=_action("user.api_key_issued"),
+        details={"api_key_id": str(uuid.uuid4()), "secret": "x"},
+    )

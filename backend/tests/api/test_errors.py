@@ -63,6 +63,9 @@ def _add_test_routes(app: FastAPI) -> None:
     async def raise_unauthenticated() -> None:
         raise errors.NotAuthenticated("Нужен вход")
 
+    async def raise_too_many() -> None:
+        raise errors.TooManyRequests(retry_after=17)
+
     async def raise_unexpected() -> None:
         raise RuntimeError(BOOM_TEXT)
 
@@ -86,6 +89,7 @@ def _add_test_routes(app: FastAPI) -> None:
         ("/_t/too-large", "GET", raise_too_large),
         ("/_t/unprocessable", "GET", raise_unprocessable),
         ("/_t/unauth", "GET", raise_unauthenticated),
+        ("/_t/too-many", "GET", raise_too_many),
         ("/_t/boom", "GET", raise_unexpected),
         ("/_t/login", "POST", post_login),
         ("/_t/query", "GET", query_int),
@@ -452,6 +456,11 @@ def test_t04_error_code_is_str_enum_with_catalog() -> None:
         "permanent_delete_not_allowed",
         "search_query_too_short",
         "due_date_in_past",  # 006/D-5, plan PD-9
+        # 007 plan §4.3
+        "agent_role_not_allowed",
+        "agent_password_not_allowed",
+        "not_an_agent",
+        "api_key_limit_reached",
     }
     for name in names:
         assert ErrorCode[name].value == name
@@ -466,3 +475,35 @@ def test_t04_app_error_code_override_and_detail() -> None:
     assert err.status_code == 404
     assert NotFound.code == "not_found"  # переопределение не меняет класс
     assert NotFound("x").code == "not_found"
+
+
+# --- 007 R7-T04: 429 (FR-28, plan §4.3) ---------------------------------------------------
+
+
+async def test_007_fr28_too_many_requests_body_and_retry_after(client: httpx.AsyncClient) -> None:
+    r = await client.get("/_t/too-many")
+    assert r.status_code == 429
+    assert r.json() == {"detail": "Слишком много запросов", "code": "too_many_requests"}
+    assert r.headers["retry-after"] == "17"
+
+
+async def test_007_fr28_other_errors_have_no_retry_after(client: httpx.AsyncClient) -> None:
+    r = await client.get("/_t/not-found")
+    assert "retry-after" not in r.headers
+
+
+def test_007_fr28_too_many_requests_class() -> None:
+    from app.core import errors
+
+    assert issubclass(errors.TooManyRequests, errors.AppError)
+    assert errors.TooManyRequests.status_code == 429
+    assert errors.TooManyRequests.code == "too_many_requests"
+    assert errors.TooManyRequests(retry_after=1).retry_after == 1
+
+
+@pytest.mark.parametrize("bad", [0, -1])
+def test_007_fr28_retry_after_below_one_raises(bad: int) -> None:
+    from app.core import errors
+
+    with pytest.raises(ValueError):
+        errors.TooManyRequests(retry_after=bad)

@@ -32,6 +32,9 @@ class EventAction(StrEnum):
     USER_ROLE_ASSIGNED = "user.role_assigned"
     USER_ROLE_CHANGED = "user.role_changed"
     USER_ROLE_REMOVED = "user.role_removed"
+    USER_AGENT_CREATED = "user.agent_created"
+    USER_API_KEY_ISSUED = "user.api_key_issued"
+    USER_API_KEY_REVOKED = "user.api_key_revoked"
     PROJECT_UPDATED = "project.updated"
     PROJECT_OWNERSHIP_TRANSFERRED = "project.ownership_transferred"
     PROJECT_ARCHIVED = "project.archived"
@@ -77,6 +80,9 @@ EVENT_CATALOG: Final[Mapping[EventAction, EventSpec]] = {
     EventAction.USER_ROLE_ASSIGNED: _USER_AUDITED,
     EventAction.USER_ROLE_CHANGED: _USER_AUDITED,
     EventAction.USER_ROLE_REMOVED: _USER_AUDITED,
+    EventAction.USER_AGENT_CREATED: _USER_AUDITED,
+    EventAction.USER_API_KEY_ISSUED: _USER_AUDITED,
+    EventAction.USER_API_KEY_REVOKED: _USER_AUDITED,
     EventAction.PROJECT_UPDATED: _feed(
         EntityType.PROJECT, fields=frozenset({"name", "description"})
     ),

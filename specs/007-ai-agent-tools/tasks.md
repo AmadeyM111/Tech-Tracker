@@ -144,7 +144,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T04 — Ошибки 429 и коды 422, действия журнала, идентификатор ключа в событиях
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** FR-11 (структура записи), FR-28 (429 с `Retry-After`), FR-30 (запись `api_key_id`); plan §4.3, PD-9
 - **Файлы:** `backend/app/core/errors.py`, `backend/app/domain/events/catalog.py`, `backend/app/domain/events/writer.py`;
   тесты: `backend/tests/api/test_errors.py`, `backend/tests/unit/test_event_catalog.py`, `backend/tests/db/test_event_log.py`
@@ -462,6 +462,7 @@ R7-T21 → R7-T22).
 
 ## R7-T14 — События задач и комментариев для всех авторов (FR-42) с идентификатором ключа
 - **Статус:** TODO
+- **Заметка ревью R7-T04:** в `events/writer.py` `record_event` включает `api_key_id` в INSERT только при `not None` (иначе падает `test_002_ac30_*` на схеме 0005); не возвращать безусловную запись; желательно тест «при None столбца в INSERT нет» (`reviews/R7-T04-1.md` п.1).
 - **AC:** AC-35, AC-28 (нет события при том же статусе), AC-43 (часть «события — по AC-35»:
   реализация здесь, сквозная проверка через MCP — R7-T18), AC-49, AC-50, AC-51, AC-52, AC-53,
   AC-47 (правки существующих тестов по исключениям v0.4); FR-29, FR-30, FR-42; NFR-7

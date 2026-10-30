@@ -82,6 +82,11 @@ class ErrorCode(StrEnum):
     search_query_too_short = "search_query_too_short"
     # [006]
     due_date_in_past = "due_date_in_past"
+    # [007]
+    agent_role_not_allowed = "agent_role_not_allowed"
+    agent_password_not_allowed = "agent_password_not_allowed"
+    not_an_agent = "not_an_agent"
+    api_key_limit_reached = "api_key_limit_reached"
 
 
 class AppError(Exception):
@@ -160,6 +165,20 @@ class ServiceBusy(AppError):
     default_detail = "Сервер занят, повторите запрос"
 
 
+class TooManyRequests(AppError):
+    """429 с ``Retry-After`` (FR-28); ``retry_after`` — целое число секунд, не меньше 1."""
+
+    status_code = 429
+    code = "too_many_requests"
+    default_detail = "Слишком много запросов"
+
+    def __init__(self, *, retry_after: int) -> None:
+        if retry_after < 1:
+            raise ValueError("retry_after должен быть не меньше 1 секунды")
+        self.retry_after: int = retry_after
+        super().__init__()
+
+
 class Unprocessable(AppError):
     """422; код обязателен (``ErrorCode`` или строка)."""
 
@@ -200,11 +219,15 @@ def _error_response(
 async def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком
     err = cast(AppError, exc)
     # D-40: временное состояние — клиент может повторить запрос (в том числе из домена).
-    headers = {"Retry-After": _RETRY_AFTER_SECONDS} if isinstance(err, ServiceBusy) else None
+    headers: dict[str, str] | None = None
+    if isinstance(err, ServiceBusy):
+        headers = {"Retry-After": _RETRY_AFTER_SECONDS}
+    elif isinstance(err, TooManyRequests):
+        headers = {"Retry-After": str(err.retry_after)}
     return _error_response(err.status_code, err.detail, err.code, headers=headers)
 
 
-async def _validation_error_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком
+async def _validation_error_handler(_request: Request, exc: Exception) -> JSONResponse:
     """422 без ``input``, ``ctx``, ``url``: введённое значение (пароль) не возвращается (FR-57).
 
     Синтаксически невалидный JSON (все ошибки ``json_invalid``) — 400 ``bad_request`` (D-65).
@@ -223,7 +246,7 @@ async def _validation_error_handler(request: Request, exc: Exception) -> JSONRes
     return _error_response(422, detail, ErrorCode.validation_error)
 
 
-async def _http_exception_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком
+async def _http_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
     http_exc = cast(StarletteHTTPException, exc)
     status = http_exc.status_code
     if status in _HTTP_STATUS_MAP:
@@ -236,7 +259,7 @@ async def _http_exception_handler(request: Request, exc: Exception) -> JSONRespo
     return _error_response(status, detail, code, headers=http_exc.headers)
 
 
-async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком
+async def _unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
     """500 с фиксированным телом; трассировка — только в лог (FR-57)."""
     logger.error("Unhandled exception", exc_info=exc)
     return _error_response(500, INTERNAL_ERROR_DETAIL, "internal_error")

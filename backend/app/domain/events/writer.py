@@ -33,6 +33,8 @@ class UserEventDetails(TypedDict, total=False):
 
     role_from: str | None
     role_to: str | None
+    api_key_id: str | None
+    api_key_name: str | None
 
 
 _ALLOWED_DETAILS_KEYS = frozenset(UserEventDetails.__annotations__)
@@ -95,7 +97,7 @@ def _validate_fields(
         raise ValueError(f"действие {action.value!r}: для ленты проекта нужен project_id")
 
 
-async def record_event(
+async def record_event(  # noqa: PLR0913  # сигнатура задана plan §4.3 (11 параметров)
     db: AsyncSession,
     *,
     workspace_id: UUID,
@@ -107,12 +109,13 @@ async def record_event(
     deal_id: UUID | None = None,
     changes: Sequence[FieldChange] | None = None,
     details: UserEventDetails | None = None,
+    api_key_id: UUID | None = None,
 ) -> int:
     """Добавляет строку ``domain_event`` в текущую транзакцию и возвращает её ``id``.
 
     ``entity_type`` и ``in_audit`` берутся из ``EVENT_CATALOG``; ``actor_id=None`` — «система».
     Неизвестное действие, отсутствие его в каталоге, ``details`` не для ``user`` или с
-    ключами кроме ``role_from``/``role_to``, поля вне белых списков каталога
+    ключами кроме ``UserEventDetails``, поля вне белых списков каталога
     (``fields``/``value_fields``), повторы в ``changed_fields``, ``changes`` без
     ``value_fields``, событие ленты проекта без ``project_id`` — ``ValueError``; строка не
     пишется (проверки до INSERT, транзакция вызывающего не затрагивается).
@@ -124,22 +127,23 @@ async def record_event(
     _validate_fields(resolved, spec, changed_fields, changes, project_id)
     checked_details = None if details is None else _validate_details(details, spec.entity_type)
 
-    result = await db.execute(
-        insert(DomainEvent)
-        .values(
-            workspace_id=workspace_id,
-            occurred_at=utcnow(),
-            actor_id=actor_id,
-            entity_type=spec.entity_type.value,
-            entity_id=entity_id,
-            action=resolved.value,
-            changed_fields=list(changed_fields),
-            project_id=project_id,
-            deal_id=deal_id,
-            in_audit=spec.audit,
-            changes=None if changes is None else [dict(c) for c in changes],
-            details=checked_details,
-        )
-        .returning(DomainEvent.id)
-    )
+    values: dict[str, object] = {
+        "workspace_id": workspace_id,
+        "occurred_at": utcnow(),
+        "actor_id": actor_id,
+        "entity_type": spec.entity_type.value,
+        "entity_id": entity_id,
+        "action": resolved.value,
+        "changed_fields": list(changed_fields),
+        "project_id": project_id,
+        "deal_id": deal_id,
+        "in_audit": spec.audit,
+        "changes": None if changes is None else [dict(c) for c in changes],
+        "details": checked_details,
+    }
+    if api_key_id is not None:
+        # столбец есть со схемы 0008; без ключа его не трогаем (NULL по умолчанию) — иначе
+        # демо-загрузка на старой схеме (тесты апгрейда 002) падала бы
+        values["api_key_id"] = api_key_id
+    result = await db.execute(insert(DomainEvent).values(**values).returning(DomainEvent.id))
     return int(result.scalar_one())
