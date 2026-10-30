@@ -48,7 +48,7 @@ PERMISSION_FIELDS = {"manage", "manage_members", "create_task", "remove_self"}
 LIST_ITEM_FIELDS = {"id", "name", "owner", "task_count"}
 MEMBER_FIELDS = {"user", "role", "is_blocked", "is_owner"}
 PAGE_FIELDS = {"items", "page", "page_size", "has_next"}
-USER_REF_FIELDS = {"id", "login"}
+USER_REF_FIELDS = {"id", "login", "is_agent"}
 
 NAME_255 = "Я" * 255
 DESC_10000 = "д" * 10_000

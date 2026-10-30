@@ -107,7 +107,7 @@ async def _views(
             CommentView(
                 id=c.id,
                 task_id=c.task_id,
-                author=refs.get(c.created_by) or UserRef(id=c.created_by, login=""),
+                author=refs.get(c.created_by) or UserRef(id=c.created_by, login="", is_agent=False),
                 body=None if is_deleted else c.body,
                 is_deleted=is_deleted,
                 created_at=c.created_at,

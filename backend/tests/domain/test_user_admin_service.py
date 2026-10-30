@@ -251,6 +251,17 @@ async def test_ac121_create_user_has_no_role_and_one_time_password_flag(
     assert row.is_blocked is False
 
 
+async def test_fr31_create_user_result_has_is_agent_false_right_after_write(
+    db: AsyncSession, env: SimpleNamespace, svc: Any
+) -> None:
+    """Результат create_user в той же сессии, без refresh/коммита: ``is_agent is False``."""
+    w = await world(db)
+    created = await svc.create_user(
+        db, w.actor, env.hasher, login="agent.check", one_time_password=SecretStr(ONE_TIME)
+    )
+    assert created.is_agent is False
+
+
 async def test_ac113_one_time_password_stored_only_as_argon2id_hash(
     db: AsyncSession, env: SimpleNamespace, svc: Any
 ) -> None:

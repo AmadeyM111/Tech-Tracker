@@ -22,7 +22,7 @@ from tests.conftest import ApiEnv
 from tests.db_support import BACKEND_DIR
 
 URL = "/api/v1/users"
-ITEM_FIELDS = {"id", "login", "role"}
+ITEM_FIELDS = {"id", "login", "role", "is_agent"}
 PAGE_FIELDS = {"items", "page", "page_size", "has_next"}
 
 

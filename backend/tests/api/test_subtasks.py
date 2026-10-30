@@ -137,7 +137,11 @@ async def test_ac47_assignee_creates_subtask_for_himself_default_is_himself(
 
     for r in (omitted, explicit):
         assert r.status_code == 201, r.text
-        assert r.json()["assignee"] == {"id": str(w.uid("usr")), "login": w.login("usr")}
+        assert r.json()["assignee"] == {
+            "id": str(w.uid("usr")),
+            "login": w.login("usr"),
+            "is_agent": False,
+        }
         assert r.json()["author"]["id"] == str(w.uid("usr"))
 
 

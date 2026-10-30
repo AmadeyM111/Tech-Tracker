@@ -75,7 +75,7 @@ async def test_page_shape_item_fields_and_no_description(api_env: ApiEnv) -> Non
         "high",
         "2026-12-01",
     )
-    assert item["assignee"] == {"id": str(w.uid("usr")), "login": w.login("usr")}
+    assert item["assignee"] == {"id": str(w.uid("usr")), "login": w.login("usr"), "is_agent": False}
     assert item["parent_id"] is None
     assert item["created_at"]
 

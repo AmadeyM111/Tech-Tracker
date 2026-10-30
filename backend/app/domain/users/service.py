@@ -79,6 +79,7 @@ class UserAccount:
     is_blocked: bool
     must_change_password: bool
     created_at: datetime
+    is_agent: bool
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,7 @@ class _Target:
     is_blocked: bool
     must_change_password: bool
     created_at: datetime
+    is_agent: bool
 
     @property
     def is_active_account_admin(self) -> bool:
@@ -102,6 +104,7 @@ class _Target:
             is_blocked=self.is_blocked,
             must_change_password=self.must_change_password,
             created_at=self.created_at,
+            is_agent=self.is_agent,
         )
 
 
@@ -145,6 +148,7 @@ async def _load_target(db: AsyncSession, workspace_id: UUID, user_id: UUID) -> _
             AppUser.is_blocked,
             AppUser.must_change_password,
             AppUser.created_at,
+            AppUser.is_agent,
             WorkspaceMember.role,
         )
         .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
@@ -160,6 +164,7 @@ async def _load_target(db: AsyncSession, workspace_id: UUID, user_id: UUID) -> _
         is_blocked=row.is_blocked,
         must_change_password=row.must_change_password,
         created_at=row.created_at,
+        is_agent=row.is_agent,
     )
 
 
@@ -332,6 +337,7 @@ async def create_user(
         is_blocked=False,
         must_change_password=True,
         created_at=inserted.created_at,
+        is_agent=False,  # значение задаёт БД (server_default); ORM-атрибут не читаем (plan §4.1)
     )
 
 
@@ -529,6 +535,7 @@ async def list_accounts(
                 AppUser.is_blocked,
                 AppUser.must_change_password,
                 AppUser.created_at,
+                AppUser.is_agent,
             )
         )
         .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
@@ -553,6 +560,7 @@ async def list_accounts(
             is_blocked=user.is_blocked,
             must_change_password=user.must_change_password,
             created_at=user.created_at,
+            is_agent=user.is_agent,
         )
         for user in users
     ]

@@ -72,7 +72,15 @@ async def test_me_returns_profile_and_sorted_capabilities_for_each_role(
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert set(body) == {"id", "login", "role", "must_change_password", "capabilities"}
+    assert set(body) == {
+        "id",
+        "login",
+        "role",
+        "must_change_password",
+        "capabilities",
+        "is_agent",
+    }
+    assert body["is_agent"] is False
     assert body["id"] == str(user.id)
     assert body["login"] == user.login
     assert body["role"] == role

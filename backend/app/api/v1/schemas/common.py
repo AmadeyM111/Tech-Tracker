@@ -15,6 +15,7 @@ class UserRef(BaseModel):
 
     id: UUID
     login: str
+    is_agent: bool
 
 
 class ProjectRef(BaseModel):
@@ -25,13 +26,14 @@ class ProjectRef(BaseModel):
 
 
 class DirectoryUser(BaseModel):
-    """Элемент ``GET /users``: ровно ``{id, login, role}`` (роль БА или П)."""
+    """Элемент ``GET /users``: ровно ``{id, login, role, is_agent}`` (роль БА или П)."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     login: str
     role: Role
+    is_agent: bool
 
 
 class DirectoryQuery(PageParams):

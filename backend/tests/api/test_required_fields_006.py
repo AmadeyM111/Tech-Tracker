@@ -73,7 +73,7 @@ async def test_006_ac19_no_assignee_key_defaults_to_creator(api_env: ApiEnv, who
     r = await _post(env, w, who, FULL)
 
     assert r.status_code == 201, r.text
-    me = {"id": str(w.uid(who)), "login": w.login(who)}
+    me = {"id": str(w.uid(who)), "login": w.login(who), "is_agent": False}
     assert r.json()["assignee"] == me
     assert r.json()["author"] == me
     assert (await task_db(env, r.json()["id"])).assignee_id == w.uid(who)
@@ -369,7 +369,11 @@ async def test_006_ac25_assignee_of_parent_creates_subtask_for_self(api_env: Api
     r = await send(env, w.tok("usr"), "POST", _sub_url(parent), {"title": "Шаг"})
 
     assert r.status_code == 201, r.text
-    assert r.json()["assignee"] == {"id": str(w.uid("usr")), "login": w.login("usr")}
+    assert r.json()["assignee"] == {
+        "id": str(w.uid("usr")),
+        "login": w.login("usr"),
+        "is_agent": False,
+    }
 
 
 async def test_006_ac25_subtask_past_due_date_is_kept(api_env: ApiEnv) -> None:

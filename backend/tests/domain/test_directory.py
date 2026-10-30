@@ -91,6 +91,7 @@ async def test_ac21_directory_contains_only_unblocked_business_roles_of_own_work
     assert _logins(items) == ["dir.ba", "dir.user"]
     assert [i.id for i in items] == [ba.id, usr.id]
     assert [Role(i.role) for i in items] == [Role.BUSINESS_ADMIN, Role.USER]
+    assert [i.is_agent for i in items] == [False, False]  # AC-36
 
 
 async def test_ac21_other_workspace_sees_only_its_own_users(
@@ -414,6 +415,7 @@ async def test_t35_user_refs_returns_id_and_login_in_one_query(
     for u in users + [blocked]:
         assert refs[u.id].id == u.id
         assert refs[u.id].login == u.login
+        assert refs[u.id].is_agent is False  # AC-36
 
 
 async def test_t35_user_refs_skips_unknown_ids_and_accepts_empty(
@@ -440,3 +442,19 @@ async def test_ac21_user_refs_skips_ids_of_other_workspace(
     assert list(refs) == [mine.id]
     assert foreign.id not in refs
     assert await directory.user_refs(db, other.id, [mine.id]) == {}
+
+
+async def test_ac36_directory_and_user_refs_carry_is_agent_right_after_insert(
+    db: AsyncSession, directory: Any
+) -> None:
+    """Фабрики вставляют агента и человека; признак читается без refresh/commit (007/FR-31)."""
+    ws = await make_workspace(db)
+    agent = await make_user(db, workspace=ws, role="user", login="ag.bot", is_agent=True)
+    human = await make_user(db, workspace=ws, role="user", login="ag.human")
+
+    items = await _list(directory, db, ws)
+    refs = await directory.user_refs(db, ws.id, [agent.id, human.id])
+
+    assert {i.login: i.is_agent for i in items} == {"ag.bot": True, "ag.human": False}
+    assert refs[agent.id].is_agent is True
+    assert refs[human.id].is_agent is False

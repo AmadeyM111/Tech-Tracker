@@ -14,6 +14,10 @@
             "title": "Id",
             "type": "string"
           },
+          "is_agent": {
+            "title": "Is Agent",
+            "type": "boolean"
+          },
           "is_blocked": {
             "title": "Is Blocked",
             "type": "boolean"
@@ -43,7 +47,8 @@
           "role",
           "is_blocked",
           "must_change_password",
-          "created_at"
+          "created_at",
+          "is_agent"
         ],
         "title": "AdminUser",
         "type": "object"
@@ -462,12 +467,16 @@
         "type": "object"
       },
       "DirectoryUser": {
-        "description": "Элемент ``GET /users``: ровно ``{id, login, role}`` (роль БА или П).",
+        "description": "Элемент ``GET /users``: ровно ``{id, login, role, is_agent}`` (роль БА или П).",
         "properties": {
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "is_agent": {
+            "title": "Is Agent",
+            "type": "boolean"
           },
           "login": {
             "title": "Login",
@@ -480,7 +489,8 @@
         "required": [
           "id",
           "login",
-          "role"
+          "role",
+          "is_agent"
         ],
         "title": "DirectoryUser",
         "type": "object"
@@ -612,6 +622,10 @@
             "title": "Id",
             "type": "string"
           },
+          "is_agent": {
+            "title": "Is Agent",
+            "type": "boolean"
+          },
           "login": {
             "title": "Login",
             "type": "string"
@@ -629,6 +643,7 @@
           "login",
           "role",
           "must_change_password",
+          "is_agent",
           "capabilities"
         ],
         "title": "MeResponse",
@@ -1627,6 +1642,10 @@
             "title": "Id",
             "type": "string"
           },
+          "is_agent": {
+            "title": "Is Agent",
+            "type": "boolean"
+          },
           "login": {
             "title": "Login",
             "type": "string"
@@ -1634,7 +1653,8 @@
         },
         "required": [
           "id",
-          "login"
+          "login",
+          "is_agent"
         ],
         "title": "UserRef",
         "type": "object"

@@ -28,6 +28,7 @@ class AdminUser(BaseModel):
     is_blocked: bool
     must_change_password: bool
     created_at: datetime
+    is_agent: bool
 
 
 class CreateUserRequest(BaseModel):

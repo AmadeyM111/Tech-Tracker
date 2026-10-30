@@ -91,7 +91,7 @@ async def test_fr23_create_returns_201_comment_shape_and_stores(api_env: ApiEnv)
     assert set(body["author"]) == USER_REF_FIELDS
     assert set(body["permissions"]) == PERMS
     assert body["task_id"] == str(t)
-    assert body["author"] == {"id": str(w.uid("usr")), "login": w.login("usr")}
+    assert body["author"] == {"id": str(w.uid("usr")), "login": w.login("usr"), "is_agent": False}
     assert body["body"] == "Привет"
     assert body["is_deleted"] is False
     assert body["edited_at"] is None
@@ -412,7 +412,7 @@ async def test_fr23_list_shape_order_and_permissions_per_actor(api_env: ApiEnv) 
     assert set(mine) == COMMENT_FIELDS
     assert mine["permissions"] == {"edit": True, "delete": True}
     assert foreign["permissions"] == {"edit": False, "delete": False}
-    assert foreign["author"] == {"id": str(w.uid("ba")), "login": w.login("ba")}
+    assert foreign["author"] == {"id": str(w.uid("ba")), "login": w.login("ba"), "is_agent": False}
     owner_view = (await send(env, w.tok("ba"), "GET", _list_url(t))).json()["items"]
     assert [i["permissions"] for i in owner_view] == [
         {"edit": False, "delete": True},  # БА-владелец удаляет чужой, править не может
@@ -467,7 +467,7 @@ async def test_ac58_list_deleted_comment_is_stub_without_body(api_env: ApiEnv) -
     stub = by_id[str(gone)]
     assert stub["body"] is None
     assert stub["is_deleted"] is True
-    assert stub["author"] == {"id": str(w.uid("usr")), "login": w.login("usr")}
+    assert stub["author"] == {"id": str(w.uid("usr")), "login": w.login("usr"), "is_agent": False}
     assert stub["permissions"] == {"edit": False, "delete": False}
     assert by_id[str(alive)]["is_deleted"] is False
 

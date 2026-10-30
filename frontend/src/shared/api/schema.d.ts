@@ -638,6 +638,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Is Agent */
+            is_agent: boolean;
             /** Is Blocked */
             is_blocked: boolean;
             /** Login */
@@ -801,7 +803,7 @@ export interface components {
         };
         /**
          * DirectoryUser
-         * @description Элемент ``GET /users``: ровно ``{id, login, role}`` (роль БА или П).
+         * @description Элемент ``GET /users``: ровно ``{id, login, role, is_agent}`` (роль БА или П).
          */
         DirectoryUser: {
             /**
@@ -809,6 +811,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Is Agent */
+            is_agent: boolean;
             /** Login */
             login: string;
             role: components["schemas"]["Role"];
@@ -869,6 +873,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Is Agent */
+            is_agent: boolean;
             /** Login */
             login: string;
             /** Must Change Password */
@@ -1281,6 +1287,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Is Agent */
+            is_agent: boolean;
             /** Login */
             login: string;
         };

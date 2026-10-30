@@ -73,4 +73,5 @@ class MeResponse(BaseModel):
     login: str
     role: Role
     must_change_password: bool
+    is_agent: bool
     capabilities: list[Capability]

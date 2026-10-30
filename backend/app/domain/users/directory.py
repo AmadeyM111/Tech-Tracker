@@ -34,12 +34,14 @@ class DirectoryUser:
     id: UUID
     login: str
     role: Role
+    is_agent: bool
 
 
 @dataclass(frozen=True)
 class UserRef:
     id: UUID
     login: str
+    is_agent: bool
 
 
 def _like_pattern(q: str) -> str:
@@ -58,7 +60,7 @@ async def list_directory(
     Второй элемент — признак следующей страницы.
     """
     stmt = (
-        select(AppUser.id, AppUser.login_display, WorkspaceMember.role)
+        select(AppUser.id, AppUser.login_display, WorkspaceMember.role, AppUser.is_agent)
         .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
         .where(
             WorkspaceMember.workspace_id == actor.workspace_id,
@@ -72,7 +74,10 @@ async def list_directory(
     offset = (params.page - 1) * params.page_size
     stmt = stmt.limit(params.page_size + 1).offset(literal(offset, BigInteger()))
     rows = (await db.execute(stmt)).all()
-    items = [DirectoryUser(id=r.id, login=r.login_display, role=Role(r.role)) for r in rows]
+    items = [
+        DirectoryUser(id=r.id, login=r.login_display, role=Role(r.role), is_agent=r.is_agent)
+        for r in rows
+    ]
     return items[: params.page_size], len(items) > params.page_size
 
 
@@ -111,8 +116,10 @@ async def user_refs(
     if not wanted:
         return {}
     rows = await db.execute(
-        select(AppUser.id, AppUser.login_display)
+        select(AppUser.id, AppUser.login_display, AppUser.is_agent)
         .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
         .where(WorkspaceMember.workspace_id == workspace_id, AppUser.id.in_(wanted))
     )
-    return {row.id: UserRef(id=row.id, login=row.login_display) for row in rows}
+    return {
+        row.id: UserRef(id=row.id, login=row.login_display, is_agent=row.is_agent) for row in rows
+    }

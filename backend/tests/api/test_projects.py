@@ -74,7 +74,7 @@ async def test_ac55_list_item_shape_owner_and_task_count_without_status(api_env:
     assert set(item) == LIST_ITEM_FIELDS  # ни status, ни description, ни задач
     assert item["id"] == str(w.project_id)
     assert item["name"] == "Основной"
-    assert item["owner"] == {"id": str(w.uid("ba")), "login": w.login("ba")}
+    assert item["owner"] == {"id": str(w.uid("ba")), "login": w.login("ba"), "is_agent": False}
     assert item["task_count"] == 2
 
 
@@ -174,7 +174,7 @@ async def test_ac51_create_with_name_only_owner_and_member_is_creator(api_env: A
     assert set(body) == DETAIL_FIELDS
     assert set(body["permissions"]) == PERMISSION_FIELDS
     assert set(body["owner"]) == USER_REF_FIELDS
-    assert body["owner"] == {"id": str(w.uid("ba3")), "login": w.login("ba3")}
+    assert body["owner"] == {"id": str(w.uid("ba3")), "login": w.login("ba3"), "is_agent": False}
     assert (body["name"], body["description"], body["task_count"]) == ("Новый", "", 0)
     assert body["is_member"] is True
     assert body["permissions"] == {
@@ -324,7 +324,7 @@ async def test_ac55_d45_card_fields_and_permissions_per_role(api_env: ApiEnv, wh
     assert set(body["permissions"]) == PERMISSION_FIELDS
     assert body["id"] == str(w.project_id)
     assert body["name"] == "Основной"
-    assert body["owner"] == {"id": str(w.uid("ba")), "login": w.login("ba")}
+    assert body["owner"] == {"id": str(w.uid("ba")), "login": w.login("ba"), "is_agent": False}
     assert body["task_count"] == 1
     is_member, manage, manage_members, create_task, remove_self = CARD_MATRIX[who]
     assert body["is_member"] is is_member
@@ -495,7 +495,7 @@ async def test_ac52_owner_transfers_to_member_ba_and_keeps_delete_right(api_env:
     assert r.status_code == 200, r.text
     body = r.json()
     assert set(body) == DETAIL_FIELDS
-    assert body["owner"] == {"id": str(w.uid("ba2")), "login": w.login("ba2")}
+    assert body["owner"] == {"id": str(w.uid("ba2")), "login": w.login("ba2"), "is_agent": False}
     assert body["permissions"]["manage"] is True  # 002/AC-12: БА управляет любым проектом
     assert (await project_db(env, w.project_id)).owner_id == w.uid("ba2")
     # прежний владелец удаляет проект (002/AC-12: отмена ограничения 001/AC-52)

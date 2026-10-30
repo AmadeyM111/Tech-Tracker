@@ -119,7 +119,7 @@ async def test_ac56_members_with_business_roles_are_accepted(
     r, _ = await _call(env, w, entry, w.uid(who))
 
     assert r.status_code in (200, 201), r.text
-    assert r.json()["assignee"] == {"id": str(w.uid(who)), "login": w.login(who)}
+    assert r.json()["assignee"] == {"id": str(w.uid(who)), "login": w.login(who), "is_agent": False}
 
 
 async def test_ac74_member_whose_role_was_removed_stays_member_but_is_not_assignable(

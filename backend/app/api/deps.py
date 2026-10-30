@@ -80,6 +80,7 @@ async def get_actor(request: Request, db: DbSession) -> Actor:
                 AppUser.login_display,
                 AppUser.is_blocked,
                 AppUser.must_change_password,
+                AppUser.is_agent,
                 WorkspaceMember.role,
             )
             .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
@@ -99,6 +100,7 @@ async def get_actor(request: Request, db: DbSession) -> Actor:
         role=None if row.role is None else Role(row.role),
         must_change_password=row.must_change_password,
         session_id=record.id,
+        is_agent=row.is_agent,
     )
     request.state.user_id = actor.user_id  # access-лог (FR-57)
     return actor

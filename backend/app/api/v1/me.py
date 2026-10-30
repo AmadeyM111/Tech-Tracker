@@ -30,5 +30,6 @@ async def me(actor: Annotated[Actor, Depends(get_active_actor)]) -> MeResponse:
         login=actor.login,
         role=actor.role,
         must_change_password=actor.must_change_password,
+        is_agent=actor.is_agent,
         capabilities=capabilities,
     )

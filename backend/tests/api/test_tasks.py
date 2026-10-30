@@ -80,12 +80,12 @@ async def test_ac49_ac24_create_minimal_body_defaults_and_shape(api_env: ApiEnv)
     assert body["due_date"] == "2026-10-13"  # 006/FR-16: срок обязателен
     assert body["parent_id"] is None
     # 006/AC-19 (было: None, AC-56): не переданный исполнитель - создатель, в т.ч. БА
-    assert body["assignee"] == {"id": str(w.uid("ba")), "login": w.login("ba")}
+    assert body["assignee"] == {"id": str(w.uid("ba")), "login": w.login("ba"), "is_agent": False}
     assert body["subtasks"] == []
     assert body["progress"] is None
     assert isinstance(body["position"], int)
     assert body["project"] == {"id": str(w.project_id), "name": "Основной"}
-    assert body["author"] == {"id": str(w.uid("ba")), "login": w.login("ba")}
+    assert body["author"] == {"id": str(w.uid("ba")), "login": w.login("ba"), "is_agent": False}
     assert set(body["author"]) == USER_REF_FIELDS
     assert set(body["permissions"]) == PERM_FIELDS
     assert all(isinstance(v, bool) for v in body["permissions"].values())
@@ -117,7 +117,7 @@ async def test_ac49_ac68_create_with_all_fields_returns_them_as_given(api_env: A
     assert body["due_date"] == "2026-10-20"  # AC-68: без времени и пояса
     assert body["priority"] == "high"
     assert body["description"] == "Описание\nс переводом строки"
-    assert body["assignee"] == {"id": str(w.uid("usr")), "login": w.login("usr")}
+    assert body["assignee"] == {"id": str(w.uid("usr")), "login": w.login("usr"), "is_agent": False}
     again = await send(env, w.tok("ba"), "GET", task_url(body["id"]))
     assert again.json()["due_date"] == "2026-10-20"
     assert str((await task_db(env, body["id"])).due_date) == "2026-10-20"
@@ -173,7 +173,7 @@ async def test_ac109_user_without_assignee_gets_himself_and_can_edit_title(api_e
     r = await _create(env, w, "usr", {"title": "Моя", **REQ})
 
     assert r.status_code == 201, r.text
-    me = {"id": str(w.uid("usr")), "login": w.login("usr")}
+    me = {"id": str(w.uid("usr")), "login": w.login("usr"), "is_agent": False}
     assert r.json()["assignee"] == me
     assert r.json()["author"] == me
     assert r.json()["permissions"]["edit"] is True
@@ -231,7 +231,11 @@ async def test_ac109_ac56_ba_without_assignee_gets_himself_and_null_is_422(
     )
 
     assert omitted.status_code == 201, omitted.text
-    assert omitted.json()["assignee"] == {"id": str(w.uid(who)), "login": w.login(who)}
+    assert omitted.json()["assignee"] == {
+        "id": str(w.uid(who)),
+        "login": w.login(who),
+        "is_agent": False,
+    }
     assert error(explicit) == (422, "validation_error")
     assert other.status_code == 201, other.text
     assert other.json()["assignee"]["id"] == str(w.uid("usr"))
@@ -310,14 +314,18 @@ async def test_card_fields_assignee_author_project_and_sorted_subtasks(api_env: 
         "high",
     )
     assert body["due_date"] == "2026-11-02"
-    assert body["assignee"] == {"id": str(w.uid("usr")), "login": w.login("usr")}
-    assert body["author"] == {"id": str(w.uid("ba2")), "login": w.login("ba2")}
+    assert body["assignee"] == {"id": str(w.uid("usr")), "login": w.login("usr"), "is_agent": False}
+    assert body["author"] == {"id": str(w.uid("ba2")), "login": w.login("ba2"), "is_agent": False}
     assert body["project"] == {"id": str(w.project_id), "name": "Основной"}
     assert body["parent_id"] is None
     assert [s["id"] for s in body["subtasks"]] == [str(s1), str(s2)]
     for item in body["subtasks"]:
         assert set(item) == BRIEF_FIELDS
-    assert body["subtasks"][1]["assignee"] == {"id": str(w.uid("ba2")), "login": w.login("ba2")}
+    assert body["subtasks"][1]["assignee"] == {
+        "id": str(w.uid("ba2")),
+        "login": w.login("ba2"),
+        "is_agent": False,
+    }
     assert body["subtasks"][0]["assignee"] is None
     assert body["progress"] == 50
 

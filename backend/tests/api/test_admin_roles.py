@@ -73,7 +73,15 @@ async def test_ac121_ac75_create_then_assign_role_are_two_separate_events(
     body = response.json()
     assert body["id"] == str(new_id)
     assert body["role"] == "user"
-    assert set(body) == {"id", "login", "role", "is_blocked", "must_change_password", "created_at"}
+    assert set(body) == {
+        "id",
+        "login",
+        "role",
+        "is_blocked",
+        "must_change_password",
+        "created_at",
+        "is_agent",
+    }
     assert await member_role(env, new_id) == "user"
     log = await events(env, entity_id=new_id)
     assert [e.action for e in log] == ["user.created", "user.role_assigned"]

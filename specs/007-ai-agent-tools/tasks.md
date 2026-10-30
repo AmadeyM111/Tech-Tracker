@@ -168,7 +168,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T05 — Признак «агент» в ссылках на пользователя и справочнике (домен и схема)
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-36; FR-31 (API: автор, исполнитель, автор комментария, участник, справочник); NFR-1; plan §4.4, PD-10
 - **Файлы:** `backend/app/domain/users/directory.py`, `backend/app/domain/projects/members.py`,
   `backend/app/domain/projects/queries.py`, `backend/app/domain/comments/service.py`,
@@ -178,7 +178,8 @@ R7-T21 → R7-T22).
   `backend/tests/api/test_project_members.py`, `backend/tests/api/test_tasks.py`,
   `backend/tests/api/test_comments.py`, `backend/tests/api/test_board.py`,
   `backend/tests/domain/test_directory.py`, `backend/tests/cli/test_openapi.py` — только
-  дополнение `is_agent` в проверках точного набора полей)
+  дополнение `is_agent` в проверках точного набора полей;
+  `backend/tests/admin_support.py`, `backend/tests/projects_api_support.py` (общие константы точных наборов полей), `backend/tests/api/test_personal_tasks.py`, `backend/tests/api/test_subtasks.py`, `backend/tests/api/test_task_recipients.py`, `backend/tests/api/test_required_fields_006.py`, `backend/tests/api/test_sessions.py`, `backend/tests/domain/test_user_admin_service.py` — только дополнение `is_agent` в ожиданиях; добавлено оркестратором по отчёту test-writer, 2026-10-31)
 - **Зависит от:** R7-T02
 - **Описание:** Доменные `UserRef(id, login, is_agent)` и `DirectoryUser(..., is_agent)` — поле
   без умолчания; все места создания (mypy их найдёт) читают `AppUser.is_agent` (`user_refs`,
@@ -210,7 +211,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T06 — Признак «агент» в `/me` и «Учётных записях»; OpenAPI и типы фронтенда
-- **Статус:** TODO
+- **Статус:** DONE
 - **AC:** AC-36 (вместе с R7-T05), FR-18 (поле признака), FR-31 (учётные записи); NFR-1; plan §4.4, PD-10
 - **Файлы:** `backend/app/domain/access/roles.py`, `backend/app/api/deps.py`, `backend/app/api/v1/schemas/auth.py`,
   `backend/app/api/v1/me.py`, `backend/app/domain/users/service.py`, `backend/app/api/v1/schemas/admin.py`;
@@ -218,6 +219,7 @@ R7-T21 → R7-T22).
   (+ `backend/tests/api/test_admin_users.py`, `backend/tests/api/test_sessions.py`,
   `backend/tests/api/test_auth_login.py`, `backend/tests/domain/test_user_admin_service.py`,
   `backend/tests/cli/test_openapi.py` — только дополнение `is_agent`;
+  `backend/tests/admin_support.py`, `backend/tests/projects_api_support.py`, `backend/tests/api/test_personal_tasks.py`, `backend/tests/api/test_subtasks.py`, `backend/tests/api/test_task_recipients.py`, `backend/tests/api/test_required_fields_006.py`, `backend/tests/api/test_comments.py`, `backend/tests/api/test_projects.py`, `backend/tests/api/test_tasks.py`, `backend/tests/api/test_users_directory.py`, `backend/tests/domain/test_directory.py` — только дополнение `is_agent` в ожиданиях (тесты задачи R7-T05, коммитятся вместе); `backend/tests/unit/test_role_matrix.py` (поле `Actor.is_agent` в конце списка), `backend/tests/api/test_admin_roles.py` (`is_agent` в наборе полей `AdminUser`) — только дополнение; добавлено оркестратором, 2026-10-31;
   `frontend/tests/**` — только добавление `is_agent: false` в фикстуры, где этого требует `npm run typecheck`)
 - **Зависит от:** R7-T05
 - **Описание:** `Actor.is_agent: bool = False` (поле с умолчанием в конце); `get_actor` (путь
@@ -249,6 +251,7 @@ R7-T21 → R7-T22).
 
 ## R7-T07 — Учётная запись агента: создание, роль, сброс пароля, вход, блокировка (сервис)
 - **Статус:** TODO
+- **Заметка ревью R7-T05/T06:** если `create_agent` создаёт агента через ORM и в том же запросе вызываются `list_members`/`list_accounts` (читают `is_agent` из `select(AppUser)`+`load_only`), добавить проверку identity map (`reviews/R7-T05-T06-1.md` п.1).
 - **AC:** AC-1, AC-2 (уровень домена), AC-4 (отзыв ключей при блокировке); FR-1, FR-2, FR-4; plan §4.5, PD-4, PD-7, PD-8
 - **Файлы:** `backend/app/domain/users/service.py`, `backend/app/domain/auth/service.py`;
   тесты: `backend/tests/domain/test_agent_accounts_007.py` (новый)
@@ -405,6 +408,7 @@ R7-T21 → R7-T22).
 
 ## R7-T12 — Аутентификация по ключу: `get_actor`, объём доступа FR-17, гейты, лимит
 - **Статус:** TODO
+- **Заметка ревью R7-T05/T06:** `Actor.is_agent` при аутентификации по ключу заполнять из `app_user.is_agent`, не по умолчанию `False`; `/me` агента с `is_agent: true` покрыть тестом (`reviews/R7-T05-T06-1.md` п.3).
 - **Заметка ревью R7-T03:** `api_key_digest` вызывать вне блока `except` с исключением, содержащим заголовок `Authorization` (иначе `__context__` несёт чужое исключение).
 - **AC:** AC-4, AC-5, AC-6 («кто я» по секрету), AC-7 (агент по ключу), AC-8 (по реальному запросу), AC-9 (401 после отзыва), AC-10, AC-13, AC-14, AC-15, AC-17, AC-33, AC-40; FR-12…FR-15, FR-17, FR-18, FR-33; plan §4.7, PD-2, PD-3, PD-5
 - **Файлы:** `backend/app/api/deps.py`, `backend/app/main.py`;
@@ -614,7 +618,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T17 — MCP: протокол stdio, транспорт, конфигурация (без инструментов)
-- **Статус:** TODO
+- **Статус:** IN_PROGRESS
 - **AC:** FR-37, FR-38 (ключ из окружения, отказ без ключа), NFR-3, NFR-6; AC-38 (stderr инструментов); plan §4.9, PD-12, PD-14, PD-15
 - **Файлы:** `backend/app/agent_mcp.py` (новый);
   тесты: `backend/tests/unit/test_agent_mcp_protocol_007.py` (новый), `backend/tests/unit/test_agent_mcp_transport_007.py` (новый),
