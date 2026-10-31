@@ -316,3 +316,58 @@ async def domain_events(env: ApiEnv, workspace_id: uuid.UUID) -> list[Any]:
     )
     assert rows is not None
     return list(rows)
+
+
+# --- R7-T15: операции записи по ключу (FR-23…FR-28) ----------------------------------------------
+
+
+def task_url(task_id: Any) -> str:
+    return f"{API}/tasks/{task_id}"
+
+
+def project_tasks_url(project_id: Any) -> str:
+    return f"{API}/projects/{project_id}/tasks"
+
+
+def subtasks_url(task_id: Any) -> str:
+    return f"{API}/tasks/{task_id}/subtasks"
+
+
+def comments_url(task_id: Any) -> str:
+    return f"{API}/tasks/{task_id}/comments"
+
+
+def board_url(project_id: Any) -> str:
+    return f"{API}/projects/{project_id}/board"
+
+
+async def task_snapshot(env: ApiEnv, task_id: uuid.UUID) -> dict[str, Any]:
+    """Вся строка ``task`` (все столбцы) свежей сессией — для «задача не изменилась ни в одном
+    поле» (всё или ничего)."""
+    from sqlalchemy import text
+
+    rows = await env.execute(text("SELECT * FROM task WHERE id = :t").bindparams(t=task_id))
+    assert rows, "задача не найдена в БД"
+    return dict(rows[0]._mapping)
+
+
+async def project_task_count(env: ApiEnv, project_id: uuid.UUID) -> int:
+    """Число строк ``task`` проекта (включая подзадачи и мягко удалённые)."""
+    from sqlalchemy import text
+
+    rows = await env.execute(
+        text("SELECT count(*) FROM task WHERE project_id = :p").bindparams(p=project_id)
+    )
+    assert rows is not None
+    return int(rows[0][0])
+
+
+async def task_comment_count(env: ApiEnv, task_id: uuid.UUID) -> int:
+    """Число строк ``comment`` задачи (включая мягко удалённые)."""
+    from sqlalchemy import text
+
+    rows = await env.execute(
+        text("SELECT count(*) FROM comment WHERE task_id = :t").bindparams(t=task_id)
+    )
+    assert rows is not None
+    return int(rows[0][0])
