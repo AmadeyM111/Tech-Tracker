@@ -7,10 +7,12 @@ import { UsersPage } from "../../../src/features/admin/UsersPage";
 import { PASSWORD_MIN_LENGTH, errorMessage, ru } from "../../../src/shared/i18n";
 import {
   CAPS_ALL,
+  ID_AGENT,
   ID_IVANOV,
   ID_PETROV,
   NO_CONTENT,
   U_ADMIN,
+  U_AGENT,
   U_IVANOV,
   U_PETROV,
   action,
@@ -649,6 +651,35 @@ describe("password panel login and stale rows (review T24 attempt 2)", () => {
     for (const c of controls) expect(c.disabled, c.outerHTML).toBe(true);
     reload.resolve(j(200, page([U_ADMIN, { ...U_IVANOV, is_blocked: true }, U_PETROV])));
     await waitFor(() => expect(action(row(container, ID_IVANOV), "unblock").disabled).toBe(false));
+  });
+});
+
+// 007 R7-T21 (FR-40, FR-1, FR-2; plan §6.2): точные перечни кнопок строки и полей формы
+// дополнены строкой агента и флажком «Учётная запись ИИ-агента»; строка человека не меняется.
+describe("exact row actions and create form fields (007 R7-T21)", () => {
+  const rowActions = (r: HTMLElement) =>
+    Array.from(r.querySelectorAll<HTMLButtonElement>("button[data-action]"))
+      .map((b) => b.dataset["action"])
+      .sort();
+  const formFields = (c: HTMLElement) =>
+    Array.from(loginInput(c).form?.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select") ?? [])
+      .map((el) => el.getAttribute("name"))
+      .sort();
+
+  it("007_fr40_human_row_actions_unchanged_agent_row_without_reset_with_keys", async () => {
+    const { container } = await open({ [LIST]: () => j(200, page([U_ADMIN, U_IVANOV, U_PETROV, U_AGENT])) });
+    expect(rowActions(row(container, ID_IVANOV))).toEqual(["block", "reset-password", "revoke-sessions", "set-role"]);
+    expect(rowActions(row(container, ID_PETROV))).toEqual(["reset-password", "revoke-sessions", "set-role", "unblock"]);
+    expect(rowActions(row(container, ID_AGENT))).toEqual(["block", "keys", "revoke-sessions", "set-role"]);
+  });
+
+  it("007_fr40_create_form_fields_login_and_agent_flag_role_only_for_agent", async () => {
+    const { container } = await open();
+    expect(formFields(container)).toEqual(["is_agent", "login"]);
+    const box = loginInput(container).form?.querySelector<HTMLInputElement>('input[name="is_agent"]');
+    expect(box?.type).toBe("checkbox");
+    fireEvent.click(box as HTMLInputElement);
+    await waitFor(() => expect(formFields(container)).toEqual(["is_agent", "login", "role"]));
   });
 });
 

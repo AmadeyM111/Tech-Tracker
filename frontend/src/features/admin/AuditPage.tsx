@@ -56,6 +56,10 @@ const ACTION_CODES: readonly string[] = [
   "user.role_changed",
   "user.role_removed",
   "project.ownership_transferred",
+  // 007/FR-11
+  "user.agent_created",
+  "user.api_key_issued",
+  "user.api_key_revoked",
 ];
 // Field names with a readable text; any other name is shown as it is.
 const FIELD_CODES: readonly string[] = ["owner_id"];
@@ -75,7 +79,8 @@ function roleName(value: string | null | undefined): string {
   return ROLE_VALUES.includes(value) ? t(`admin.role.${value}` as MessageKey) : value;
 }
 
-// Role names (never the raw keys) for the role events; empty for other actions. The audit API
+// Role names (never the raw keys) for the role events and the agent creation, the key name for
+// the api key events (007/FR-11); empty for other actions. The audit API
 // gives no old/new owner for project.ownership_transferred (details exist only for user events,
 // changes are not exposed, BR-2), so that event shows just the action text.
 function detailsText(entry: AuditEntry): string {
@@ -83,11 +88,17 @@ function detailsText(entry: AuditEntry): string {
   const to = entry.details?.["role_to"];
   switch (entry.action) {
     case "user.role_assigned":
+    case "user.agent_created":
       return roleName(to);
     case "user.role_removed":
       return roleName(from);
     case "user.role_changed":
       return t("admin.audit.role_change", { from: roleName(from), to: roleName(to) });
+    case "user.api_key_issued":
+    case "user.api_key_revoked": {
+      const name = entry.details?.["api_key_name"];
+      return name === null || name === undefined ? "" : t("admin.audit.api_key", { name });
+    }
     default:
       return "";
   }

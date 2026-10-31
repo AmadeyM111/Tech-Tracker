@@ -320,6 +320,10 @@ describe("action texts, roles, timezone (review T24 attempt 2)", () => {
     "user.role_assigned",
     "user.role_changed",
     "user.role_removed",
+    // 007/FR-11, FR-40 (R7-T22; plan §6.2): три новых действия журнала
+    "user.agent_created",
+    "user.api_key_issued",
+    "user.api_key_revoked",
   ];
   const ACTION_TEXTS = Object.entries(ru)
     .filter(([k]) => k.startsWith("admin.audit.action."))
@@ -409,6 +413,55 @@ describe("action texts, roles, timezone (review T24 attempt 2)", () => {
     const { container } = await open();
     // 2026-10-12T21:30:00Z -> 13.10.2026 00:30 MSK (UTC+3)
     expect(cell(entry(container, 6), "occurred_at").textContent).toBe("13.10.2026, 00:30");
+  });
+});
+
+// 007 R7-T22 (FR-11, З-7; plan §4.10): подписи и детали новых действий журнала. Тексты - литералы plan.
+describe("007 agent and api key actions (FR-11)", () => {
+  const KEY_ID = "a1a1a1a1-0000-4000-8000-000000000001";
+  const AGENT_ID = "77777777-7777-4777-8777-777777777777";
+  const mk = (id: number, action: string, details: Record<string, string | null> | null) => ({
+    id,
+    occurred_at: "2026-11-02T07:00:00Z",
+    actor: { kind: "user", id: ADMIN_ID, login: "admin" },
+    action,
+    entity_type: "user",
+    entity_id: AGENT_ID,
+    entity_deleted: false,
+    changed_fields: [],
+    details,
+  });
+  const items = [
+    mk(501, "user.agent_created", { role_to: "user" }),
+    mk(502, "user.agent_created", { role_to: null }),
+    mk(503, "user.api_key_issued", { api_key_id: KEY_ID, api_key_name: "claude-laptop" }),
+    mk(504, "user.api_key_revoked", { api_key_id: KEY_ID, api_key_name: "claude-laptop" }),
+  ];
+
+  it("007_fr11_three_actions_have_russian_labels", async () => {
+    const { container } = await open({ [AUDIT]: () => j(200, page(items)) });
+    expect(cell(entry(container, 501), "action").textContent).toBe("Создание учётной записи агента");
+    expect(cell(entry(container, 503), "action").textContent).toBe("Выпуск ключа доступа");
+    expect(cell(entry(container, 504), "action").textContent).toBe("Отзыв ключа доступа");
+    expect((ru as Record<string, string>)["admin.audit.action.user.api_key_issued"]).toBe("Выпуск ключа доступа");
+  });
+
+  it("007_fr11_agent_created_details_show_role_name", async () => {
+    const { container } = await open({ [AUDIT]: () => j(200, page(items)) });
+    expect(cell(entry(container, 501), "details").textContent).toBe(ru["admin.role.user"]);
+    expect(cell(entry(container, 502), "details").textContent).toBe(ru["admin.role.none"]);
+  });
+
+  it("007_fr11_api_key_details_show_key_name_not_raw_fields", async () => {
+    const { container } = await open({ [AUDIT]: () => j(200, page(items)) });
+    for (const id of [503, 504]) {
+      expect(cell(entry(container, id), "details").textContent).toBe("Ключ «claude-laptop»");
+      const text = entry(container, id).textContent ?? "";
+      expect(text).not.toMatch(/api_key_name|api_key_id|user\.api_key/);
+      expect(text).not.toContain("gtk_");
+    }
+    // время по Москве: 07:00Z -> 10:00
+    expect(cell(entry(container, 503), "occurred_at").textContent).toBe("02.11.2026, 10:00");
   });
 });
 

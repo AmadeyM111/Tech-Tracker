@@ -46,6 +46,11 @@ const API_CODES = [
   "parent_task_deleted",
   // 006 (FR-21): срок в прошлом при создании
   "due_date_in_past",
+  // 007 (R7-T21, plan §4.10): агенты и ключи
+  "agent_role_not_allowed",
+  "agent_password_not_allowed",
+  "not_an_agent",
+  "api_key_limit_reached",
 ];
 const CLIENT_CODES = ["network_error", "invalid_response"];
 // Коды из общего обработчика HTTP-ошибок backend (core/errors.py, _HTTP_STATUS_MAP).
@@ -623,5 +628,52 @@ describe("006 AC-52 dictionary strings (NFR-2)", () => {
     expect(errorMessage("due_date_in_past")).toBe("Срок не может быть раньше сегодняшнего дня");
     expect(errorMessage("due_date_in_past")).not.toBe(errorMessage("definitely_not_a_code"));
     expect(errorMessage("due_date_in_past")).not.toBe(dict["error.unknown"]);
+  });
+});
+
+// 007 R7-T21, R7-T22: словарь агентов и ключей. Тексты - литералы plan §4.10.
+describe("007 agent and api key dictionary (plan 4.10)", () => {
+  const FIXED: Record<string, string> = {
+    "users.agent_mark": "ИИ",
+    "users.agent_mark_title": "ИИ-агент",
+    "admin.users.agent_label": "Учётная запись ИИ-агента",
+    "admin.users.role_label": "Роль",
+    "admin.users.agent_created": "Учётная запись агента создана",
+    "admin.users.keys": "Ключи",
+    "error.agent_role_not_allowed": "Агенту нельзя назначить роль технического администратора",
+    "error.agent_password_not_allowed": "У учётной записи агента нет пароля",
+    "error.not_an_agent": "Ключи выпускаются только учётным записям агентов",
+    "error.api_key_limit_reached": "У агента уже 5 действующих ключей",
+    "admin.audit.action.user.agent_created": "Создание учётной записи агента",
+    "admin.audit.action.user.api_key_issued": "Выпуск ключа доступа",
+    "admin.audit.action.user.api_key_revoked": "Отзыв ключа доступа",
+    "admin.audit.api_key": "Ключ «{name}»",
+  };
+
+  it("007_fr40_fr11_fixed_keys_have_plan_texts", () => {
+    for (const [key, text] of Object.entries(FIXED)) expect(dict[key], key).toBe(text);
+  });
+
+  it("007_fr40_new_error_codes_map_to_own_messages_not_unknown", () => {
+    for (const code of ["agent_role_not_allowed", "agent_password_not_allowed", "not_an_agent", "api_key_limit_reached"]) {
+      expect(errorMessage(code), code).toBe(dict[`error.${code}`]);
+      expect(errorMessage(code), code).not.toBe(dict["error.unknown"]);
+    }
+  });
+
+  it("007_fr40_admin_keys_texts_present", () => {
+    const keys = Object.entries(dict).filter(([k]) => k.startsWith("admin.keys."));
+    const values = keys.map(([, v]) => v);
+    expect(keys.length).toBeGreaterThan(0);
+    for (const text of ["Копировать", "Скопировано", "Закрыть"]) expect(values, text).toContain(text);
+    for (const re of [/^действует$/i, /^истёк$/i, /^отозван/i, /^не использовался$/i]) {
+      expect(values.some((v) => re.test(v)), String(re)).toBe(true);
+    }
+    expect(values).toContain(
+      "Скопируйте ключ сейчас: после закрытия окна он не будет показан. Не вставляйте ключ в текст запроса к модели, не коммитьте и не пересылайте его",
+    );
+    expect(values).toContain(
+      "Отозвать ключ «{name}»? Агент с этим ключом сразу потеряет доступ. Действие необратимо.",
+    );
   });
 });

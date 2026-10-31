@@ -59,6 +59,26 @@
 //     сбрасывается на 1), button[data-action="reset-filters"];
 //   строки <tr data-entry-id="<id>"> с [data-field="occurred_at"|"actor"|"action"|"entity_type"|
 //     "entity_id"|"changed_fields"]; пагинация как у пользователей.
+//
+// 007 (R7-T21, R7-T22; plan §4.10, PD-16, PD-17) - дополнение контракта UsersPage:
+//   api.ts: createAgent({login, role}) POST /api/v1/admin/agents тело ровно {login, role};
+//     listApiKeys(userId, {page}) GET /api/v1/admin/agents/{id}/api-keys?page=;
+//     issueApiKey(userId, {name, expires_in_days}) POST .../api-keys (expires_in_days - число JSON);
+//     revokeApiKey(userId, keyId) POST .../api-keys/{key_id}/revoke (204).
+//   td[data-field="login"] - UserName: у агента abbr.ui-agent-mark «ИИ», textContent «логин ИИ».
+//   Форма создания: input[type=checkbox][name="is_agent"] с label «Учётная запись ИИ-агента»;
+//     при флажке в форме select[name="role"] (значения "", business_admin, user; "user" по
+//     умолчанию; tech_admin нет), отправка -> createAgent, сообщение «Учётная запись агента создана»
+//     (role="status"/aria-live), без панели одноразового пароля.
+//   Строка агента: нет [data-action="reset-password"], в select[name="role"] нет tech_admin,
+//     есть button[data-action="keys"] «Ключи» (открывает раздел ключей).
+//   Раздел ключей: section[data-section="agent-keys"], заголовок «Ключи доступа: <логин>»; таблица
+//     ключей (строка tr содержит название; состояние «действует»/«истёк»/«отозван <время МСК>»,
+//     «не использовался»), Pagination (data-action next-page/prev-page внутри раздела); у
+//     действующего - кнопка «Отозвать» -> ConfirmDialog. Форма выпуска: текстовое поле названия с
+//     label, select[name="expires_in_days"] 30/90/180/365 (90 по умолчанию), кнопка «Выпустить
+//     ключ». После 201 - [role="dialog"] с input[readonly] (значение = секрет), «Копировать»
+//     (navigator.clipboard.writeText), предупреждение и «Закрыть». Секрет - только в useState.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
@@ -93,6 +113,8 @@ export interface UserFx {
   is_blocked: boolean;
   must_change_password: boolean;
   created_at: string;
+  /** 007/FR-31: признак учётной записи агента (у людей false). */
+  is_agent: boolean;
 }
 
 export function mkUser(over: Partial<UserFx> & Pick<UserFx, "id" | "login">): UserFx {
@@ -101,6 +123,7 @@ export function mkUser(over: Partial<UserFx> & Pick<UserFx, "id" | "login">): Us
     is_blocked: false,
     must_change_password: true,
     created_at: "2026-10-01T08:00:00Z",
+    is_agent: false,
     ...over,
   };
 }
@@ -108,6 +131,92 @@ export function mkUser(over: Partial<UserFx> & Pick<UserFx, "id" | "login">): Us
 export const U_IVANOV = mkUser({ id: ID_IVANOV, login: "ivanov" });
 export const U_PETROV = mkUser({ id: ID_PETROV, login: "petrov", role: "user", is_blocked: true, must_change_password: false });
 export const U_ADMIN = mkUser({ id: ADMIN_ID, login: "admin", role: "tech_admin", must_change_password: false });
+
+// 007 (R7-T21, R7-T22): учётные записи агентов и ключи.
+export const ID_AGENT = "77777777-7777-4777-8777-777777777777";
+export const ID_AGENT_BA = "88888888-8888-4888-8888-888888888888";
+export const U_AGENT = mkUser({ id: ID_AGENT, login: "agent.u", role: "user", is_agent: true, must_change_password: false });
+export const U_AGENT_BA = mkUser({
+  id: ID_AGENT_BA,
+  login: "agent.ba",
+  role: "business_admin",
+  is_agent: true,
+  must_change_password: false,
+});
+
+export const agentsUrl = "/api/v1/admin/agents";
+export const keysUrl = (userId: string) => `/api/v1/admin/agents/${userId}/api-keys`;
+export const revokeUrl = (userId: string, keyId: string) => `${keysUrl(userId)}/${keyId}/revoke`;
+
+export interface ApiKeyFx {
+  id: string;
+  name: string;
+  created_by: { id: string; login: string; is_agent: boolean } | null;
+  created_at: string;
+  expires_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  state: "active" | "expired" | "revoked";
+}
+
+/** Ключ из перечня (ApiKeyInfo, 8 полей; секрета в перечне нет). */
+export function mkKey(over: Partial<ApiKeyFx> & Pick<ApiKeyFx, "id" | "name">): ApiKeyFx {
+  return {
+    created_by: { id: ADMIN_ID, login: "admin", is_agent: false },
+    created_at: "2026-10-01T08:00:00Z",
+    expires_at: "2026-12-30T08:00:00Z",
+    last_used_at: null,
+    revoked_at: null,
+    state: "active",
+    ...over,
+  };
+}
+
+/** Подмена navigator.clipboard (в jsdom его нет); возвращает спай writeText и снятие подмены. */
+export function installClipboard(impl: (text: string) => Promise<void> = async () => undefined) {
+  const writeText = vi.fn(impl);
+  Object.defineProperty(window.navigator, "clipboard", {
+    value: { writeText },
+    configurable: true,
+  });
+  return {
+    writeText,
+    restore: () => {
+      Reflect.deleteProperty(window.navigator, "clipboard");
+    },
+  };
+}
+
+function safeJson(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? "";
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * Всё, что держит кэш TanStack Query: ключи и данные запросов, ключи, переменные, данные и
+ * контекст мутаций (PD-17: секрет не должен попадать ни в один из них).
+ */
+export function cacheText(qc: QueryClient): string {
+  const queries = qc
+    .getQueryCache()
+    .getAll()
+    .map((q) => safeJson({ key: q.queryKey, data: q.state.data }));
+  const mutations = qc
+    .getMutationCache()
+    .getAll()
+    .map((m) =>
+      safeJson({
+        key: m.options.mutationKey,
+        variables: m.state.variables,
+        data: m.state.data,
+        context: m.state.context,
+      }),
+    );
+  return [...queries, ...mutations].join("\n");
+}
 
 export function page<T>(items: T[], p = 1, hasNext = false, size = 50) {
   return { items, page: p, page_size: size, has_next: hasNext };

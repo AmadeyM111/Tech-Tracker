@@ -40,14 +40,17 @@ const ACTIVE_STYLE: CSSProperties = {
 const MAX_QUERY_LENGTH = 64;
 
 /** Логин и, для учётной записи агента, метка «ИИ» (007/FR-31); логин остаётся текстом рядом с меткой. */
-export function UserName({ user }: { user: { login: string; is_agent?: boolean } }) {
+export function UserName({ user }: { user: { login: string; is_agent: boolean } }) {
   return (
     <span className="ui-user">
       {user.login}
-      {user.is_agent === true ? (
-        <abbr className="ui-agent-mark" title={t("users.agent_mark_title")}>
-          {t("users.agent_mark")}
-        </abbr>
+      {user.is_agent ? (
+        <>
+          {" "}
+          <abbr className="ui-agent-mark" title={t("users.agent_mark_title")}>
+            {t("users.agent_mark")}
+          </abbr>
+        </>
       ) : null}
     </span>
   );
