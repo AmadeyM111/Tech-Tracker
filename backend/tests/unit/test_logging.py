@@ -473,19 +473,20 @@ async def test_access_log_has_no_headers_or_bodies(
     logs: LogReader, app_client: tuple[FastAPI, httpx.AsyncClient]
 ) -> None:
     _, client = app_client
-    r = await client.post(
-        "/_t/echo",
-        json={"login": "carol", "password": "BODYPASSWORDVAL"},
-        headers={
-            "Authorization": "Bearer AUTHTOKENVALUE",
-            "Cookie": "gt_session=COOKIESESSIONVAL",
-        },
-    )
+    body = {"login": "carol", "password": "BODYPASSWORDVAL"}
+    cookie = {"Cookie": "gt_session=COOKIESESSIONVAL"}
+    r = await client.post("/_t/echo", json=body, headers=cookie)
     assert r.status_code == 200
+    # /_t/echo вне AGENT_OPERATIONS: заголовок ключа -> 403 forbidden (007/FR-17, PD-3, З-4)
+    r_key = await client.post(
+        "/_t/echo", json=body, headers={"Authorization": "Bearer AUTHTOKENVALUE", **cookie}
+    )
+    assert (r_key.status_code, r_key.json()["code"]) == (403, "forbidden")
 
     recs = [x for x in _access_records(logs.records()) if x["path"] == "/_t/echo"]
-    assert len(recs) == 1
-    assert recs[0]["method"] == "POST"
+    assert len(recs) == 2
+    assert [x["method"] for x in recs] == ["POST", "POST"]
+    assert [x["status"] for x in recs] == [200, 403]
     text = logs.text()
     for leaked in ("BODYPASSWORDVAL", "AUTHTOKENVALUE", "COOKIESESSIONVAL"):
         assert leaked not in text

@@ -417,7 +417,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T12 — Аутентификация по ключу: `get_actor`, объём доступа FR-17, гейты, лимит
-- **Статус:** TODO
+- **Статус:** DONE
 - **ОБЯЗАТЕЛЬНЫЕ условия ревью R7-T11 (`reviews/R7-T11-1.md`):** (1) `commit_durably` сразу после `authenticate_api_key`, ДО разбора `None`/`RateLimited`; API-тест: после 429 в БД `rate_count=121` и следующий запрос в окне тоже 429; (2) `_actor_from_api_key` проверяет `is_blocked`, членство в `KeyPrincipal.workspace_id` и `is_agent`, любой отказ — тот же `NotAuthenticated`, `Actor(session_id=None, api_key_id=…, is_agent=True, must_change_password=False)`; (3) `api_key_digest` вне блока `except`; (4) `/auth/logout` и `/auth/password` с Bearer и действующей cookie → 403, cookie-сессия цела (FR-15; `api/v1/auth.py:81-96` logout берёт cookie напрямую).
 - **Заметка ревью R7-T10 (обязательно, `reviews/R7-T10-1.md`):** сценарии AC-6 («кто я» по выпущенному секрету), AC-7 (`agent.ba` по `K_ba` → точный 403 на перечне, выпуске, отзыве; тест Bearer в `test_api_keys_admin_007.py` ужесточить с «401 или 403» до точного значения), AC-8 (`last_used_at` после реального запроса), AC-9 (401 после отзыва).
 - **Заметка ревью R7-T05/T06:** `Actor.is_agent` при аутентификации по ключу заполнять из `app_user.is_agent`, не по умолчанию `False`; `/me` агента с `is_agent: true` покрыть тестом (`reviews/R7-T05-T06-1.md` п.3).
@@ -425,7 +425,9 @@ R7-T21 → R7-T22).
 - **AC:** AC-4, AC-5, AC-6 («кто я» по секрету), AC-7 (агент по ключу), AC-8 (по реальному запросу), AC-9 (401 после отзыва), AC-10, AC-13, AC-14, AC-15, AC-17, AC-33, AC-40; FR-12…FR-15, FR-17, FR-18, FR-33; plan §4.7, PD-2, PD-3, PD-5
 - **Файлы:** `backend/app/api/deps.py`, `backend/app/main.py`;
   тесты: `backend/tests/api/test_api_key_auth_api_007.py` (новый), `backend/tests/api/test_agent_scope_007.py` (новый),
-  `backend/tests/agents007_support.py` (только добавить помощники)
+  `backend/tests/agents007_support.py` (только добавить помощники),
+  `backend/tests/api/test_api_keys_admin_007.py` (только ужесточение: Bearer-тест `in (401, 403)` → точный `(403, "forbidden")` после появления аутентификации по ключу; добавлено оркестратором по заметке ревью R7-T10 и отчёту test-writer, 2026-10-31),
+  `backend/tests/unit/test_logging.py` (только разбивка `test_access_log_has_no_headers_or_bodies` на два запроса: тело и cookie без `Authorization` → 200; с `Authorization` → 403 `forbidden`; проверки утечки в журнале доступа сохраняются полностью; добавлено оркестратором по отчёту implementer, 2026-10-31)
 - **Зависит от:** R7-T10, R7-T11
 - **Описание:** По plan §4.7: `AGENT_OPERATIONS`, `presented_api_key`, `require_agent_scope`
   (app-level, после `check_origin`; в `main.py` — `dependencies=[Depends(check_origin),
@@ -457,6 +459,7 @@ R7-T21 → R7-T22).
 
 ## R7-T13 — Операции чтения по ключу: проекты по членству, права в карточке
 - **Статус:** TODO
+- **Заметка ревью R7-T12 (`reviews/R7-T12-1.md`):** добавить тест: у строки агента в БД `must_change_password = true` → ключ работает, `/me` по ключу показывает `false`; `/me` по ключу возвращает `capabilities` по роли (у `agent.ba` — управление проектами, закрытое по ключу FR-17) — при желании фильтровать для запросов по ключу (З-6); MCP-инструменты на `capabilities` не опираются.
 - **AC:** AC-16, AC-18, AC-19, AC-20, AC-21; FR-17 (права в карточке), FR-19…FR-22, FR-34; plan §4.8, PD-3, З-6
 - **Файлы:** `backend/app/domain/projects/queries.py`, `backend/app/domain/access/policy.py`;
   тесты: `backend/tests/api/test_agent_reads_007.py` (новый), `backend/tests/unit/test_policy.py`
@@ -604,6 +607,7 @@ R7-T21 → R7-T22).
 
 ## R7-T16 — Секрет не утекает: логи, ответы, журнал, события, БД, access-лог web
 - **Статус:** TODO
+- **Заметка ревью R7-T12:** на стенде проверить, что nginx передаёт `Authorization` (два заголовка, разные регистры имени) в приложение без искажений.
 - **Заметка ревью R7-T10:** AC-39 — искать секрет и в `bytea`-столбцах (декодировать или искать hex-кодировку подстрок ≥ 8), а не только `x::text LIKE`.
 - **Заметки ревью R7-T03 (обязательно учесть):** `reviews/R7-T03-1.md` п.1–3: имена ключей в `extra`/Mapping не маскируются в `core/logging.py`; в сквозной AC-38 добавить ключ с `/` или `+` внутри (путь и заголовок), при находке — вернуться к plan PD-11; nginx `log_format` без `$request`.
 - **AC:** AC-38 (API, журнал, события), AC-39; FR-32, FR-6; plan PD-1, PD-11
@@ -862,6 +866,7 @@ R7-T21 → R7-T22).
 
 ## R7-T26 — Финальная приёмка 007
 - **Статус:** TODO
+- **Открытые вопросы к финальной приёмке:** `reviews/open-items.md` — каждый пункт получает решение (исправлено / принято владельцем / перенесено); в трассировку AC-47 внести обоснованное исключение для `test_logging.py::test_access_log_has_no_headers_or_bodies` (FR-17).
 - **AC:** AC-47; сверка plan §6.1 и §6.2; AC-37, AC-46, AC-48 (*ручные* / *вне CI* — передаются владельцу)
 - **Файлы:** нет (только проверки; дефекты — новые задачи R7-Tnn по решению оркестратора)
 - **Зависит от:** R7-T01…R7-T25

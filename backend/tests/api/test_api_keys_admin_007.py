@@ -38,6 +38,7 @@ from tests.agents007_support import (
     AUDIT,
     CLOCK,
     bearer,
+    hide,
     make_agent,
     make_key,
 )
@@ -435,18 +436,34 @@ async def test_007_ac7_without_cookie_is_401(api_env: ApiEnv) -> None:
     assert await _rows(env, agent.id) == []
 
 
-async def test_007_ac7_bearer_header_does_not_open_admin_routes_before_t12(
+async def test_007_ac7_agent_key_on_admin_routes_is_403_forbidden(
     api_env: ApiEnv,
 ) -> None:
-    """Секрет ключа не даёт доступа к управлению ключами (ни до, ни после R7-T12)."""
+    """Действующий ключ агента (``agent.u`` — П, ``agent.ba`` — БА) на /admin/agents/** и
+    /admin/users -> ровно 403 ``forbidden`` (вне AGENT_OPERATIONS, FR-17); ключи не меняются."""
     env = api_env
     w, agent = await _agent_world(env)
-    key = await make_key(env, agent, created_by=await _ta_row(env, w), created_at=env.clock.now())
+    ta = await _ta_row(env, w)
+    agent_ba = await make_agent(env, "agent.ba", "business_admin", workspace=w.ws)
+    key = hide(await make_key(env, agent, created_by=ta, created_at=env.clock.now()))
+    key_ba = hide(await make_key(env, agent_ba, created_by=ta, created_at=env.clock.now()))
 
-    r = await env.client.post(keys_url(agent.id), json={"name": "k"}, headers=bearer(key.secret))
-
-    assert r.status_code in (401, 403)
-    assert len(await _rows(env, agent.id)) == 1
+    for label, secret in (("agent.u", key.secret), ("agent.ba", key_ba.secret)):
+        h = bearer(secret)
+        responses = {
+            "выпуск": await env.client.post(keys_url(agent.id), json={"name": "k"}, headers=h),
+            "перечень": await env.client.get(keys_url(agent.id), headers=h),
+            "отзыв": await env.client.post(revoke_url(agent.id, key.id), headers=h),
+            "учётные записи": await env.client.get(ADMIN_USERS, headers=h),
+            "создание агента": await env.client.post(
+                ADMIN_AGENTS, json={"login": "agent.x", "role": "user"}, headers=h
+            ),
+        }
+        got = {name: (r.status_code, code_of(r)) for name, r in responses.items()}
+        assert got == dict.fromkeys(responses, (403, "forbidden")), label
+    rows = await _rows(env, agent.id)
+    assert len(rows) == 1
+    assert rows[0].revoked_at is None
 
 
 async def test_007_ac7_foreign_origin_is_403_origin_mismatch(api_env: ApiEnv) -> None:

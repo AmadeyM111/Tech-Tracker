@@ -10,7 +10,7 @@ from fastapi.routing import APIRoute
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from app.api.deps import check_origin
+from app.api.deps import check_origin, require_agent_scope
 from app.api.v1 import router as api_v1_router
 from app.core.clock import Clock, SystemClock, use_clock
 from app.core.config import Settings, get_settings
@@ -88,7 +88,8 @@ def create_app(settings: Settings | None = None, *, clock: Clock | None = None) 
         redoc_url="/redoc" if docs else None,
         openapi_url="/openapi.json" if docs else None,
         generate_unique_id_function=_operation_id,
-        dependencies=[Depends(check_origin)],  # D-16: CSRF для небезопасных методов
+        # D-16: CSRF для небезопасных методов; 007 PD-3: объём доступа по ключу агента
+        dependencies=[Depends(check_origin), Depends(require_agent_scope)],
     )
     application.state.settings = settings
     application.state.clock = clock if clock is not None else SystemClock()
