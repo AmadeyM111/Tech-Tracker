@@ -390,12 +390,13 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T11 — Аутентификация по ключу: проверка, срок, лимит частоты (домен)
-- **Статус:** TODO
+- **Статус:** DONE
 - **Заметка ревью R7-T07:** аутентификация по ключу не зависит от `failed_login_count`/`login_locked_until` (перебором паролей нельзя заблокировать ключ); дополнительно проверять `app_user.is_blocked`, а не только `revoked_at`.
 - **AC:** AC-10, AC-40 (уровень домена); FR-9, FR-13 (домен), FR-16, FR-33; plan §4.7, PD-5
 - **Файлы:** `backend/app/domain/api_keys/auth.py` (новый), `backend/app/domain/access/roles.py`,
   `backend/app/domain/auth/service.py`;
-  тесты: `backend/tests/domain/test_api_key_auth_007.py` (новый)
+  тесты: `backend/tests/domain/test_api_key_auth_007.py` (новый),
+  `backend/tests/unit/test_role_matrix.py` (только дополнение: `"api_key_id"` между `"session_id"` и `"is_agent"` в списке полей `Actor`; добавлено оркестратором по отчёту implementer, 2026-10-31)
   (+ `backend/tests/domain/test_auth_service.py` — только если тест строит `Actor`/`SessionActor` с проверкой типа `session_id`)
 - **Зависит от:** R7-T02, R7-T03, R7-T06
 - **Описание:** По plan §4.7 и PD-5: `authenticate_api_key(db, digest, *, now)` — один
@@ -417,6 +418,7 @@ R7-T21 → R7-T22).
 
 ## R7-T12 — Аутентификация по ключу: `get_actor`, объём доступа FR-17, гейты, лимит
 - **Статус:** TODO
+- **ОБЯЗАТЕЛЬНЫЕ условия ревью R7-T11 (`reviews/R7-T11-1.md`):** (1) `commit_durably` сразу после `authenticate_api_key`, ДО разбора `None`/`RateLimited`; API-тест: после 429 в БД `rate_count=121` и следующий запрос в окне тоже 429; (2) `_actor_from_api_key` проверяет `is_blocked`, членство в `KeyPrincipal.workspace_id` и `is_agent`, любой отказ — тот же `NotAuthenticated`, `Actor(session_id=None, api_key_id=…, is_agent=True, must_change_password=False)`; (3) `api_key_digest` вне блока `except`; (4) `/auth/logout` и `/auth/password` с Bearer и действующей cookie → 403, cookie-сессия цела (FR-15; `api/v1/auth.py:81-96` logout берёт cookie напрямую).
 - **Заметка ревью R7-T10 (обязательно, `reviews/R7-T10-1.md`):** сценарии AC-6 («кто я» по выпущенному секрету), AC-7 (`agent.ba` по `K_ba` → точный 403 на перечне, выпуске, отзыве; тест Bearer в `test_api_keys_admin_007.py` ужесточить с «401 или 403» до точного значения), AC-8 (`last_used_at` после реального запроса), AC-9 (401 после отзыва).
 - **Заметка ревью R7-T05/T06:** `Actor.is_agent` при аутентификации по ключу заполнять из `app_user.is_agent`, не по умолчанию `False`; `/me` агента с `is_agent: true` покрыть тестом (`reviews/R7-T05-T06-1.md` п.3).
 - **Заметка ревью R7-T03:** `api_key_digest` вызывать вне блока `except` с исключением, содержащим заголовок `Authorization` (иначе `__context__` несёт чужое исключение).

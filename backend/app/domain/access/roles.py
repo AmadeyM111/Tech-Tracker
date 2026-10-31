@@ -76,7 +76,8 @@ class Actor:
     login: str
     role: Role | None
     must_change_password: bool
-    session_id: bytes
+    session_id: bytes | None  # None — запрос по ключу агента (007 plan §4.7)
+    api_key_id: UUID | None = None  # не None — запрос по ключу (007 FR-30, PD-9)
     is_agent: bool = False
 
     def can(self, cap: Capability) -> bool:

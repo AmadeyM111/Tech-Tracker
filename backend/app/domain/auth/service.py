@@ -27,7 +27,13 @@ from pydantic import SecretStr
 from sqlalchemy import event, select, update
 
 from app.core.db import commit_durably
-from app.core.errors import ErrorCode, InvalidCredentials, NotAuthenticated, Unprocessable
+from app.core.errors import (
+    ErrorCode,
+    Forbidden,
+    InvalidCredentials,
+    NotAuthenticated,
+    Unprocessable,
+)
 from app.core.security.passwords import (
     PasswordHasher,
     PasswordPolicyError,
@@ -66,7 +72,7 @@ class SessionActor(Protocol):
     def login(self) -> str: ...
 
     @property
-    def session_id(self) -> bytes: ...
+    def session_id(self) -> bytes | None: ...  # None — запрос по ключу агента (007)
 
 
 @dataclass(frozen=True)
@@ -172,7 +178,14 @@ async def change_own_password(
     (фиксируется до ответа). Наружу во всех этих случаях уходит один и тот же
     ``invalid_current_password``. Блокировка входа, поставленная ранее, ответ не меняет: попытка
     не засчитывается, пароль не проверяется.
+
+    Без сессии (запрос по ключу агента, 007 plan §4.7) — ``Forbidden`` первым шагом: пароль не
+    проверяется, хеш и счётчики неудач не меняются.
     """
+    session_id = actor.session_id
+    if session_id is None:
+        raise Forbidden()
+
     current_value = current.get_secret_value()
     new_value = new.get_secret_value()
 
@@ -199,7 +212,7 @@ async def change_own_password(
     if not await _current_password_matches(hasher, reservation.password_hash, current_value):
         if reservation.own_lock is not None:
             # порог достигнут: блокировка уже зафиксирована, текущая сессия завершается
-            await sessions.delete_by_id(db, actor.session_id)
+            await sessions.delete_by_id(db, session_id)
             await commit_durably(db)
         raise Unprocessable(code=ErrorCode.invalid_current_password)
 
@@ -239,7 +252,7 @@ async def change_own_password(
         if blocked is not False:  # заблокирован (или удалён) параллельно: как у get_actor
             raise NotAuthenticated()
         raise Unprocessable(code=ErrorCode.invalid_current_password)
-    await sessions.delete_all_for_user(db, actor.user_id, keep_id=actor.session_id)
+    await sessions.delete_all_for_user(db, actor.user_id, keep_id=session_id)
 
     # ПОСЛЕДНИМ действием: после этой точки фиксаций до COMMIT запроса быть не должно
     _remove_initial_admin_file_after_commit(db, settings, actor.login)
