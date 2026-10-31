@@ -14,6 +14,7 @@ HTTP-статус). Ключ, аргументы и тела ответов не
 
 from __future__ import annotations
 
+import copy
 import email.utils
 import http.client
 import json
@@ -93,12 +94,15 @@ def _parse_retry_after(value: str | None) -> int | None:
         return None
     value = value.strip()
     if value.isascii() and value.isdigit():
-        return int(value)
+        try:
+            return int(value)
+        except ValueError:  # длиннее предела int(str) (4300 цифр): значение не используется
+            return None
     try:
         moment = email.utils.parsedate_to_datetime(value)
-    except (TypeError, ValueError, IndexError):
+        return max(0, int(moment.timestamp() - time.time()))
+    except (TypeError, ValueError, IndexError, OverflowError):
         return None
-    return max(0, int(moment.timestamp() - time.time()))
 
 
 class UrllibTransport:
@@ -244,7 +248,300 @@ class ToolSpec:
     body_params: tuple[str, ...] = ()
 
 
-TOOLS: Final[tuple[ToolSpec, ...]] = ()  # 11 инструментов добавляет R7-T18
+_API: Final = "/api/v1"
+_STATUSES: Final = ("todo", "in_progress", "review", "done")
+_PRIORITIES: Final = ("low", "medium", "high")
+_DATE_PATTERN: Final = r"^\d{4}-\d{2}-\d{2}$"
+_DATE_RULE: Final = "Срок в формате YYYY-MM-DD, не раньше сегодняшней даты по Europe/Moscow."
+_STATUS_TEXT: Final = (
+    "Статусы: todo — к выполнению, in_progress — в работе, review — на проверке, "
+    "done — выполнена (закрытие задачи)."
+)
+_PRIORITY_TEXT: Final = "Приоритет: low — низкий, medium — средний, high — высокий."
+_PAGE_FIELDS: Final = ("page", "page_size")
+
+
+def _schema(properties: Mapping[str, object], required: Sequence[str] = ()) -> dict[str, object]:
+    return {
+        "type": "object",
+        "properties": dict(properties),
+        "required": list(required),
+        "additionalProperties": False,
+    }
+
+
+def _uuid(description: str) -> dict[str, object]:
+    return {"type": "string", "format": "uuid", "description": description}
+
+
+def _uuid_or_null(description: str) -> dict[str, object]:
+    return {
+        "anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}],
+        "description": description,
+    }
+
+
+def _status(description: str) -> dict[str, object]:
+    return {"type": "string", "enum": list(_STATUSES), "description": description}
+
+
+def _priority(description: str, *, default: str | None = None) -> dict[str, object]:
+    prop: dict[str, object] = {
+        "type": "string",
+        "enum": list(_PRIORITIES),
+        "description": description,
+    }
+    if default is not None:
+        prop["default"] = default
+    return prop
+
+
+def _due_date(description: str) -> dict[str, object]:
+    return {
+        "type": "string",
+        "format": "date",
+        "pattern": _DATE_PATTERN,
+        "description": description,
+    }
+
+
+def _due_date_or_null(description: str) -> dict[str, object]:
+    return {
+        "anyOf": [
+            {
+                "type": "string",
+                "format": "date",
+                "pattern": _DATE_PATTERN,
+                "description": "Дата в формате YYYY-MM-DD.",
+            },
+            {"type": "null"},
+        ],
+        "description": description,
+    }
+
+
+def _title(description: str) -> dict[str, object]:
+    return {"type": "string", "minLength": 1, "maxLength": 255, "description": description}
+
+
+def _text(description: str, *, min_length: int = 0) -> dict[str, object]:
+    prop: dict[str, object] = {"type": "string", "maxLength": 10000, "description": description}
+    if min_length:
+        prop["minLength"] = min_length
+    return prop
+
+
+_PAGE_PROPS: Final[Mapping[str, object]] = {
+    "page": {"type": "integer", "minimum": 1, "description": "Номер страницы, начиная с 1."},
+    "page_size": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "description": "Размер страницы: от 1 до 100 (по умолчанию 50).",
+    },
+}
+_TASK_ID: Final = _uuid("Идентификатор задачи или подзадачи (UUID).")
+_PROJECT_ID: Final = _uuid("Идентификатор проекта (UUID).")
+
+TOOLS: Final[tuple[ToolSpec, ...]] = (
+    ToolSpec(
+        name="whoami",
+        description=(
+            "Сведения о своей учётной записи агента: идентификатор, логин, роль и признак "
+            "«агент». Параметров нет."
+        ),
+        input_schema=_schema({}),
+        method="GET",
+        path=f"{_API}/me",
+    ),
+    ToolSpec(
+        name="list_projects",
+        description=(
+            "Список проектов, где учётная запись агента — участник: идентификатор, название, "
+            "владелец. Постраничный: page и page_size."
+        ),
+        input_schema=_schema(_PAGE_PROPS),
+        method="GET",
+        path=f"{_API}/projects",
+        query_params=_PAGE_FIELDS,
+    ),
+    ToolSpec(
+        name="list_my_tasks",
+        description=(
+            "Задачи и подзадачи всех своих проектов, где агент — исполнитель. "
+            "Постраничный: page и page_size."
+        ),
+        input_schema=_schema(_PAGE_PROPS),
+        method="GET",
+        path=f"{_API}/me/tasks",
+        query_params=_PAGE_FIELDS,
+    ),
+    ToolSpec(
+        name="list_project_tasks",
+        description=(
+            "Задачи и подзадачи проекта с фильтрами по статусу и исполнителю. Обязателен "
+            f"project_id. {_STATUS_TEXT} Проект, где агент не участник, — ошибка 403. "
+            "Постраничный: page и page_size."
+        ),
+        input_schema=_schema(
+            {
+                "project_id": _PROJECT_ID,
+                "status": _status(f"Фильтр по статусу. {_STATUS_TEXT}"),
+                "assignee_id": _uuid("Фильтр по исполнителю: идентификатор пользователя (UUID)."),
+                **_PAGE_PROPS,
+            },
+            ["project_id"],
+        ),
+        method="GET",
+        path=f"{_API}/projects/{{project_id}}/tasks",
+        path_params=("project_id",),
+        query_params=("status", "assignee_id", *_PAGE_FIELDS),
+    ),
+    ToolSpec(
+        name="get_task",
+        description=(
+            "Карточка задачи или подзадачи: все поля, автор, исполнитель, подзадачи и прогресс, "
+            "ссылка на родителя, права агента на эту задачу."
+        ),
+        input_schema=_schema({"task_id": _TASK_ID}, ["task_id"]),
+        method="GET",
+        path=f"{_API}/tasks/{{task_id}}",
+        path_params=("task_id",),
+    ),
+    ToolSpec(
+        name="create_task",
+        description=(
+            "Создать задачу верхнего уровня в проекте, где агент — участник. Обязательные поля: "
+            "project_id, название (title, 1–255 символов), описание (description, не пустое, "
+            "до 10 000 символов) и срок (due_date, формат YYYY-MM-DD, не раньше сегодняшней "
+            "даты по Europe/Moscow). Приоритет (priority): low, medium или high, по умолчанию "
+            "medium. Исполнитель по умолчанию — сам агент; назначить другого (assignee_id, "
+            "участник проекта) может только агент с ролью БА. Статус новой задачи — todo."
+        ),
+        input_schema=_schema(
+            {
+                "project_id": _PROJECT_ID,
+                "title": _title("Название задачи, 1–255 символов. Обязательно."),
+                "description": _text(
+                    "Описание задачи: обязательно, не пустое, до 10 000 символов.", min_length=1
+                ),
+                "due_date": _due_date(f"{_DATE_RULE} Обязателен."),
+                "priority": _priority(_PRIORITY_TEXT + " По умолчанию medium.", default="medium"),
+                "assignee_id": _uuid(
+                    "Исполнитель (UUID участника проекта). По умолчанию — сам агент; другого "
+                    "может назначить только агент с ролью БА."
+                ),
+            },
+            ["project_id", "title", "description", "due_date"],
+        ),
+        method="POST",
+        path=f"{_API}/projects/{{project_id}}/tasks",
+        path_params=("project_id",),
+        body_params=("title", "description", "due_date", "priority", "assignee_id"),
+    ),
+    ToolSpec(
+        name="create_subtask",
+        description=(
+            "Создать подзадачу у задачи верхнего уровня (task_id — родитель). Достаточно "
+            "названия (title); вложенность — один уровень. Необязательные поля: описание, срок "
+            "(YYYY-MM-DD), приоритет (low, medium, high), исполнитель."
+        ),
+        input_schema=_schema(
+            {
+                "task_id": _uuid("Идентификатор родительской задачи (UUID)."),
+                "title": _title("Название подзадачи, 1–255 символов. Обязательно."),
+                "description": _text("Описание подзадачи, до 10 000 символов."),
+                "due_date": _due_date("Срок в формате YYYY-MM-DD."),
+                "priority": _priority(_PRIORITY_TEXT),
+                "assignee_id": _uuid(
+                    "Исполнитель (UUID участника проекта); назначить другого может только "
+                    "агент с ролью БА."
+                ),
+            },
+            ["task_id", "title"],
+        ),
+        method="POST",
+        path=f"{_API}/tasks/{{task_id}}/subtasks",
+        path_params=("task_id",),
+        body_params=("title", "description", "due_date", "priority", "assignee_id"),
+    ),
+    ToolSpec(
+        name="set_task_status",
+        description=(
+            "Сменить статус задачи или подзадачи. Закрыть задачу — перевести в done; переходы "
+            f"не ограничены, из любого статуса в любой, включая возврат из done. {_STATUS_TEXT}"
+        ),
+        input_schema=_schema(
+            {"task_id": _TASK_ID, "status": _status(f"Новый статус. {_STATUS_TEXT}")},
+            ["task_id", "status"],
+        ),
+        method="PATCH",
+        path=f"{_API}/tasks/{{task_id}}",
+        path_params=("task_id",),
+        body_params=("status",),
+    ),
+    ToolSpec(
+        name="update_task",
+        description=(
+            "Изменить поля задачи или подзадачи: название, описание, срок, приоритет, "
+            "исполнитель. Меняются только переданные поля, всё или ничего. Статус здесь не "
+            "меняется — для этого set_task_status. У задачи верхнего уровня нельзя снять "
+            "исполнителя или срок, очистить описание, поставить срок раньше сегодняшней даты "
+            "по Europe/Moscow. Сменить исполнителя может только агент с ролью БА."
+        ),
+        input_schema=_schema(
+            {
+                "task_id": _TASK_ID,
+                "title": _title("Новое название, 1–255 символов."),
+                "description": _text("Новое описание, до 10 000 символов."),
+                "due_date": _due_date_or_null(
+                    "Новый срок в формате YYYY-MM-DD или null, чтобы снять срок (только у "
+                    "подзадачи)."
+                ),
+                "priority": _priority(_PRIORITY_TEXT),
+                "assignee_id": _uuid_or_null(
+                    "Новый исполнитель (UUID участника проекта) или null, чтобы снять "
+                    "исполнителя (только у подзадачи)."
+                ),
+            },
+            ["task_id"],
+        ),
+        method="PATCH",
+        path=f"{_API}/tasks/{{task_id}}",
+        path_params=("task_id",),
+        body_params=("title", "description", "due_date", "priority", "assignee_id"),
+    ),
+    ToolSpec(
+        name="list_comments",
+        description=(
+            "Комментарии задачи или подзадачи; удалённые показываются заглушкой. "
+            "Постраничный: page и page_size."
+        ),
+        input_schema=_schema({"task_id": _TASK_ID, **_PAGE_PROPS}, ["task_id"]),
+        method="GET",
+        path=f"{_API}/tasks/{{task_id}}/comments",
+        path_params=("task_id",),
+        query_params=_PAGE_FIELDS,
+    ),
+    ToolSpec(
+        name="add_comment",
+        description=(
+            "Добавить комментарий к задаче или подзадаче: текст 1–10 000 символов, HTML "
+            "вырезается. Результат работы агент оставляет комментарием."
+        ),
+        input_schema=_schema(
+            {
+                "task_id": _TASK_ID,
+                "body": _text("Текст комментария, 1–10 000 символов.", min_length=1),
+            },
+            ["task_id", "body"],
+        ),
+        method="POST",
+        path=f"{_API}/tasks/{{task_id}}/comments",
+        path_params=("task_id",),
+        body_params=("body",),
+    ),
+)
 
 
 class UnknownToolError(LookupError):
@@ -344,7 +641,7 @@ class McpServer:
                 {
                     "name": tool.name,
                     "description": tool.description,
-                    "inputSchema": dict(tool.input_schema),
+                    "inputSchema": copy.deepcopy(dict(tool.input_schema)),
                 }
                 for tool in self._tool_list
             ]
@@ -403,7 +700,6 @@ class McpServer:
             raise _InvalidArguments("Аргументы должны быть объектом")
         properties = tool.input_schema.get("properties")
         known = set(properties) if isinstance(properties, dict) else set()
-        known.update(tool.path_params, tool.query_params, tool.body_params)
         unknown = sorted(str(key) for key in arguments if key not in known)
         if unknown:
             raise _InvalidArguments("Неизвестные параметры: " + ", ".join(unknown))
@@ -421,7 +717,15 @@ class McpServer:
         }
         body: dict[str, object] | None = None
         if tool.body_params:
-            body = {param: arguments[param] for param in tool.body_params if param in arguments}
+            # Обязательные параметры тела уходят всегда (при отсутствии — null): отказ
+            # возвращает API (422), а не «успех» пустого запроса; локально не проверяются.
+            required_raw = tool.input_schema.get("required")
+            required = set(required_raw) if isinstance(required_raw, (list, tuple)) else set()
+            body = {
+                param: arguments.get(param)
+                for param in tool.body_params
+                if param in arguments or param in required
+            }
         return path, query or None, body
 
     @staticmethod
@@ -479,9 +783,10 @@ def serve(instream: BinaryIO, outstream: BinaryIO, server: McpServer) -> None:
 
 
 def build_server(environ: Mapping[str, str]) -> McpServer:
-    """Сервер по окружению: нет ключа -> 401 на вызовах; неверный URL -> ``config_error``."""
+    """Сервер по окружению: нет ключа или ключ недопустимого формата -> 401 на вызовах
+    без обращения к сети (FR-38); неверный URL или ``GOSTRACKER_CA_FILE`` -> ``config_error``."""
     api_key = environ.get(ENV_KEY, "").strip()
-    if not api_key:
+    if not api_key or not _KEY_RE.fullmatch(api_key):
         return McpServer(None)
     url = environ.get(ENV_URL, "").strip()
     if not url:

@@ -716,7 +716,7 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T18 — MCP: 11 инструментов агента и сквозные тесты
-- **Статус:** TODO
+- **Статус:** DONE
 - **Заметки ревью R7-T17 (обязательно учесть, `reviews/R7-T17-1.md`):** (1) ключ недопустимого формата → 401 `not_authenticated` без сети (`McpServer(None)`), `config_error` только для URL/CA (AC-45); (2) `Retry-After` из очень длинной строки не должен давать -32603 (try/except); (3) регрессионные тесты: системные прокси игнорируются, нечитаемый `GOSTRACKER_CA_FILE`, ключ с `\r\n`/пробелом, обходы URL; (4) снять skip в `test_agent_mcp_stdio_007.py:162`, тест утечки через `connection_error`; (5) по возможности лимит длины строки stdin.
 - **AC:** AC-42, AC-43, AC-44, AC-45, AC-38 (результаты и логи инструментов); FR-35, FR-36, FR-37, FR-38; plan §4.9, PD-13, PD-14
 - **Файлы:** `backend/app/agent_mcp.py`, `backend/pyproject.toml` (только `[project.scripts] gostracker-mcp`);
@@ -743,7 +743,7 @@ R7-T21 → R7-T22).
 - **Готово, когда:** `source .venv/bin/activate && pip install -e "backend[dev]" -q && pytest -q backend/tests/api/test_agent_mcp_tools_007.py backend/tests/unit/test_agent_mcp_protocol_007.py backend/tests/cli/test_agent_mcp_stdio_007.py backend/tests/arch/test_dependencies_allowlist.py`
   зелёный; `gostracker-mcp < /dev/null` завершается с кодом 0; проверки бэкенда зелёные;
   «Фронтенд не тронут»; `python scripts/task_scope.py R7-T18` → 0.
-- **Попытки:** 0
+- **Попытки:** 2 (1: CHANGES_REQUESTED `reviews/R7-T18-1.md` — `set_task_status` без `status` давал ложный успех; 2: APPROVE `reviews/R7-T18-2.md`)
 
 ## R7-T19 — Интерфейс: метка «ИИ» — компонент, карточка задачи (автор, исполнитель), комментарии
 - **Статус:** TODO
@@ -860,6 +860,7 @@ R7-T21 → R7-T22).
 
 ## R7-T24 — Документы: ADR-0015, инструкция для агентов, README, чек-лист приёмки, глоссарий
 - **Статус:** TODO
+- **Заметка ревью R7-T18 (`reviews/R7-T18-2.md`):** ручная проверка AC-46 (подключение `gostracker-mcp` к Claude Code, 11 инструментов, сквозной сценарий) — в чек-лист; отдельно проверить, как Claude Code обрабатывает схемы с `default: "medium"` и `anyOf` с `null`; в описание `update_task` возможно добавить «передайте хотя бы одно поле» (желательное).
 - **Заметки ревью R7-T16 (`reviews/R7-T16-1.md`, open-items п.15–16):** ручная проверка на стенде — `nginx -t` для `deploy/web/default.conf.template` и передача `Authorization` (два заголовка, разные регистры) в приложение без искажений; отметить в документации принятый остаточный риск маскирования в логах (plan §4.2) и в журнале web (`$uri` без маскировки, сервер 80 с `$request`, `error_log` nginx).
 - **Заметки ревью R7-T14:** `docs/data-model.md:336` «В R1.0 пишутся только действия `user.*`» неточна (есть `project.ownership_transferred`) — выровнять; отметить в документации рост `domain_event` без очистки.
 - **Заметка по R7-T14 (отчёт implementer):** в `docs/data-model.md` (a) «Каталог событий R1.0» не содержит аудит-событий 007 (`user.agent_created`, `user.api_key_issued`, `user.api_key_revoked`); (b) первая строка документа говорит о миграциях `0001`–`0006`, хотя есть 0007 и 0008 — выровнять, не ломая `test_nfr11_data_model_covers_every_table_and_column` и `test_t88_data_model_mvp_section`.
