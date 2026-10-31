@@ -39,6 +39,20 @@ const ACTIVE_STYLE: CSSProperties = {
 // Mirrors the backend login length limit; the server stays authoritative.
 const MAX_QUERY_LENGTH = 64;
 
+/** Логин и, для учётной записи агента, метка «ИИ» (007/FR-31); логин остаётся текстом рядом с меткой. */
+export function UserName({ user }: { user: { login: string; is_agent?: boolean } }) {
+  return (
+    <span className="ui-user">
+      {user.login}
+      {user.is_agent === true ? (
+        <abbr className="ui-agent-mark" title={t("users.agent_mark_title")}>
+          {t("users.agent_mark")}
+        </abbr>
+      ) : null}
+    </span>
+  );
+}
+
 /** Combobox over the users directory: search by login, keyboard and click selection. */
 export function UserPicker({ label, onSelect, allowedIds, disabled, busy, quietError, labelledBy, required, invalid, describedBy, labelMark }: UserPickerProps) {
   const baseId = useId();

@@ -32,6 +32,7 @@ import { Link } from "react-router-dom";
 import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
+import { UserName } from "../../shared/ui/UserPicker";
 import type { TaskStatus } from "../tasks/api";
 import { getBoard, moveTask, type Board, type BoardCard, type BoardColumn } from "./api";
 import { dropIndexInColumn, insertIndexFor, nearestCardIndex, neighborsInFullOrder, pickDropColumn } from "./dnd";
@@ -158,7 +159,7 @@ function Card({ card }: { card: BoardCard }) {
           <time dateTime={card.due_date}>{formatDate(card.due_date)}</time>
         )}
       </div>
-      <div data-field="assignee">{card.assignee === null ? t("tasks.assignee_none") : card.assignee.login}</div>
+      <div data-field="assignee">{card.assignee === null ? t("tasks.assignee_none") : <UserName user={card.assignee} />}</div>
       <div data-field="progress">
         {card.progress === null ? t("tasks.progress_none") : t("tasks.progress_value", { percent: card.progress })}
       </div>

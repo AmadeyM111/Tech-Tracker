@@ -17,6 +17,7 @@ import { errorMessage, t } from "../../shared/i18n";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import { ErrorAlert, type AlertState } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
+import { UserName } from "../../shared/ui/UserPicker";
 import type { Page } from "../admin/api";
 import {
   createComment,
@@ -105,7 +106,9 @@ function CommentItem({ comment, pending, alert, onSave, onDelete }: ItemProps) {
   }
 
   const author = (
-    <span data-field="author">{comment.author.login}</span>
+    <span data-field="author">
+      <UserName user={comment.author} />
+    </span>
   );
   const when = (
     <span data-field="created_at">

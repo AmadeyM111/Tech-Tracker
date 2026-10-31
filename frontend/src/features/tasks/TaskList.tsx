@@ -6,6 +6,7 @@ import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
+import { UserName } from "../../shared/ui/UserPicker";
 import type { ProjectMember } from "../projects/api";
 import {
   listMyTasks,
@@ -55,7 +56,7 @@ function TaskTable({ items, withProject }: { items: TaskListItem[]; withProject:
             ) : null}
             <td data-field="status">{t(`tasks.status.${task.status}`)}</td>
             <td data-field="priority">{t(`tasks.priority.${task.priority}`)}</td>
-            <td data-field="assignee">{task.assignee === null ? t("tasks.assignee_none") : task.assignee.login}</td>
+            <td data-field="assignee">{task.assignee === null ? t("tasks.assignee_none") : <UserName user={task.assignee} />}</td>
             <td data-field="due_date">
               {task.due_date === null ? (
                 t("tasks.due_none")

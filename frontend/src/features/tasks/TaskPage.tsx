@@ -9,7 +9,7 @@ import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import { ErrorAlert, FieldError, useAlertState } from "../../shared/ui/ErrorAlert";
-import { UserPicker } from "../../shared/ui/UserPicker";
+import { UserName, UserPicker } from "../../shared/ui/UserPicker";
 import { Comments } from "../comments/Comments";
 import { listAllMembers } from "../projects/api";
 import { deleteTask, getTask, updateTask, type TaskDetail, type TaskPriority, type TaskStatus, type TaskUpdate } from "./api";
@@ -320,7 +320,7 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
                 if (e.key === "Enter") e.preventDefault();
               }}
             >
-              <span className="ui-current">{task.assignee === null ? t("tasks.assignee_none") : task.assignee.login}</span>
+              <span className="ui-current">{task.assignee === null ? t("tasks.assignee_none") : <UserName user={task.assignee} />}</span>
               <UserPicker
                 key={pickerKey}
                 label={t("tasks.col_assignee")}
@@ -339,7 +339,7 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
           ) : task.assignee === null ? (
             t("tasks.assignee_none")
           ) : (
-            task.assignee.login
+            <UserName user={task.assignee} />
           )}
         </dd>
 
@@ -394,6 +394,11 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
             task.description
           )}
           <FieldError id={errorId("description")} message={errorText("description")} />
+        </dd>
+
+        <dt>{t("tasks.author_label")}</dt>
+        <dd data-field="author">
+          <UserName user={task.author} />
         </dd>
       </dl>
     </>

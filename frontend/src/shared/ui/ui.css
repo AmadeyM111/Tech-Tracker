@@ -182,6 +182,19 @@ select:disabled {
   margin-left: 4px;
 }
 
+/* 007 (FR-31): метка «ИИ» у учётной записи агента; цвета из токенов, размер шрифта наследуется. */
+.ui-agent-mark {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--accent);
+  background: var(--surface-2);
+  text-decoration: none;
+  cursor: help;
+}
+
 .ui-error {
   color: var(--danger);
   margin: 0 0 12px;
