@@ -93,16 +93,25 @@ def can_change_assignee(a: Actor, p: ProjectFacts, t: TaskFacts) -> bool:
 
 
 def can_delete_task(a: Actor, p: ProjectFacts, t: TaskFacts) -> bool:
+    if a.api_key_id is not None:  # по ключу удаление закрыто (007/FR-17, PD-3)
+        return False
     return can_edit_task_fully(a, p, t)
 
 
 def can_edit_comment(a: Actor, author_id: UUID) -> bool:
-    """Свой комментарий (FR-23); участие проверяет сервис."""
+    """Свой комментарий (FR-23); участие проверяет сервис. По ключу — нет (007/FR-17)."""
+    if a.api_key_id is not None:
+        return False
     return a.can(Capability.BUSINESS_ACCESS) and author_id == a.user_id
 
 
 def can_delete_comment(a: Actor, p: ProjectFacts, author_id: UUID) -> bool:
-    """Свой или любой комментарий проекта для БА-участника (002/FR-9, AC-13)."""
+    """Свой или любой комментарий проекта для БА-участника (002/FR-9, AC-13).
+
+    По ключу — нет (007/FR-17, PD-3).
+    """
+    if a.api_key_id is not None:
+        return False
     if not (a.can(Capability.BUSINESS_ACCESS) and p.actor_is_member):
         return False
     return author_id == a.user_id or a.role is Role.BUSINESS_ADMIN

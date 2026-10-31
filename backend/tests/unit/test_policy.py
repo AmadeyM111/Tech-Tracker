@@ -549,3 +549,67 @@ def test_pure_module_has_no_infra_imports(rel: str) -> None:
             if any(n == f or n.startswith(f + ".") for f in _FORBIDDEN):
                 bad.append(n)
     assert bad == []
+
+
+# --- 007 R7-T13: запрос по ключу агента (FR-17, PD-3, З-6)
+def _key_actor(roles: ModuleType, role: str | None, key_id: uuid.UUID | None) -> Any:
+    return roles.Actor(
+        user_id=ME,
+        workspace_id=WS,
+        login="agent",
+        role=None if role is None else roles.Role[role],
+        must_change_password=False,
+        session_id=None if key_id is not None else b"s",
+        api_key_id=key_id,
+        is_agent=key_id is not None,
+    )
+
+
+KEY_ID = uuid.UUID(int=900)
+
+
+@pytest.mark.parametrize("role", ["BUSINESS_ADMIN", "USER"])
+@pytest.mark.parametrize("member", [True, False])
+def test_007_fr17_api_key_actor_cannot_delete_task(pol, roles, role, member) -> None:
+    a = _key_actor(roles, role, KEY_ID)
+    # задача, которую без ключа эта роль могла бы удалить
+    t = _task(pol, created_by=ME, assignee=ME)
+    assert pol.can_delete_task(a, _proj(pol, member=member), t) is False
+
+
+@pytest.mark.parametrize("role", ["BUSINESS_ADMIN", "USER"])
+def test_007_fr17_api_key_actor_cannot_edit_comment(pol, roles, role) -> None:
+    a = _key_actor(roles, role, KEY_ID)
+    assert pol.can_edit_comment(a, ME) is False  # свой комментарий
+
+
+@pytest.mark.parametrize("role", ["BUSINESS_ADMIN", "USER"])
+@pytest.mark.parametrize("author_me", [True, False])
+def test_007_fr17_api_key_actor_cannot_delete_comment(pol, roles, role, author_me) -> None:
+    a = _key_actor(roles, role, KEY_ID)
+    author = ME if author_me else OTHER
+    assert pol.can_delete_comment(a, _proj(pol, member=True), author) is False
+
+
+def test_007_fr17_same_actor_without_key_keeps_old_table(pol, roles) -> None:
+    """Без api_key_id прежняя таблица: БА-участник и автор-исполнитель-П удаляют, правят."""
+    ba = _key_actor(roles, "BUSINESS_ADMIN", None)
+    usr = _key_actor(roles, "USER", None)
+    p = _proj(pol, member=True)
+    assert pol.can_delete_task(ba, p, _task(pol, created_by=OTHER, assignee=OTHER)) is True
+    assert pol.can_delete_task(usr, p, _task(pol, created_by=ME, assignee=ME)) is True
+    assert pol.can_edit_comment(ba, ME) is True
+    assert pol.can_delete_comment(ba, p, OTHER) is True
+    assert pol.can_delete_comment(usr, p, ME) is True
+
+
+def test_007_fr17_key_actor_other_permissions_unchanged(pol, roles) -> None:
+    """Запрет по ключу касается только трёх функций: правка, статус, исполнитель, подзадача
+    считаются по роли и участию (FR-22)."""
+    ba = _key_actor(roles, "BUSINESS_ADMIN", KEY_ID)
+    p = _proj(pol, member=True)
+    t = _task(pol, created_by=OTHER, assignee=OTHER)
+    assert pol.can_edit_task_fully(ba, p, t) is True
+    assert pol.can_change_task_status(ba, p, t) is True
+    assert pol.can_change_assignee(ba, p, t) is True
+    assert pol.can_create_subtask(ba, p, t, ME) is True
