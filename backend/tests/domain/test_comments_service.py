@@ -307,7 +307,14 @@ async def test_d55_no_events_and_no_mentions_written(db: AsyncSession, svc: Any)
     )
     await svc.edit_comment(db, actor_of(w.usr), view.id, f"правка @{w.ba2.login}")
     await svc.delete_comment(db, actor_of(w.ba), view.id)
-    assert len(await events(db, w.ws.id)) == before
+    # D-55 заменено 007/FR-42: создание и удаление пишут события, правка - нет
+    written = (await events(db, w.ws.id))[before:]
+    assert [(e.action, e.entity_type, e.entity_id) for e in written] == [
+        ("comment.created", "comment", view.id),
+        ("comment.deleted", "comment", view.id),
+    ]
+    assert [e.actor_id for e in written] == [w.usr.id, w.ba.id]
+    assert all(e.api_key_id is None and e.project_id == w.project_id for e in written)
     # упоминание остаётся обычным текстом (SC-6)
     assert await _body(db, view.id) == f"правка @{w.ba2.login}"
     tables = await db.execute(text("SELECT to_regclass('public.mention')"))

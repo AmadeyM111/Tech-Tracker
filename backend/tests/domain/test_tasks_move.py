@@ -329,8 +329,14 @@ async def test_p10_2_move_locks_project_share(db: AsyncSession, svc: Any) -> Non
 async def test_d55_move_writes_no_events(db: AsyncSession, svc: Any) -> None:
     w = await make_world(db)
     t = await mk_task(db, w)
+    """D-55 заменено 007/FR-42: перенос в другую колонку пишет ``task.updated`` по статусу."""
     await _mv(svc, db, w.ba, t, "done")
-    assert await events(db, w.ws.id) == []
+    written = await events(db, w.ws.id)
+    assert [(e.action, e.entity_id) for e in written] == [("task.updated", t)]
+    (e,) = written
+    assert e.changed_fields == ["status"]
+    assert e.changes == [{"field": "status", "old": "todo", "new": "done"}]
+    assert (e.actor_id, e.api_key_id, e.project_id) == (w.ba.id, None, w.project_id)
 
 
 async def test_t73_review_exhausted_lock_attempts_is_503(

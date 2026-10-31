@@ -750,11 +750,26 @@ async def test_ac108_one_invalid_field_rejects_whole_patch(db: AsyncSession, svc
 async def test_d55_update_and_delete_write_no_events(db: AsyncSession, svc: Any) -> None:
     w = await make_world(db)
     tid = await mk_task(db, w)
+    """D-55 заменено 007/FR-42: правка пишет одно ``task.updated``; удаление событий не пишет."""
+    old_assignee = (await task_row(db, tid)).assignee_id
     await svc.update_task(
         db, actor_of(w.ba), tid, _patch(svc, title="Х", status="done", assignee_id=w.usr.id)
     )
+    written = await events(db, w.ws.id)
+    assert [(e.action, e.entity_id) for e in written] == [("task.updated", tid)]
+    (e,) = written
+    assert e.changed_fields == ["status", "assignee_id", "title"]
+    assert e.changes == [
+        {"field": "status", "old": "todo", "new": "done"},
+        {
+            "field": "assignee_id",
+            "old": None if old_assignee is None else str(old_assignee),
+            "new": str(w.usr.id),
+        },
+    ]
+    assert (e.actor_id, e.api_key_id, e.project_id) == (w.ba.id, None, w.project_id)
     await svc.delete_task(db, actor_of(w.ba), tid)
-    assert await events(db, w.ws.id) == []
+    assert [x.id for x in await events(db, w.ws.id)] == [e.id]  # удаление событий не пишет
 
 
 async def test_t69_review_update_keeps_workspace_project_and_author(

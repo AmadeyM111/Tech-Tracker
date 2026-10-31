@@ -660,10 +660,10 @@ async def test_ac65_changed_field_outside_whitelist_is_rejected(
         ws.id,
         action=_action("task.updated"),
         project_id=uuid.uuid4(),
-        changed_fields=["status", "priority"],
+        changed_fields=["status", "position"],
     )
     assert "task.updated" in str(exc)
-    assert "priority" in str(exc)
+    assert "position" in str(exc)
 
 
 async def test_ac65_changed_fields_for_event_without_fields_are_rejected(
@@ -737,7 +737,7 @@ async def test_br2_exception_text_has_no_values_for_invalid_changed_field(
         ws.id,
         action=_action("task.updated"),
         project_id=uuid.uuid4(),
-        changed_fields=["priority"],
+        changed_fields=["position"],
         changes=[{"field": "status", "old": SECRET, "new": "done"}],
     )
     assert SECRET not in str(exc)
@@ -1049,3 +1049,36 @@ async def test_007_fr11_unknown_details_key_still_rejected(
         action=_action("user.api_key_issued"),
         details={"api_key_id": str(uuid.uuid4()), "secret": "x"},
     )
+
+
+async def test_007_ac51_priority_is_allowed_changed_field_with_values(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    """AC-51, PD-22: ``priority`` - допустимое поле ``task.updated``, значения до/после пишутся."""
+    ws = await make_workspace(db)
+    changes = [{"field": "priority", "old": "medium", "new": "high"}]
+    event_id = await _record(
+        db,
+        ws.id,
+        action=_action("task.updated"),
+        project_id=uuid.uuid4(),
+        changed_fields=["priority"],
+        changes=changes,
+    )
+    row = await _row(db, event_id)
+    assert row["changed_fields"] == ["priority"]
+    assert row["changes"] == changes
+
+
+async def test_007_record_event_without_api_key_has_no_column_in_insert(
+    db: AsyncSession, fixed_clock: FixedClock
+) -> None:
+    """Заметка ревью R7-T04: при ``api_key_id=None`` столбца в INSERT нет (схема 0005)."""
+    from tests.projects_support import capture_sql
+
+    ws = await make_workspace(db)
+    with capture_sql(db) as seen:
+        await _record(db, ws.id, action=_action("user.created"))
+    inserts = [s for s in seen if "insert into domain_event" in s.lower()]
+    assert len(inserts) == 1
+    assert "api_key_id" not in inserts[0]

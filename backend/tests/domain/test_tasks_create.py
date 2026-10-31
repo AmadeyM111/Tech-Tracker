@@ -773,10 +773,21 @@ async def test_p10_2_create_subtask_lock_order(db: AsyncSession, svc: Any) -> No
 
 async def test_d55_create_writes_no_events(db: AsyncSession, svc: Any) -> None:
     w = await make_world(db)
+    """D-55 заменено 007/FR-42: создание задачи и подзадачи пишет по одному ``task.created``."""
     before = len(await events(db, w.ws.id))
+    assert before == 0
     t = await svc.create_task(db, actor_of(w.ba), w.project_id, _data(svc, assignee=w.usr.id))
-    await svc.create_subtask(db, actor_of(w.ba), t, _data(svc, assignee=w.usr.id))
-    assert len(await events(db, w.ws.id)) == before == 0
+    s = await svc.create_subtask(db, actor_of(w.ba), t, _data(svc, assignee=w.usr.id))
+    written = (await events(db, w.ws.id))[before:]
+    assert [(e.action, e.entity_type, e.entity_id) for e in written] == [
+        ("task.created", "task", t),
+        ("task.created", "task", s),
+    ]
+    for e in written:
+        assert e.actor_id == w.ba.id
+        assert e.api_key_id is None
+        assert e.project_id == w.project_id
+        assert e.in_audit is False
 
 
 async def test_t69_review_service_keeps_workspace_and_project_of_parent(

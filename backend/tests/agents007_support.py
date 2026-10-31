@@ -300,3 +300,19 @@ def mutated_secret(secret: str) -> HiddenSecret:
     i = len(secret) // 2
     repl = "A" if secret[i] != "A" else "B"
     return HiddenSecret(secret[:i] + repl + secret[i + 1 :])
+
+
+# --- R7-T14: чтение хранилища событий (FR-42) ---------------------------------------------------
+
+
+async def domain_events(env: ApiEnv, workspace_id: uuid.UUID) -> list[Any]:
+    """Все строки ``domain_event`` пространства по порядку ``id`` (столбцы — атрибуты строки)."""
+    from sqlalchemy import text
+
+    rows = await env.execute(
+        text("SELECT * FROM domain_event WHERE workspace_id = :w ORDER BY id").bindparams(
+            w=workspace_id
+        )
+    )
+    assert rows is not None
+    return list(rows)

@@ -60,7 +60,8 @@ async def test_002_ac13_ba_member_deletes_foreign_comment_c1(api_env: ApiEnv) ->
     assert (await _comment(env, w, "c2")).deleted_at is None
     assert (await _comment(env, w, "c3")).deleted_at is None
     after = await snapshot(env, w)
-    assert after["events"] == before["events"]  # комментарии журнал не пишут (D-55)
+    # D-55 заменено 007/FR-42: прямое удаление c1 пишет один comment.deleted
+    assert after["events"] == before["events"] + 1
     assert after["tasks"] == before["tasks"]
 
     r = await send(env, w.tok("u1"), "GET", _list_url(w, "T1"))

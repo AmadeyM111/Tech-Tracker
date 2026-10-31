@@ -4,7 +4,9 @@
 задача или комментарий (404) -> ``FOR SHARE`` проекта (§10.2 п.2) -> участие и права (403) ->
 входные данные и очистка (422) -> запись. Права пересчитываются после блокировки проекта.
 Правит комментарий только автор, оставаясь участником (``can_edit_comment``); удаляет —
-``can_delete_comment``. События и упоминания не пишутся (D-55, SC-6).
+``can_delete_comment``. Упоминания не пишутся (SC-6); события по 007/FR-42 (plan 007 §4.8,
+PD-24): ``comment.created`` при создании, ``comment.deleted`` только при прямом удалении; правка
+комментария событий не пишет.
 """
 
 from __future__ import annotations
@@ -29,6 +31,8 @@ from app.domain.access.policy import (
 from app.domain.access.roles import Actor
 from app.domain.comments.models import Comment
 from app.domain.comments.sanitize import strip_html
+from app.domain.events.catalog import EventAction
+from app.domain.events.writer import record_event
 from app.domain.projects.models import Project
 from app.domain.projects.queries import load_project_facts
 from app.domain.tasks.context import load_task_context
@@ -194,6 +198,21 @@ async def _lock_task_rows(db: AsyncSession, task_id: UUID, parent_id: UUID | Non
             raise NotFound("Задача не найдена")
 
 
+async def _record_comment_event(
+    db: AsyncSession, actor: Actor, action: EventAction, comment: Comment, project_id: UUID
+) -> None:
+    """Событие комментария (FR-42): автор — актор, проект — проект задачи, ключ — если есть."""
+    await record_event(
+        db,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.user_id,
+        action=action,
+        entity_id=comment.id,
+        project_id=project_id,
+        api_key_id=actor.api_key_id,
+    )
+
+
 async def create_comment(db: AsyncSession, actor: Actor, task_id: UUID, body: str) -> CommentView:
     """Новый комментарий участника проекта (AC-58, FR-23)."""
     ctx = await load_task_context(db, actor, task_id, lock_project="share")
@@ -208,6 +227,9 @@ async def create_comment(db: AsyncSession, actor: Actor, task_id: UUID, body: st
     )
     db.add(comment)
     await db.flush()
+    await _record_comment_event(
+        db, actor, EventAction.COMMENT_CREATED, comment, ctx.project.project_id
+    )
     return await _view(db, actor, ctx.project, comment)
 
 
@@ -234,6 +256,7 @@ async def delete_comment(db: AsyncSession, actor: Actor, comment_id: UUID) -> No
     comment.deleted_at = utcnow()
     comment.deleted_batch_id = uuid4()
     await db.flush()
+    await _record_comment_event(db, actor, EventAction.COMMENT_DELETED, comment, project.project_id)
 
 
 async def list_comments(

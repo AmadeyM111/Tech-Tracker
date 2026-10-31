@@ -4,7 +4,10 @@ D-46, D-52, D-55, D-56).
 Не вызывает ``commit()``: транзакцию запроса фиксирует ``get_db``. Порядок проверок: проект
 или задача (404) -> ``FOR SHARE`` проекта (§10.2 п.2) -> права (403) -> входные данные (422) ->
 глубина (422, подзадача) -> получатель (422, ``FOR SHARE``, п.3) -> колонка (п.4) -> запись.
-Событий ленты нет (D-55). Название и описание хранятся как введены (D-52).
+События по 007/FR-42 (plan 007 §4.8, PD-9, PD-22, PD-23): ``task.created`` при создании задачи и
+подзадачи, одно ``task.updated`` на запрос при изменении полей или переносе в другую колонку; в
+транзакции запроса после записи изменения. Удаление (и каскад) событий не пишет. Название и
+описание хранятся как введены (D-52).
 """
 
 from __future__ import annotations
@@ -34,6 +37,8 @@ from app.domain.access.policy import (
 from app.domain.access.recipients import RecipientPurpose, check_recipient
 from app.domain.access.roles import Actor, Role
 from app.domain.comments.models import Comment
+from app.domain.events.catalog import EventAction
+from app.domain.events.writer import FieldChange, JsonValue, record_event
 from app.domain.projects.models import ProjectMember
 from app.domain.projects.queries import load_project_facts
 from app.domain.tasks import positions
@@ -47,6 +52,10 @@ if TYPE_CHECKING:
 
 TITLE_MAX: Final = 255
 DESCRIPTION_MAX: Final = 10_000
+# Порядок ``changed_fields`` в ``task.updated`` (PD-22); значения до/после — только у
+# ``EVENT_VALUE_FIELDS``: у названия и описания хранится лишь имя поля (BR-2).
+EVENT_FIELDS: Final = ("status", "assignee_id", "due_date", "priority", "title", "description")
+EVENT_VALUE_FIELDS: Final = frozenset({"status", "assignee_id", "due_date", "priority"})
 
 
 class Unset(Enum):
@@ -146,6 +155,63 @@ async def _check_assignee(
     )
 
 
+def _json_value(value: object) -> JsonValue:
+    """Значение поля для ``changes``: UUID — строка, дата — ISO, перечисление — его значение."""
+    if value is None:
+        return None
+    if isinstance(value, Enum):
+        return _json_value(value.value)
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, str | int | float | bool):
+        return value
+    raise TypeError(f"значение типа {type(value).__name__} нельзя записать в событие")
+
+
+async def _record_task_created(db: AsyncSession, actor: Actor, task: Task) -> None:
+    await record_event(
+        db,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.user_id,
+        action=EventAction.TASK_CREATED,
+        entity_id=task.id,
+        project_id=task.project_id,
+        api_key_id=actor.api_key_id,
+    )
+
+
+async def _record_task_updated(
+    db: AsyncSession,
+    actor: Actor,
+    task: Task,
+    old: Mapping[str, object],
+    new: Mapping[str, object],
+) -> None:
+    """Одно ``task.updated`` (FR-42): ``changed_fields`` — поля ``new`` в порядке
+    ``EVENT_FIELDS``; ``changes`` — значения до/после у ``EVENT_VALUE_FIELDS``. Пусто — нет."""
+    changed_fields = [f for f in EVENT_FIELDS if f in new]
+    if not changed_fields:
+        return
+    changes: list[FieldChange] = [
+        {"field": f, "old": _json_value(old[f]), "new": _json_value(new[f])}
+        for f in changed_fields
+        if f in EVENT_VALUE_FIELDS
+    ]
+    await record_event(
+        db,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.user_id,
+        action=EventAction.TASK_UPDATED,
+        entity_id=task.id,
+        changed_fields=changed_fields,
+        project_id=task.project_id,
+        changes=changes or None,
+        api_key_id=actor.api_key_id,
+    )
+
+
 async def create_task(
     db: AsyncSession, actor: Actor, project_id: UUID, data: TaskCreateData
 ) -> UUID:
@@ -175,6 +241,7 @@ async def create_task(
     )
     db.add(task)
     await db.flush()
+    await _record_task_created(db, actor, task)
     return task.id
 
 
@@ -224,6 +291,7 @@ async def create_subtask(
     )
     db.add(task)
     await db.flush()
+    await _record_task_created(db, actor, task)
     return task.id
 
 
@@ -367,6 +435,8 @@ async def update_task(db: AsyncSession, actor: Actor, task_id: UUID, patch: Task
     _authorize(actor, ctx.project, task, changed)
     if recipient_error is not None and "assignee_id" in changed:
         raise recipient_error
+    # «Было» — со свежей строки под блокировкой, до переноса и записи полей (FR-42).
+    old = {name: getattr(task, name) for name in changed}
     if "status" in changed:
         assert status is not None
         if task.parent_id is None:
@@ -380,6 +450,7 @@ async def update_task(db: AsyncSession, actor: Actor, task_id: UUID, patch: Task
             value = changed[name]
             setattr(task, name, TaskPriority(value).value if name == "priority" else value)
     await db.flush()
+    await _record_task_updated(db, actor, task, old, changed)
 
 
 async def delete_task(db: AsyncSession, actor: Actor, task_id: UUID) -> None:
@@ -444,7 +515,13 @@ async def move(
         raise _invalid(positions.SUBTASK_NOT_ON_BOARD)
     target = _status(status)
     task = await _load_task(db, task_id)
+    # PD-23: «было» — статус свежей строки под блокировками колонок и строки; повторный вызов
+    # внутри ``move_task`` под уже взятыми блокировками не ждёт.
+    await positions.lock_task_columns(db, task, target)
+    old = TaskStatus(task.status)
     await positions.move_task(
         db, task, status=target, before_task_id=before_task_id, after_task_id=after_task_id
     )
     await db.flush()
+    if old != target:  # внутри колонки события нет (FR-42)
+        await _record_task_updated(db, actor, task, {"status": old}, {"status": target})

@@ -105,8 +105,8 @@ EVENT_CATALOG: Final[Mapping[EventAction, EventSpec]] = {
     EventAction.TASK_RESTORED: _feed(EntityType.TASK),
     EventAction.TASK_UPDATED: _feed(
         EntityType.TASK,
-        fields=frozenset({"status", "assignee_id", "due_date", "title", "description"}),
-        value_fields=frozenset({"status", "assignee_id", "due_date"}),
+        fields=frozenset({"status", "assignee_id", "due_date", "priority", "title", "description"}),
+        value_fields=frozenset({"status", "assignee_id", "due_date", "priority"}),
     ),
     EventAction.TASK_UNASSIGNED_MEMBER_REMOVED: _feed(
         EntityType.TASK,
