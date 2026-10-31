@@ -211,6 +211,27 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
 и `IVANOV.PETR` открывают ту же запись. Логин, отличающийся только регистром от существующего,
 занят: создание такой записи отклоняется с ответом 422 и кодом `login_taken`.
 
+### ИИ-агенты
+
+ИИ-агент (например, Claude Code) может вести в трекере свою работу: создавать задачи и
+подзадачи, менять статус и закрывать задачи, оставлять результат комментарием. Агент работает
+под учётной записью агента (её создаёт технический администратор на странице «Учётные записи»,
+флажок «Учётная запись ИИ-агента»; пароля и входа в браузер у неё нет) и аутентифицируется
+ключом доступа в заголовке `Authorization: Bearer`. Ключи выпускает и отзывает только
+технический администратор (кнопка «Ключи» в строке агента): ключ показывается один раз, срок
+до 365 суток (по умолчанию 90), не больше 5 действующих ключей, не больше 120 запросов в минуту
+на ключ; блокировка агента отзывает все его ключи. По ключу доступны только чтение и изменение
+задач, чтение и добавление комментариев в проектах, где агент - участник, в пределах его роли
+(правка и удаление комментариев по ключу запрещены); задачи и
+комментарии агента помечены в интерфейсе меткой «ИИ».
+
+Claude Code подключается через локальный процесс `backend/app/agent_mcp.py` (протокол MCP по
+stdio, только стандартная библиотека Python, 11 инструментов), который обращается к API
+трекера по HTTPS. Пошаговая инструкция - `docs/agents.md`, решение и риски -
+`docs/adr/0015-agent-access.md`. Ключ - секрет наравне с паролем: не вставляйте его в текст
+запроса к модели, не коммитьте и не пересылайте. Прокси с Basic-аутентификацией перед стеком
+не поддерживается: любой заголовок `Authorization` считается ключом агента.
+
 ### Обновление с предыдущей версии MVP
 
 Обновляйтесь только командой `docker compose up -d --build --wait` (стек под другим именем
@@ -240,6 +261,12 @@ Compose). Веб-часть (frontend внутри образа `web`) при э
 `docs/adr/0013-three-roles.md`, раздел «Порядок обновления» (команды - в его блоке «Команды
 чек-листа»). Откат роль `mixed` не возвращает.
 
+Миграция `0008` (ИИ-агенты: признак учётной записи агента, таблица ключей доступа, ключ в
+событиях) только добавляет столбцы и таблицу и выполняется автоматически при старте, до
+запуска `api`; перед обновлением сделайте копию БД. Откат ниже `0008`
+(`alembic downgrade 0007`) удаляет все ключи агентов и признак «агент». Порядок и команды - в
+`docs/adr/0015-agent-access.md`, раздел «Порядок обновления».
+
 Миграция `0005` (столбец с написанием логина) применяется при старте, до запуска `api`, без
 действий оператора. Прежние логины не меняются: у существующих записей написание равно
 логину как прежде (строчными), вход и пароли те же. Откат ниже `0005`
@@ -264,8 +291,14 @@ Compose). Веб-часть (frontend внутри образа `web`) при э
 - **Доверие к прокси.** Образ запускает uvicorn с `--proxy-headers --forwarded-allow-ips='*'`.
   Это допустимо, пока порт `api` (8000) не публикуется. Если публикуете порт, сузьте
   `--forwarded-allow-ips` до адреса прокси.
-- **Журнал доступа nginx.** access-log контейнера `web` пишет полный запрос, включая строку
-  query. Не передавайте секреты в URL. Журнал самого `api` пишет путь без query.
+- **Журнал доступа nginx.** access-log контейнера `web` для HTTPS пишет метод, путь без строки
+  запроса (query) и статус. Переадресация с порта 80 и `error_log` nginx (например, при ответах
+  502 и 504) пишут запрос целиком, включая строку query, а путь не маскируется. Не передавайте
+  секреты в URL. Журнал самого `api` пишет путь без query и маскирует ключи агентов.
+- **Рост журнала событий.** Каждое создание и изменение задачи, создание и прямое удаление
+  комментария (людьми и ИИ-агентами) добавляет строку в таблицу событий `domain_event`. Таблица
+  только дописывается, `gostracker maintenance` её не очищает: следите за размером БД
+  (`docs/adr/0015-agent-access.md`, «Последствия»).
 - **Таймауты.** У `db` заданы `lock_timeout=30s` и `idle_in_transaction_session_timeout=60s`:
   при ожидании блокировки дольше 30 с или при взаимоблокировке запрос получает ответ 503 с кодом
   `service_busy` и заголовком `Retry-After: 5` (повторите через 5 с; интерфейс показывает
@@ -601,6 +634,26 @@ everywhere: in the UI, API responses and the audit log. Sign-in is case-insensit
 and `IVANOV.PETR` open the same account. A login that differs only in case from an existing one
 is taken: creating it is rejected with a 422 response and the `login_taken` code.
 
+### AI agents
+
+An AI agent (for example Claude Code) can run its own work in the tracker: create tasks and
+subtasks, change their status and close them, and leave the result as a comment. The agent works
+under an agent account (a technical administrator creates it on the "Учётные записи" (Accounts)
+page with the "Учётная запись ИИ-агента" checkbox; it has no password and cannot sign in to the
+browser) and authenticates with an access key in the `Authorization: Bearer` header. Only a
+technical administrator issues and revokes keys (the "Ключи" button in the agent row): a key is
+shown once, it is valid for up to 365 days (90 by default), an agent has at most 5 active keys,
+and a key allows at most 120 requests per minute; blocking the agent revokes all its keys. With
+a key the agent can only read and change tasks, and read and add comments, in projects where it
+is a member, within its role (editing and deleting comments with a key is forbidden); the UI marks the agent's tasks and comments with the "ИИ" (AI) label.
+
+Claude Code connects through a local process `backend/app/agent_mcp.py` (the MCP protocol over
+stdio, Python standard library only, 11 tools) that calls the tracker API over HTTPS. The
+step-by-step guide (in Russian) is `docs/agents.md`; the decision and its risks are in
+`docs/adr/0015-agent-access.md`. A key is a secret just like a password: do not paste it into a
+prompt to the model, do not commit it and do not forward it. A proxy with Basic authentication
+in front of the stack is not supported: any `Authorization` header is treated as an agent key.
+
 ### Upgrading from the previous MVP version
 
 Upgrade only with `docker compose up -d --build --wait` (a stack under another Compose name:
@@ -631,6 +684,12 @@ commands are in `docs/adr/0013-three-roles.md`, section "Порядок обно
 the commands are in its "Команды чек-листа" block). A downgrade does not bring the `mixed` role
 back.
 
+Migration `0008` (AI agents: the agent account flag, the access key table, the key in events)
+only adds columns and a table and runs automatically at start, before `api` runs; back up the
+database before upgrading. A downgrade below `0008`
+(`alembic downgrade 0007`) deletes all agent keys and the agent flag. The order and the
+commands are in `docs/adr/0015-agent-access.md`, section "Порядок обновления" (Upgrade order).
+
 Migration `0005` (the column with the login spelling) is applied at start, before `api` runs,
 with no operator action. Existing logins stay unchanged: for existing accounts the
 spelling equals the login as before (lower case), and sign-in and passwords are the same. A
@@ -658,9 +717,15 @@ before a downgrade.
 - **Proxy trust.** The image starts uvicorn with `--proxy-headers --forwarded-allow-ips='*'`.
   This is acceptable while the `api` port (8000) is not published. If you publish the port,
   narrow `--forwarded-allow-ips` to the proxy address.
-- **nginx access log.** The access log of the `web` container records the full request,
-  including the query string. Do not pass secrets in URLs. The `api` own log keeps the path
-  without the query.
+- **nginx access log.** For HTTPS the access log of the `web` container records the method, the
+  path without the query string and the status. The port 80 redirect and the nginx `error_log`
+  (for example on 502 and 504 responses) record the full request, including the query string,
+  and the path is not masked. Do not pass secrets in URLs. The `api` own log keeps the path
+  without the query and masks agent keys.
+- **Event log growth.** Every task creation and change, and every comment creation and direct
+  deletion (by people and AI agents), adds a row to the `domain_event` event table. The table is
+  append-only and `gostracker maintenance` does not clean it: keep an eye on the database size
+  (`docs/adr/0015-agent-access.md`, "Последствия" (Consequences)).
 - **Timeouts.** `db` runs with `lock_timeout=30s` and `idle_in_transaction_session_timeout=60s`:
   a request that waits for a lock longer than 30 s, or hits a deadlock, gets a 503 response
   with the code `service_busy` and the `Retry-After: 5` header (retry in 5 s; the UI shows

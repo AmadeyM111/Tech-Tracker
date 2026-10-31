@@ -1,6 +1,7 @@
 # Модель данных GOSTracker, этапы R1.0 и MVP
 
-Документ описывает схему БД, которую создают миграции `0001`–`0006` (PostgreSQL 16). Источник
+Документ описывает схему БД, которую создают миграции `0001`–`0006` (R1.0, MVP, три роли),
+`0007` (три приоритета, ADR-0014) и `0008` (ИИ-агенты, ADR-0015); PostgreSQL 16. Источник
 истины — модели `backend/app/domain/*/models.py` и миграции `backend/migrations/versions/`;
 проектное обоснование — `specs/001-pilot-r1/plan.md`, §4.3 (решения D-2…D-8, D-26) и §11.6
 (MVP: проекты, задачи, комментарии; D-56…D-58). Таблицы отложенных этапов (метки, упоминания,
@@ -294,7 +295,7 @@
 | `deal_id` | uuid | да | сделка для истории сделки (R1.3); внешнего ключа нет |
 | `in_audit` | boolean | нет | событие попадает в журнал аудита |
 | `changes` | jsonb | да | список `{field, old, new}` (с R1.1); в API аудита не отдаётся |
-| `details` | jsonb | да | только для `entity_type = user`: `role_from`, `role_to`; паролей и секретов нет |
+| `details` | jsonb | да | только для `entity_type = user`: `role_from`, `role_to`; с 007 — `api_key_id`, `api_key_name` у выпуска и отзыва ключа; паролей и секретов (в том числе секрета ключа) нет |
 | `api_key_id` | uuid | да | ключ API, по которому выполнено действие (007/FR-30; миграция 0008); FK `fk_domain_event_api_key_id_api_key` → `api_key.id`, `RESTRICT`, deferrable; `NULL` — действие человека или системы; без `DEFAULT` |
 
 #### Индексы
@@ -333,8 +334,10 @@ TRUNCATE` — в бэклоге (plan D-8).
 
 ## Каталог событий R1.0
 
-Каталог — `backend/app/domain/events/catalog.py`. В R1.0 пишутся только действия `user.*`;
-все они попадают в журнал аудита (`in_audit = true`), в ленту проекта и историю сделки — нет.
+Каталог — `backend/app/domain/events/catalog.py`. В R1.0 и MVP пишутся действия `user.*` и
+`project.ownership_transferred` (передача владения проектом); все они попадают в журнал аудита
+(`in_audit = true`), в ленту проекта и историю сделки — нет. С 007 к `user.*` добавлены
+`user.agent_created`, `user.api_key_issued` и `user.api_key_revoked` (тоже в журнале аудита).
 С 007 (FR-42) пишутся также `task.created`, `task.updated`, `comment.created` и
 `comment.deleted` — для всех авторов, с `project_id` проекта задачи и `api_key_id` у запросов по
 ключу; в журнал аудита они не попадают (`in_audit = false`), ленты по-прежнему нет (001/FR-38).
@@ -350,6 +353,10 @@ TRUNCATE` — в бэклоге (plan D-8).
 | `user.role_assigned` | `details.role_from`, `details.role_to` |
 | `user.role_changed` | `details.role_from`, `details.role_to` |
 | `user.role_removed` | `details.role_from`, `details.role_to` |
+| `user.agent_created` | `details.role_to` — роль агента или `NULL` («без роли»); объект — учётная запись агента (007/FR-1) |
+| `user.api_key_issued` | `details.api_key_id`, `details.api_key_name` — идентификатор и название ключа, секрета нет; объект — учётная запись агента (007/FR-11) |
+| `user.api_key_revoked` | `details.api_key_id`, `details.api_key_name`; повторный отзыв и отзыв при блокировке записей не пишут (007/FR-8, FR-11) |
+| `project.ownership_transferred` | `changed_fields = ["owner_id"]`, `changes` — прежний и новый владелец; `project_id` — этот проект |
 | `task.created` | только метаданные (007/FR-42) |
 | `task.updated` | `changed_fields` из `status`, `assignee_id`, `due_date`, `priority`, `title`, `description`; `changes` (значения до и после) только у `status`, `assignee_id`, `due_date`, `priority`; у `title` и `description` — только имя поля (007/FR-42) |
 | `comment.created` | только метаданные, без текста комментария (007/FR-42) |
