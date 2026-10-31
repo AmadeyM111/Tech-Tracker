@@ -69,7 +69,7 @@ ML-кода, датасетов, обучения и GPU нет (NFR-5).
 | PD-8 | Протокол блокировок действий с ключами | Выпуск и отзыв — после `users.service.lock_for_account_change` (публичная обёртка над `_lock_for_account_change`, тот же advisory-lock пространства): подсчёт пяти действующих ключей и вставка не гонятся | Свой `SELECT … FOR UPDATE` строки агента | Единый протокол действий с учётными записями (deadlock-разбор T16/T16a в 001); монопатч `_lock_for_account_change` в `test_admin_roles.py` продолжает действовать, т.к. обёртка вызывает его по имени модуля |
 | PD-9 | События и идентификатор ключа (FR-30, FR-42, AC-35, AC-49) | `domain_event.api_key_id uuid NULL` (FK `api_key.id` RESTRICT, ключи не удаляются). `record_event(..., api_key_id: UUID | None = None)`. Сервисы передают `actor.api_key_id` (у людей `None`). Пишутся для всех авторов (FR-42): `task.created` (`create_task`, `create_subtask`), `task.updated` (`update_task` — при изменении хотя бы одного поля из `fields` каталога, `changes` — по `value_fields`; `move` — PD-23), `comment.created` (`create_comment`), `comment.deleted` (`delete_comment`, PD-24). Аудит: `user.agent_created`, `user.api_key_issued`, `user.api_key_revoked` (`entity_type=user`, `entity_id` = агент, `details.api_key_id`, `details.api_key_name`) | ContextVar с ключом запроса | Явная передача видна в типах; ContextVar в зависимости FastAPI под `httpx.ASGITransport` живёт в задаче теста и «протекает» между запросами |
 | PD-10 | Признак «агент» в API (FR-31, AC-36, NFR-1) | Обязательное `is_agent: bool` в ответах: `UserRef` (автор, исполнитель, автор комментария, участник, владелец, доска), `DirectoryUser`, `AdminUser`, `MeResponse`. Доменные `UserRef`/`DirectoryUser`/`UserAccount` получают поле без значения по умолчанию (mypy находит все места создания). `AuditActor` не меняется | Необязательное поле с умолчанием | Признак всегда известен; FastAPI всё равно делает поля ответа с умолчанием обязательными в выходной схеме. `AuditActor` не входит в перечень FR-31 (журнал — раздел ТА) |
-| PD-11 | Маскирование секрета (FR-32, AC-38) | (1) Секрет хешируется до любого обращения к БД — в SQL и тексты `DBAPIError` попадает только дайджест. (2) `redact_text` в `core/logging.py` дополнительно заменяет `gtk_[A-Za-z0-9_-]{8,}` на `***` в любом тексте (сообщения, трассировки, путь в access-логе). (3) `IssuedApiKey.secret` — `field(repr=False)`. (4) Ошибки аутентификации не содержат значения заголовка. (5) nginx: свой `log_format` без строки запроса (`$request_method $uri`), чтобы ключ в `?…` не попал в access-лог web | Только существующий фильтр по именам ключей | Фильтр маскирует `authorization=…`, но не голое значение (например, в пути); шаблон ключа узнаваем по префиксу |
+| PD-11 | Маскирование секрета (FR-32, AC-38) | (1) Секрет хешируется до любого обращения к БД — в SQL и тексты `DBAPIError` попадает только дайджест. (2) `redact_text` в `core/logging.py` дополнительно заменяет `API_KEY_LEAK_PATTERN` (точное значение — §4.2: префикс `gtk_` + непрерывная последовательность любых символов, кроме пробельных и разделителей контекста, длиной ≥ 8) на `***` в любом тексте (сообщения, трассировки, путь в access-логе); имена полей `extra` и ключи вложенных `Mapping` тоже проходят `redact_text` (обычные имена не меняются). Уточнено в R7-T16 (было `gtk_[A-Za-z0-9_-]{8,}`: ключ с `/`, `+`, `%`, `.`, не-ASCII внутри маскировался только до испорченного символа, хвост ≥ 8 оставался открытым; при порче на 12-й позиции не маскировалась и голова), обоснование набора — §4.2. (3) `IssuedApiKey.secret` — `field(repr=False)`. (4) Ошибки аутентификации не содержат значения заголовка. (5) nginx: свой `log_format gt_access` = `$remote_addr - - [$time_local] "$request_method $uri $server_protocol" $status $body_bytes_sent "$http_user_agent"` у сервера 443 — без строки запроса (`$request`, `$args`, `$query_string`, `$request_uri`), чтобы ключ в `?…` не попал в access-лог web, и без `$remote_user` (литерал `-`): nginx заполняет `$remote_user` из `Authorization: Basic` даже без `auth_basic`, и `curl -u gtk_…:` записал бы ключ целиком (найдено ревью R7-T16) | Только существующий фильтр по именам ключей | Фильтр маскирует `authorization=…`, но не голое значение (например, в пути); шаблон ключа узнаваем по префиксу |
 | PD-12 | Реализация MCP (FR-35, D-7, NFR-6) | Свой минимальный сервер в одном модуле `backend/app/agent_mcp.py`, **только стандартная библиотека** (проверяется AST-тестом). JSON-RPC 2.0, одно сообщение — одна строка UTF-8 в stdin/stdout; методы `initialize`, `ping`, `tools/list`, `tools/call`; уведомления (`notifications/*`) без ответа; массивы (batch) → `-32600`. Версии протокола: `2025-06-18`, `2025-03-26`, `2024-11-05` (ответ — запрошенная, если поддержана, иначе `2025-06-18`). HTTP — `urllib.request`. Запуск: `python3 -I <репозиторий>/backend/app/agent_mcp.py` (установка пакета не нужна) или консольная команда `gostracker-mcp` (`[project.scripts]`) | (а) официальный пакет `mcp` (MIT); (б) сервер на Node; (в) точка MCP в сервере трекера | (а) ~10 транзитивных пакетов (anyio, httpx-sse, starlette, sse-starlette, uvicorn, pydantic-settings, jsonschema, python-multipart…), правка allowlist и проверка лицензий; на машине агента пришлось бы ставить весь бэкенд. Нужные 4 метода — ~300 строк. (б) второй рантайм. (в) вне рамок (Q-9) |
 | PD-13 | Набор инструментов (FR-35, AC-42) | **Ровно 11**, по одному на действие: FR-18 `whoami`, FR-19 `list_projects`, FR-20 `list_my_tasks`, FR-21 `list_project_tasks`, FR-22 `get_task`, FR-23 `create_task`, FR-24 `create_subtask`, FR-25 `set_task_status`, FR-26 `update_task`, FR-27 `list_comments` и `add_comment`. FR-25 и FR-26 — разные инструменты над одним `PATCH /tasks/{id}` (`set_task_status` шлёт только `status`; у `update_task` параметра `status` нет). Таблица — §4.9 | (а) 10 (один `update_task` со статусом); (б) 10 (комментарии одним инструментом с режимом) | FR-27 называет две операции (чтение и добавление); AC-42 требует описания смены статуса с `done` как закрытием — отдельный инструмент делает это однозначным. Число 11 закрепляется тестом (З-3) |
 | PD-14 | Проверка аргументов инструментов (FR-37, AC-44) | Локально: аргументы — объект; неизвестные имена → ошибка `invalid_arguments`; параметры пути (`task_id`, `project_id`) — обязательны и формата UUID. Остальное (обязательность полей тела, перечисления, формат даты, длины) проверяет API и возвращает свои коды (`validation_error`, `due_date_in_past`…) | Полная проверка по JSON Schema на стороне инструмента | Иначе «создание без описания» дало бы локальный код вместо 422 `validation_error` (AC-44), и правила разошлись бы с сервером. Проверка UUID не даёт подставить в путь `../admin/...` |
@@ -122,7 +122,10 @@ ML-кода, датасетов, обучения и GPU нет (NFR-5).
 (R7-T19); `features/boards/BoardView.tsx`, `features/tasks/TaskList.tsx` (R7-T20);
 `features/admin/api.ts`, `features/admin/UsersPage.tsx` (R7-T21, R7-T22); `features/admin/AuditPage.tsx` (R7-T22).
 
-**Инфраструктура:** `deploy/web/default.conf.template` (`log_format`) — R7-T16.
+**Инфраструктура:** `deploy/web/default.conf.template` (`log_format gt_access` без строки запроса
+и без `$remote_user`, PD-11 п. 5) — R7-T16.
+`core/security/api_keys.py` (только `API_KEY_LEAK_PATTERN`) и `core/logging.py` (имена полей) —
+также R7-T16 (PD-11, §4.2).
 
 **Документы:** `docs/data-model.md` (R7-T02 — столбцы и таблица; R7-T14 — абзац «События» и
 каталог: что пишется по FR-42); `docs/adr/0015-agent-access.md`, `docs/agents.md`,
@@ -204,7 +207,7 @@ secret=None, created_at, expires_at, revoked_at=None, revoked_by=None, last_used
 API_KEY_PREFIX: Final = "gtk_"
 API_KEY_RANDOM_BYTES: Final = 32
 API_KEY_FORMAT: Final = re.compile(r"gtk_[A-Za-z0-9_-]{43}", re.ASCII)       # fullmatch
-API_KEY_LEAK_PATTERN: Final = re.compile(r"gtk_[A-Za-z0-9_-]{8,}", re.ASCII)  # для логов
+API_KEY_LEAK_PATTERN: Final = re.compile(r"""gtk_[^\s"'`<>&;,()\[\]{}|]{8,}""")  # для логов; без re.ASCII (R7-T16)
 
 def generate_api_key() -> str: ...          # gtk_ + urlsafe_b64(token_bytes(32)) без '='
 def is_api_key_format(value: str) -> bool: ...
@@ -212,7 +215,38 @@ def api_key_digest(value: str) -> bytes: ... # sha256(value.encode("ascii")).dig
 
 # backend/app/core/logging.py: redact_text(text) дополнительно
 #   if API_KEY_PREFIX in text: text = API_KEY_LEAK_PATTERN.sub(MASK, text)
+# [R7-T16] имена полей: _sanitize (Mapping) — out_key = redact_text(out_key), если ключ — str
+#   (при redact=True; при redact=False ключи args попадают только в итоговое сообщение,
+#   которое очищается целиком);
+#   SecretsFilter._sanitize_record — если redact_text(key) != key: значение переносится под
+#   очищенное имя (pop старого атрибута); JsonFormatter.format — name = redact_text(name).
+#   _is_secret_key проверяется по исходному имени. Обычные имена (без gtk_ + ≥ 8) не меняются;
+#   совпадение очищенных имён -> остаётся последнее значение (потеря поля, не утечка).
 ```
+
+**Шаблон утечки `API_KEY_LEAK_PATTERN` (уточнён в R7-T16, PD-11).** `API_KEY_FORMAT` не меняется
+(`gtk_` + 43 символа base64url, `fullmatch`); меняется только шаблон для логов. Ключ маскируется
+от `gtk_` до первого пробельного символа или разделителя контекста.
+- **Исключены (останавливают маску):** любой пробельный символ Юникода (`\s` без `re.ASCII`:
+  пробел, перевод строки, табуляция, `\xa0`); кавычки `"`, `'`, `` ` `` (JSON, `repr`, оболочка);
+  `<`, `>` (HTML/XML, `<…>` в сообщениях); `&`, `;` (граница параметров querystring и cookie);
+  `,` (перечни, JSON); скобки `( ) [ ] { }` (`repr`, кортежи, JSON); `|` (табличные логи).
+- **Не исключены (ключ с ними маскируется целиком):** `/`, `+`, `=` (стандартный base64 и
+  `padding`), `%` (процентное кодирование: `%2F`, `%5F`), `.`, `:`, `~`, `?`, `#`, `@`, `\`
+  (экранированный `\/` в JSON), не-ASCII буквы. Цена — лишняя маскировка хвоста пути после
+  ключа (`/api/v1/gtk_…/x` → `/api/v1/***`): допустимо, это журнал, не данные.
+- **Короткие вхождения:** хвост < 8 символов (`gtk_abc`, `gtk_`) не трогается, как раньше.
+- **ReDoS нет:** один класс символов с квантификатором `{8,}`, без вложенных квантификаторов и
+  альтернатив; неудачная попытка просматривает не больше 8 символов, удачная поглощает пробег —
+  разбор линейный (проба: 2 млн символов `gtk_gtk_…`, `gtk_aaaa…`, `gtk_1234567 …` — ≤ 0,01 с).
+- **Вне рамок (принятый остаточный риск):** (1) порча самого префикса (`GTK_`, `gtx_`) не
+  опознаётся; (2) маска обрывается на **любом** исключённом символе шаблона, а не только на
+  пробеле и переводе строки: пробельные Юникода (в т.ч. `\xa0`, ` `, `　`, `\x1c`–`\x1f`) и
+  `"`, `'`, `` ` ``, `<`, `>`, `&`, `;`, `,`, `(`, `)`, `[`, `]`, `{`, `}`, `|`. Если ключ испорчен
+  таким символом на позициях 4–38, открытой может остаться голова (до 11 символов вместе с
+  `gtk_`, если до разрыва < 8 символов тела) или хвост без префикса. Принято владельцем процесса
+  (`reviews/open-items.md`, п. 15); журнал web (`$uri`, сервер 80, `error_log` nginx) — там же,
+  в R7-T16 не решается.
 
 ### 4.3. Ошибки и события (R7-T04)
 
@@ -626,7 +660,7 @@ API-тест одной темы, API-файл получает суффикс `
 | AC-35 | `record_event(api_key_id)` в сервисах (PD-9) | `test_agent_events_007.py::test_007_ac35_*` | R7-T14 |
 | AC-36 | `UserRef`/`DirectoryUser.is_agent` | `backend/tests/api/test_agent_flag_007.py::test_007_ac36_*` (данные агента вставлены в БД) | R7-T05/R7-T06 |
 | AC-37 | `UserName`, `UsersPage`, `AgentKeys` | *ручной*: пункт `007/AC-37` в `docs/acceptance/mvp-demo.md`; автотесты компонентов — `frontend/tests/features/tasks/AgentMark.test.tsx`, `frontend/tests/features/boards/AgentMarkBoard.test.tsx`, `frontend/tests/features/admin/UsersPageAgents.test.tsx`, `frontend/tests/features/admin/AgentKeys.test.tsx` (`007_fr31_*`, `007_fr40_*`) | R7-T19…R7-T22, R7-T24 |
-| AC-38 | PD-11, PD-15 | API, журнал, события: `backend/tests/api/test_api_key_leaks_007.py::test_007_ac38_*`; инструменты: `backend/tests/api/test_agent_mcp_tools_007.py::test_007_ac38_*`, `backend/tests/cli/test_agent_mcp_stdio_007.py` (stderr) | R7-T16, R7-T17, R7-T18 |
+| AC-38 | PD-11, PD-15 | API, журнал, события: `backend/tests/api/test_api_key_leaks_007.py::test_007_ac38_*`; шаблон и имена полей логов — `backend/tests/unit/test_logging.py::test_ac38_*`; инструменты: `backend/tests/api/test_agent_mcp_tools_007.py::test_007_ac38_*`, `backend/tests/cli/test_agent_mcp_stdio_007.py` (stderr) | R7-T16, R7-T17, R7-T18 |
 | AC-39 | PD-1 | `test_api_key_leaks_007.py::test_007_ac39_*` (выгрузка всех таблиц) | R7-T16 |
 | AC-40 | PD-5 | `backend/tests/domain/test_api_key_auth_007.py` (счётчик, окно); `test_api_key_auth_api_007.py::test_007_ac40_*` (API) | R7-T11, R7-T12 |
 | AC-41 | `generate_api_key` | `backend/tests/unit/test_api_key_secret_007.py::test_007_ac41_*` | R7-T03 |
@@ -657,6 +691,7 @@ plan 001 D-55, — R7-T25), FR-42 (AC-49…AC-53, R7-T14).
 | `backend/tests/db/test_migrations.py` | голова `0008` | R7-T02 |
 | `backend/tests/db/test_identity_models.py`, `backend/tests/db/test_r11_models.py` (если перечисляют столбцы) | `app_user.is_agent`, `domain_event.api_key_id` | R7-T02 |
 | `backend/tests/unit/test_logging.py` | случай ключа `gtk_…` | R7-T03 |
+| `backend/tests/unit/test_logging.py` (новые `test_ac38_*`), `backend/tests/unit/test_api_key_secret_007.py::test_ac41_constants_match_plan` | дополнения под уточнённый `API_KEY_LEAK_PATTERN` и имена полей (PD-11, §4.2); прежние ожидания R7-T03 не ослабляются (все 9 `test_ac38_*` совместимы с новым шаблоном) | R7-T16 |
 | `backend/tests/unit/test_event_catalog.py` (`test_fr41_catalog_has_all_r11_actions_and_user_actions_only`) | +3 действия `user.*` | R7-T04 |
 | `backend/tests/api/test_errors.py` | каталог кодов +4, `TooManyRequests` | R7-T04 |
 | тесты с точным набором полей ответов (`UserRef`, `DirectoryUser`, `AdminUser`, `MeResponse`), например `test_users_directory.py`, `test_admin_users.py`, `test_auth_login.py`/`test_sessions.py` (`/me`), `test_projects.py`, `test_tasks.py`, `test_comments.py` | + `is_agent` | R7-T05, R7-T06 |

@@ -16,7 +16,7 @@ from typing import Final
 API_KEY_PREFIX: Final = "gtk_"
 API_KEY_RANDOM_BYTES: Final = 32
 API_KEY_FORMAT: Final = re.compile(r"gtk_[A-Za-z0-9_-]{43}", re.ASCII)  # fullmatch
-API_KEY_LEAK_PATTERN: Final = re.compile(r"gtk_[A-Za-z0-9_-]{8,}", re.ASCII)  # для логов
+API_KEY_LEAK_PATTERN: Final = re.compile(r"""gtk_[^\s"'`<>&;,()\[\]{}|]{8,}""")  # для логов
 
 _INVALID_FORMAT_MESSAGE: Final = "API key has invalid format"
 

@@ -66,6 +66,18 @@ def test_ac41_constants_match_plan() -> None:
     assert api_keys.API_KEY_FORMAT.fullmatch(key + "A") is None
     assert api_keys.API_KEY_LEAK_PATTERN.fullmatch("gtk_" + "A" * 8) is not None
     assert api_keys.API_KEY_LEAK_PATTERN.fullmatch("gtk_" + "A" * 7) is None
+    # R7-T16 (plan PD-11, §4.2): формат ключа не изменился
+    assert api_keys.API_KEY_FORMAT.pattern == r"gtk_[A-Za-z0-9_-]{43}"
+    assert api_keys.API_KEY_FORMAT.flags & re.ASCII
+    # шаблон утечки: внутри допускаются / + % . и не-ASCII (ключ маскируется целиком)
+    assert api_keys.API_KEY_LEAK_PATTERN.fullmatch("gtk_AAAA/AAA+%2F.я") is not None
+    # совпадение обрывается перед разделителем контекста
+    for sep in ['"', "'", "`", ")", "(", "&", ";", ",", "]", "[", "}", "{", "|", "<", ">"]:
+        found = api_keys.API_KEY_LEAK_PATTERN.search("gtk_" + "A" * 8 + sep + "BBBBBBBB")
+        assert found is not None and found.group(0) == "gtk_" + "A" * 8, f"разделитель {sep!r}"
+    for space in [" ", "\n", "\t", "\xa0"]:
+        found = api_keys.API_KEY_LEAK_PATTERN.search("gtk_" + "A" * 8 + space + "BBBBBBBB")
+        assert found is not None and found.group(0) == "gtk_" + "A" * 8, f"пробел {space!r}"
 
 
 def test_ac41_generated_key_is_format() -> None:

@@ -956,3 +956,119 @@ async def test_ac38_agent_key_in_access_log_path_is_masked(
     leaked = _leaks_key(text, key)
     assert not leaked, "ключ или его подстрока ≥ 8 в access-логе"
     assert "no-such-route" in text
+
+
+# ------------------------------------------- ключ агента: уточнённый шаблон (007, R7-T16)
+# plan PD-11, §4.2: ключ с ``/``, ``+``, ``%``, ``.``, не-ASCII внутри маскируется целиком;
+# имена полей ``extra`` и ключи вложенных словарей проходят ``redact_text``.
+
+_CORRUPTIONS = ["/", "+", "%2F", ".", "я"]
+# индекс 11 — 12-й символ ключа: перед ним только 7 символов тела (голова короче 8)
+_CORRUPT_POSITIONS = {"pos12": 11, "middle": 4 + 43 // 2}
+
+
+def _corrupted_key(char: str, where: str) -> tuple[str, str]:
+    key = _agent_key()
+    pos = _CORRUPT_POSITIONS[where]
+    return key, key[:pos] + char + key[pos + 1 :]
+
+
+@pytest.mark.parametrize("where", sorted(_CORRUPT_POSITIONS))
+@pytest.mark.parametrize("char", _CORRUPTIONS, ids=["slash", "plus", "pct2F", "dot", "cyr"])
+def test_ac38_corrupted_key_in_message_is_masked(logs: LogReader, char: str, where: str) -> None:
+    """R7-T16: испорченный ключ в тексте сообщения — нет подстрок ≥ 8 исходного и испорченного."""
+    key, bad = _corrupted_key(char, where)
+    logging.getLogger("tests.key").info("presented " + bad + " end-marker")
+    text = logs.text()
+    leaked = _leaks_key(text, key) or _leaks_key(text, bad)
+    assert not leaked, "испорченный ключ или его подстрока ≥ 8 в логе (сообщение)"
+    assert "presented" in text and "end-marker" in text
+
+
+@pytest.mark.parametrize("where", sorted(_CORRUPT_POSITIONS))
+@pytest.mark.parametrize("char", _CORRUPTIONS, ids=["slash", "plus", "pct2F", "dot", "cyr"])
+def test_ac38_corrupted_key_in_extra_path_is_masked(logs: LogReader, char: str, where: str) -> None:
+    """R7-T16: испорченный ключ в ``extra["path"]``."""
+    key, bad = _corrupted_key(char, where)
+    logging.getLogger("tests.key").info(
+        "event", extra={"path": "/api/v1/tasks/" + bad, "login": "alice-v"}
+    )
+    text = logs.text()
+    leaked = _leaks_key(text, key) or _leaks_key(text, bad)
+    assert not leaked, "испорченный ключ или его подстрока ≥ 8 в логе (extra.path)"
+    assert "alice-v" in text and "/api/v1/tasks/" in text
+
+
+@pytest.mark.parametrize("where", sorted(_CORRUPT_POSITIONS))
+@pytest.mark.parametrize("char", _CORRUPTIONS, ids=["slash", "plus", "pct2F", "dot", "cyr"])
+async def test_ac38_corrupted_key_in_access_log_path_is_masked(
+    logs: LogReader, app_client: tuple[FastAPI, httpx.AsyncClient], char: str, where: str
+) -> None:
+    """R7-T16: испорченный ключ в пути запроса — access-лог без подстрок ≥ 8 ключа."""
+    key, bad = _corrupted_key(char, where)
+    _, client = app_client
+    r = await client.get("/api/v1/no-such-route/" + bad)
+    assert r.status_code == 404
+    recs = _access_records(logs.records())
+    assert recs, "access-лог запроса не перехвачен"
+    text = logs.text()
+    leaked = _leaks_key(text, key) or _leaks_key(text, bad)
+    assert not leaked, "испорченный ключ или его подстрока ≥ 8 в access-логе"
+    assert "no-such-route" in text
+
+
+def test_ac38_key_as_extra_field_name_is_masked(logs: LogReader) -> None:
+    """R7-T16 (ревью R7-T03 п.1): ``extra={key: 1}`` — имя поля очищается; обычные имена
+    (``login``) не меняются."""
+    key = _agent_key()
+    logging.getLogger("tests.key").info("event-name", extra={key: 1, "login": "alice-v"})
+    recs = [r for r in logs.records() if _pick(r, _MESSAGE_KEYS) == "event-name"]
+    assert len(recs) == 1
+    leaked = _leaks_key(logs.text(), key)
+    assert not leaked, "ключ в имени поля extra попал в лог"
+    assert recs[0].get("login") == "alice-v"
+
+
+def test_ac38_key_as_nested_mapping_key_is_masked(logs: LogReader) -> None:
+    """R7-T16 (ревью R7-T03 п.1): ``extra={"ctx": {key: 1}}`` — ключ вложенного словаря
+    очищается; имя ``ctx`` и обычные вложенные имена не меняются."""
+    key = _agent_key()
+    logging.getLogger("tests.key").info("event-nested", extra={"ctx": {key: 1, "login": "bob-v"}})
+    recs = [r for r in logs.records() if _pick(r, _MESSAGE_KEYS) == "event-nested"]
+    assert len(recs) == 1
+    leaked = _leaks_key(logs.text(), key)
+    assert not leaked, "ключ во вложенном словаре extra попал в лог"
+    ctx = recs[0].get("ctx")
+    assert isinstance(ctx, dict), "поле ctx пропало или переименовано"
+    assert ctx.get("login") == "bob-v"
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "expected"),
+    [
+        ('"', '"', '"***"'),
+        ("'", "'", "'***'"),
+        ("(", "),", "(***),"),
+        ("k=", "&a=1", "k=***&a=1"),
+        ("[", "]", "[***]"),
+        ("", "\nnext", "***\nnext"),
+    ],
+    ids=["dquote", "squote", "paren-comma", "query", "brackets", "newline"],
+)
+def test_ac38_redact_text_stops_mask_at_context_delimiters(
+    before: str, after: str, expected: str
+) -> None:
+    """R7-T16, plan §4.2: маска от ``gtk_`` до разделителя контекста, разделитель сохраняется."""
+    from app.core.logging import redact_text
+
+    key = _agent_key()
+    result = redact_text(before + key + after)
+    exact = result == expected
+    assert exact, f"redact_text на границе {expected!r} дал другой результат"
+
+
+def test_ac38_redact_text_leaves_short_tail_with_slash_alone() -> None:
+    """R7-T16: ``gtk_abc/def`` (хвост 7 символов) не маскируется."""
+    from app.core.logging import redact_text
+
+    assert redact_text("gtk_abc/def") == "gtk_abc/def"

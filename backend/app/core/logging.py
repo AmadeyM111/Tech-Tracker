@@ -4,7 +4,8 @@
 - ``SecretsFilter``: маскирует значения ключей ``password|secret|token|cookie|authorization``
   в ``extra`` и аргументах (в том числе вложенных) на копиях, готовит очищенный текст
   трассировки без ``f_locals`` и значений аргументов, подавляет дубль трассировки
-  ``uvicorn.error``;
+  ``uvicorn.error``; имена полей ``extra`` и ключи вложенных словарей очищаются от ключа
+  агента (007, R7-T16);
 - ``JsonFormatter``: сборка JSON-записи; текст сообщения и исключений очищается от
   ``key=value`` / ``key: value`` для запрещённых ключей;
 - ``AccessLogMiddleware``: чистый ASGI access-лог без заголовков и тел.
@@ -226,6 +227,18 @@ def _stringify(value: object) -> str:
         return f"<unprintable {type(value).__name__}>"
 
 
+def _clean_key(key: Any, *, json_mode: bool, redact: bool) -> Any:
+    """[R7-T16] Ключ ``Mapping`` без ключа агента в имени (plan §4.2).
+
+    Строка — через ``redact_text`` (при ``redact=True``; при ``redact=False`` ключи попадают
+    только в итоговое сообщение, которое очищается целиком). Нестроковый ключ в JSON — его
+    текст, очищенный всегда (как значения в ``_stringify``).
+    """
+    if isinstance(key, str):
+        return redact_text(key) if redact else key
+    return _stringify(key) if json_mode else key
+
+
 def _sanitize(value: Any, *, json_mode: bool = False, redact: bool = True, depth: int = 0) -> Any:
     """Копия значения без секретов; исходные объекты не меняются.
 
@@ -242,8 +255,9 @@ def _sanitize(value: Any, *, json_mode: bool = False, redact: bool = True, depth
     if isinstance(value, Mapping):
         out: dict[Any, Any] = {}
         for key, item in value.items():
-            out_key = str(key) if json_mode and not isinstance(key, str) else key
-            if _is_secret_key(key):
+            # совпадение очищенных имён -> остаётся последнее значение (потеря поля, не утечка)
+            out_key = _clean_key(key, json_mode=json_mode, redact=redact)
+            if _is_secret_key(key):  # по исходному имени
                 out[out_key] = MASK
             else:
                 out[out_key] = _sanitize(item, json_mode=json_mode, redact=redact, depth=depth + 1)
@@ -378,7 +392,13 @@ class SecretsFilter(logging.Filter):
         record.msg = redact_text(_message_of(record))
         record.args = None
         for key in [k for k in record.__dict__ if k not in _STANDARD_ATTRS]:
-            record.__dict__[key] = MASK if _is_secret_key(key) else _sanitize(record.__dict__[key])
+            value = MASK if _is_secret_key(key) else _sanitize(record.__dict__[key])
+            # [R7-T16] имя поля extra очищается: значение переносится под очищенное имя
+            # (в очищенном имени есть ``***`` — оно не совпадает со стандартными атрибутами)
+            clean_key = redact_text(key) if isinstance(key, str) else key
+            if clean_key != key:
+                del record.__dict__[key]
+            record.__dict__[clean_key] = value
         info = _exc_info_of(record)
         if info is not None:
             record.exc_text = format_exception_text(info)
@@ -417,6 +437,8 @@ class JsonFormatter(logging.Formatter):
             if key in _STANDARD_ATTRS or key in _DROPPED_EXTRAS:
                 continue
             name = f"extra_{key}" if key in _RESERVED_FIELDS else key
+            if isinstance(name, str):  # [R7-T16] имя поля без ключа агента
+                name = redact_text(name)
             if _is_secret_key(key):
                 entry[name] = MASK
             else:

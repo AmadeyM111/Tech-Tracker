@@ -3,6 +3,10 @@
 
 server_tokens off;
 
+# Access-лог без строки запроса (007, PD-11 (5)): ключ агента в "?..." не попадает в журнал web.
+log_format gt_access '$remote_addr - - [$time_local] "$request_method $uri $server_protocol" '
+                     '$status $body_bytes_sent "$http_user_agent"';
+
 # Порт 80: только переадресация на HTTPS, без проксирования и без данных приложения.
 server {
     listen 80 default_server;
@@ -14,6 +18,8 @@ server {
 server {
     listen 443 ssl default_server;
     server_name _;
+
+    access_log /var/log/nginx/access.log gt_access;
 
     # Сертификат выбирает /docker-entrypoint.d/10-gostracker-tls.sh (символьные ссылки).
     ssl_certificate     /run/gostracker-tls/tls.crt;

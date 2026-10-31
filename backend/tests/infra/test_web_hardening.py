@@ -80,6 +80,99 @@ def test_t27_dockerfile_healthcheck_uses_healthz() -> None:
     assert not re.search(r"https://127\.0\.0\.1:443/\s", cmd + " "), "проверка всё ещё на /"
 
 
+# --- R7-T16: access-лог web без строки запроса (007/AC-38, FR-32; plan PD-11 (5)) -----------
+
+GT_ACCESS_FORMAT = (
+    '$remote_addr - - [$time_local] "$request_method $uri $server_protocol" '
+    '$status $body_bytes_sent "$http_user_agent"'
+)
+# переменные nginx, которые несут строку запроса (ключ в ``?…``) или заголовки с секретами;
+# ``$remote_user`` nginx берёт из ``Authorization: Basic`` (``curl -u gtk_…:``)
+FORBIDDEN_LOG_VARS = re.compile(
+    r"\$(?:request|args|query_string|request_uri|is_args|arg_\w+|request_body|"
+    r"http_authorization|http_cookie|http_referer|cookie_\w+|remote_user)(?!\w)"
+)
+
+
+def _server_blocks(conf: str) -> list[str]:
+    """Тела всех блоков ``server { … }`` верхнего уровня шаблона."""
+    blocks: list[str] = []
+    for m in re.finditer(r"(?m)^\s*server\s*\{", conf):
+        depth, i = 1, m.end()
+        while i < len(conf) and depth:
+            depth += {"{": 1, "}": -1}.get(conf[i], 0)
+            i += 1
+        blocks.append(conf[m.end() : i - 1])
+    return blocks
+
+
+def _top_level(body: str) -> str:
+    """Директивы самого блока без вложенных ``location``/``if``."""
+    out, depth = [], 0
+    for ch in body:
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif depth == 0:
+            out.append(ch)
+    return "".join(out)
+
+
+def _tls_server(conf: str) -> str:
+    found = [b for b in _server_blocks(conf) if re.search(r"\blisten\s+443\b", _top_level(b))]
+    assert len(found) == 1, f"сервер 443 не найден однозначно: {len(found)}"
+    return found[0]
+
+
+def _log_format(conf: str, name: str) -> str | None:
+    m = re.search(rf"\blog_format\s+{name}\s+(.*?);", conf, re.S)
+    if m is None:
+        return None
+    raw = m.group(1)
+    if raw.lstrip().startswith("escape="):
+        raw = raw.lstrip().split(None, 1)[1]
+    parts = re.findall(r"'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"", raw)
+    if parts:
+        return "".join(a or b for a, b in parts)
+    return " ".join(raw.split())
+
+
+def test_007_ac38_web_access_log_format_has_no_query_string() -> None:
+    """Сервер 443 пишет access-лог в формате ``gt_access`` без ``$request``, ``$args``,
+    ``$query_string``, ``$request_uri``: ключ в ``?…`` не попадает в access-лог web
+    (FR-32, plan PD-11 (5)); ``location = /healthz`` по-прежнему без access-лога."""
+    conf = _strip_comments(_read("default.conf.template"))
+
+    fmt = _log_format(conf, "gt_access")
+    assert fmt is not None, "нет log_format gt_access"
+    assert not FORBIDDEN_LOG_VARS.search(fmt), f"формат пишет строку запроса: {fmt}"
+    assert " ".join(fmt.split()) == " ".join(GT_ACCESS_FORMAT.split()), fmt
+
+    server = _tls_server(conf)
+    server_level = re.findall(r"\baccess_log\s+([^;]*);", _top_level(server))
+    assert any(re.fullmatch(r"\S+\s+gt_access(?:\s+.*)?", d.strip()) for d in server_level), (
+        f"у сервера 443 нет access_log … gt_access: {server_level}"
+    )
+    for directive in re.findall(r"\baccess_log\s+([^;]*);", server):
+        d = directive.strip()
+        assert d == "off" or re.fullmatch(r"\S+\s+gt_access(?:\s+.*)?", d), (
+            f"access_log сервера 443 без формата gt_access: {d}"
+        )
+    body = _location_body(conf, r"location\s*=\s*/healthz")
+    assert re.search(r"access_log\s+off\s*;", body)
+
+
+def test_007_ac38_web_does_not_log_or_strip_authorization_header() -> None:
+    """Заметка ревью R7-T12 (статическая часть): прокси ``/api/`` не переписывает и не убирает
+    ``Authorization`` и пересылает заголовки; ни один ``log_format`` не пишет его значение."""
+    conf = _strip_comments(_read("default.conf.template"))
+    api = _location_body(conf, r"location\s+/api/")
+    assert not re.search(r"proxy_set_header\s+Authorization\b", api, re.I)
+    assert not re.search(r"proxy_pass_request_headers\s+off", api)
+    assert not re.search(r"\$http_authorization\b", conf)
+
+
 # --- Docker-часть --------------------------------------------------------------------------
 
 

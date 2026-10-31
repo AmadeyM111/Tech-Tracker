@@ -130,7 +130,9 @@ R7-T21 → R7-T22).
 - **Описание:** По plan §4.2: `generate_api_key`, `is_api_key_format`, `api_key_digest`
   (не по формату → `ValueError` без значения в тексте), константы формата. В `redact_text` —
   замена `API_KEY_LEAK_PATTERN` на `***` (быстрая проверка `API_KEY_PREFIX in text`), остальная
-  логика без изменений.
+  логика без изменений. *Примечание (после ревью R7-T03 и тестов R7-T16):* исходный шаблон
+  утечки `gtk_[A-Za-z0-9_-]{8,}` и маскирование имён полей уточняются в R7-T16 (plan PD-11,
+  §4.2); `API_KEY_FORMAT` и функции этой задачи не меняются, тесты R7-T03 остаются в силе.
   Test-writer: AC-41 — 1 000 ключей попарно различны, каждый `fullmatch` формата, после
   `base64.urlsafe_b64decode(k[4:] + "=")` — ровно 32 байта; подмена `secrets.token_bytes` даёт
   ожидаемую строку (источник — `secrets`, 32 байта). Формат: 46 и 48 символов, `+`, `/`, `=`,
@@ -607,19 +609,37 @@ R7-T21 → R7-T22).
 - **Попытки:** 0
 
 ## R7-T16 — Секрет не утекает: логи, ответы, журнал, события, БД, access-лог web
-- **Статус:** TODO
+- **Статус:** DONE
 - **Заметка ревью R7-T12:** на стенде проверить, что nginx передаёт `Authorization` (два заголовка, разные регистры имени) в приложение без искажений.
 - **Заметка ревью R7-T10:** AC-39 — искать секрет и в `bytea`-столбцах (декодировать или искать hex-кодировку подстрок ≥ 8), а не только `x::text LIKE`.
-- **Заметки ревью R7-T03 (обязательно учесть):** `reviews/R7-T03-1.md` п.1–3: имена ключей в `extra`/Mapping не маскируются в `core/logging.py`; в сквозной AC-38 добавить ключ с `/` или `+` внутри (путь и заголовок), при находке — вернуться к plan PD-11; nginx `log_format` без `$request`.
-- **AC:** AC-38 (API, журнал, события), AC-39; FR-32, FR-6; plan PD-1, PD-11
-- **Файлы:** `deploy/web/default.conf.template`;
+- **Заметки ревью R7-T03 (учтены в plan):** `reviews/R7-T03-1.md` п.1–3 подтверждены тестами
+  R7-T16 (утечки найдены) и решены в plan PD-11 и §4.2: (1) имена полей `extra` и ключи вложенных
+  `Mapping` прогоняются через `redact_text`; (2) шаблон утечки расширен — ключ с `/`, `+`, `%`, `.`,
+  не-ASCII внутри маскируется целиком; (3) nginx `log_format gt_access` без `$request` и без
+  `$remote_user` (ревью R7-T16: `$remote_user` берётся из `Authorization: Basic` даже без
+  `auth_basic`, `curl -u gtk_…:` писал бы ключ целиком).
+- **AC:** AC-38 (API, журнал, события), AC-39; FR-32, FR-6; plan PD-1, PD-11, §4.2
+- **Файлы:** `deploy/web/default.conf.template`, `backend/app/core/security/api_keys.py` (только
+  константа `API_KEY_LEAK_PATTERN`), `backend/app/core/logging.py`;
   тесты: `backend/tests/api/test_api_key_leaks_007.py` (новый), `backend/tests/infra/test_web_hardening.py`
-  (+ `backend/app/core/logging.py`, `backend/app/api/deps.py` — только если тест AC-38 нашёл утечку; причина — в отчёте)
+  (+ `backend/tests/unit/test_logging.py`, `backend/tests/unit/test_api_key_secret_007.py` — только
+  дополнение новых случаев и уточнение проверки константы шаблона;
+  `backend/app/api/deps.py` — только если тест AC-38 нашёл там утечку; причина — в отчёте)
 - **Зависит от:** R7-T14
-- **Описание:** nginx: `log_format gt_access` без строки запроса (`$remote_addr - $remote_user
-  [$time_local] "$request_method $uri $server_protocol" $status $body_bytes_sent
-  "$http_user_agent"`) и `access_log … gt_access` в сервере 443; `location = /healthz` без
-  изменений. Код меняется только при найденной утечке.
+- **Описание:** (1) nginx: `log_format gt_access` без строки запроса и без `$remote_user`
+  (`$remote_addr - - [$time_local] "$request_method $uri $server_protocol" $status
+  $body_bytes_sent "$http_user_agent"` — на месте пользователя литерал `-`: nginx заполняет
+  `$remote_user` из `Authorization: Basic` даже без `auth_basic`, plan PD-11 п. 5) и
+  `access_log … gt_access` в сервере 443; `location = /healthz` без изменений. `$uri` без маскирования, сервер 80 и `error_log` nginx в этой задаче **не** менять
+  (открытый вопрос владельца, `reviews/open-items.md` п. 15).
+  (2) `api_keys.py`: `API_KEY_LEAK_PATTERN = re.compile(r"""gtk_[^\s"'`<>&;,()\[\]{}|]{8,}""")`
+  без `re.ASCII` (plan §4.2: набор исключений и обоснование). `API_KEY_PREFIX`, `API_KEY_FORMAT`,
+  `generate_api_key`, `is_api_key_format`, `api_key_digest` не менять.
+  (3) `core/logging.py` (plan §4.2, комментарий `[R7-T16]`): ключи-строки вложенных `Mapping` в
+  `_sanitize` (при `redact=True`) — через `redact_text`; имена полей `extra` в
+  `SecretsFilter._sanitize_record` (перенос значения под очищенное имя) и в `JsonFormatter.format`
+  — через `redact_text`; `_is_secret_key` — по исходному имени; для обычных имён поведение не
+  меняется. Быстрая проверка `API_KEY_PREFIX in text` в `redact_text` остаётся.
   Test-writer: AC-38 — перехват всех логов (`capsys` JSON-вывода `configure_logging("DEBUG")` и
   `caplog`) при: выпуске ключа; «кто я», создании задачи и комментарии по ключу; запросах после
   отзыва; ключе с изменённым символом; 403 (маршрут вне перечня и чужая задача), 422, 429 по ключу;
@@ -629,10 +649,37 @@ R7-T21 → R7-T22).
   таблицы схемы `public` (`SELECT * FROM <таблица>` для каждой из `information_schema.tables`,
   текстовые значения и `bytea` как байты) — секрета и подстрок ≥ 8 нет (сравнение в байтах и в
   тексте). `test_web_hardening.py` (статически, `infra_static`): у сервера 443 `access_log` с
-  форматом без `$request` и `$args`/`$query_string`/`$request_uri`.
-- **Старые тесты → AC:** `test_web_hardening.py` — только новый статический тест.
-- **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/api/test_api_key_leaks_007.py && pytest -q -m infra_static backend/tests/infra/test_web_hardening.py`
-  зелёные; проверки бэкенда зелёные; «Фронтенд не тронут»; `python scripts/task_scope.py R7-T16` → 0.
+  форматом `gt_access`, в котором нет `$request`, `$args`, `$query_string`, `$request_uri` и
+  `$remote_user`.
+  Дополнения unit-тестов (новые `test_ac38_*` в `test_logging.py`): ключ, у которого символ на
+  позиции 12 (сразу после 7 символов тела) и в середине тела заменён на `/`, `+`, `%2F`, `.`,
+  `я`, — в сообщении, в `extra["path"]` и в access-логе пути — нет подстрок ≥ 8 исходного и
+  испорченного ключа; ключ в имени поля `extra` (`extra={key: 1}`) и в ключе вложенного словаря
+  (`extra={"ctx": {key: 1}}`) — в JSON-выводе нет подстрок ≥ 8, обычные имена полей
+  (`login`, `ctx`) без изменений; точные результаты `redact_text` на границах контекста:
+  `'"' + key + '"'` → `'"***"'`, `"'" + key + "'"` → `"'***'"`, `"(" + key + "),"` → `"(***),"`,
+  `"k=" + key + "&a=1"` → `"k=***&a=1"`, `"[" + key + "]"` → `"[***]"`, `key + "\nnext"` →
+  `"***\nnext"`; `"gtk_abc/def"` (хвост 7) — без изменений.
+- **Старые тесты → AC:** `test_web_hardening.py` — только новый статический тест. Дополнения
+  (без ослабления, прежние assert-ы не меняются; FR-32, AC-38, plan §6.2):
+  `backend/tests/unit/test_api_key_secret_007.py::test_ac41_constants_match_plan` — прежние две
+  проверки шаблона (`gtk_` + 8 «A» совпадает, + 7 — нет) остаются верными; добавить: `fullmatch`
+  для `gtk_AAAA/AAA+%2F.я` (≥ 8, с `/`, `+`, `%`, `.`, не-ASCII) не `None`; на `gtk_AAAAAAAA"`,
+  `…'`, `…)`, `…&`, `…;`, `…,`, `…]`, `…}`, `…|`, `…<`, `… ` совпадение (`search`) обрывается
+  перед разделителем; `API_KEY_FORMAT` не изменился.
+  `backend/tests/unit/test_logging.py::test_ac38_*` (9 тестов R7-T03) — ни одно ожидание не
+  зависит от узкого алфавита старого шаблона: `…_leaves_short_gtk_text_alone` (`gtk_abc`, `gtk_`
+  < 8 символов хвоста — не трогаются и новым шаблоном), `…_mutated_agent_key_is_still_masked`
+  (замена на `A`/`B` — в обоих шаблонах), `…_key_adjacent_to_punctuation_is_masked` (разделители
+  `&`, `;`, `)`, `,` — исключены и в новом шаблоне), `…_redact_text_masks_key_and_keeps_rest`
+  (`"before *** after"` — пробел исключён); остальные пять — по `_leaks_key`. Остаются без правок;
+  новые случаи — отдельными тестами (см. выше).
+- **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/api/test_api_key_leaks_007.py backend/tests/unit/test_logging.py backend/tests/unit/test_api_key_secret_007.py backend/tests/unit/test_sanitize.py backend/tests/api/test_password_leaks.py && pytest -q -m infra_static backend/tests/infra/test_web_hardening.py`
+  зелёные; проверки бэкенда зелёные; «Фронтенд не тронут»; `git diff HEAD -- backend/app/core/security/api_keys.py`
+  меняет только строку `API_KEY_LEAK_PATTERN`; в `deploy/web/default.conf.template` формат
+  `gt_access` ровно `$remote_addr - - [$time_local] "$request_method $uri $server_protocol" $status
+  $body_bytes_sent "$http_user_agent"` (без `$remote_user`), его использует `access_log` сервера 443;
+  `nginx -t` на стенде — ручная проверка R7-T24; `python scripts/task_scope.py R7-T16` → 0.
 - **Попытки:** 0
 
 ## R7-T17 — MCP: протокол stdio, транспорт, конфигурация (без инструментов)
@@ -813,6 +860,7 @@ R7-T21 → R7-T22).
 
 ## R7-T24 — Документы: ADR-0015, инструкция для агентов, README, чек-лист приёмки, глоссарий
 - **Статус:** TODO
+- **Заметки ревью R7-T16 (`reviews/R7-T16-1.md`, open-items п.15–16):** ручная проверка на стенде — `nginx -t` для `deploy/web/default.conf.template` и передача `Authorization` (два заголовка, разные регистры) в приложение без искажений; отметить в документации принятый остаточный риск маскирования в логах (plan §4.2) и в журнале web (`$uri` без маскировки, сервер 80 с `$request`, `error_log` nginx).
 - **Заметки ревью R7-T14:** `docs/data-model.md:336` «В R1.0 пишутся только действия `user.*`» неточна (есть `project.ownership_transferred`) — выровнять; отметить в документации рост `domain_event` без очистки.
 - **Заметка по R7-T14 (отчёт implementer):** в `docs/data-model.md` (a) «Каталог событий R1.0» не содержит аудит-событий 007 (`user.agent_created`, `user.api_key_issued`, `user.api_key_revoked`); (b) первая строка документа говорит о миграциях `0001`–`0006`, хотя есть 0007 и 0008 — выровнять, не ломая `test_nfr11_data_model_covers_every_table_and_column` и `test_t88_data_model_mvp_section`.
 - **AC:** FR-39, NFR-7 (ADR); AC-37, AC-46, AC-48 (*ручные* / *вне CI*: пункты чек-листа); plan PD-20, §4.9
