@@ -699,7 +699,12 @@ async def test_t18_openapi_audit_entry_has_no_changes_and_page_schema_is_unique(
     assert "changes" not in props
     page_names = [n for n in schemas if n.startswith("Page_") and "AuditEntry" in n]
     assert len(page_names) == 1, page_names
-    assert not any("changes" in set(s.get("properties", {})) for s in schemas.values())
+    # Лента проекта (ADR-0015, plan §10.3) отдаёт значения полей по плану; аудит их не отдаёт.
+    assert not any(
+        "changes" in set(s.get("properties", {}))
+        for name, s in schemas.items()
+        if name != "ActivityItem"
+    )
     actor = schemas.get("AuditActor") or schemas.get("AuditEntryActor")
     if actor is not None:  # форма actor: kind, id, login
         assert set(actor["properties"]) == {"kind", "id", "login"}

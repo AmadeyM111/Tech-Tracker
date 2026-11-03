@@ -255,6 +255,8 @@ def test_t21_src_files_only_expected() -> None:
         # T82
         "features/projects/api.ts", "features/projects/ProjectsPage.tsx",
         "features/projects/ProjectPage.tsx",
+        # T104: лента проекта (ADR-0015)
+        "features/projects/ActivityFeed.tsx",
         # T83
         "features/tasks/api.ts", "features/tasks/TaskList.tsx", "features/tasks/CreateTaskForm.tsx",
         "features/tasks/TaskPage.tsx", "features/tasks/SubtaskList.tsx",

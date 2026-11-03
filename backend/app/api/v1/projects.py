@@ -15,6 +15,12 @@ from fastapi import APIRouter, Depends, Query, Response
 
 from app.api.deps import get_active_actor, require_capability
 from app.api.openapi import error_responses
+from app.api.v1.schemas.activity import (
+    ActivityActor,
+    ActivityChange,
+    ActivityEntity,
+    ActivityItem,
+)
 from app.api.v1.schemas.projects import (
     MemberAdd,
     OwnerChange,
@@ -27,6 +33,7 @@ from app.api.v1.schemas.projects import (
 from app.core.db import DbSession
 from app.core.pagination import Page, PageParams
 from app.domain.access.roles import Actor, Capability
+from app.domain.activity import service as activity
 from app.domain.projects import members, queries, service
 
 router = APIRouter(
@@ -129,6 +136,46 @@ async def list_members(
         page=params.page,
         page_size=params.page_size,
         has_next=has_next,
+    )
+
+
+@router.get(
+    "/{project_id}/activity",
+    response_model=Page[ActivityItem],
+    responses=error_responses(403, 404, 422),
+)
+async def project_activity(
+    project_id: UUID, db: DbSession, actor: CurrentActor, params: Annotated[PageParams, Query()]
+) -> Page[ActivityItem]:
+    """Лента проекта, новые первыми; только участникам (FR-38, ADR-0015)."""
+    rows, has_next = await activity.project_feed(db, actor, project_id, params)
+    return Page[ActivityItem](
+        items=[_activity_item(row) for row in rows],
+        page=params.page,
+        page_size=params.page_size,
+        has_next=has_next,
+    )
+
+
+def _activity_item(row: activity.FeedRow) -> ActivityItem:
+    actor = row.actor
+    return ActivityItem(
+        id=row.id,
+        occurred_at=row.occurred_at,
+        actor=ActivityActor(
+            kind="user" if actor is not None else "system",
+            id=None if actor is None else actor.id,
+            login=None if actor is None else actor.login,
+        ),
+        action=row.action,
+        entity=ActivityEntity(
+            type=row.entity.type,
+            id=row.entity.id,
+            deleted=row.entity.deleted,
+            title=row.entity.title,
+        ),
+        changed_fields=row.changed_fields,
+        changes=None if row.changes is None else [ActivityChange(**c) for c in row.changes],
     )
 
 

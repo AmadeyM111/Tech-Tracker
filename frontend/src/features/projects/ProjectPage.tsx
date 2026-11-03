@@ -20,15 +20,17 @@ import {
 } from "./api";
 import { BoardView } from "../boards/BoardView";
 import { ProjectTaskList } from "../tasks/TaskList";
+import { ActivityFeed } from "./ActivityFeed";
 import { ProjectFields } from "./ProjectsPage";
 
-type TabId = "board" | "tasks" | "members";
-const TABS: readonly TabId[] = ["board", "tasks", "members"];
+type TabId = "board" | "tasks" | "members" | "activity";
+const TABS: readonly TabId[] = ["board", "tasks", "members", "activity"];
 
 const TAB_LABELS: Record<TabId, MessageKey> = {
   board: "projects.tab_board",
   tasks: "projects.tab_tasks",
   members: "projects.tab_members",
+  activity: "projects.tab_activity",
 };
 
 const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : "unknown");
@@ -394,6 +396,7 @@ function ProjectCard({
             ) : null}
           </>
         ) : null}
+        {tab === "activity" ? <ActivityFeed projectId={project.id} /> : null}
       </div>
 
       {confirmation === null ? null : (

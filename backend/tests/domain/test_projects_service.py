@@ -52,6 +52,7 @@ from tests.projects_support import (
     World,
     actor_of,
     capture_sql,
+    event_actions,
     events,
     fails,
     forbidden,
@@ -335,7 +336,7 @@ async def test_ac110_owner_ba_updates_name_and_description(
     assert (row.name, row.description) == ("Новое", "Описание")
     assert row.updated_at == fixed_clock.now()
     assert row.owner_id == w.ba.id
-    assert await events(db, w.ws.id) == []  # D-55: project.updated не пишется
+    assert await event_actions(db, w.ws.id) == ["project.updated"]  # лента, без значений
 
 
 async def test_ac110_ba_not_member_updates_any_project(db: AsyncSession, svc: Any) -> None:

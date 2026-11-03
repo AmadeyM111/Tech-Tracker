@@ -17,8 +17,9 @@ AC-58, AC-103 (комментарии), FR-23 (без упоминаний, SC-6
 проверка пустоты (422 ``validation_error``) -> запись. create/edit/delete берут FOR SHARE на
 строке проекта (§10.2 п.2). Автор может править только свой (``can_edit_comment``) и только
 оставаясь участником; удалять — ``can_delete_comment`` (автор, БА-участник; 002/AC-13).
-Мягкое удаление: ``deleted_at`` и собственный ``deleted_batch_id``. События и упоминания не
-пишутся (D-55, SC-6). Возвращаемое значение проверяется только в части ``id`` и в ``list``.
+Мягкое удаление: ``deleted_at`` и собственный ``deleted_batch_id``. Лента: ``comment.created`` и
+``comment.deleted`` без текста; упоминаний нет (plan §10.5, SC-6). Возвращаемое значение
+проверяется только в части ``id`` и в ``list``.
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ from tests.projects_support import (
     add_member_row,
     capture_sql,
     comment_row,
+    event_actions,
     events,
     fails,
     forbidden,
@@ -299,7 +301,9 @@ async def test_p10_2_create_edit_delete_lock_project_share(db: AsyncSession, svc
     assert any("for share" in s.lower() and "from project" in s.lower() for s in seen3), seen3
 
 
-async def test_d55_no_events_and_no_mentions_written(db: AsyncSession, svc: Any) -> None:
+async def test_feed_create_and_delete_events_without_text_or_mentions(
+    db: AsyncSession, svc: Any
+) -> None:
     w, tid = await _setup(db)
     before = len(await events(db, w.ws.id))
     view = await svc.create_comment(
@@ -307,7 +311,7 @@ async def test_d55_no_events_and_no_mentions_written(db: AsyncSession, svc: Any)
     )
     await svc.edit_comment(db, actor_of(w.usr), view.id, f"правка @{w.ba2.login}")
     await svc.delete_comment(db, actor_of(w.ba), view.id)
-    assert len(await events(db, w.ws.id)) == before
+    assert (await event_actions(db, w.ws.id))[before:] == ["comment.created", "comment.deleted"]
     # упоминание остаётся обычным текстом (SC-6)
     assert await _body(db, view.id) == f"правка @{w.ba2.login}"
     tables = await db.execute(text("SELECT to_regclass('public.mention')"))

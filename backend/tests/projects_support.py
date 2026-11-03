@@ -153,6 +153,11 @@ async def events(db: AsyncSession, workspace_id: uuid.UUID) -> list[Any]:
     return list(rows)
 
 
+async def event_actions(db: AsyncSession, workspace_id: uuid.UUID) -> list[str]:
+    """Действия событий пространства по порядку ``id`` (лента и аудит, plan §4.4)."""
+    return [row.action for row in await events(db, workspace_id)]
+
+
 @contextmanager
 def capture_sql(db: AsyncSession) -> Iterator[list[str]]:
     """Тексты SQL, выполненные на соединении сессии (before_cursor_execute)."""

@@ -110,6 +110,16 @@ async def update_project(
         await db.execute(
             update(Project).where(Project.id == project_id).values(**values, updated_at=utcnow())
         )
+        # лента: только имена полей, без значений (plan §10.5, Q-5)
+        await record_event(
+            db,
+            workspace_id=actor.workspace_id,
+            actor_id=actor.user_id,
+            action=EventAction.PROJECT_UPDATED,
+            entity_id=project_id,
+            project_id=project_id,
+            changed_fields=sorted(values),
+        )
     return await project_view(db, actor, facts)
 
 

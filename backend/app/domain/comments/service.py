@@ -29,6 +29,8 @@ from app.domain.access.policy import (
 from app.domain.access.roles import Actor
 from app.domain.comments.models import Comment
 from app.domain.comments.sanitize import strip_html
+from app.domain.events.catalog import EventAction
+from app.domain.events.writer import record_event
 from app.domain.projects.models import Project
 from app.domain.projects.queries import load_project_facts
 from app.domain.tasks.context import load_task_context
@@ -208,6 +210,15 @@ async def create_comment(db: AsyncSession, actor: Actor, task_id: UUID, body: st
     )
     db.add(comment)
     await db.flush()
+    # лента: без текста комментария (plan §10.5)
+    await record_event(
+        db,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.user_id,
+        action=EventAction.COMMENT_CREATED,
+        entity_id=comment.id,
+        project_id=ctx.project.project_id,
+    )
     return await _view(db, actor, ctx.project, comment)
 
 
@@ -234,6 +245,14 @@ async def delete_comment(db: AsyncSession, actor: Actor, comment_id: UUID) -> No
     comment.deleted_at = utcnow()
     comment.deleted_batch_id = uuid4()
     await db.flush()
+    await record_event(
+        db,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.user_id,
+        action=EventAction.COMMENT_DELETED,
+        entity_id=comment.id,
+        project_id=project.project_id,
+    )
 
 
 async def list_comments(

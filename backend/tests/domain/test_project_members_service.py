@@ -38,6 +38,7 @@ from tests.projects_support import (
     World,
     actor_of,
     capture_sql,
+    event_actions,
     events,
     fails,
     forbidden,
@@ -85,7 +86,7 @@ async def test_ac73_owner_ba_adds_member_of_each_business_role(
         assert row is not None
         assert row.workspace_id == w.ws.id  # проект и участник одного пространства
         assert row.created_by == w.ba.id
-    assert await events(db, w.ws.id) == []  # D-55: member.added не пишется
+    assert await event_actions(db, w.ws.id) == ["member.added", "member.added"]
 
 
 async def test_ac73_ba_not_member_adds_other_and_self(db: AsyncSession, members: Any) -> None:
@@ -103,7 +104,7 @@ async def test_002_ac11_ba_non_owner_adds_member(db: AsyncSession, members: Any,
     w = await make_world(db)
     await members.add_member(db, actor_of(getattr(w, who)), w.project_id, w.usr2.id)
     assert w.usr2.id in await member_ids(db, w.project_id)
-    assert await events(db, w.ws.id) == []
+    assert await event_actions(db, w.ws.id) == ["member.added"]
 
 
 @pytest.mark.parametrize("who", ["usr", "usr2", "ta", "norole"])
@@ -221,7 +222,7 @@ async def test_ac73_owner_ba_removes_member(db: AsyncSession, members: Any) -> N
     w = await make_world(db)
     assert await members.remove_member(db, actor_of(w.ba), w.project_id, w.usr.id) is None
     assert w.usr.id not in await member_ids(db, w.project_id)
-    assert await events(db, w.ws.id) == []  # D-55
+    assert await event_actions(db, w.ws.id) == ["member.removed"]
 
 
 async def test_ac73_ba_not_member_removes_member(db: AsyncSession, members: Any) -> None:
@@ -239,7 +240,7 @@ async def test_002_ac11_ba_non_owner_removes_other_member(
     w = await make_world(db)
     await members.remove_member(db, actor_of(getattr(w, who)), w.project_id, w.usr.id)
     assert w.usr.id not in await member_ids(db, w.project_id)
-    assert await events(db, w.ws.id) == []  # D-55
+    assert await event_actions(db, w.ws.id) == ["member.removed"]
 
 
 @pytest.mark.parametrize("who", ["usr", "ta", "norole"])
@@ -395,7 +396,14 @@ async def test_ac50_q7_remove_clears_assignee_everywhere_in_project(
     # задачи остаются в проекте, не удаляются и не восстанавливаются
     assert (await task_row(db, top.id)).deleted_at is None
     assert (await task_row(db, soft_deleted.id)).deleted_at == deleted["deleted_at"]
-    assert await events(db, ws_id) == []  # task.unassigned_member_removed не пишется (D-55)
+    # лента: по событию на каждую задачу с исполнителем, затем member.removed (FR-15a)
+    unassigned = [
+        str(row.entity_id)
+        for row in await events(db, ws_id)
+        if row.action == "task.unassigned_member_removed"
+    ]
+    assert sorted(unassigned) == sorted(str(t.id) for t in (top, sub, soft_deleted, deleted_sub))
+    assert (await event_actions(db, ws_id))[-1] == "member.removed"
 
 
 async def test_ac50_self_remove_also_clears_assignee(db: AsyncSession, members: Any) -> None:

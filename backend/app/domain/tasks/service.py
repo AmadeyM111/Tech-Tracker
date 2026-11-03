@@ -34,13 +34,15 @@ from app.domain.access.policy import (
 from app.domain.access.recipients import RecipientPurpose, check_recipient
 from app.domain.access.roles import Actor, Role
 from app.domain.comments.models import Comment
+from app.domain.events.catalog import EventAction
+from app.domain.events.writer import FieldChange, JsonValue, record_event
 from app.domain.projects.models import ProjectMember
 from app.domain.projects.queries import load_project_facts
 from app.domain.tasks import positions
 from app.domain.tasks.context import load_task_context
 from app.domain.tasks.models import Task, TaskPriority, TaskStatus
 from app.domain.tasks.positions import append_position, lock_columns
-from app.domain.users.directory import load_recipient
+from app.domain.users.directory import UserRef, load_recipient, user_refs
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -175,6 +177,7 @@ async def create_task(
     )
     db.add(task)
     await db.flush()
+    await _record_task_event(db, actor, EventAction.TASK_CREATED, task.id, project_id)
     return task.id
 
 
@@ -224,6 +227,7 @@ async def create_subtask(
     )
     db.add(task)
     await db.flush()
+    await _record_task_event(db, actor, EventAction.TASK_CREATED, task.id, ctx.project.project_id)
     return task.id
 
 
@@ -241,6 +245,9 @@ class TaskPatch:
 
 _FIELDS: Final = ("title", "description", "assignee_id", "due_date", "priority", "status")
 _FULL_EDIT_FIELDS: Final = ("title", "description", "due_date", "priority")
+# лента (plan §10.5): приоритет и метки событий не дают
+_FEED_FIELDS: Final = frozenset({"status", "assignee_id", "due_date", "title", "description"})
+_FEED_VALUE_FIELDS: Final = frozenset({"status", "assignee_id", "due_date"})
 
 
 async def _load_task(db: AsyncSession, task_id: UUID) -> Task:
@@ -367,6 +374,7 @@ async def update_task(db: AsyncSession, actor: Actor, task_id: UUID, patch: Task
     _authorize(actor, ctx.project, task, changed)
     if recipient_error is not None and "assignee_id" in changed:
         raise recipient_error
+    before = {name: getattr(task, name) for name in changed}  # снимок для ленты
     if "status" in changed:
         assert status is not None
         if task.parent_id is None:
@@ -380,6 +388,67 @@ async def update_task(db: AsyncSession, actor: Actor, task_id: UUID, patch: Task
             value = changed[name]
             setattr(task, name, TaskPriority(value).value if name == "priority" else value)
     await db.flush()
+    await _record_update(db, actor, task, before, changed)
+
+
+async def _record_update(
+    db: AsyncSession,
+    actor: Actor,
+    task: Task,
+    before: Mapping[str, Any],
+    changed: Mapping[str, Any],
+) -> None:
+    """Лента ``task.updated``: поля из ``_FEED_FIELDS``, значения — у ``_FEED_VALUE_FIELDS``."""
+    names = sorted(name for name in changed if name in _FEED_FIELDS)
+    if not names:
+        return
+    refs: dict[UUID, UserRef] = {}
+    if "assignee_id" in changed:
+        ids = [v for v in (before["assignee_id"], changed["assignee_id"]) if v is not None]
+        refs = await user_refs(db, actor.workspace_id, ids)
+    changes: list[FieldChange] = [
+        {
+            "field": name,
+            "old": _feed_value(name, before[name], refs),
+            "new": _feed_value(name, changed[name], refs),
+        }
+        for name in _FEED_FIELDS
+        if name in changed and name in _FEED_VALUE_FIELDS
+    ]
+    await record_event(
+        db,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.user_id,
+        action=EventAction.TASK_UPDATED,
+        entity_id=task.id,
+        project_id=task.project_id,
+        changed_fields=names,
+        changes=changes or None,
+    )
+
+
+def _feed_value(name: str, value: Any, refs: Mapping[UUID, UserRef]) -> JsonValue:
+    if value is None:
+        return None
+    if name == "assignee_id":
+        ref = refs[value]
+        return {"id": str(ref.id), "login": ref.login}
+    if name == "due_date":
+        return date.isoformat(value)
+    return _status(value).value  # status
+
+
+async def _record_task_event(
+    db: AsyncSession, actor: Actor, action: EventAction, task_id: UUID, project_id: UUID
+) -> None:
+    await record_event(
+        db,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.user_id,
+        action=action,
+        entity_id=task_id,
+        project_id=project_id,
+    )
 
 
 async def delete_task(db: AsyncSession, actor: Actor, task_id: UUID) -> None:
@@ -425,6 +494,8 @@ async def delete_task(db: AsyncSession, actor: Actor, task_id: UUID) -> None:
         .where(Comment.task_id.in_(family), Comment.deleted_at.is_(None))
         .values(**stamp)
     )
+    # одно событие на пакет: корень удаления, подзадачи — по нему (как task.restored в plan §10.6)
+    await _record_task_event(db, actor, EventAction.TASK_DELETED, task_id, ctx.project.project_id)
 
 
 async def move(

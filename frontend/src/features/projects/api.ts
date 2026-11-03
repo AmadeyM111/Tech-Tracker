@@ -5,6 +5,9 @@ import { ApiError, INVALID_RESPONSE, getAppClient } from "../../shared/api/clien
 import type { components } from "../../shared/api/schema";
 import type { Page, PageParams } from "../admin/api";
 
+export type ActivityItem = components["schemas"]["ActivityItem"];
+export type ActivityChange = components["schemas"]["ActivityChange"];
+
 export type ProjectListItem = components["schemas"]["ProjectListItem"];
 export type ProjectDetail = components["schemas"]["ProjectDetail"];
 export type ProjectMember = components["schemas"]["ProjectMember"];
@@ -126,4 +129,24 @@ export async function listCreatableProjects(): Promise<CreatableProject[]> {
   return cards
     .filter((card) => card.permissions.create_task === true)
     .map((card) => ({ id: card.id, name: card.name }));
+}
+
+export interface ActivityReadOptions {
+  page: number;
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+}
+
+/** Лента проекта (FR-38, ADR-0015); `headers` несёт заголовок фонового опроса (FR-59). */
+export async function listActivity(
+  id: string,
+  options: ActivityReadOptions,
+): Promise<Page<ActivityItem>> {
+  const { data } = await getAppClient().GET("/api/v1/projects/{project_id}/activity", {
+    params: { path: { project_id: id }, query: { page: options.page } },
+    headers: options.headers,
+    signal: options.signal,
+  });
+  if (data === undefined) throw invalidBody(200);
+  return data;
 }

@@ -399,6 +399,26 @@ export interface paths {
         patch: operations["update_project"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Activity
+         * @description Лента проекта, новые первыми; только участникам (FR-38, ADR-0015).
+         */
+        get: operations["project_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/board": {
         parameters: {
             query?: never;
@@ -624,6 +644,59 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * ActivityActor
+         * @description Автор действия; ``kind = system`` при отсутствии автора (id и login — ``null``).
+         */
+        ActivityActor: {
+            /** Id */
+            id: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "user" | "system";
+            /** Login */
+            login: string | null;
+        };
+        /** ActivityChange */
+        ActivityChange: {
+            /** Field */
+            field: string;
+            new: components["schemas"]["JsonValue"];
+            old: components["schemas"]["JsonValue"];
+        };
+        /** ActivityEntity */
+        ActivityEntity: {
+            /** Deleted */
+            deleted: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string | null;
+            type: components["schemas"]["EntityType"];
+        };
+        /** ActivityItem */
+        ActivityItem: {
+            /** Action */
+            action: string;
+            actor: components["schemas"]["ActivityActor"];
+            /** Changed Fields */
+            changed_fields: string[];
+            /** Changes */
+            changes: components["schemas"]["ActivityChange"][] | null;
+            entity: components["schemas"]["ActivityEntity"];
+            /** Id */
+            id: number;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+        };
+        /**
          * AdminUser
          * @description Учётная запись в разделе администрирования (``GET``, ``POST``, ``PUT …/role``).
          */
@@ -840,6 +913,7 @@ export interface components {
             /** Detail */
             detail: string | components["schemas"]["ErrorDetail"][];
         };
+        JsonValue: unknown;
         /**
          * LoginRequest
          * @description ``POST /auth/login``: логин нормализуется и проверяется сервисом (FR-73).
@@ -890,6 +964,17 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
+        };
+        /** Page[ActivityItem] */
+        Page_ActivityItem_: {
+            /** Has Next */
+            has_next: boolean;
+            /** Items */
+            items: components["schemas"]["ActivityItem"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
         };
         /** Page[AdminUser] */
         Page_AdminUser_: {
@@ -2525,6 +2610,67 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    project_activity: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ActivityItem_"];
                 };
             };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */

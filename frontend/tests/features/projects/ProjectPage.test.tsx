@@ -100,13 +100,13 @@ describe("card and tabs (UF-3, NFR-7)", () => {
     for (const c of f.calls) expect(c.headers.get("X-GT-Background")).toBeNull();
   });
 
-  it("uf3_three_tabs_with_dictionary_titles_board_selected_by_default", async () => {
+  it("uf3_four_tabs_with_dictionary_titles_board_selected_by_default", async () => {
     const { container } = await open();
     const tabs = Array.from(container.querySelectorAll<HTMLElement>('[role="tablist"] [role="tab"]'));
-    expect(tabs.map((t) => t.getAttribute("data-tab"))).toEqual(["board", "tasks", "members"]);
+    expect(tabs.map((t) => t.getAttribute("data-tab"))).toEqual(["board", "tasks", "members", "activity"]);
     for (const t of tabs) expect(DICT).toContain(t.textContent);
-    expect(new Set(tabs.map((t) => t.textContent)).size).toBe(3);
-    expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
+    expect(new Set(tabs.map((t) => t.textContent)).size).toBe(4);
+    expect(tabs.map((t) => t.getAttribute("aria-selected"))).toEqual(["true", "false", "false", "false"]);
     const panel = screen.getByRole("tabpanel");
     expect(tabs[0]!.getAttribute("aria-controls")).toBe(panel.id);
     expect(panel.getAttribute("aria-labelledby")).toBe(tabs[0]!.id);
@@ -668,24 +668,24 @@ describe("review T82 attempt 2", () => {
   it("nfr7_tabs_roving_tabindex_and_arrow_home_end_keys", async () => {
     const { container } = await open();
     const tab = (n: string) => q<HTMLElement>(container, `[role="tab"][data-tab="${n}"]`)!;
-    const idx = () => ["board", "tasks", "members"].map((n) => tab(n).getAttribute("tabindex"));
-    expect(idx()).toEqual(["0", "-1", "-1"]);
+    const idx = () => ["board", "tasks", "members", "activity"].map((n) => tab(n).getAttribute("tabindex"));
+    expect(idx()).toEqual(["0", "-1", "-1", "-1"]);
     tab("board").focus();
     fireEvent.keyDown(tab("board"), { key: "ArrowRight" });
     await waitFor(() => expect(tab("tasks").getAttribute("aria-selected")).toBe("true"));
     expect(document.activeElement).toBe(tab("tasks"));
-    expect(idx()).toEqual(["-1", "0", "-1"]);
+    expect(idx()).toEqual(["-1", "0", "-1", "-1"]);
     fireEvent.keyDown(tab("tasks"), { key: "End" });
-    await waitFor(() => expect(tab("members").getAttribute("aria-selected")).toBe("true"));
-    expect(document.activeElement).toBe(tab("members"));
-    fireEvent.keyDown(tab("members"), { key: "ArrowRight" });
+    await waitFor(() => expect(tab("activity").getAttribute("aria-selected")).toBe("true"));
+    expect(document.activeElement).toBe(tab("activity"));
+    fireEvent.keyDown(tab("activity"), { key: "ArrowRight" });
     await waitFor(() => expect(tab("board").getAttribute("aria-selected")).toBe("true"));
     fireEvent.keyDown(tab("board"), { key: "ArrowLeft" });
-    await waitFor(() => expect(tab("members").getAttribute("aria-selected")).toBe("true"));
-    fireEvent.keyDown(tab("members"), { key: "Home" });
+    await waitFor(() => expect(tab("activity").getAttribute("aria-selected")).toBe("true"));
+    fireEvent.keyDown(tab("activity"), { key: "Home" });
     await waitFor(() => expect(tab("board").getAttribute("aria-selected")).toBe("true"));
     expect(document.activeElement).toBe(tab("board"));
-    expect(idx()).toEqual(["0", "-1", "-1"]);
+    expect(idx()).toEqual(["0", "-1", "-1", "-1"]);
   });
 
   it("nfr7_placeholder_tabpanel_without_focusable_content_is_focusable", async () => {

@@ -23,7 +23,7 @@ AC-106, AC-108, AC-109; FR-18...FR-21, FR-28a; заметки ревью T69/T70
 ``subtask_depth_exceeded``, коды получателя (``user_not_found``, ``user_blocked``,
 ``recipient_wrong_role``, ``not_project_member``). Порядок: проект/родитель 404 -> FOR SHARE
 проекта -> права 403 -> (для подзадачи) глубина 422 -> получатель 422 -> вставка.
-Событий не пишут (D-55).
+Пишут `task.created` (лента, plan §10.5).
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ from tests.projects_support import (
     actor_of,
     add_member_row,
     capture_sql,
-    events,
+    event_actions,
     fails,
     forbidden,
     make_world,
@@ -768,15 +768,16 @@ async def test_p10_2_create_subtask_lock_order(db: AsyncSession, svc: Any) -> No
     assert project_lock < recipient_lock < insert
 
 
-# --- события (D-55) и инварианты ----------------------------------------------------------------
+# --- лента: события задач (plan §10.5) и инварианты -------------------------------------
 
 
-async def test_d55_create_writes_no_events(db: AsyncSession, svc: Any) -> None:
+async def test_feed_create_writes_task_created_for_task_and_subtask(
+    db: AsyncSession, svc: Any
+) -> None:
     w = await make_world(db)
-    before = len(await events(db, w.ws.id))
     t = await svc.create_task(db, actor_of(w.ba), w.project_id, _data(svc, assignee=w.usr.id))
     await svc.create_subtask(db, actor_of(w.ba), t, _data(svc, assignee=w.usr.id))
-    assert len(await events(db, w.ws.id)) == before == 0
+    assert await event_actions(db, w.ws.id) == ["task.created", "task.created"]
 
 
 async def test_t69_review_service_keeps_workspace_and_project_of_parent(

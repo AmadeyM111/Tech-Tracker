@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -24,10 +25,12 @@ from app.domain.access.policy import (
 )
 from app.domain.access.recipients import RecipientPurpose, check_recipient
 from app.domain.access.roles import Actor, Role
+from app.domain.events.catalog import EventAction
+from app.domain.events.writer import FieldChange, record_event
 from app.domain.projects.models import ProjectMember
 from app.domain.projects.queries import load_project_facts
 from app.domain.tasks.models import Task
-from app.domain.users.directory import UserRef, load_recipient
+from app.domain.users.directory import UserRef, load_recipient, user_refs
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import WorkspaceMember
 
@@ -84,16 +87,28 @@ async def add_member(db: AsyncSession, actor: Actor, project_id: UUID, user_id: 
     recipient = await load_recipient(db, actor.workspace_id, user_id, lock=True)
     check_recipient(recipient, RecipientPurpose.PROJECT_MEMBER, project_member_ids=None)
     # уже участник — без изменений (D-46); проект заблокирован, ON CONFLICT — страховка
-    await db.execute(
-        pg_insert(ProjectMember)
-        .values(
-            project_id=project_id,
-            user_id=user_id,
-            workspace_id=actor.workspace_id,
-            created_by=actor.user_id,
+    added = (
+        await db.execute(
+            pg_insert(ProjectMember)
+            .values(
+                project_id=project_id,
+                user_id=user_id,
+                workspace_id=actor.workspace_id,
+                created_by=actor.user_id,
+            )
+            .on_conflict_do_nothing(index_elements=["project_id", "user_id"])
+            .returning(ProjectMember.user_id)
         )
-        .on_conflict_do_nothing(index_elements=["project_id", "user_id"])
-    )
+    ).first()
+    if added is not None:  # событие только при реальном добавлении
+        await record_event(
+            db,
+            workspace_id=actor.workspace_id,
+            actor_id=actor.user_id,
+            action=EventAction.MEMBER_ADDED,
+            entity_id=user_id,
+            project_id=project_id,
+        )
 
 
 async def remove_member(db: AsyncSession, actor: Actor, project_id: UUID, user_id: UUID) -> None:
@@ -125,13 +140,50 @@ async def remove_member(db: AsyncSession, actor: Actor, project_id: UUID, user_i
             code=ErrorCode.owner_cannot_be_removed,
         )
     # исполнитель снимается со всех задач проекта, включая подзадачи и удалённые (Q-7)
-    await db.execute(
-        update(Task)
-        .where(Task.project_id == project_id, Task.assignee_id == user_id)
-        .values(assignee_id=None)
-    )
+    unassigned_ids = (
+        await db.scalars(
+            update(Task)
+            .where(Task.project_id == project_id, Task.assignee_id == user_id)
+            .values(assignee_id=None)
+            .returning(Task.id)
+        )
+    ).all()
     await db.execute(
         delete(ProjectMember).where(
             ProjectMember.project_id == project_id, ProjectMember.user_id == user_id
         )
+    )
+    await _record_removal(db, actor, project_id, user_id, unassigned_ids)
+
+
+async def _record_removal(
+    db: AsyncSession, actor: Actor, project_id: UUID, user_id: UUID, unassigned_ids: Sequence[UUID]
+) -> None:
+    """Лента: снятие исполнителя (FR-15a) и исключение участника; значения — у исполнителя."""
+    if unassigned_ids:
+        refs = await user_refs(db, actor.workspace_id, [user_id])
+        old = refs[user_id]
+        change: FieldChange = {
+            "field": "assignee_id",
+            "old": {"id": str(old.id), "login": old.login},
+            "new": None,
+        }
+        for task_id in unassigned_ids:
+            await record_event(
+                db,
+                workspace_id=actor.workspace_id,
+                actor_id=actor.user_id,
+                action=EventAction.TASK_UNASSIGNED_MEMBER_REMOVED,
+                entity_id=task_id,
+                project_id=project_id,
+                changed_fields=["assignee_id"],
+                changes=[change],
+            )
+    await record_event(
+        db,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.user_id,
+        action=EventAction.MEMBER_REMOVED,
+        entity_id=user_id,
+        project_id=project_id,
     )

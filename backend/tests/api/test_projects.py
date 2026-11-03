@@ -863,6 +863,7 @@ EXPECTED_OPERATIONS: set[tuple[str, str]] = {
     ("GET", "/api/v1/projects/{project_id}/tasks"),
     ("POST", "/api/v1/projects/{project_id}/tasks"),
     ("GET", "/api/v1/projects/{project_id}/board"),  # T78
+    ("GET", "/api/v1/projects/{project_id}/activity"),  # T104: лента проекта (ADR-0015)
 }
 
 

@@ -20,7 +20,7 @@ AC-50, AC-99, AC-103, AC-108 (границы), FR-19, FR-19a, FR-19b, FR-20, FR-
 получателя) -> запись; смена статуса верхнего уровня — в конец целевой колонки (FR-28a);
 у подзадачи позиции нет. ``delete_task``: 404 -> ``can_delete_task`` (403) -> строка задачи
 FOR NO KEY UPDATE -> одно ``deleted_at``/``deleted_batch_id`` у задачи, её неудалённых
-подзадач и неудалённых комментариев задачи и подзадач. События не пишутся (D-55).
+подзадач и неудалённых комментариев задачи и подзадач. Лента: ``task.updated``/``task.deleted``.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from tests.projects_support import (
     add_member_row,
     capture_sql,
     comment_row,
-    events,
+    event_actions,
     fails,
     forbidden,
     make_world,
@@ -747,14 +747,14 @@ async def test_ac108_one_invalid_field_rejects_whole_patch(db: AsyncSession, svc
     assert await _snapshot(db, tid) == before
 
 
-async def test_d55_update_and_delete_write_no_events(db: AsyncSession, svc: Any) -> None:
+async def test_feed_update_and_delete_write_task_events(db: AsyncSession, svc: Any) -> None:
     w = await make_world(db)
     tid = await mk_task(db, w)
     await svc.update_task(
         db, actor_of(w.ba), tid, _patch(svc, title="Х", status="done", assignee_id=w.usr.id)
     )
     await svc.delete_task(db, actor_of(w.ba), tid)
-    assert await events(db, w.ws.id) == []
+    assert await event_actions(db, w.ws.id) == ["task.updated", "task.deleted"]
 
 
 async def test_t69_review_update_keeps_workspace_project_and_author(
@@ -908,7 +908,7 @@ async def test_d56_delete_task_cascades_to_subtasks_and_comments_with_one_batch(
         assert (await task_row(db, tid)).deleted_at is None
     for cid in (c_other.id, c_other_sub.id):
         assert (await comment_row(db, cid)).deleted_at is None
-    assert await events(db, w.ws.id) == []
+    assert await event_actions(db, w.ws.id) == ["task.deleted"]
     # повторное удаление и обращение к подзадаче — 404
     await db.commit()  # иначе rollback в not_found() откатит удаление
     await not_found(db, svc.delete_task(db, actor_of(w.ba), parent))

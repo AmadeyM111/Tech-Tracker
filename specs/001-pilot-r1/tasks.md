@@ -1248,7 +1248,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T55 — Лента проекта и признак «объект удалён»
-- **Статус:** SKIPPED (следующая версия) — лента отложена (SC-8)
+- **Статус:** SUPERSEDED → T104 (ADR-0015: лента проекта возвращена в текущую версию)
 - **AC:** AC-90 (проект: создание задачи, смена статуса, исполнителя и срока, комментарий без текста, вложение, участник, владение, архив — по событию; правка названия — без старого и нового значения; не участник — 403; CRM-событий нет), FR-38, FR-25b (окончательно удалённый объект — «объект удалён» в ленте и журнале, без названия и значений), AC-65 (`entity_deleted`), AC-21; plan §4.4 (представления), §10.3 (`ActivityItem`), **Q-5**
 - **Файлы:** `backend/app/domain/activity/service.py`, `backend/app/domain/events/queries.py`
   (`entity_deleted` для project/task/comment/attachment — один запрос на тип для страницы),
@@ -1395,7 +1395,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Попытки:** 0
 
 ## T65 — Поиск и лента проекта
-- **Статус:** SKIPPED (следующая версия) — поиск и лента отложены (SC-8, SC-9)
+- **Статус:** SKIPPED (следующая версия) — поиск отложен (SC-9); лента проекта → T104 (ADR-0015)
 - **AC:** UF-9, UF-10, FR-38, FR-39, FR-29 (опрос ленты проекта), AC-90, AC-92 (интерфейс: «не короче 2 символов», «объект удалён»); NFR-5 (время — Europe/Moscow), NFR-6, NFR-7
 - **Файлы:** `frontend/src/features/search/SearchPage.tsx` (+ `features/search/api.ts`),
   `frontend/src/features/projects/ActivityFeed.tsx` (вкладка «Лента» карточки проекта, `usePolledQuery`);
@@ -2389,6 +2389,41 @@ T69 → T73.
 
 Критический путь (5 задач): **T93 → T94 → T96 → T97 → T99**. T95 — параллельно с T94; T98 — как
 только зафиксирована работа T91/T92, независимо от backend. Риски — plan §11.11 R-M8…R-M11.
+
+---
+
+## T104 — Лента проекта (возврат по ADR-0015)
+- **Статус:** DONE (автоматическая часть; ручная проверка в браузере не выполнялась). `scripts/check.sh`: ruff, mypy, alembic, фронтенд (lint, typecheck, 1388 тестов) зелёные; backend 3798 passed, 81 skipped, 2 failed — `test_t88_readme_mvp_term[экспорт отложен-ru/en]`: фразы нет в README уже в HEAD, задача её не меняет.
+- **Основание:** ADR-0015 (решение владельца 2026-11-03): лента проекта возвращена в текущую версию;
+  ADR-0012 в части SC-8 снят. Лента сделки (SC-1) и поиск (SC-9) остаются отложенными.
+- **AC:** AC-90 (проект: создание задачи, смена статуса, исполнителя и срока, комментарий без
+  текста, участник, правка названия без значений; не участник — 403; CRM-событий нет), FR-38
+  (только проект), FR-25b (окончательно удалённый объект — «объект удалён» без названия и значений),
+  UF-9; plan §4.4 (лента проекта), §10.3 (`ActivityItem`), §10.5 (каталог событий).
+  Вложения (`attachment.*`) в MVP отсутствуют (T49–T51 SKIPPED) — их событий нет.
+- **Файлы:**
+  `backend/app/domain/activity/__init__.py`, `backend/app/domain/activity/service.py` (новый: `project_feed`),
+  `backend/app/api/v1/schemas/activity.py` (новый: `ActivityItem`), `backend/app/api/v1/projects.py`
+  (маршрут `GET /projects/{id}/activity`), `backend/app/domain/projects/service.py` (`project.updated`),
+  `backend/app/domain/projects/members.py` (`member.added/removed`, `task.unassigned_member_removed`),
+  `backend/app/domain/tasks/service.py` (`task.created/updated/deleted`),
+  `backend/app/domain/comments/service.py` (`comment.created/deleted`),
+  `backend/tests/api/test_activity.py` (новый), `backend/tests/projects_support.py` (`event_actions`),
+  `backend/tests/domain/test_project_members_service.py`, `backend/tests/domain/test_projects_service.py`,
+  `backend/tests/domain/test_tasks_create.py`, `backend/tests/domain/test_tasks_update_delete.py`,
+  `backend/tests/domain/test_comments_service.py`, `backend/tests/api/test_audit.py` (аудит: `changes` только вне ленты),
+  `backend/tests/api/test_ba_tasks_002.py` (событие `comment.deleted`), `backend/tests/api/test_projects.py` (операция ленты),
+  `backend/tests/infra/test_frontend_scaffold.py` (новый файл фронтенда),
+  `docs/api/openapi.json`, `docs/adr/0015-activity-feed-returned.md` (новый),
+  `frontend/src/shared/api/schema.d.ts`, `frontend/src/features/projects/api.ts`,
+  `frontend/src/features/projects/ActivityFeed.tsx` (новый), `frontend/src/features/projects/ProjectPage.tsx`,
+  `frontend/src/shared/i18n/ru.ts`, `frontend/tests/features/projects/ActivityFeed.test.tsx` (новый),
+  `frontend/tests/features/projects/ProjectPage.test.tsx`
+  `specs/001-pilot-r1/spec.md` (статусы FR-38/UF-9/AC-90, см. ADR-0015)
+- **Зависит от:** T71, T72, T74, T75, T77, T79, T80, T82, T84
+- **Готово, когда:** `pytest -q backend/tests/api/test_activity.py` и обновлённые доменные тесты
+  зелёные; `bash scripts/check.sh` зелёный; `npm run lint && npm run typecheck && npm test` зелёные.
+- **Попытки:** 0
 
 ---
 
