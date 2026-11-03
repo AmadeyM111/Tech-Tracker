@@ -560,7 +560,7 @@ MVP_README_TERMS: list[tuple[str, str, str]] = [
     (r"вложени", r"attachments?", "вложения отложены"),
     (r"корзин", r"trash|recycle", "корзина отложена"),
     (r"поиск", r"search", "поиск отложен"),
-    (r"экспорт", r"export", "экспорт отложен"),
+    (r"экспорт", r"export", "экспорт и импорт в MVP"),
     (r"резервн\w*\s+копи|бэкап|backup", r"backup", "резервная копия отложена"),
     (
         r"docker compose exec api gostracker demo-data",

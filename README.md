@@ -46,6 +46,9 @@ R1 - прототип таск-трекера (MVP): приёмка R1 прох�
 - задачи: название, описание, исполнитель, срок, приоритет, статус; подзадачи одного уровня и
   прогресс по ним;
 - комментарии: простой текст, HTML вырезается, без упоминаний;
+- лента активности проекта: события по задачам, участникам и комментариям, без текста комментариев
+  (`docs/adr/0015-activity-feed-returned.md`);
+- экспорт и импорт данных (оператор, CLI: `gostracker export` / `gostracker import`);
 - личный список «Мои задачи» и список задач проекта с фильтрами по исполнителю и статусу;
 - канбан-доска с перетаскиванием, ручным порядком карточек и клавиатурной заменой
   перетаскивания;
@@ -60,7 +63,7 @@ R1 - прототип таск-трекера (MVP): приёмка R1 прох�
 - упоминания и уведомления - отложены;
 - корзина, восстановление и окончательное удаление: в MVP нет, отложены; удаление мягкое, а
   удалённое не видно и отвечает 404;
-- поиск, лента активности проекта, архив проекта - отложены;
+- поиск, архив проекта - отложены;
 - фильтры по сроку и общий список задач по всем проектам (FR-27a) - отложены;
 - резервная копия БД - отложена: прототип показывают, работу в нём не ведут;
 - замеры производительности и автоматические e2e-тесты браузера - отложены.
@@ -441,6 +444,9 @@ Included in the MVP demo:
 - tasks: title, description, assignee, due date, priority, status; one-level subtasks and their
   progress;
 - comments: plain text, HTML is stripped, no mentions;
+- project activity feed: events for tasks, members and comments, without comment text
+  (`docs/adr/0015-activity-feed-returned.md`);
+- data export and import (operator, CLI: `gostracker export` / `gostracker import`);
 - the personal "My tasks" list and the project task list with assignee and status filters;
 - a kanban board with drag and drop, manual card order and a keyboard replacement for dragging;
 - server polling (at least every 15 s) on the board, task lists and the task card;
@@ -454,7 +460,7 @@ Deferred (not part of the MVP, planned for the next version):
 - mentions and notifications - deferred;
 - trash, restore and permanent delete: not in the MVP, deferred; deletion is soft, and a deleted
   item is hidden and answers 404;
-- search, the project activity feed, project archive - deferred;
+- search, project archive - deferred;
 - due-date filters and a cross-project task list (FR-27a) - deferred;
 - database backup - deferred: the prototype is shown, not used for real work;
 - performance measurements and automated browser e2e tests - deferred.
