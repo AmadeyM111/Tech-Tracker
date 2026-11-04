@@ -50,6 +50,7 @@ R1 - прототип таск-трекера (MVP): приёмка R1 прох�
 - канбан-доска с перетаскиванием, ручным порядком карточек и клавиатурной заменой
   перетаскивания;
 - опрос сервера (не реже раза в 15 с) на доске, в списках задач и в карточке задачи;
+- экспорт и импорт данных оператором (CLI `gostracker export` и `gostracker import`, ADR-0015);
 - демо-данные одной командой (см. ниже).
 
 Отложено (не входит в MVP, вернётся в следующей версии):
@@ -62,7 +63,6 @@ R1 - прототип таск-трекера (MVP): приёмка R1 прох�
   удалённое не видно и отвечает 404;
 - поиск, лента активности проекта, архив проекта - отложены;
 - фильтры по сроку и общий список задач по всем проектам (FR-27a) - отложены;
-- экспорт и импорт - отложены;
 - резервная копия БД - отложена: прототип показывают, работу в нём не ведут;
 - замеры производительности и автоматические e2e-тесты браузера - отложены.
 
@@ -348,6 +348,16 @@ cd frontend && npm ci && npm run dev                  # фронтенд на :5
 В dev-режиме пароль первого администратора лежит в `.data/secrets/initial-admin-password.txt`
 (`DATA_DIR=./.data` из `deploy/dev.env.example`).
 
+Экспорт и импорт данных (оператор, CLI):
+
+```bash
+gostracker export --out /backup/gostracker-export.tar   # tar с data.json, режим 0600
+gostracker import /backup/gostracker-export.tar         # только в пустую систему
+```
+
+`import` заменяет автоданные первого администратора данными архива и отказывает (код 2),
+если в системе уже есть данные или версия схемы архива другая. Сессии входа не переносятся.
+
 ### Node.js
 
 Фронтенду нужен Node.js `^22.12 || ^24 || >=26` (поле `engines` в `frontend/package.json`;
@@ -435,6 +445,7 @@ Included in the MVP demo:
 - the personal "My tasks" list and the project task list with assignee and status filters;
 - a kanban board with drag and drop, manual card order and a keyboard replacement for dragging;
 - server polling (at least every 15 s) on the board, task lists and the task card;
+- data export and import by the operator (CLI `gostracker export` and `gostracker import`, ADR-0015);
 - demo data with one command (see below).
 
 Deferred (not part of the MVP, planned for the next version):
@@ -447,7 +458,6 @@ Deferred (not part of the MVP, planned for the next version):
   item is hidden and answers 404;
 - search, the project activity feed, project archive - deferred;
 - due-date filters and a cross-project task list (FR-27a) - deferred;
-- export and import - deferred;
 - database backup - deferred: the prototype is shown, not used for real work;
 - performance measurements and automated browser e2e tests - deferred.
 
@@ -744,6 +754,17 @@ cd frontend && npm ci && npm run dev                  # frontend on :5173, /api 
 
 In dev mode the first administrator password is in `.data/secrets/initial-admin-password.txt`
 (`DATA_DIR=./.data` from `deploy/dev.env.example`).
+
+Export and import of data (operator, CLI):
+
+```bash
+gostracker export --out /backup/gostracker-export.tar   # tar with data.json, mode 0600
+gostracker import /backup/gostracker-export.tar         # into an empty system only
+```
+
+`import` replaces the first administrator's automatic data with the archive's data and refuses
+(exit code 2) if the system already has data or the archive's schema version differs. Login
+sessions are not transferred.
 
 ### Node.js
 
