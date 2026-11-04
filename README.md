@@ -50,6 +50,7 @@ R1 - прототип таск-трекера (MVP): приёмка R1 прох�
 - канбан-доска с перетаскиванием, ручным порядком карточек и клавиатурной заменой
   перетаскивания;
 - опрос сервера (не реже раза в 15 с) на доске, в списках задач и в карточке задачи;
+- экспорт и импорт данных оператором (CLI `gostracker export` и `gostracker import`, ADR-0015);
 - демо-данные одной командой (см. ниже).
 
 Отложено (не входит в MVP, вернётся в следующей версии):
@@ -444,6 +445,7 @@ Included in the MVP demo:
 - the personal "My tasks" list and the project task list with assignee and status filters;
 - a kanban board with drag and drop, manual card order and a keyboard replacement for dragging;
 - server polling (at least every 15 s) on the board, task lists and the task card;
+- data export and import by the operator (CLI `gostracker export` and `gostracker import`, ADR-0015);
 - demo data with one command (see below).
 
 Deferred (not part of the MVP, planned for the next version):
