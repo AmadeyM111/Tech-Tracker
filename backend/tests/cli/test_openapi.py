@@ -288,7 +288,13 @@ def test_d32_operation_ids_unique_and_equal_function_names(spec: dict[str, Any])
 
 def test_d33_error_responses_declared(spec: dict[str, Any]) -> None:
     """D-33: 401/403/404/422 описаны там, где возможны: админка, /me, пароль, logout."""
-    public = {("POST", "/api/v1/auth/login"), ("GET", "/api/v1/health")}
+    public = {
+        ("POST", "/api/v1/auth/login"),
+        ("GET", "/api/v1/health"),
+        ("GET", "/api/v1/auth/password-reset/status"),  # R7-T11
+        ("POST", "/api/v1/auth/password-reset/request"),  # R7-T11
+        ("POST", "/api/v1/auth/password-reset/confirm"),  # R7-T12
+    }
     for method, path, op in _operations(spec):
         responses = op["responses"]
         if (method, path) in public:
@@ -393,6 +399,9 @@ BODY_ROUTES_400 = {
     ("POST", "/api/v1/admin/users"),
     ("POST", "/api/v1/admin/users/{user_id}/reset-password"),
     ("PUT", "/api/v1/admin/users/{user_id}/role"),
+    ("PUT", "/api/v1/admin/users/{user_id}/email"),  # R7-T10
+    ("POST", "/api/v1/auth/password-reset/request"),  # R7-T11
+    ("POST", "/api/v1/auth/password-reset/confirm"),  # R7-T12
     ("POST", "/api/v1/projects"),
     ("PATCH", "/api/v1/projects/{user_id}"),
     ("PUT", "/api/v1/projects/{user_id}/owner"),

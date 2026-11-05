@@ -22,6 +22,10 @@ USER_ACTIONS = {
     "user.role_assigned",
     "user.role_changed",
     "user.role_removed",
+    # 007 (plan PR-4, Q-1, Q-10)
+    "user.email_changed",
+    "user.password_reset_requested",
+    "user.password_reset_completed",
 }
 
 F = frozenset
@@ -171,3 +175,25 @@ def test_t30_project_feed_actions_are_exactly_the_r11_non_user_set() -> None:
     feed_project: Any = {a.value for a, s in EVENT_CATALOG.items() if s.feed == "project"}
     assert feed_project == set(EXPECTED)
     assert all(s.feed is None for a, s in EVENT_CATALOG.items() if a.value in USER_ACTIONS)
+
+
+_NEW_007 = ("user.email_changed", "user.password_reset_requested", "user.password_reset_completed")
+
+
+@pytest.mark.parametrize("action", _NEW_007)
+def test_007_new_user_events_are_audited_user_events(action: str) -> None:
+    """R7-T05 / FR-2, FR-15, AC-12: три новых события - аудируемые user.* без полей и ленты."""
+    assert action in {m.value for m in EventAction}
+    spec = _spec(action)
+    assert spec.entity_type == EntityType.USER
+    assert spec.audit is True
+    assert spec.feed is None
+    assert spec.deal_history is False
+    assert spec.fields == frozenset()
+    assert spec.value_fields == frozenset()
+
+
+def test_007_legacy_password_reset_kept_distinct_from_new_events() -> None:
+    """Старое user.password_reset (админский сброс) не заменено и не переименовано."""
+    assert "user.password_reset" in {m.value for m in EventAction}
+    assert len({m.value for m in EventAction}) == len(list(EventAction))

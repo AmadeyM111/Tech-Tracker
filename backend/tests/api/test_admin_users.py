@@ -1100,6 +1100,7 @@ async def test_t17_openapi_declares_all_admin_user_operations(api_env: ApiEnv) -
         ("POST", "/api/v1/admin/users/{user_id}/reset-password"),
         ("POST", "/api/v1/admin/users/{user_id}/revoke-sessions"),
         ("PUT", "/api/v1/admin/users/{user_id}/role"),
+        ("PUT", "/api/v1/admin/users/{user_id}/email"),
     }
     normalized = {(m, re.sub(r"\{[^}]+\}", "{user_id}", p)) for (m, p) in ops}
     assert normalized == expected
@@ -1109,7 +1110,7 @@ async def test_t17_operation_id_equals_function_name_and_is_unique(api_env: ApiE
     from tests.api.test_route_guards import _iter_routes
 
     ops = _admin_operations(api_env)
-    assert len(ops) == 8
+    assert len(ops) == 9
     ids = [op["operationId"] for op in ops.values()]
     assert len(ids) == len(set(ids))
     by_path: dict[tuple[str, str], str] = {}
@@ -1126,7 +1127,7 @@ async def test_d15_t17_openapi_responses_have_no_password_fields(api_env: ApiEnv
     schema = api_env.app.openapi()
     schemas = schema["components"]["schemas"]
     operations = _admin_operations(api_env)
-    assert len(operations) == 8
+    assert len(operations) == 9
     for key, op in operations.items():
         seen: set[str] = set()
         _collect_refs(op.get("responses", {}), schemas, seen)

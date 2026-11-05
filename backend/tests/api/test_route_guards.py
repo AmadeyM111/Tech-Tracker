@@ -34,7 +34,13 @@ LOGIN_URL = "/api/v1/auth/login"
 LOGOUT_URL = "/api/v1/auth/logout"
 PASSWORD_URL = "/api/v1/auth/password"
 PUBLIC: frozenset[tuple[str, str]] = frozenset(
-    {("POST", "/api/v1/auth/login"), ("GET", "/api/v1/health")}
+    {
+        ("POST", "/api/v1/auth/login"),
+        ("GET", "/api/v1/health"),
+        ("GET", "/api/v1/auth/password-reset/status"),  # R7-T11
+        ("POST", "/api/v1/auth/password-reset/request"),  # R7-T11
+        ("POST", "/api/v1/auth/password-reset/confirm"),  # R7-T12
+    }
 )
 SOME_ID = "6f9619ff-8b86-4d11-b42d-00c04fc964ff"
 

@@ -97,6 +97,10 @@ async def _build_previous_version_installation(
     from app.domain.system.bootstrap import run_bootstrap
 
     await to_schema_0005(env)
+    # 007: в схеме 0005 нет app_user.email, а ORM-модель AppUser её вставляет (код приложения
+    # этого теста - run_bootstrap / load_demo_data - идёт через ORM). Колонка добавляется на время
+    # создания данных и снимается до обновления: миграция 0008 создаёт её сама (NULL).
+    await env.execute(text("ALTER TABLE app_user ADD COLUMN email varchar(254)"))
     settings = env.settings
     settings.secrets_dir.mkdir(parents=True, exist_ok=True)
     settings.secrets_dir.chmod(0o700)
@@ -118,6 +122,8 @@ async def _build_previous_version_installation(
         mp.setattr(demo, "_REGULAR_PRIORITY", "base")
         await demo.load_demo_data(env.sessionmaker, settings, clock=clock, seed=1)
 
+    await env.execute(text("ALTER TABLE app_user DROP COLUMN email"))
+    await env.sessionmaker.kw["bind"].dispose()
     passwords = {"admin": FIRST_ADMIN_PASSWORD}
     passwords.update(_demo_passwords(env))
     return passwords

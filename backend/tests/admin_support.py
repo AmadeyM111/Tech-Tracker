@@ -24,7 +24,15 @@ ADMIN_USERS = "/api/v1/admin/users"
 PW = "Sup3r-secret-Pa55phrase-xyz"
 OTP = "Tmp-Pa55phrase-xyz-777"
 OTP_FIELD = "one_time_password"  # plan §4.6: {login, one_time_password}
-ADMIN_VIEW_FIELDS = {"id", "login", "role", "is_blocked", "must_change_password", "created_at"}
+ADMIN_VIEW_FIELDS = {
+    "id",
+    "login",
+    "email",
+    "role",
+    "is_blocked",
+    "must_change_password",
+    "created_at",
+}
 
 
 def code_of(response: httpx.Response) -> str:

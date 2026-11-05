@@ -17,6 +17,7 @@ from app.core.db import create_engine
 from app.domain.ops.archive import (
     FORMAT,
     encode_value,
+    exported_columns,
     iso_utc,
     payload_bytes,
     tables_in_order,
@@ -26,7 +27,7 @@ from app.domain.ops.archive import (
 
 async def _read_table(conn: AsyncConnection, table: Any) -> list[dict[str, Any]]:
     primary_key = list(table.primary_key.columns)
-    result = await conn.execute(select(table).order_by(*primary_key))
+    result = await conn.execute(select(*exported_columns(table)).order_by(*primary_key))
     return [{key: encode_value(value) for key, value in row.items()} for row in result.mappings()]
 
 

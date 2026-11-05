@@ -35,6 +35,8 @@ class AppUser(UUIDPkMixin, TimestampMixin, AuthoredMixin, Base):
         # D-66: показ совпадает с ключом с точностью до регистра латинских букв; COLLATE "C"
         # делает lower() ASCII-only и независимым от локали БД (знак Кельвина не приводится).
         CheckConstraint('lower(login_display COLLATE "C") = login', name="login_display_lower"),
+        # 007/PR-1: email хранится в нижнем регистре (нормализует сервис); NULL допустим.
+        CheckConstraint('lower(email COLLATE "C") = email', name="email_lower"),
     )
 
     # КЛЮЧ: нормализованный вид (вход, уникальность, поиск, сортировка). НЕ показывать.
@@ -43,6 +45,7 @@ class AppUser(UUIDPkMixin, TimestampMixin, AuthoredMixin, Base):
     login_display: Mapped[str] = mapped_column(
         String(64), nullable=False, default=_login_display_default
     )
+    email: Mapped[str | None] = mapped_column(String(254), unique=True, nullable=True)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False)
     is_blocked: Mapped[bool] = mapped_column(Boolean, nullable=False)

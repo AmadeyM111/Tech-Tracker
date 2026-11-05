@@ -2,7 +2,7 @@
 
 Одноразовый пароль приходит только в запросе (``SecretStr``: в ``repr``, ``model_dump`` и
 сообщения 422 значение не попадает; в OpenAPI поле — ``format: password``, ``writeOnly``).
-В ответах паролей, хешей и счётчиков входа нет: ``AdminUser`` — ровно шесть полей.
+В ответах паролей, хешей и счётчиков входа нет: ``AdminUser`` — ровно семь полей, включая ``email``.
 """
 
 from __future__ import annotations
@@ -16,6 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.api.v1.schemas.auth import MAX_CREDENTIAL_LENGTH, Password
 from app.domain.access.roles import Role
 
+EMAIL_MAX_LENGTH = 254
+
 
 class AdminUser(BaseModel):
     """Учётная запись в разделе администрирования (``GET``, ``POST``, ``PUT …/role``)."""
@@ -28,6 +30,7 @@ class AdminUser(BaseModel):
     is_blocked: bool
     must_change_password: bool
     created_at: datetime
+    email: str | None
 
 
 class CreateUserRequest(BaseModel):
@@ -37,6 +40,7 @@ class CreateUserRequest(BaseModel):
 
     login: Annotated[str, Field(max_length=MAX_CREDENTIAL_LENGTH)]
     one_time_password: Password
+    email: Annotated[str | None, Field(max_length=EMAIL_MAX_LENGTH)] = None
 
 
 class ResetPasswordRequest(BaseModel):
@@ -53,3 +57,11 @@ class SetRoleRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     role: Role | None
+
+
+class SetEmailRequest(BaseModel):
+    """``PUT /admin/users/{user_id}/email``: ``""`` и ``null`` очищают адрес (FR-2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: Annotated[str | None, Field(max_length=EMAIL_MAX_LENGTH)]

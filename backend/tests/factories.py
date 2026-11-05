@@ -96,6 +96,7 @@ async def make_user(
     password_hash: str | None = None,
     blocked: bool = False,
     must_change_password: bool = False,
+    email: str | None = None,
 ) -> UserRow:
     """Пользователь + строка ``workspace_member`` (роль ``None`` = «без роли», FR-66).
 
@@ -110,10 +111,12 @@ async def make_user(
     user_id = uuid.uuid4()
     the_hash = password_hash or _hash_password(password)
     the_login = login or next_login()
+    email_values: dict[str, str] = {} if email is None else {"email": email}
     await db.execute(
         get_table("app_user")
         .insert()
         .values(
+            **email_values,
             id=user_id,
             login=the_login.lower(),
             login_display=the_login,

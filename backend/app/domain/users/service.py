@@ -30,7 +30,7 @@ FR-65, FR-66, FR-69, FR-73).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import TYPE_CHECKING, Final
 from uuid import UUID, uuid4
@@ -38,10 +38,11 @@ from uuid import UUID, uuid4
 from pydantic import SecretStr
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import load_only
 
 from app.core.clock import utcnow
-from app.core.errors import ErrorCode, Forbidden, NotFound, Unprocessable
+from app.core.errors import EmailTaken, ErrorCode, Forbidden, NotFound, Unprocessable
 from app.core.pagination import PageParams, paginate
 from app.core.security.passwords import (
     PasswordHasher,
@@ -54,6 +55,7 @@ from app.domain.auth.provider import normalize_login
 from app.domain.auth.sessions import SessionStore
 from app.domain.events.catalog import EventAction
 from app.domain.events.writer import UserEventDetails, record_event
+from app.domain.users.email import normalize_email
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import WorkspaceMember
 
@@ -79,6 +81,7 @@ class UserAccount:
     is_blocked: bool
     must_change_password: bool
     created_at: datetime
+    email: str | None
 
 
 @dataclass(frozen=True)
@@ -89,6 +92,7 @@ class _Target:
     is_blocked: bool
     must_change_password: bool
     created_at: datetime
+    email: str | None
 
     @property
     def is_active_account_admin(self) -> bool:
@@ -102,6 +106,7 @@ class _Target:
             is_blocked=self.is_blocked,
             must_change_password=self.must_change_password,
             created_at=self.created_at,
+            email=self.email,
         )
 
 
@@ -145,6 +150,7 @@ async def _load_target(db: AsyncSession, workspace_id: UUID, user_id: UUID) -> _
             AppUser.is_blocked,
             AppUser.must_change_password,
             AppUser.created_at,
+            AppUser.email,
             WorkspaceMember.role,
         )
         .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
@@ -160,6 +166,7 @@ async def _load_target(db: AsyncSession, workspace_id: UUID, user_id: UUID) -> _
         is_blocked=row.is_blocked,
         must_change_password=row.must_change_password,
         created_at=row.created_at,
+        email=row.email,
     )
 
 
@@ -250,6 +257,31 @@ async def ensure_account_admin_remains(db: AsyncSession, workspace_id: UUID) -> 
         )
 
 
+def _parse_email(email: str | None) -> str | None:
+    """Пустой ввод (``None``, пробелы) -> ``None``; недопустимый -> 422 ``email_invalid``."""
+    if email is None or not email.strip(" "):
+        return None
+    normalized = normalize_email(email)
+    if normalized is None:
+        raise Unprocessable("Недопустимый email", code=ErrorCode.email_invalid)
+    return normalized
+
+
+async def _ensure_email_free(db: AsyncSession, email: str, own_id: UUID | None) -> None:
+    """Адрес не занят другим пользователем (любого пространства, в том числе заблокированным)."""
+    stmt = select(AppUser.id).where(AppUser.email == email)
+    if own_id is not None:
+        stmt = stmt.where(AppUser.id != own_id)
+    if (await db.execute(stmt)).first() is not None:
+        raise EmailTaken()
+
+
+def _raise_if_email_conflict(exc: IntegrityError) -> None:
+    """Гонка за адрес: нарушение ``uq_app_user_email`` -> ``EmailTaken`` (значение не выводится)."""
+    if "uq_app_user_email" in str(exc.orig):
+        raise EmailTaken() from None
+
+
 async def create_user(
     db: AsyncSession,
     actor: Actor,
@@ -257,6 +289,7 @@ async def create_user(
     *,
     login: str,
     one_time_password: SecretStr,
+    email: str | None = None,
 ) -> UserAccount:
     """Создаёт пользователя без роли с одноразовым паролем (FR-4, FR-66, FR-73, AC-121).
 
@@ -265,7 +298,9 @@ async def create_user(
     ``login``); занят — ``login_taken`` (в том числе пользователем другого пространства:
     логин глобален).
     ``must_change_password = true``. Событие ``user.created``. Порядок проверок:
-    ``login_invalid`` -> ``login_taken`` -> политика пароля (FR-52/FR-53). Протокол блокировок
+    ``login_invalid`` -> ``login_taken`` -> ``email_invalid`` (422) -> ``email_taken`` (409) ->
+    политика пароля (FR-52/FR-53). Пустой ``email`` (``None``, ``""``) допустим и хранится
+    как NULL. Протокол блокировок
     (с автором в роли цели) — после хеширования; одновременное создание того же логина
     отсекает ``ON CONFLICT DO NOTHING``.
     """
@@ -278,6 +313,9 @@ async def create_user(
     ).scalar_one_or_none()
     if taken is not None:
         raise Unprocessable("Логин уже занят", code=ErrorCode.login_taken)
+    normalized_email = _parse_email(email)
+    if normalized_email is not None:
+        await _ensure_email_free(db, normalized_email, None)
 
     password = one_time_password.get_secret_value()
     _check_one_time_password(password)
@@ -286,26 +324,31 @@ async def create_user(
 
     user_id = uuid4()
     now = utcnow()
-    inserted = (
-        await db.execute(
-            pg_insert(AppUser)
-            .values(
-                id=user_id,
-                login=normalized,
-                login_display=login,
-                password_hash=password_hash,
-                must_change_password=True,
-                is_blocked=False,
-                failed_login_count=0,
-                password_changed_at=now,
-                created_at=now,
-                updated_at=now,
-                created_by=actor.user_id,
-            )
-            .on_conflict_do_nothing(index_elements=[AppUser.login])
-            .returning(AppUser.created_at)
+    insert_stmt = (
+        pg_insert(AppUser)
+        .values(
+            id=user_id,
+            login=normalized,
+            login_display=login,
+            email=normalized_email,
+            password_hash=password_hash,
+            must_change_password=True,
+            is_blocked=False,
+            failed_login_count=0,
+            password_changed_at=now,
+            created_at=now,
+            updated_at=now,
+            created_by=actor.user_id,
         )
-    ).one_or_none()
+        .on_conflict_do_nothing(index_elements=[AppUser.login])
+        .returning(AppUser.created_at)
+    )
+    try:
+        async with db.begin_nested():
+            inserted = (await db.execute(insert_stmt)).one_or_none()
+    except IntegrityError as exc:
+        _raise_if_email_conflict(exc)
+        raise
     if inserted is None:  # параллельное создание того же логина
         raise Unprocessable("Логин уже занят", code=ErrorCode.login_taken)
     await db.execute(
@@ -332,6 +375,7 @@ async def create_user(
         is_blocked=False,
         must_change_password=True,
         created_at=inserted.created_at,
+        email=normalized_email,
     )
 
 
@@ -529,6 +573,7 @@ async def list_accounts(
                 AppUser.is_blocked,
                 AppUser.must_change_password,
                 AppUser.created_at,
+                AppUser.email,
             )
         )
         .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
@@ -553,6 +598,7 @@ async def list_accounts(
             is_blocked=user.is_blocked,
             must_change_password=user.must_change_password,
             created_at=user.created_at,
+            email=user.email,
         )
         for user in users
     ]
@@ -564,3 +610,42 @@ async def get_account(db: AsyncSession, actor: Actor, user_id: UUID, /) -> UserA
     _require(actor, Capability.MANAGE_ACCOUNTS)
     target = await _load_target(db, actor.workspace_id, user_id)
     return target.to_account(role=target.role)
+
+
+async def set_email(
+    db: AsyncSession, actor: Actor, user_id: UUID, email: str | None, /
+) -> UserAccount:
+    """Задаёт или очищает email пользователя (FR-2, AC-1).
+
+    Порядок: права (403) -> нормализация (422 ``email_invalid``; ``""``/``None`` -> очистка) ->
+    блокировки и загрузка цели (404) -> то же значение без изменений и без события -> занят
+    другим (409 ``email_taken``) -> UPDATE и событие ``user.email_changed`` (без значений).
+    Сессии не затрагиваются.
+    """
+    _require(actor, Capability.MANAGE_ACCOUNTS)
+    new_email = _parse_email(email)
+    await _lock_for_account_change(db, actor.workspace_id, user_id, actor.user_id)
+    target = await _load_target(db, actor.workspace_id, user_id)
+    if target.email == new_email:
+        return target.to_account(role=target.role)
+    if new_email is not None:
+        await _ensure_email_free(db, new_email, target.id)
+    try:
+        async with db.begin_nested():
+            await db.execute(
+                update(AppUser)
+                .where(AppUser.id == target.id)
+                .values(email=new_email, updated_at=utcnow())
+                .execution_options(synchronize_session=False)
+            )
+    except IntegrityError as exc:
+        _raise_if_email_conflict(exc)
+        raise
+    await record_event(
+        db,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.user_id,
+        action=EventAction.USER_EMAIL_CHANGED,
+        entity_id=target.id,
+    )
+    return replace(target, email=new_email).to_account(role=target.role)

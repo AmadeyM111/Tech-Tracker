@@ -244,12 +244,14 @@ def test_t21_src_files_only_expected() -> None:
         "shared/i18n/ru.ts", "shared/i18n/index.ts",
         # T23
         "app/router.tsx", "features/auth/api.ts", "features/auth/LoginPage.tsx",
-        "features/auth/ChangePasswordPage.tsx", "features/auth/NoRolePage.tsx",
+        "features/auth/ChangePasswordPage.tsx", "features/auth/PasswordResetConfirmPage.tsx",
+        "features/auth/NoRolePage.tsx",
         "features/auth/useLogout.ts", "shared/ui/TextField.tsx",
         "shared/ui/ErrorAlert.tsx", "shared/ui/ui.css",
         # T24
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
-        "features/admin/password.ts", "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
+        "features/admin/password.ts", "features/admin/EmailDialog.tsx",
+        "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
         # T81
         "shared/ui/UserPicker.tsx", "features/users/api.ts",
         # T82
@@ -268,6 +270,8 @@ def test_t21_src_files_only_expected() -> None:
         "shared/ui/Icon.tsx",
         # T103
         "features/auth/session.ts",
+        # 007/R7-T17
+        "features/auth/PasswordResetRequestPage.tsx",
     }  # fmt: skip
     assert {"main.tsx", "app/App.tsx", "app/providers.tsx"} <= found
     assert found <= allowed, f"лишние файлы: {sorted(found - allowed)}"

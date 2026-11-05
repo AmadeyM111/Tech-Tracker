@@ -240,7 +240,7 @@ async def change_own_password(
     await sessions.delete_all_for_user(db, actor.user_id, keep_id=actor.session_id)
 
     # ПОСЛЕДНИМ действием: после этой точки фиксаций до COMMIT запроса быть не должно
-    _remove_initial_admin_file_after_commit(db, settings, actor.login)
+    remove_initial_admin_file_after_commit(db, settings, actor.login)
 
 
 def _check_new_password(current: str, new: str) -> None:
@@ -267,7 +267,7 @@ async def _reset_series(db: AsyncSession, reservation: AttemptReservation, now: 
     )
 
 
-def _remove_initial_admin_file_after_commit(
+def remove_initial_admin_file_after_commit(
     db: AsyncSession, settings: Settings, login: str
 ) -> None:
     """Удаляет файл пароля первого ТА (FR-6) после успешного COMMIT текущей транзакции.

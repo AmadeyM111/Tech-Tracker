@@ -82,6 +82,8 @@ class ErrorCode(StrEnum):
     search_query_too_short = "search_query_too_short"
     # [006]
     due_date_in_past = "due_date_in_past"
+    # [007]
+    email_invalid = "email_invalid"
 
 
 class AppError(Exception):
@@ -144,6 +146,24 @@ class ProjectArchived(AppError):
     status_code = 409
     code = "project_archived"
     default_detail = "Проект в архиве"
+
+
+class FeatureDisabled(AppError):
+    status_code = 404
+    code = "feature_disabled"
+    default_detail = "Функция отключена"
+
+
+class ResetTokenInvalid(AppError):
+    status_code = 400
+    code = "reset_token_invalid"
+    default_detail = "Ссылка для сброса пароля недействительна"
+
+
+class EmailTaken(AppError):
+    status_code = 409
+    code = "email_taken"
+    default_detail = "Email уже используется"
 
 
 class PayloadTooLarge(AppError):

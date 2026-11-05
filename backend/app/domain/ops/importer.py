@@ -23,6 +23,7 @@ from app.domain.ops.archive import (
     FORMAT,
     ImportRefused,
     decode_value,
+    exported_columns,
     read_data_member,
     tables_in_order,
 )
@@ -31,7 +32,14 @@ from app.domain.system.bootstrap import INITIAL_ADMIN_FILE
 # Таблицы, которые должны быть пустыми (кроме автоданных первого ТА и воронки по умолчанию).
 BUSINESS_TABLES: Final = ("project", "project_member", "task", "comment", "domain_event")
 # Автоданные установки, которые импорт заменяет; domain_event не трогается (триггер запрещает).
-AUTO_TABLES: Final = ("user_session", "workspace_member", "app_user", "workspace")
+AUTO_TABLES: Final = (
+    "password_reset_token",
+    "password_reset_attempt",
+    "user_session",
+    "workspace_member",
+    "app_user",
+    "workspace",
+)
 
 
 def parse_rows(raw: bytes, *, schema_version: str) -> dict[str, list[dict[str, Any]]]:
@@ -57,7 +65,7 @@ def parse_rows(raw: bytes, *, schema_version: str) -> dict[str, list[dict[str, A
 def _decode_table(name: str, rows: Any, table: sa.Table) -> list[dict[str, Any]]:
     if not isinstance(rows, list):
         raise ImportRefused(f"таблица {name} задана не списком")
-    columns = {column.name for column in table.columns}
+    columns = {column.name for column in exported_columns(table)}
     decoded: list[dict[str, Any]] = []
     for row in rows:
         if not isinstance(row, dict) or set(row) != columns:

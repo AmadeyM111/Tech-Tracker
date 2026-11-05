@@ -409,6 +409,32 @@ async def api_env_secure(
         yield env
 
 
+RESET_SETTINGS = {
+    "smtp_host": "smtp.invalid",
+    "smtp_from": "tracker@example.test",
+    "public_base_url": "https://tracker.example.test",
+}
+
+
+@pytest_asyncio.fixture
+async def reset_api_env(
+    settings: Settings,
+    fixed_clock: FixedClock,
+    db_sessionmaker: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[ApiEnv]:
+    """Сброс пароля включён (plan §4.6); письма пишет ``RecordingMailer`` в ``app.state.mailer``."""
+    from app.main import create_app
+    from tests.mail_support import RecordingMailer
+
+    enabled = settings.model_copy(update=RESET_SETTINGS)
+    application = create_app(enabled, clock=fixed_clock)
+    async for env in _open_api_env(
+        application, enabled, fixed_clock, db_sessionmaker, "http://testserver"
+    ):
+        application.state.mailer = RecordingMailer()
+        yield env
+
+
 @pytest_asyncio.fixture
 async def committed_api_env(
     app: FastAPI,

@@ -7,8 +7,10 @@
 
 Строки отсортированы по первичному ключу; ключи JSON отсортированы; ``uuid`` — строки,
 ``timestamptz`` — ISO 8601 UTC с микросекундами и ``Z``, ``date`` — ``YYYY-MM-DD``.
-Сессии (``user_session``) не выгружаются. Членов ``files/`` в этой версии нет: вложений
-в схеме пока нет. Всё, что не совпадает с ожидаемым форматом, отвергается как ``ImportRefused``.
+Сессии (``user_session``), таблицы сброса пароля (``password_reset_token``,
+``password_reset_attempt``) и колонка ``app_user.email`` не выгружаются.
+Членов ``files/`` в этой версии нет: вложений в схеме пока нет.
+Всё, что не совпадает с ожидаемым форматом, отвергается как ``ImportRefused``.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ import io
 import json
 import os
 import tarfile
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, Final
@@ -37,7 +40,11 @@ from app.core.models import Base
 FORMAT: Final = "gostracker-export"
 DATA_MEMBER: Final = "data.json"
 # Сессии входа не переносятся: их идентификаторы — секреты текущей установки.
-EXCLUDED_TABLES: Final = frozenset({"user_session"})
+EXCLUDED_TABLES: Final = frozenset(
+    {"user_session", "password_reset_token", "password_reset_attempt"}
+)
+# Колонки, не попадающие в архив (персональные данные); после импорта они NULL.
+EXCLUDED_COLUMNS: Final[Mapping[str, frozenset[str]]] = {"app_user": frozenset({"email"})}
 MAX_DATA_BYTES: Final = 1024 * 1024 * 1024  # 1 GiB: защита от архива-бомбы
 
 
@@ -48,6 +55,12 @@ class ImportRefused(Exception):
 def tables_in_order() -> list[sa.Table]:
     """Таблицы для выгрузки в порядке зависимостей FK: родители раньше потомков."""
     return [t for t in Base.metadata.sorted_tables if t.name not in EXCLUDED_TABLES]
+
+
+def exported_columns(table: sa.Table) -> list[sa.Column[Any]]:
+    """Колонки таблицы, входящие в архив (без ``EXCLUDED_COLUMNS``)."""
+    skipped = EXCLUDED_COLUMNS.get(table.name, frozenset())
+    return [column for column in table.columns if column.name not in skipped]
 
 
 def iso_utc(value: datetime) -> str:

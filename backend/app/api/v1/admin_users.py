@@ -16,11 +16,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.api.deps import get_active_actor, require_capability
-from app.api.openapi import error_responses
+from app.api.openapi import error_response, error_responses
 from app.api.v1.schemas.admin import (
     AdminUser,
     CreateUserRequest,
     ResetPasswordRequest,
+    SetEmailRequest,
     SetRoleRequest,
 )
 from app.core.db import DbSession
@@ -55,14 +56,25 @@ async def list_users(
     )
 
 
-@router.post("", status_code=201, response_model=AdminUser, responses=error_responses(400, 422))
+@router.post(
+    "",
+    status_code=201,
+    response_model=AdminUser,
+    responses=error_responses(400, 422)
+    | error_response(409, "Email уже используется (code: email_taken)"),
+)
 async def create_user(
     body: CreateUserRequest, request: Request, db: DbSession, actor: CurrentActor
 ) -> AdminUser:
     """Создаёт пользователя без роли с одноразовым паролем из запроса (FR-4, D-15)."""
     hasher: PasswordHasher = request.app.state.password_hasher
     account = await service.create_user(
-        db, actor, hasher, login=body.login, one_time_password=body.one_time_password
+        db,
+        actor,
+        hasher,
+        login=body.login,
+        one_time_password=body.one_time_password,
+        email=body.email,
     )
     return AdminUser.model_validate(account)
 
@@ -148,4 +160,18 @@ async def set_role(
 ) -> AdminUser:
     """Назначает, меняет или снимает роль (FR-12); сессии и пароль не затрагиваются."""
     account = await service.set_role(db, actor, user_id, body.role)
+    return AdminUser.model_validate(account)
+
+
+@router.put(
+    "/{user_id}/email",
+    response_model=AdminUser,
+    responses=error_responses(400, 404, 422)
+    | error_response(409, "Email уже используется (code: email_taken)"),
+)
+async def set_email(
+    user_id: UUID, body: SetEmailRequest, db: DbSession, actor: CurrentActor
+) -> AdminUser:
+    """Задаёт или очищает email пользователя (FR-2); сессии не затрагиваются."""
+    account = await service.set_email(db, actor, user_id, body.email)
     return AdminUser.model_validate(account)

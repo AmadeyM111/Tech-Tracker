@@ -30,6 +30,13 @@ SETTINGS_FIELDS = (
     "attachment_max_bytes",
     "attachments_per_task",
     "trash_retention",
+    "smtp_host",
+    "smtp_port",
+    "smtp_user",
+    "smtp_password",
+    "smtp_from",
+    "smtp_starttls",
+    "public_base_url",
 )
 
 
@@ -145,3 +152,150 @@ def test_nfr5_get_settings_cache_clear_rereads_environment(
     assert config.get_settings().cookie_name == "gt_session"  # кеш
     config.get_settings.cache_clear()
     assert config.get_settings().cookie_name == "changed"
+
+
+# --- 007 (R7-T02): SMTP и PUBLIC_BASE_URL, plan §4.2, PR-10 -----------------------------
+
+_SMTP_NONE_FIELDS = ("smtp_host", "smtp_user", "smtp_password", "smtp_from", "public_base_url")
+
+
+def test_007_fr3_defaults_feature_disabled(config: Any) -> None:
+    s = config.Settings()
+    for name in _SMTP_NONE_FIELDS:
+        assert getattr(s, name) is None, name
+    assert s.smtp_port == 587
+    assert s.smtp_starttls is True
+    assert s.password_reset_enabled is False
+
+
+def test_007_fr3_reads_environment_variables(config: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.ru")
+    monkeypatch.setenv("SMTP_PORT", "2525")
+    monkeypatch.setenv("SMTP_USER", "mailer")
+    monkeypatch.setenv("SMTP_PASSWORD", "p4ss-value")
+    monkeypatch.setenv("SMTP_FROM", "noreply@example.ru")
+    monkeypatch.setenv("SMTP_STARTTLS", "false")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://tracker.example.ru:8443")
+    s = config.Settings()
+    assert s.smtp_host == "smtp.example.ru"
+    assert s.smtp_port == 2525
+    assert s.smtp_user == "mailer"
+    assert s.smtp_password is not None
+    assert s.smtp_password.get_secret_value() == "p4ss-value"
+    assert s.smtp_from == "noreply@example.ru"
+    assert s.smtp_starttls is False
+    assert s.public_base_url == "https://tracker.example.ru:8443"
+    assert s.password_reset_enabled is True
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\t "])
+def test_007_fr3_blank_strings_become_none(
+    config: Any, monkeypatch: pytest.MonkeyPatch, blank: str
+) -> None:
+    for name in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM", "PUBLIC_BASE_URL"):
+        monkeypatch.setenv(name, blank)
+    s = config.Settings()
+    for name in _SMTP_NONE_FIELDS:
+        assert getattr(s, name) is None, name
+    assert s.password_reset_enabled is False
+
+
+def test_007_fr3_blank_user_with_host_means_no_login(
+    config: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.ru")
+    monkeypatch.setenv("SMTP_FROM", "noreply@example.ru")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://t.example.ru")
+    monkeypatch.setenv("SMTP_USER", "")
+    monkeypatch.setenv("SMTP_PASSWORD", "")
+    s = config.Settings()
+    assert s.smtp_user is None
+    assert s.smtp_password is None
+    assert s.password_reset_enabled is True
+
+
+def test_007_fr3_smtp_password_is_masked_in_repr(
+    config: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SMTP_PASSWORD", "smtp-very-secret")
+    s = config.Settings()
+    assert "smtp-very-secret" not in repr(s)
+    assert "smtp-very-secret" not in str(s)
+
+
+@pytest.mark.parametrize("missing", ["SMTP_FROM", "PUBLIC_BASE_URL"])
+def test_007_pr10_host_without_required_field_fails_fast(
+    config: Any, monkeypatch: pytest.MonkeyPatch, missing: str
+) -> None:
+    env = {
+        "SMTP_HOST": "smtp.example.ru-host-value",
+        "SMTP_FROM": "noreply@example.ru",
+        "PUBLIC_BASE_URL": "https://t.example.ru",
+        "SMTP_PASSWORD": "leaky-password-value",
+    }
+    del env[missing]
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    with pytest.raises(ValueError) as info:
+        config.Settings()
+    text = str(info.value)
+    assert missing.lower() in text.lower()
+    for value in env.values():
+        assert value not in text
+
+
+@pytest.mark.parametrize("blank_name", ["SMTP_FROM", "PUBLIC_BASE_URL"])
+def test_007_pr10_blank_required_field_with_host_fails_fast(
+    config: Any, monkeypatch: pytest.MonkeyPatch, blank_name: str
+) -> None:
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.ru")
+    monkeypatch.setenv("SMTP_FROM", "noreply@example.ru")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://t.example.ru")
+    monkeypatch.setenv(blank_name, "  ")
+    with pytest.raises(ValueError):
+        config.Settings()
+
+
+def test_007_pr10_from_and_base_url_without_host_is_allowed(
+    config: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SMTP_FROM", "noreply@example.ru")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://t.example.ru")
+    s = config.Settings()
+    assert s.password_reset_enabled is False
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://tracker.example.ru",
+        "http://localhost:8080",
+        "http://127.0.0.1:5173",
+        "https://t.example.ru:8443",
+    ],
+)
+def test_007_pr10_public_base_url_valid(
+    config: Any, monkeypatch: pytest.MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setenv("PUBLIC_BASE_URL", url)
+    assert config.Settings().public_base_url == url
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://t.example.ru/",
+        "https://t.example.ru/app",
+        "tracker.example.ru",
+        "ftp://t.example.ru",
+        "https://",
+        "https://t.example .ru",
+        "javascript:alert(1)",
+    ],
+)
+def test_007_pr10_public_base_url_invalid_is_rejected(
+    config: Any, monkeypatch: pytest.MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setenv("PUBLIC_BASE_URL", url)
+    with pytest.raises(ValueError):
+        config.Settings()

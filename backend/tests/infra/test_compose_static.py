@@ -463,3 +463,71 @@ def test_t27_db_command_sets_positive_server_timeout(compose: dict[str, Any], pa
 def test_t27_service_restart_unless_stopped(compose: dict[str, Any], service: str) -> None:
     """T26 п.6, plan §4.12 (а): после перезагрузки хоста стек поднимается сам."""
     assert compose["services"][service].get("restart") == "unless-stopped"
+
+
+# --- 007 (R7-T03): SMTP_* и PUBLIC_BASE_URL в поставке (FR-3, PR-10) ----------------------
+
+SMTP_ENV_DEFAULTS = {
+    "SMTP_HOST": "",
+    "SMTP_PORT": "587",
+    "SMTP_USER": "",
+    "SMTP_PASSWORD": "",
+    "SMTP_FROM": "",
+    "SMTP_STARTTLS": "true",
+    "PUBLIC_BASE_URL": "",
+}
+
+
+@pytest.mark.parametrize(("var", "default"), sorted(SMTP_ENV_DEFAULTS.items()))
+def test_007_fr3_api_env_from_dotenv_with_defaults(
+    compose: dict[str, Any], var: str, default: str
+) -> None:
+    """FR-3: api получает SMTP_*/PUBLIC_BASE_URL из .env с умолчаниями (функция выключена)."""
+    assert _env(_svc(compose, "api")).get(var) == f"${{{var}:-{default}}}"
+
+
+def test_007_fr3_smtp_password_is_reference_only(repo_root: Path, compose: dict[str, Any]) -> None:
+    """FR-3, NFR-1: SMTP_PASSWORD в compose только ссылкой ${...}, не литералом.
+
+    Другим сервисам (db, web) SMTP_* не передаются.
+    """
+    value = _env(_svc(compose, "api")).get("SMTP_PASSWORD", "")
+    assert value.startswith("${SMTP_PASSWORD"), value
+    for name in ("db", "web"):
+        assert not any(k.startswith("SMTP_") for k in _env(_svc(compose, name)))
+    text = (repo_root / "docker-compose.yml").read_text(encoding="utf-8")
+    assert re.search(r"^\s*SMTP_PASSWORD\s*:\s*\S*\$\{SMTP_PASSWORD", text, re.M), (
+        "SMTP_PASSWORD в тексте compose должен быть ссылкой ${SMTP_PASSWORD...}"
+    )
+    test_nfr9_compose_has_no_secrets_or_placeholders(repo_root)
+
+
+def test_007_fr3_env_example_has_all_seven_vars_commented(repo_root: Path) -> None:
+    """FR-3: .env.example содержит все семь имён закомментированными, активных нет."""
+    lines = _env_example_lines(repo_root)
+    active = parse_env_file(repo_root / ".env.example")
+    for var in SMTP_ENV_DEFAULTS:
+        assert var not in active, f"{var} должен быть закомментирован"
+        assert any(re.match(rf"#\s*{var}=", ln.strip()) for ln in lines), f"нет # {var}= "
+
+
+def test_007_fr3_env_example_documents_feature(repo_root: Path) -> None:
+    """FR-3, PR-10: комментарий по-русски: без SMTP_HOST сброс выключен; нужен PUBLIC_BASE_URL."""
+    text = (repo_root / ".env.example").read_text(encoding="utf-8")
+    comments = [ln for ln in text.splitlines() if ln.lstrip().startswith("#")]
+    block = "\n".join(comments)
+    assert re.search(r"[А-Яа-яЁё]", block)
+    assert "выключен" in block.lower()
+    assert "https://tracker.example.ru" in block
+    assert re.search(r"SMTP_PASSWORD.*коммит|коммит.*SMTP_PASSWORD", block, re.I | re.S)
+
+
+def test_007_fr3_dev_env_example_has_commented_smtp_example(repo_root: Path) -> None:
+    """FR-3: deploy/dev.env.example — закомментированный пример, по умолчанию функция выключена."""
+    path = repo_root / "deploy" / "dev.env.example"
+    active = parse_env_file(path)
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert "SMTP_HOST" not in active
+    assert "PUBLIC_BASE_URL" not in active
+    assert any(re.match(r"#\s*SMTP_HOST=", ln.strip()) for ln in lines)
+    assert any(re.match(r"#\s*PUBLIC_BASE_URL=", ln.strip()) for ln in lines)

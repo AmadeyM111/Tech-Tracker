@@ -270,3 +270,213 @@ async def test_cli_import_into_empty_system_succeeds(
     assert await asyncio.to_thread(_run, ["import", str(archive)]) == 0
     assert await _count(db_engine, AppUser) > 1
     assert not (settings.secrets_dir / INITIAL_ADMIN_FILE).exists()
+
+
+# --- [007] email и служебные таблицы сброса пароля не переносятся (plan PR-14, Q-9) ----------
+
+SOURCE_EMAIL = "owner@example.ru"
+RESET_TABLES = ("password_reset_token", "password_reset_attempt")
+
+
+async def _seed_reset_data(engine: AsyncEngine, *, set_email: bool = True) -> None:
+    """Задаёт email всем пользователям и добавляет токен и попытку сброса."""
+    async with engine.begin() as conn:
+        if set_email:
+            await conn.execute(
+                text("UPDATE app_user SET email = 'user-' || id::text || '@example.ru'")
+            )
+        user_id = (
+            await conn.execute(text("SELECT id FROM app_user ORDER BY created_at, id LIMIT 1"))
+        ).scalar_one()
+        await conn.execute(
+            text(
+                "INSERT INTO password_reset_token (id, user_id, token_hash, created_at, expires_at)"
+                " VALUES (gen_random_uuid(), :u, :h, now(), now() + interval '1 hour')"
+            ),
+            {"u": user_id, "h": b"\x01" * 32},
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO password_reset_attempt (id, scope, key_hash, created_at)"
+                " VALUES (gen_random_uuid(), 'email', :h, now())"
+            ),
+            {"h": b"\x02" * 32},
+        )
+
+
+async def _scalar(engine: AsyncEngine, sql: str) -> Any:
+    async with engine.connect() as conn:
+        return (await conn.execute(text(sql))).scalar_one()
+
+
+def test_007_archive_constants_describe_exclusions() -> None:
+    from app.domain.ops import archive, importer
+
+    assert set(RESET_TABLES) <= set(archive.EXCLUDED_TABLES)
+    assert "user_session" in archive.EXCLUDED_TABLES
+    assert {"app_user": frozenset({"email"})} == archive.EXCLUDED_COLUMNS
+    assert tuple(importer.AUTO_TABLES[:2]) == RESET_TABLES
+    assert {"user_session", "workspace_member", "app_user", "workspace"} <= set(
+        importer.AUTO_TABLES
+    )
+
+
+def test_007_tables_in_order_skips_reset_tables() -> None:
+    from app.domain.ops.archive import tables_in_order
+
+    names = {table.name for table in tables_in_order()}
+    assert names.isdisjoint(RESET_TABLES)
+    assert "app_user" in names
+
+
+def test_007_exported_columns_drop_only_email() -> None:
+    from app.core.models import Base
+    from app.domain.ops.archive import exported_columns
+
+    app_user = Base.metadata.tables["app_user"]
+    names = [column.name for column in exported_columns(app_user)]
+    assert "email" in app_user.c
+    assert "email" not in names
+    assert set(names) == {column.name for column in app_user.columns} - {"email"}
+    workspace = Base.metadata.tables["workspace"]
+    assert [c.name for c in exported_columns(workspace)] == [c.name for c in workspace.columns]
+
+
+async def test_007_export_has_no_email_and_no_reset_tables(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings],
+    tmp_path: Path,
+) -> None:
+    _sm, engine, _settings = filled
+    await _seed_reset_data(engine)
+    assert await _scalar(engine, "SELECT count(*) FROM app_user WHERE email IS NOT NULL") > 0
+
+    payload = await _export_payload(engine)
+    assert payload["tables"]["app_user"]
+    for row in payload["tables"]["app_user"]:
+        assert "email" not in row
+    for name in RESET_TABLES:
+        assert name not in payload["tables"]
+
+    archive = tmp_path / "export.tar"
+    write_archive(payload_bytes(payload), archive)
+    with tarfile.open(archive) as tar:
+        member = tar.extractfile(DATA_MEMBER)
+        assert member is not None
+        raw = member.read().decode("utf-8")
+    assert "@example.ru" not in raw
+    assert '"email"' not in raw
+    for name in RESET_TABLES:
+        assert name not in raw
+
+
+async def test_007_import_leaves_email_null(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings],
+    test_database_url: str,
+    tmp_path: Path,
+) -> None:
+    sm, engine, settings = filled
+    await _seed_reset_data(engine)
+    archive = tmp_path / "export.tar"
+    first = await _export_payload(engine)
+    write_archive(payload_bytes(first), archive)
+
+    await _reset_schema(engine, test_database_url)
+    await _bootstrap(sm, settings)
+    await import_archive(settings, archive, schema_version=schema_head())
+
+    assert await _scalar(engine, "SELECT count(*) FROM app_user") == len(
+        first["tables"]["app_user"]
+    )
+    assert await _scalar(engine, "SELECT count(*) FROM app_user WHERE email IS NOT NULL") == 0
+    for name in RESET_TABLES:
+        assert await _scalar(engine, f"SELECT count(*) FROM {name}") == 0
+
+
+async def test_007_roundtrip_identical_with_email_in_source(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings],
+    test_database_url: str,
+    tmp_path: Path,
+) -> None:
+    sm, engine, settings = filled
+    before_seed = await _export_payload(engine)
+    await _seed_reset_data(engine)
+    first = await _export_payload(engine)
+    # email и токены не влияют на содержимое архива
+    assert _strip_timestamp(first) == _strip_timestamp(before_seed)
+
+    archive = tmp_path / "export.tar"
+    write_archive(payload_bytes(first), archive)
+    await _reset_schema(engine, test_database_url)
+    await _bootstrap(sm, settings)
+    await import_archive(settings, archive, schema_version=schema_head())
+
+    second = await _export_payload(engine)
+    assert payload_bytes(_strip_timestamp(second)) == payload_bytes(_strip_timestamp(first))
+
+
+async def test_007_import_succeeds_when_receiver_first_admin_has_reset_token(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings],
+    test_database_url: str,
+    tmp_path: Path,
+) -> None:
+    sm, engine, settings = filled
+    archive = tmp_path / "export.tar"
+    first = await _export_payload(engine)
+    write_archive(payload_bytes(first), archive)
+
+    await _reset_schema(engine, test_database_url)
+    await _bootstrap(sm, settings)
+    await _seed_reset_data(engine)  # у первого ТА приёмника есть email, токен и попытка
+    assert await _scalar(engine, "SELECT count(*) FROM password_reset_token") == 1
+
+    await import_archive(settings, archive, schema_version=schema_head())
+
+    assert await _scalar(engine, "SELECT count(*) FROM password_reset_token") == 0
+    assert await _scalar(engine, "SELECT count(*) FROM password_reset_attempt") == 0
+    assert await _scalar(engine, "SELECT count(*) FROM app_user WHERE email IS NOT NULL") == 0
+    assert await _scalar(engine, "SELECT count(*) FROM app_user") == len(
+        first["tables"]["app_user"]
+    )
+
+
+async def test_007_archive_with_email_key_is_refused(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings],
+) -> None:
+    _sm, engine, _settings = filled
+    payload = await _export_payload(engine)
+    payload["tables"]["app_user"][0]["email"] = SOURCE_EMAIL
+    with pytest.raises(ImportRefused, match="не соответствуют схеме"):
+        parse_rows(payload_bytes(payload), schema_version=schema_head())
+
+
+async def test_007_archive_without_other_app_user_column_is_refused(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings],
+) -> None:
+    """Сверка колонок остаётся строгой: исключён только email, остальное обязательно."""
+    _sm, engine, _settings = filled
+    payload = await _export_payload(engine)
+    del payload["tables"]["app_user"][0]["login"]
+    with pytest.raises(ImportRefused, match="не соответствуют схеме"):
+        parse_rows(payload_bytes(payload), schema_version=schema_head())
+
+
+@pytest.mark.parametrize("name", RESET_TABLES)
+async def test_007_archive_with_reset_table_is_refused(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings], name: str
+) -> None:
+    _sm, engine, _settings = filled
+    payload = await _export_payload(engine)
+    payload["tables"][name] = []
+    with pytest.raises(ImportRefused, match="набор таблиц"):
+        parse_rows(payload_bytes(payload), schema_version=schema_head())
+
+
+async def test_007_archive_of_schema_0007_is_refused_by_version(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings],
+) -> None:
+    _sm, engine, _settings = filled
+    payload = await _export_payload(engine)
+    assert schema_head() != "0007"
+    payload["schema_version"] = "0007"
+    with pytest.raises(ImportRefused, match="версия схемы"):
+        parse_rows(payload_bytes(payload), schema_version=schema_head())
