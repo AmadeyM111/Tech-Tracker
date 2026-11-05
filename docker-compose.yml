@@ -47,6 +47,14 @@ services:
       ARGON2_TIME_COST: ${ARGON2_TIME_COST:-3}
       ARGON2_MEMORY_COST_KIB: ${ARGON2_MEMORY_COST_KIB:-131072}
       ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-2}
+      # Сброс пароля по email (007): без SMTP_HOST функция выключена. SMTP_PASSWORD — только ссылка на .env.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
     volumes:
       - appdata:/data
     depends_on:

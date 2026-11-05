@@ -163,6 +163,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -197,7 +208,8 @@
           "role",
           "is_blocked",
           "must_change_password",
-          "created_at"
+          "created_at",
+          "email"
         ],
         "title": "AdminUser",
         "type": "object"
@@ -595,6 +607,18 @@
         "additionalProperties": false,
         "description": "``POST /admin/users``: роль не передаётся, назначается отдельным действием (FR-4).",
         "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "login": {
             "maxLength": 1024,
             "title": "Login",
@@ -1067,6 +1091,75 @@
         "title": "Page[TaskListItem]",
         "type": "object"
       },
+      "PasswordResetAccepted": {
+        "description": "Единый ответ на запрос сброса (FR-6).",
+        "properties": {
+          "detail": {
+            "default": "Если для этого адреса есть учётная запись, мы отправили письмо со ссылкой.",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "title": "PasswordResetAccepted",
+        "type": "object"
+      },
+      "PasswordResetConfirm": {
+        "additionalProperties": false,
+        "description": "``POST /auth/password-reset/confirm``: токен из ссылки и новый пароль (FR-11).",
+        "properties": {
+          "new_password": {
+            "format": "password",
+            "maxLength": 1024,
+            "title": "New Password",
+            "type": "string",
+            "writeOnly": true
+          },
+          "token": {
+            "format": "password",
+            "maxLength": 128,
+            "title": "Token",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "PasswordResetConfirm",
+        "type": "object"
+      },
+      "PasswordResetRequest": {
+        "additionalProperties": false,
+        "description": "``POST /auth/password-reset/request``: формат адреса проверяет домен, не схема (PR-21).",
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 1,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "PasswordResetRequest",
+        "type": "object"
+      },
+      "PasswordResetStatus": {
+        "description": "``GET /auth/password-reset/status``: настроена ли отправка писем.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "PasswordResetStatus",
+        "type": "object"
+      },
       "ProjectCreate": {
         "additionalProperties": false,
         "properties": {
@@ -1337,6 +1430,29 @@
           "must_change_password"
         ],
         "title": "SessionUser",
+        "type": "object"
+      },
+      "SetEmailRequest": {
+        "additionalProperties": false,
+        "description": "``PUT /admin/users/{user_id}/email``: ``\"\"`` и ``null`` очищают адрес (FR-2).",
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "SetEmailRequest",
         "type": "object"
       },
       "SetRoleRequest": {
@@ -2148,6 +2264,16 @@
             },
             "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Email уже используется (code: email_taken)"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -2301,6 +2427,110 @@
           }
         },
         "summary": "Block User",
+        "tags": [
+          "admin-users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/email": {
+      "put": {
+        "description": "Задаёт или очищает email пользователя (FR-2); сессии не затрагиваются.",
+        "operationId": "set_email",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Email уже используется (code: email_taken)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Set Email",
         "tags": [
           "admin-users"
         ]
@@ -2788,6 +3018,165 @@
           }
         },
         "summary": "Change Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password-reset/confirm": {
+      "post": {
+        "description": "Смена пароля по токену из письма; успех — 204 без тела и без cookie (FR-11).\n\nНеверный, просроченный или использованный токен — 400 ``reset_token_invalid``.",
+        "operationId": "confirm_password_reset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Функция отключена (code: feature_disabled)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Confirm Password Reset",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password-reset/request": {
+      "post": {
+        "description": "Запрос письма со ссылкой сброса; ответ одинаков для любого адреса (FR-6).\n\nIP берётся из ``request.client`` (``X-Forwarded-For`` не читается). Письмо уходит\nфоновой задачей после ответа.",
+        "operationId": "request_password_reset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Функция отключена (code: feature_disabled)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Request Password Reset",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password-reset/status": {
+      "get": {
+        "description": "Включён ли сброс пароля по email (настроен SMTP).",
+        "operationId": "password_reset_status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Password Reset Status",
         "tags": [
           "auth"
         ]

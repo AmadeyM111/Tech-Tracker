@@ -1,6 +1,6 @@
 # Модель данных GOSTracker, этапы R1.0 и MVP
 
-Документ описывает схему БД, которую создают миграции `0001`–`0006` (PostgreSQL 16). Источник
+Документ описывает схему БД, которую создают миграции `0001`–`0006` (PostgreSQL 16), а также `0007` и `0008` (см. «Миграции»). Источник
 истины — модели `backend/app/domain/*/models.py` и миграции `backend/migrations/versions/`;
 проектное обоснование — `specs/001-pilot-r1/plan.md`, §4.3 (решения D-2…D-8, D-26) и §11.6
 (MVP: проекты, задачи, комментарии; D-56…D-58). Таблицы отложенных этапов (метки, упоминания,
@@ -41,13 +41,14 @@
 
 ### app_user
 
-Учётная запись (миграция 0001; `login_display` — миграция 0005).
+Учётная запись (миграция 0001; `login_display` — миграция 0005; `email` — миграция 0008).
 
 | Столбец | Тип | NULL | Описание |
 |---|---|---|---|
 | `id` | uuid | нет | первичный ключ `pk_app_user` |
 | `login` | varchar(64) | нет | **ключ** логина (нормализованный вид, строчные): вход, уникальность, поиск, сортировка; наружу не отдаётся; `UNIQUE` (`uq_app_user_login`); `CHECK` `ck_app_user_login_format`: `^[a-z0-9][a-z0-9._-]{2,63}$` — заодно гарантирует нижний регистр, поэтому уникальность регистронезависима |
 | `login_display` | varchar(64) | нет | логин в написании при создании (FR-73a, D-66): так он показывается во всех ответах API; `CHECK` `ck_app_user_login_display_lower`: `lower(login_display COLLATE "C") = login` (показ совпадает с ключом с точностью до регистра латинских букв); у существующих строк при миграции 0005 равен `login`; если не передан, приложение подставляет `login` |
+| `email` | varchar(254) | да | адрес для сброса пароля (007, PR-1), в нижнем регистре (нормализует сервис); `NULL` — адрес не задан; `UNIQUE` `uq_app_user_email` (уникальность без учёта регистра, т. к. значение всегда в нижнем регистре; `NULL` не конфликтует с `NULL`); `CHECK` `ck_app_user_email_lower`: `lower(email COLLATE "C") = email` |
 | `password_hash` | text | нет | хеш Argon2id (пароль в открытом виде не хранится) |
 | `must_change_password` | boolean | нет | требуется смена пароля при входе |
 | `is_blocked` | boolean | нет | учётная запись заблокирована |
@@ -89,6 +90,35 @@
 
 Индекс: `ix_user_session_user_id` на `(user_id)`. Истёкшие сессии удаляет команда
 `gostracker maintenance`.
+
+### password_reset_token
+
+Токены сброса пароля (миграция 0008, 007). Сам токен не хранится, только его SHA-256.
+
+| Столбец | Тип | NULL | Описание |
+|---|---|---|---|
+| `id` | uuid | нет | первичный ключ `pk_password_reset_token` |
+| `user_id` | uuid | нет | FK `fk_password_reset_token_user_id_app_user` → `app_user.id`, `ON DELETE CASCADE`, `DEFERRABLE INITIALLY IMMEDIATE` |
+| `token_hash` | bytea | нет | SHA-256 токена (32 байта); `UNIQUE` `uq_password_reset_token_token_hash`; `CHECK` `ck_password_reset_token_token_hash_length`: `octet_length(token_hash) = 32` |
+| `created_at` | timestamptz | нет | момент выпуска |
+| `expires_at` | timestamptz | нет | момент истечения срока |
+| `used_at` | timestamptz | да | момент использования; `NULL` — токен не использован |
+
+Индекс: `ix_password_reset_token_user_id` на `(user_id)`.
+
+### password_reset_attempt
+
+Попытки запроса сброса пароля для ограничения частоты (миграция 0008, 007). Хранятся только хеши ключей.
+
+| Столбец | Тип | NULL | Описание |
+|---|---|---|---|
+| `id` | uuid | нет | первичный ключ `pk_password_reset_attempt` |
+| `scope` | text | нет | вид ключа лимита: `email` или `ip`; `CHECK` `ck_password_reset_attempt_scope_valid`: `scope IN ('email','ip')` |
+| `key_hash` | bytea | нет | HMAC-SHA256 ключа лимита (32 байта); `CHECK` `ck_password_reset_attempt_key_hash_length`: `octet_length(key_hash) = 32` |
+| `created_at` | timestamptz | нет | момент попытки |
+
+Внешних ключей нет. Индексы: `ix_password_reset_attempt_scope_key_hash_created_at` на
+`(scope, key_hash, created_at)`; `ix_password_reset_attempt_created_at` на `(created_at)`.
 
 ## Проекты, задачи, комментарии (MVP)
 
@@ -317,6 +347,8 @@ TRUNCATE` — в бэклоге (plan D-8).
 | `0004` | `project`, `project_member`, `task`, `comment`, их индексы; `CHECK` `ck_domain_event_entity_type_valid` на `domain_event.entity_type` (откат удаляет таблицы и `CHECK`) |
 | `0005` | `app_user.login_display` (заполняется `login`) и `CHECK` `ck_app_user_login_display_lower` (откат удаляет столбец и `CHECK`; написание теряется) |
 | `0006` | три роли (ADR-0013): у всех пользователей с ролью `mixed` роль снимается (`NULL`), а если в пространстве нет активного ТА, активные бывшие СМ получают `tech_admin` (FR-16); на каждого бывшего СМ одна запись `domain_event` от «системы» (`actor_id = NULL`); `CHECK` `ck_workspace_member_role_valid` пересоздаётся с тремя значениями; всё в одной транзакции (откат `downgrade 0005` возвращает прежний `CHECK`, но роли `mixed` не возвращает и журнал не меняет) |
+| `0007` | приоритет задачи: значение `base` заменяется на `medium`, `high` без изменений; `CHECK` `ck_task_priority_valid` |
+| `0008` | сброс пароля по email: `app_user.email` с `uq_app_user_email` и `ck_app_user_email_lower`, таблицы `password_reset_token` и `password_reset_attempt` с индексами (откат удаляет всё созданное) |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия
 моделей миграциям — `alembic -c backend/alembic.ini check` (входит в `scripts/check.sh` и CI).
