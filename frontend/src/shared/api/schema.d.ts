@@ -108,6 +108,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users/{user_id}/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Email
+         * @description Задаёт или очищает email пользователя (FR-2); сессии не затрагиваются.
+         */
+        put: operations["set_email"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/{user_id}/reset-password": {
         parameters: {
             query?: never;
@@ -254,6 +274,71 @@ export interface paths {
          *     первого ТА сервис удаляет после COMMIT (``get_db`` фиксирует транзакцию до ответа).
          */
         post: operations["change_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Password Reset
+         * @description Смена пароля по токену из письма; успех — 204 без тела и без cookie (FR-11).
+         *
+         *     Неверный, просроченный или использованный токен — 400 ``reset_token_invalid``.
+         */
+        post: operations["confirm_password_reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Password Reset
+         * @description Запрос письма со ссылкой сброса; ответ одинаков для любого адреса (FR-6).
+         *
+         *     IP берётся из ``request.client`` (``X-Forwarded-For`` не читается). Письмо уходит
+         *     фоновой задачей после ответа.
+         */
+        post: operations["request_password_reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Password Reset Status
+         * @description Включён ли сброс пароля по email (настроен SMTP).
+         */
+        get: operations["password_reset_status"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -706,6 +791,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Email */
+            email: string | null;
             /**
              * Id
              * Format: uuid
@@ -864,6 +951,8 @@ export interface components {
          * @description ``POST /admin/users``: роль не передаётся, назначается отдельным действием (FR-4).
          */
         CreateUserRequest: {
+            /** Email */
+            email?: string | null;
             /** Login */
             login: string;
             /**
@@ -1053,6 +1142,49 @@ export interface components {
             /** Page Size */
             page_size: number;
         };
+        /**
+         * PasswordResetAccepted
+         * @description Единый ответ на запрос сброса (FR-6).
+         */
+        PasswordResetAccepted: {
+            /**
+             * Detail
+             * @default Если для этого адреса есть учётная запись, мы отправили письмо со ссылкой.
+             */
+            detail: string;
+        };
+        /**
+         * PasswordResetConfirm
+         * @description ``POST /auth/password-reset/confirm``: токен из ссылки и новый пароль (FR-11).
+         */
+        PasswordResetConfirm: {
+            /**
+             * New Password
+             * Format: password
+             */
+            new_password: string;
+            /**
+             * Token
+             * Format: password
+             */
+            token: string;
+        };
+        /**
+         * PasswordResetRequest
+         * @description ``POST /auth/password-reset/request``: формат адреса проверяет домен, не схема (PR-21).
+         */
+        PasswordResetRequest: {
+            /** Email */
+            email: string;
+        };
+        /**
+         * PasswordResetStatus
+         * @description ``GET /auth/password-reset/status``: настроена ли отправка писем.
+         */
+        PasswordResetStatus: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** ProjectCreate */
         ProjectCreate: {
             /**
@@ -1183,6 +1315,14 @@ export interface components {
             /** Must Change Password */
             must_change_password: boolean;
             role: components["schemas"]["Role"] | null;
+        };
+        /**
+         * SetEmailRequest
+         * @description ``PUT /admin/users/{user_id}/email``: ``""`` и ``null`` очищают адрес (FR-2).
+         */
+        SetEmailRequest: {
+            /** Email */
+            email: string | null;
         };
         /**
          * SetRoleRequest
@@ -1587,6 +1727,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Email уже используется (code: email_taken) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
             422: {
                 headers: {
@@ -1694,6 +1843,86 @@ export interface operations {
             };
             /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_email: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"];
+                };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Email уже используется (code: email_taken) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2114,6 +2343,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    confirm_password_reset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Функция отключена (code: feature_disabled) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    request_password_reset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordResetAccepted"];
+                };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Функция отключена (code: feature_disabled) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    password_reset_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordResetStatus"];
                 };
             };
         };

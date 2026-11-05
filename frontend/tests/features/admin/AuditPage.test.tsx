@@ -474,3 +474,35 @@ describe("start screen: logout and no password-change link (FR-55, FR-60; T103: 
     expect(screen.queryByRole("link", { name: /Сменить пароль/ })).toBeNull();
   });
 });
+
+describe("007 audit actions (FR-15)", () => {
+  it.each([
+    [101, "user.email_changed", "admin.audit.action.user.email_changed"],
+    [102, "user.password_reset_requested", "admin.audit.action.user.password_reset_requested"],
+    [103, "user.password_reset_completed", "admin.audit.action.user.password_reset_completed"],
+  ])("007_fr15_action_%i_%s_shown_as_russian_label_not_code", async (id, code, key) => {
+    const { container } = await open({
+      [AUDIT]: () =>
+        j(
+          200,
+          page([
+            {
+              id,
+              occurred_at: "2026-10-13T09:00:00Z",
+              actor: { kind: "system", id: null, login: null },
+              action: code,
+              entity_type: "user",
+              entity_id: ID_IVANOV,
+              entity_deleted: false,
+              changed_fields: [],
+              details: null,
+            },
+          ]),
+        ),
+    });
+    const text = cell(entry(container, id), "action").textContent ?? "";
+    expect(text).toBe((ru as Record<string, string>)[key]);
+    expect(text).toMatch(/[Ѐ-ӿ]/);
+    expect(text).not.toContain(code);
+  });
+});

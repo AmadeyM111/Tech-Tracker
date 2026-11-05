@@ -18,6 +18,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render } from "@testing-library/react";
 import type { ReactElement } from "react";
+import { vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 export function Where() {
@@ -82,4 +83,20 @@ export function pressKey(el: HTMLElement, key: "Enter" | " ") {
 /** Кнопки показа пароля: у них (и только у них) есть aria-pressed. */
 export function revealButtons(container: ParentNode): HTMLButtonElement[] {
   return Array.from(container.querySelectorAll<HTMLButtonElement>("button[aria-pressed]"));
+}
+
+/** 007: мок fetch для GET /api/v1/auth/password-reset/status; остальные запросы отдаёт `rest` (по умолчанию 404). */
+export function installStatusFetch(enabled: boolean, rest?: (r: Request) => Response | Promise<Response>) {
+  const calls: Request[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (r: Request) => {
+      calls.push(r);
+      if (new URL(r.url).pathname === "/api/v1/auth/password-reset/status") {
+        return new Response(JSON.stringify({ enabled }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return rest ? rest(r) : new Response(JSON.stringify({ detail: "x", code: "not_found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }),
+  );
+  return calls;
 }

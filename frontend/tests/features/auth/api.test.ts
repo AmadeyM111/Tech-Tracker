@@ -1,7 +1,7 @@
 // T23: features/auth/api.ts поверх общего клиента: пути, тела, ApiError.
 import { describe, expect, it, vi } from "vitest";
 
-import { changePassword, login, logout, me } from "../../../src/features/auth/api";
+import { changePassword, confirmPasswordReset, login, logout, me, passwordResetStatus, requestPasswordReset } from "../../../src/features/auth/api";
 import { ApiError } from "../../../src/shared/api/client";
 
 const j = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
@@ -53,5 +53,35 @@ describe("auth api (T23)", () => {
   it("me_rejects_with_api_error_code", async () => {
     stub(() => j(403, { detail: "x", code: "no_role" }));
     await expect(me()).rejects.toMatchObject({ code: "no_role", status: 403 });
+  });
+
+  it("password_reset_status_gets_status_and_returns_enabled", async () => {
+    const calls = stub(() => j(200, { enabled: true }));
+    expect(await passwordResetStatus()).toEqual({ enabled: true });
+    expect(new URL(calls[0]!.url).pathname).toBe("/api/v1/auth/password-reset/status");
+    expect(calls[0]!.method).toBe("GET");
+  });
+
+  it("request_password_reset_posts_email", async () => {
+    const calls = stub(() => new Response(null, { status: 204 }));
+    await requestPasswordReset({ email: "a@x.ru" });
+    expect(new URL(calls[0]!.url).pathname).toBe("/api/v1/auth/password-reset/request");
+    expect(calls[0]!.method).toBe("POST");
+    expect(await calls[0]!.json()).toEqual({ email: "a@x.ru" });
+  });
+
+  it("confirm_password_reset_posts_token_and_password_body_only", async () => {
+    const calls = stub(() => new Response(null, { status: 204 }));
+    await confirmPasswordReset({ token: "tok-123", new_password: "New-Pass-12345" });
+    expect(new URL(calls[0]!.url).pathname).toBe("/api/v1/auth/password-reset/confirm");
+    expect(calls[0]!.method).toBe("POST");
+    expect(await calls[0]!.json()).toEqual({ token: "tok-123", new_password: "New-Pass-12345" });
+    expect(calls[0]!.url).not.toContain("tok-123");
+  });
+
+  it("password_reset_calls_reject_with_api_error_code", async () => {
+    stub(() => j(404, { detail: "x", code: "feature_disabled" }));
+    await expect(requestPasswordReset({ email: "a@x.ru" })).rejects.toMatchObject({ code: "feature_disabled", status: 404 });
+    await expect(passwordResetStatus()).rejects.toBeInstanceOf(ApiError);
   });
 });

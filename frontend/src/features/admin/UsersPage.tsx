@@ -14,12 +14,14 @@ import {
   resetPassword,
   revokeSessions,
   setRole,
+  setUserEmail,
   unblockUser,
   type AdminUser,
   type Role,
 } from "./api";
 import { useFocusHeadingOnArrival } from "../auth/session";
 import { generateOneTimePassword } from "./password";
+import { EmailDialog } from "./EmailDialog";
 
 const USERS_KEY = ["admin", "users"] as const;
 const ROLES: readonly Role[] = ["tech_admin", "business_admin", "user"];
@@ -55,6 +57,7 @@ interface RowProps {
   onUnblock: () => void;
   onReset: () => void;
   onRevoke: () => void;
+  onEditEmail: () => void;
   onSetRole: (role: Role | null) => void;
 }
 
@@ -68,6 +71,7 @@ function UserRow(props: RowProps) {
   return (
     <tr data-user-id={user.id}>
       <td data-field="login">{user.login}</td>
+      <td data-field="email">{user.email ?? t("admin.users.email_missing")}</td>
       <td data-field="role">{roleText(user.role)}</td>
       <td data-field="status">
         {t(user.is_blocked ? "admin.users.status_blocked" : "admin.users.status_active")}
@@ -113,6 +117,15 @@ function UserRow(props: RowProps) {
           >
             {t("admin.users.revoke_sessions")}
           </button>
+          <button
+            type="button"
+            data-action="edit-email"
+            aria-label={t("admin.users.edit_email_aria", params)}
+            disabled={disabled}
+            onClick={props.onEditEmail}
+          >
+            {t("admin.users.edit_email")}
+          </button>
           {canAssignRoles ? (
             <>
               <select
@@ -155,8 +168,10 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
   const busy = useRef(false);
   const [page, setPage] = useState(1);
   const [login, setLogin] = useState("");
+  const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [emailUser, setEmailUser] = useState<AdminUser | null>(null);
   const [shown, setShown] = useState<ShownPassword | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   useFocusHeadingOnArrival(headingRef);
@@ -226,10 +241,11 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
     // The password lives in this closure and, after success, in `shown` only.
     const password = generateOneTimePassword();
     void run(async () => {
-      const created = await createUser({ login: name, one_time_password: password });
+      const created = await createUser({ login: name, one_time_password: password, email: email.trim() === "" ? null : email.trim() });
       // The login as the server stored it (FR-73a), not the typed one.
       setShown({ login: created.login, password });
       setLogin("");
+      setEmail("");
     });
   }
 
@@ -295,6 +311,14 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
           hint={t("admin.users.login_hint")}
           disabled={disabled}
         />
+        <TextField
+          label={t("admin.users.email_label")}
+          name="email"
+          value={email}
+          onChange={setEmail}
+          autoComplete="email"
+          disabled={disabled}
+        />
         <button type="submit" disabled={disabled}>
           {t("admin.users.create_submit")}
         </button>
@@ -311,6 +335,7 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
           <thead>
             <tr>
               <th scope="col">{t("admin.users.col_login")}</th>
+              <th scope="col">{t("admin.users.email_column")}</th>
               <th scope="col">{t("admin.users.col_role")}</th>
               <th scope="col">{t("admin.users.col_status")}</th>
               <th scope="col">{t("admin.users.col_actions")}</th>
@@ -327,6 +352,7 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
                 onUnblock={() => void run(() => unblockUser(user.id), user.id)}
                 onReset={() => setConfirmation({ kind: "reset", user })}
                 onRevoke={() => setConfirmation({ kind: "revoke", user })}
+                onEditEmail={() => setEmailUser(user)}
                 onSetRole={(role) => {
                   if (role === null) {
                     setConfirmation({ kind: "remove_role", user });
@@ -348,6 +374,18 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
         busy={users.isPlaceholderData || pending}
         onPage={changePage}
       />
+
+      {emailUser === null ? null : (
+        <EmailDialog
+          login={emailUser.login}
+          email={emailUser.email ?? null}
+          onSave={async (value) => {
+            await setUserEmail(emailUser.id, value);
+            await queryClient.invalidateQueries({ queryKey: USERS_KEY });
+          }}
+          onClose={() => setEmailUser(null)}
+        />
+      )}
 
       {confirmation === null ? null : (
         <ConfirmDialog

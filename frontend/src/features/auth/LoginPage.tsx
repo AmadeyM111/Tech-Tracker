@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { TextField } from "../../shared/ui/TextField";
-import { login } from "./api";
+import { login, passwordResetStatus } from "./api";
 import { FOCUS_HEADING_STATE } from "./session";
 
 export function LoginPage() {
@@ -19,6 +19,13 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [shown, setShown] = useState(false);
+
+  const resetStatus = useQuery({
+    queryKey: ["auth", "password-reset-status"],
+    queryFn: () => passwordResetStatus(),
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   useEffect(() => {
     loginRef.current?.focus();
@@ -79,6 +86,7 @@ export function LoginPage() {
           {t("auth.login_submit")}
         </button>
       </form>
+      {resetStatus.data?.enabled === true && <Link to="/password-reset">{t("auth.forgot_password")}</Link>}
       <section className="ui-login-help" aria-labelledby="login-help-title">
         <h2 id="login-help-title">{t("auth.help_title")}</h2>
         <p>{t("auth.help_p1")}</p>

@@ -6,6 +6,8 @@ import { AuditPage } from "../features/admin/AuditPage";
 import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
+import { PasswordResetConfirmPage } from "../features/auth/PasswordResetConfirmPage";
+import { PasswordResetRequestPage } from "../features/auth/PasswordResetRequestPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
 import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
 import { MyTasksPage } from "../features/tasks/TaskList";
@@ -370,6 +372,8 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           </NeedsSession>
         }
       />
+      <Route path="/password-reset" element={<PasswordResetRequestPage />} />
+      <Route path="/password-reset/confirm" element={<PasswordResetConfirmPage />} />
       <Route path="/" element={<StartRedirect insideMain={insideMain} />} />
       <Route
         path="/admin/users"

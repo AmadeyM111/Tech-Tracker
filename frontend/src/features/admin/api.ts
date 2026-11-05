@@ -41,8 +41,23 @@ export async function listUsers(p: PageParams): Promise<Page<AdminUser>> {
 }
 
 export async function createUser(body: CreateUserRequest): Promise<AdminUser> {
-  const { data } = await getAppClient().POST("/api/v1/admin/users", { body });
+  const payload: CreateUserRequest =
+    body.email === undefined
+      ? body
+      : { ...body, email: body.email === null || body.email.trim() === "" ? null : body.email.trim() };
+  const { data } = await getAppClient().POST("/api/v1/admin/users", { body: payload });
   if (data === undefined) throw invalidBody(201);
+  return data;
+}
+
+/** An empty address removes the email (FR-2). */
+export async function setUserEmail(id: string, email: string | null): Promise<AdminUser> {
+  const value = email === null || email.trim() === "" ? null : email.trim();
+  const { data } = await getAppClient().PUT("/api/v1/admin/users/{user_id}/email", {
+    params: { path: { user_id: id } },
+    body: { email: value },
+  });
+  if (data === undefined) throw invalidBody(200);
   return data;
 }
 

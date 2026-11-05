@@ -46,6 +46,11 @@ const API_CODES = [
   "parent_task_deleted",
   // 006 (FR-21): срок в прошлом при создании
   "due_date_in_past",
+  // 007 (NFR-3): сброс пароля по email
+  "feature_disabled",
+  "reset_token_invalid",
+  "email_taken",
+  "email_invalid",
 ];
 const CLIENT_CODES = ["network_error", "invalid_response"];
 // Коды из общего обработчика HTTP-ошибок backend (core/errors.py, _HTTP_STATUS_MAP).
@@ -623,5 +628,94 @@ describe("006 AC-52 dictionary strings (NFR-2)", () => {
     expect(errorMessage("due_date_in_past")).toBe("Срок не может быть раньше сегодняшнего дня");
     expect(errorMessage("due_date_in_past")).not.toBe(errorMessage("definitely_not_a_code"));
     expect(errorMessage("due_date_in_past")).not.toBe(dict["error.unknown"]);
+  });
+});
+
+// 007 (R7-T15, plan §4.7): фиксированный набор ключей сброса пароля / email.
+const KEYS_007 = [
+  "auth.forgot_password",
+  "auth.reset_request_title",
+  "auth.reset_email_label",
+  "auth.reset_request_submit",
+  "auth.reset_request_sent",
+  "auth.reset_back_to_login",
+  "auth.reset_confirm_title",
+  "auth.reset_new_password_label",
+  "auth.reset_repeat_password_label",
+  "auth.reset_confirm_submit",
+  "auth.reset_done",
+  "auth.reset_login_link",
+  "auth.reset_link_invalid",
+  "auth.reset_request_again",
+  "error.feature_disabled",
+  "error.reset_token_invalid",
+  "error.email_taken",
+  "error.email_invalid",
+  "admin.users.email_column",
+  "admin.users.email_missing",
+  "admin.users.email_label",
+  "admin.users.edit_email",
+  "admin.users.edit_email_aria",
+  "admin.users.email_dialog_title",
+  "admin.users.email_dialog_hint",
+  "admin.users.email_save",
+  "admin.users.email_cancel",
+  "admin.audit.action.user.email_changed",
+  "admin.audit.action.user.password_reset_requested",
+  "admin.audit.action.user.password_reset_completed",
+];
+
+// Подписи-термины, которые spec 007 (FR-5, AC-3) задаёт буквально.
+const LITERAL_EMAIL_KEYS_007 = ["auth.reset_email_label", "admin.users.email_column"];
+
+describe("007 ru keys (plan 4.7, NFR-3)", () => {
+  it.each(KEYS_007)("007_nfr3_has_russian_value_for_%s", (key) => {
+    const value = dict[key];
+    expect(typeof value).toBe("string");
+    if (LITERAL_EMAIL_KEYS_007.includes(key)) {
+      // spec 007 FR-5/AC-3 задаёт подпись буквально.
+      expect(value).toBe("Email");
+    } else {
+      expect(CYRILLIC.test(value!)).toBe(true);
+    }
+  });
+
+  it("007_nfr3_new_error_messages_are_pairwise_distinct_and_not_existing", () => {
+    const fresh = KEYS_007.filter((k) => k.startsWith("error.")).map((k) => dict[k]);
+    expect(fresh.length).toBe(4);
+    expect(new Set(fresh).size).toBe(4);
+    const old = Object.entries(dict)
+      .filter(([k]) => k.startsWith("error.") && !KEYS_007.includes(k))
+      .map(([, v]) => v);
+    for (const v of fresh) expect(old).not.toContain(v);
+  });
+
+  it("007_nfr3_error_message_returns_new_texts", () => {
+    for (const c of ["feature_disabled", "reset_token_invalid", "email_taken", "email_invalid"]) {
+      expect(errorMessage(c)).toBe(dict[`error.${c}`]);
+      expect(errorMessage(c)).not.toBe(errorMessage("unknown"));
+    }
+  });
+
+  it("007_nfr3_login_placeholder_in_email_dialog_keys", () => {
+    expect(dict["admin.users.edit_email_aria"]).toContain("{login}");
+    expect(dict["admin.users.email_dialog_title"]).toContain("{login}");
+    expect(t("admin.users.edit_email_aria" as never, { login: "ivanov" })).toContain("ivanov");
+  });
+
+  it("007_nfr3_key_set_is_fixed_no_extra_007_keys", () => {
+    const allowed = new Set(KEYS_007);
+    const extra = Object.keys(dict).filter(
+      (k) =>
+        (k.startsWith("auth.reset_") ||
+          k === "auth.forgot_password" ||
+          k.startsWith("admin.users.email_") ||
+          k === "admin.users.edit_email" ||
+          k === "admin.users.edit_email_aria" ||
+          /^admin\.audit\.action\.user\.(email_changed|password_reset_)/.test(k) ||
+          /^error\.(feature_disabled|reset_token_invalid|email_taken|email_invalid)$/.test(k)) &&
+        !allowed.has(k),
+    );
+    expect(extra).toEqual([]);
   });
 });

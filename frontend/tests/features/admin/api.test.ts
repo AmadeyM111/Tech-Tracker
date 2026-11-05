@@ -9,6 +9,7 @@ import {
   resetPassword,
   revokeSessions,
   setRole,
+  setUserEmail,
   unblockUser,
 } from "../../../src/features/admin/api";
 import { ApiError } from "../../../src/shared/api/client";
@@ -99,5 +100,37 @@ describe("admin api (T24)", () => {
       status: 422,
     });
     await expect(blockUser(ID_IVANOV)).rejects.toMatchObject({ code: "last_account_admin" });
+  });
+});
+
+describe("admin api email (007, R7-T19)", () => {
+  it("007_create_user_sends_email_and_null_when_empty", async () => {
+    const calls = stub(() => j(201, U_IVANOV));
+    await createUser({ login: "ivanov", one_time_password: "Qw3rty-uiop-9", email: "a@x.ru" });
+    await createUser({ login: "ivanov", one_time_password: "Qw3rty-uiop-9", email: null });
+    expect(await calls[0]!.json()).toEqual({
+      login: "ivanov",
+      one_time_password: "Qw3rty-uiop-9",
+      email: "a@x.ru",
+    });
+    expect(((await calls[1]!.json()) as { email: unknown }).email).toBeNull();
+  });
+
+  it("007_set_user_email_puts_to_email_path_with_body", async () => {
+    const calls = stub(() => j(200, { ...U_IVANOV, email: "new@x.ru" }));
+    await setUserEmail(ID_IVANOV, "new@x.ru");
+    await setUserEmail(ID_IVANOV, null);
+    expect(path(calls[0]!)).toBe(`/api/v1/admin/users/${ID_IVANOV}/email`);
+    expect(calls[0]!.method).toBe("PUT");
+    expect(await calls[0]!.json()).toEqual({ email: "new@x.ru" });
+    expect(await calls[1]!.json()).toEqual({ email: null });
+  });
+
+  it("007_set_user_email_non_2xx_rejects_with_api_error_code", async () => {
+    stub(() => j(409, { detail: "email_taken", code: "email_taken" }));
+    await expect(setUserEmail(ID_IVANOV, "a@x.ru")).rejects.toMatchObject({
+      status: 409,
+      code: "email_taken",
+    });
   });
 });

@@ -237,8 +237,10 @@ describe("create user (FR-4, FR-55, FR-65, FR-73, OI-108)", () => {
     await waitFor(() => expect(f.count(CREATE)).toBe(1));
     const req = f.last(CREATE);
     expect(new URL(req.url).search).toBe("");
-    const body = (await req.clone().json()) as Record<string, string>;
-    expect(Object.keys(body).sort()).toEqual(["login", "one_time_password"]);
+    const body = (await req.clone().json()) as Record<string, string | null>;
+    // R7-T19: контракт добавил необязательный email; пустое поле уходит как null
+    expect(Object.keys(body).sort()).toEqual(["email", "login", "one_time_password"]);
+    expect(body["email"]).toBeNull();
     expect(body["login"]).toBe("sidorov");
     expect(body["one_time_password"]?.length).toBeGreaterThanOrEqual(PASSWORD_MIN_LENGTH);
     expect(body["one_time_password"]).toMatch(/^\S+$/);
@@ -688,5 +690,151 @@ describe("no password reveal on admin screens (006/AC-2)", () => {
     fireEvent.click(action(dialog, "confirm"));
     await waitFor(() => expect(shownPassword()).not.toBeNull());
     expectNoReveal();
+  });
+});
+
+describe("email (007, R7-T19)", () => {
+  const withEmail = { ...U_IVANOV, email: "ivanov@example.ru" };
+  const noEmail = { ...U_PETROV, email: null };
+
+  function emailInput(c: HTMLElement): HTMLInputElement {
+    const el = c.querySelector<HTMLInputElement>('input[name="email"]');
+    if (!el) throw new Error("no input[name=email]");
+    return el;
+  }
+
+  it("007_email_column_shows_address_or_missing_label", async () => {
+    const { container } = await open({
+      [LIST]: () => j(200, page([{ ...U_ADMIN, email: null }, withEmail, noEmail])),
+    });
+    expect(cell(row(container, ID_IVANOV), "email").textContent).toBe("ivanov@example.ru");
+    expect(cell(row(container, ID_PETROV), "email").textContent).toBe(ru["admin.users.email_missing"]);
+    expect(ru["admin.users.email_missing"]).toBe("email не указан");
+  });
+
+  it("007_create_with_email_sends_it", async () => {
+    const { container } = await open({ [CREATE]: () => j(201, { ...created, email: "s@x.ru" }) });
+    fireEvent.change(emailInput(container), { target: { value: "s@x.ru" } });
+    submitCreate(container, "sidorov");
+    await waitFor(() => expect(f.count(CREATE)).toBe(1));
+    const body = (await f.last(CREATE).clone().json()) as { login: string; email: unknown };
+    expect(body.login).toBe("sidorov");
+    expect(body.email).toBe("s@x.ru");
+  });
+
+  it("007_create_without_email_sends_null", async () => {
+    const { container } = await open({ [CREATE]: () => j(201, { ...created, email: null }) });
+    expect(screen.getByLabelText(ru["admin.users.email_label"])).toBe(emailInput(container));
+    submitCreate(container, "sidorov");
+    await waitFor(() => expect(f.count(CREATE)).toBe(1));
+    const body = (await f.last(CREATE).clone().json()) as { email: unknown };
+    expect(body.email).toBeNull();
+  });
+
+  it("007_create_email_taken_409_shown_via_error_message", async () => {
+    const { container } = await open({ [CREATE]: () => err(409, "email_taken") });
+    fireEvent.change(emailInput(container), { target: { value: "ivanov@example.ru" } });
+    submitCreate(container, "sidorov");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(errorMessage("email_taken"));
+    expect(errorMessage("email_taken")).toBe(ru["error.email_taken"]);
+    expect(shownPassword()).toBeNull();
+  });
+
+  it("007_create_email_invalid_shown_via_error_message", async () => {
+    const { container } = await open({ [CREATE]: () => err(422, "email_invalid") });
+    fireEvent.change(emailInput(container), { target: { value: "bad" } });
+    submitCreate(container, "sidorov");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(ru["error.email_invalid"]);
+  });
+
+  it("007_admin_reset_password_still_works_with_email_column", async () => {
+    const { container } = await open({
+      [LIST]: () => j(200, page([{ ...U_ADMIN, email: null }, withEmail, noEmail])),
+      [`POST ${url(ID_IVANOV, "reset-password")}`]: NO_CONTENT,
+    });
+    fireEvent.click(action(row(container, ID_IVANOV), "reset-password"));
+    await screen.findByRole("alertdialog");
+    fireEvent.click(action(document.body, "confirm"));
+    await waitFor(() => expect(f.count(`POST ${url(ID_IVANOV, "reset-password")}`)).toBe(1));
+    await waitFor(() => expect(shownPassword()).toBeTruthy());
+  });
+});
+
+describe("email dialog in row (007, R7-T20)", () => {
+  const withEmail = { ...U_IVANOV, email: "ivanov@example.ru" };
+  const noEmail = { ...U_PETROV, email: null };
+  const EMAIL_PUT = `PUT ${url(ID_IVANOV, "email")}`;
+  const LIST_ROWS = () => j(200, page([{ ...U_ADMIN, email: null }, withEmail, noEmail]));
+
+  function editButton(c: HTMLElement, id: string, login: string): HTMLElement {
+    return within(row(c, id)).getByRole("button", {
+      name: ru["admin.users.edit_email_aria"].replace("{login}", login),
+    });
+  }
+
+  it("007_edit_email_sends_put_with_new_value_and_closes_dialog", async () => {
+    let current: string | null = "ivanov@example.ru";
+    const { container } = await open({
+      [LIST]: () => j(200, page([{ ...U_ADMIN, email: null }, { ...U_IVANOV, email: current }, noEmail])),
+      [EMAIL_PUT]: async (r) => {
+        current = ((await r.clone().json()) as { email: string }).email;
+        return j(200, { ...U_IVANOV, email: current });
+      },
+    });
+    fireEvent.click(editButton(container, ID_IVANOV, "ivanov"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "new@example.ru" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: ru["admin.users.email_save"] }));
+    await waitFor(() => expect(f.count(EMAIL_PUT)).toBe(1));
+    const body = (await f.last(EMAIL_PUT).clone().json()) as { email: unknown };
+    expect(body.email).toBe("new@example.ru");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(cell(row(container, ID_IVANOV), "email").textContent).toBe("new@example.ru"));
+  });
+
+  it("007_clear_email_sends_null_and_row_shows_missing_label", async () => {
+    let current: string | null = "ivanov@example.ru";
+    const { container } = await open({
+      [LIST]: () => j(200, page([{ ...U_ADMIN, email: null }, { ...U_IVANOV, email: current }, noEmail])),
+      [EMAIL_PUT]: () => {
+        current = null;
+        return j(200, { ...U_IVANOV, email: null });
+      },
+    });
+    fireEvent.click(editButton(container, ID_IVANOV, "ivanov"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: ru["admin.users.email_save"] }));
+    await waitFor(() => expect(f.count(EMAIL_PUT)).toBe(1));
+    const body = (await f.last(EMAIL_PUT).clone().json()) as { email: unknown };
+    expect(body.email).toBeNull();
+    await waitFor(() =>
+      expect(cell(row(container, ID_IVANOV), "email").textContent).toBe("email не указан"),
+    );
+  });
+
+  it("007_edit_email_taken_409_shown_in_dialog_which_stays_open", async () => {
+    const { container } = await open({
+      [LIST]: LIST_ROWS,
+      [EMAIL_PUT]: () => err(409, "email_taken"),
+    });
+    fireEvent.click(editButton(container, ID_IVANOV, "ivanov"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "other@example.ru" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: ru["admin.users.email_save"] }));
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toBe(errorMessage("email_taken"));
+    expect(screen.queryByRole("dialog")).toBe(dialog);
+  });
+
+  it("007_cancel_sends_no_request", async () => {
+    const { container } = await open({ [LIST]: LIST_ROWS, [EMAIL_PUT]: () => j(200, withEmail) });
+    fireEvent.click(editButton(container, ID_IVANOV, "ivanov"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: ru["admin.users.email_cancel"] }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(f.count(EMAIL_PUT)).toBe(0);
   });
 });

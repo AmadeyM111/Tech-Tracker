@@ -13,6 +13,9 @@ vi.mock("../../../src/features/auth/api", () => ({
   login: vi.fn(),
   logout: vi.fn(),
   changePassword: vi.fn(),
+  passwordResetStatus: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  confirmPasswordReset: vi.fn(),
 }));
 
 const PASSWORD = "Correct-Horse-Battery-9";
@@ -27,6 +30,8 @@ function fill(c: HTMLElement, login = "ivanov", password = PASSWORD) {
 
 beforeEach(() => {
   vi.mocked(api.login).mockReset();
+  vi.mocked(api.passwordResetStatus).mockReset();
+  vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: false });
 });
 
 describe("LoginPage (T23)", () => {
@@ -464,5 +469,58 @@ describe("LoginPage password reveal (006)", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+// Spec 007 (R7-T16): ссылка «Забыли пароль?» зависит от GET /auth/password-reset/status.
+describe("LoginPage forgot-password link (spec 007)", () => {
+  const link = () => screen.queryByRole("link", { name: t("auth.forgot_password") });
+
+  it("fr17_enabled_false_has_no_link", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: false });
+    renderAt("/login", <LoginPage />);
+    await waitFor(() => expect(api.passwordResetStatus).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(link()).toBeNull();
+  });
+
+  it("fr17_status_error_has_no_link", async () => {
+    vi.mocked(api.passwordResetStatus).mockRejectedValue(new ApiError(500, "internal_error", "x"));
+    renderAt("/login", <LoginPage />);
+    await waitFor(() => expect(api.passwordResetStatus).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(link()).toBeNull();
+    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
+  });
+
+  it("fr17_pending_status_has_no_link", async () => {
+    const d = deferred<{ enabled: boolean }>();
+    vi.mocked(api.passwordResetStatus).mockReturnValue(d.promise);
+    renderAt("/login", <LoginPage />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(link()).toBeNull();
+    d.resolve({ enabled: true });
+    await waitFor(() => expect(link()).not.toBeNull());
+  });
+
+  it("ac3_enabled_true_link_after_submit_and_before_help", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    const { container } = renderAt("/login", <LoginPage />);
+    const a = await screen.findByRole("link", { name: t("auth.forgot_password") });
+    expect(a.getAttribute("href")).toBe("/password-reset");
+    const submit = submitButton(container);
+    const help = container.querySelector("section.ui-login-help")!;
+    expect(submit.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(a.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(help.contains(a)).toBe(false);
+  });
+
+  it("ac15_status_query_not_refetched_on_focus_or_retried", async () => {
+    vi.mocked(api.passwordResetStatus).mockRejectedValue(new ApiError(500, "internal_error", "x"));
+    renderAt("/login", <LoginPage />);
+    await waitFor(() => expect(api.passwordResetStatus).toHaveBeenCalledTimes(1));
+    window.dispatchEvent(new Event("focus"));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(api.passwordResetStatus).toHaveBeenCalledTimes(1);
   });
 });

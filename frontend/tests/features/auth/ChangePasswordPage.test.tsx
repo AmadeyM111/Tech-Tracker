@@ -18,6 +18,9 @@ vi.mock("../../../src/features/auth/api", () => ({
   login: vi.fn(),
   logout: vi.fn(),
   changePassword: vi.fn(),
+  passwordResetStatus: vi.fn(async () => ({ enabled: false })),
+  requestPasswordReset: vi.fn(async () => undefined),
+  confirmPasswordReset: vi.fn(async () => undefined),
 }));
 
 const OLD = "One-Time-Pass-123";
