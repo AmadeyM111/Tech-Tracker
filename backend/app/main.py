@@ -11,6 +11,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.api.deps import check_origin
+from app.api.mcp.endpoint import McpEndpoint
+from app.api.mcp.server import McpRuntime, build_session_manager
+from app.api.mcp.tools import default_registry
 from app.api.v1 import router as api_v1_router
 from app.core.clock import Clock, SystemClock, use_clock
 from app.core.config import Settings, get_settings
@@ -83,7 +86,8 @@ async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
     application.state.engine = engine
     application.state.sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
     try:
-        yield
+        async with application.state.mcp_runtime:
+            yield
     finally:
         await engine.dispose()
 
@@ -111,6 +115,17 @@ def create_app(settings: Settings | None = None, *, clock: Clock | None = None) 
     application.add_middleware(AccessLogMiddleware)
     install_error_handlers(application)
     application.include_router(api_v1_router)
+    # MCP для AI-агентов (ADR-0018): реестр инструментов и протокольный слой на /mcp
+    application.state.mcp_registry = default_registry()
+    session_manager = build_session_manager()
+    application.state.mcp_runtime = McpRuntime(session_manager)
+    # ASGI-приложение как endpoint: Starlette передаёт не-функции без обёртки (типы этого не видят)
+    application.add_route(
+        "/mcp",
+        McpEndpoint(session_manager),  # type: ignore[arg-type]
+        methods=["GET", "POST", "DELETE"],
+        include_in_schema=False,
+    )
     return application
 
 

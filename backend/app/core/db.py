@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, Request
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.core.config import Settings
 
@@ -23,6 +29,24 @@ def create_engine(settings: Settings) -> AsyncEngine:
     )
 
 
+@asynccontextmanager
+async def transaction(
+    sessionmaker: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[AsyncSession]:
+    """Сессия с одной транзакцией вне HTTP-зависимостей (MCP, ADR-0018 PN-3).
+
+    COMMIT при выходе без исключения, ROLLBACK при исключении. Та же модель, что у ``get_db``.
+    """
+    async with sessionmaker() as session:
+        await session.begin()
+        try:
+            yield session
+            await session.commit()
+        except BaseException:
+            await session.rollback()
+            raise
+
+
 async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
     """Сессия на запрос: одна транзакция, откат при исключении, COMMIT в конце запроса.
 
@@ -37,15 +61,8 @@ async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
     после отправки ответа, и при сбое клиент уже получил 200; смешение ``Depends(get_db)`` и
     ``DbSession`` в одном запросе даёт две сессии и две транзакции.
     """
-    sessionmaker = request.app.state.sessionmaker
-    async with sessionmaker() as session:
-        await session.begin()
-        try:
-            yield session
-            await session.commit()
-        except BaseException:
-            await session.rollback()
-            raise
+    async with transaction(request.app.state.sessionmaker) as session:
+        yield session
 
 
 async def commit_durably(session: AsyncSession) -> None:

@@ -94,7 +94,12 @@ M20-T10 → M20-T11 → M20-T12. Задачи последовательные (
 - **Зависит от:** M20-T03, M20-T04
 
 ## M20-T07 — Ядро MCP-сервера: `/mcp`, токен, Origin
-- **Файлы:** `backend/app/api/mcp/__init__.py` (новый), `backend/app/api/mcp/server.py` (новый),
+- **Файлы:** `backend/app/api/mcp/__init__.py` (новый), `backend/app/api/mcp/context.py` (новый),
+  `backend/app/api/mcp/registry.py` (новый), `backend/app/api/mcp/server.py` (новый),
+  `backend/app/api/mcp/endpoint.py` (новый), `backend/app/api/mcp/tools/__init__.py` (новый, пустой реестр),
+  `backend/app/main.py`, `backend/app/core/db.py` (только `transaction()` — сессия с одной транзакцией
+  вне HTTP-зависимостей; `get_db` переведён на неё без изменения поведения; нужна, потому что AST-тест
+  запрещает `commit()` в сервисах и адаптерах), `backend/tests/api/test_m20_t07_mcp_core.py` (новый).
   `backend/app/api/mcp/auth.py` (новый), `backend/app/api/mcp/errors.py` (новый), `backend/app/main.py`.
 - **AC:** AC-2 (401 без токена или с неверным), AC-6 (`tools/list` без инструментов для роли без доступа
   к задачам; PN-11), AC-10 (чужой Origin → 403), PN-3 (блокировка, `must_change_password`, роль «без роли»
