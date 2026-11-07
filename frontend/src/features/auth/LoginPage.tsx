@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
+import { GTrackLogo } from "../../shared/ui/GTrackLogo";
 import { TextField } from "../../shared/ui/TextField";
 import { login, passwordResetStatus } from "./api";
 import { FOCUS_HEADING_STATE } from "./session";
@@ -62,7 +63,10 @@ export function LoginPage() {
 
   return (
     <section className="ui-form">
-      <h1>{t("auth.login_title")}</h1>
+      <div className="ui-brand">
+        <GTrackLogo />
+        <h1>{t("auth.login_title")}</h1>
+      </div>
       <form onSubmit={(e) => void onSubmit(e)} noValidate>
         <ErrorAlert message={alert.message} seq={alert.seq} />
         <TextField
@@ -90,7 +94,6 @@ export function LoginPage() {
       <section className="ui-login-help" aria-labelledby="login-help-title">
         <h2 id="login-help-title">{t("auth.help_title")}</h2>
         <p>{t("auth.help_p1")}</p>
-        <p>{t("auth.help_p2")}</p>
       </section>
     </section>
   );

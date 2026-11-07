@@ -1,4 +1,4 @@
-"""Подкоманда ``gostracker hash-bench [--iterations N]`` (plan §4.13; AC-38, FR-52).
+"""Подкоманда ``gtrack hash-bench [--iterations N]`` (plan §4.13; AC-38, FR-52).
 
 Замеряет время ``PasswordHasher.hash`` с параметрами Argon2id из ``Settings`` на одном и том же
 случайном пароле. БД, секретный ключ и файлы не затрагиваются; пароль и хеши не печатаются.

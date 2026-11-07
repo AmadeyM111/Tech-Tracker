@@ -40,7 +40,7 @@ export const ru = {
   "error.parent_task_deleted": "Родительская задача удалена, действие недоступно",
   "error.due_date_in_past": "Срок не может быть раньше сегодняшнего дня",
   "error.unknown": "Не удалось выполнить действие. Попробуйте ещё раз",
-  "auth.login_title": "Вход в систему",
+  "auth.login_title": "Войти в GTrack",
   "auth.login_label": "Логин",
   "auth.password_label": "Пароль",
   "auth.show_password": "Показать пароль",
@@ -50,9 +50,7 @@ export const ru = {
   "auth.login_submit": "Войти",
   "auth.help_title": "О системе",
   "auth.help_p1":
-    "GOSTracker — трекер задач для команды. Проекты, задачи с подзадачами и комментариями, список и канбан-доска.",
-  "auth.help_p2":
-    "Учётную запись и первый пароль выдаёт технический администратор. После первого входа пароль нужно сменить.",
+    "GTrack — интеллектуальный трекер задач для команд и компаний. Проекты, задачи с подзадачами со статусами с канбан-доской.",
   "auth.current_password_label": "Текущий пароль",
   "auth.new_password_label": "Новый пароль",
   "auth.confirm_password_label": "Повторите новый пароль",

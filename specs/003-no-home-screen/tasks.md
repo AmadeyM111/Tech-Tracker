@@ -338,7 +338,7 @@ R4-T09 → R4-T11. R4-T01 выполняется до R4-T04 (лучше пер�
 - **Описание:** Выполнить и приложить к отчёту итог:
   (1) `cd frontend && npm run lint && npm run typecheck && npm test`;
   (2) `bash scripts/check.sh` (тестовая БД — как в `specs/002-three-roles/tasks.md`, «Общие
-  условия»: `docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db`,
+  условия»: `docker compose -p gtrack-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db`,
   `TEST_DATABASE_URL=…/tracker_test`; тома не удалять);
   (3) AC-33: `git diff --stat e43d435 -- backend docs/api frontend/src/shared/api/schema.d.ts`
   пуст, `git diff e43d435 -- frontend/package.json` пуст;

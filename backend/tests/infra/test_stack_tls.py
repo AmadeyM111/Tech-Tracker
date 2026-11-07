@@ -4,14 +4,14 @@ AC-95, AC-105, T25 п.1, 2, 5, 6, 7).
 Маркер ``infra_stack``; без ``GT_INFRA_STACK=1`` пропускаются (см. stack_support.py).
 
 Две части:
-1. запросы к поднятому стеку (проект gostracker-infratest, порты HTTP_PORT/HTTPS_PORT);
-2. поведение скрипта ``10-gostracker-tls.sh`` на ОБРАЗЕ web из стека: отдельные контейнеры
+1. запросы к поднятому стеку (проект gtrack-infratest, порты HTTP_PORT/HTTPS_PORT);
+2. поведение скрипта ``10-gtrack-tls.sh`` на ОБРАЗЕ web из стека: отдельные контейнеры
    ``gt-t26-*`` без публикации портов, без сети с api и с собственными томами ``gt-t26-*``.
    Всё создаваемое удаляется в finalizer'ах. Ни стек пользователя, ни тома проекта не затрагиваются.
 
 Контракт, который проверяют тесты части 2 (plan §4.12, tasks T26 «Перенесено из ревью T25»):
-- сгенерированная пара лежит в ``/var/lib/gostracker/tls/tls.{crt,key}``, сертификат оператора -
-  ``/etc/gostracker/tls/tls.{crt,key}``;
+- сгенерированная пара лежит в ``/var/lib/gtrack/tls/tls.{crt,key}``, сертификат оператора -
+  ``/etc/gtrack/tls/tls.{crt,key}``;
 - ошибка конфигурации = контейнер завершается с кодом != 0, причина названа в логе по имени
   переменной (``TLS_SERVER_NAME``/``HTTPS_PORT``), значение выполняться не должно;
 - сгенерированная пара при несовпадении ключа и сертификата или истечении срока перегенерируется;
@@ -41,8 +41,8 @@ CSP = (
     "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; "
     "frame-ancestors 'none'"
 )
-GEN = "/var/lib/gostracker/tls"
-OPR = "/etc/gostracker/tls"
+GEN = "/var/lib/gtrack/tls"
+OPR = "/etc/gtrack/tls"
 PAIR_CHECK = (
     'a=$(openssl x509 -in {d}/tls.crt -noout -pubkey | openssl sha256); '
     'b=$(openssl pkey -in {d}/tls.key -pubout | openssl sha256); '
@@ -208,7 +208,7 @@ def test_ac105_api_container_has_secure_cookies_forced_on() -> None:
 
 
 # =============================================================================================
-# Часть 2. Образ web из стека: скрипт 10-gostracker-tls.sh и валидация переменных
+# Часть 2. Образ web из стека: скрипт 10-gtrack-tls.sh и валидация переменных
 # =============================================================================================
 
 

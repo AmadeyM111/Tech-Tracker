@@ -282,16 +282,16 @@ def test_fr6_entrypoint_umask_077_before_bootstrap(entrypoint: str) -> None:
     """FR-6, D-19: ``umask 077`` задан до запуска bootstrap."""
     cmds = _commands(entrypoint)
     umask_idx = next((i for i, c in enumerate(cmds) if re.fullmatch(r"umask\s+0?077", c)), None)
-    boot_idx = next((i for i, c in enumerate(cmds) if "gostracker bootstrap" in c), None)
+    boot_idx = next((i for i, c in enumerate(cmds) if "gtrack bootstrap" in c), None)
     assert umask_idx is not None, "нет umask 077"
-    assert boot_idx is not None, "нет gostracker bootstrap"
+    assert boot_idx is not None, "нет gtrack bootstrap"
     assert umask_idx < boot_idx
 
 
 def test_fr6_entrypoint_runs_bootstrap_then_exec_uvicorn(entrypoint: str) -> None:
     """FR-6: bootstrap выполняется до uvicorn; uvicorn запускается через exec (PID 1, SIGTERM)."""
     cmds = _commands(entrypoint)
-    boot_idx = next(i for i, c in enumerate(cmds) if "gostracker bootstrap" in c)
+    boot_idx = next(i for i, c in enumerate(cmds) if "gtrack bootstrap" in c)
     uv_idx = next((i for i, c in enumerate(cmds) if "uvicorn" in c), None)
     assert uv_idx is not None, "нет запуска uvicorn"
     assert boot_idx < uv_idx

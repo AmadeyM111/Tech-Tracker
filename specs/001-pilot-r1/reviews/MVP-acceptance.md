@@ -11,8 +11,8 @@
 |---|---|
 | Трассировка §11.7, целевые наборы (БД `tracker_acc_test`) | 2666 passed, 0 skip |
 | `bash scripts/check.sh` | ВСЁ ЗЕЛЁНОЕ: pytest 3488 passed / 81 skipped (infra_stack), ruff/mypy/alembic check чистые, фронтенд 671 тест, build |
-| Свежий стек `up -d --build --wait` + `infra_stack` (проект `gostracker-infratest-acc`) | 81 passed |
-| Стек `gostracker-acc`: demo-data, вход, смена пароля, `maintenance --dry-run`, `/healthz` | ок; пароли 0600, не в логах; повтор demo-data → код 2 |
+| Свежий стек `up -d --build --wait` + `infra_stack` (проект `gtrack-infratest-acc`) | 81 passed |
+| Стек `gtrack-acc`: demo-data, вход, смена пароля, `maintenance --dry-run`, `/healthz` | ок; пароли 0600, не в логах; повтор demo-data → код 2 |
 | Живой сценарий UF-2…UF-6 по HTTP (`/tmp/mvp-acc/scripts/live.py`, `uf2.py`) | 149 + 22 проверки, 0 провалов |
 | Миграции `downgrade 0003` → `upgrade head` с данными | ок, `alembic check` без изменений |
 | Нагрузка: 120 переносов в 16 потоков, 2 пользователя | 93×204, 27×503 (40P01), 0×500; данные согласованы |
@@ -53,5 +53,5 @@
 фильтры по сроку, экспорт/импорт, бэкап, NFR-2, Playwright). Доска без пагинации (R-M4). Лента следующей
 версии начнётся пустой для данных MVP (D-55).
 
-Стеки `gostracker-infratest-acc`, `gostracker-acc` и БД `tracker_acc_test` удалены; dev-стек, `tracker`,
+Стеки `gtrack-infratest-acc`, `gtrack-acc` и БД `tracker_acc_test` удалены; dev-стек, `tracker`,
 `pgdata` не тронуты. Логи и скрипты — `/tmp/mvp-acc/`.

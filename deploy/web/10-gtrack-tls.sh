@@ -1,24 +1,24 @@
 #!/bin/sh
 # Выбор TLS-сертификата для nginx (plan §4.12, D-17, FR-63). Запускается entrypoint'ом образа nginx.
-# Порядок: 1) сертификат оператора /etc/gostracker/tls/tls.{crt,key} (не перегенерируется);
-#          2) уже сгенерированный самоподписанный в /var/lib/gostracker/tls, если пара цела
+# Порядок: 1) сертификат оператора /etc/gtrack/tls/tls.{crt,key} (не перегенерируется);
+#          2) уже сгенерированный самоподписанный в /var/lib/gtrack/tls, если пара цела
 #             (ключ подходит к сертификату, срок не истёк);
 #          3) генерация нового самоподписанного (EC prime256v1, 825 дней).
-# nginx читает сертификат по фиксированным путям /run/gostracker-tls/tls.{crt,key} (символьные ссылки).
+# nginx читает сертификат по фиксированным путям /run/gtrack-tls/tls.{crt,key} (символьные ссылки).
 #
 # Скрипт стартует раньше envsubst-шаблонов образа nginx (префикс 10-), поэтому значения
 # переменных проверяются здесь, до подстановки в конфигурацию.
 set -eu
 
-OPERATOR_CRT=/etc/gostracker/tls/tls.crt
-OPERATOR_KEY=/etc/gostracker/tls/tls.key
-GENERATED_DIR=/var/lib/gostracker/tls
-ACTIVE_DIR=/run/gostracker-tls
+OPERATOR_CRT=/etc/gtrack/tls/tls.crt
+OPERATOR_KEY=/etc/gtrack/tls/tls.key
+GENERATED_DIR=/var/lib/gtrack/tls
+ACTIVE_DIR=/run/gtrack-tls
 TLS_NAME_MAX=64
 
-log() { echo "gostracker-tls: $*"; }
+log() { echo "gtrack-tls: $*"; }
 fail() {
-    echo "gostracker-tls: ошибка: $*" >&2
+    echo "gtrack-tls: ошибка: $*" >&2
     exit 1
 }
 
@@ -65,7 +65,7 @@ if [ -e "$OPERATOR_CRT" ] || [ -e "$OPERATOR_KEY" ]; then
     else
         missing=tls.crt
     fi
-    log "предупреждение: в /etc/gostracker/tls нужны оба файла (tls.crt и tls.key), файл $missing" \
+    log "предупреждение: в /etc/gtrack/tls нужны оба файла (tls.crt и tls.key), файл $missing" \
         "отсутствует или пуст; сертификат оператора не используется"
 fi
 

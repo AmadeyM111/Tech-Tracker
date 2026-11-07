@@ -1,4 +1,4 @@
-"""Подкоманда ``gostracker import PATH`` (plan §4.10, FR-40, AC-93).
+"""Подкоманда ``gtrack import PATH`` (plan §4.10, FR-40, AC-93).
 
 Заменяет автоданные установки (первого ТА, воронку по умолчанию) данными архива в
 одной транзакции; идентификаторы сохраняются. Импорт в непустую систему и архив другой
@@ -23,7 +23,7 @@ from app.core.config import Settings, get_settings
 from app.domain.ops.archive import ImportRefused
 from app.domain.ops.importer import import_archive
 
-_BOOTSTRAP_HINT = "Выполните `gostracker bootstrap` и повторите команду."
+_BOOTSTRAP_HINT = "Выполните `gtrack bootstrap` и повторите команду."
 
 
 def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -36,7 +36,7 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
             "После импорта удаляется файл с паролем первого ТА."
         ),
     )
-    parser.add_argument("path", metavar="PATH", help="архив, созданный gostracker export")
+    parser.add_argument("path", metavar="PATH", help="архив, созданный gtrack export")
     parser.set_defaults(handler=run)
 
 
@@ -45,7 +45,7 @@ async def _import(settings: Settings, archive: Path, *, schema_version: str) -> 
 
 
 def run(args: argparse.Namespace) -> int:
-    """Выполняет ``gostracker import``; возвращает код выхода."""
+    """Выполняет ``gtrack import``; возвращает код выхода."""
     step = "настройки"
     archive = Path(args.path)
     try:
