@@ -55,6 +55,7 @@ from app.domain.auth.provider import normalize_login
 from app.domain.auth.sessions import SessionStore
 from app.domain.events.catalog import EventAction
 from app.domain.events.writer import UserEventDetails, record_event
+from app.domain.tokens.service import revoke_all_for_user as revoke_agent_tokens
 from app.domain.users.email import normalize_email
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import WorkspaceMember
@@ -401,6 +402,8 @@ async def block_user(
     if target.is_active_account_admin:
         await ensure_account_admin_remains(db, actor.workspace_id)
     await sessions.delete_all_for_user(db, target.id)
+    # PN-4 (ADR-0018): токены агентов отзываются вместе с сессиями, в той же транзакции.
+    await revoke_agent_tokens(db, workspace_id=actor.workspace_id, user_id=target.id)
     await record_event(
         db,
         workspace_id=actor.workspace_id,
