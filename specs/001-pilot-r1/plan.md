@@ -1,4 +1,4 @@
-# Plan: Пилот GOSTracker R1 — проекты, задачи, CRM
+# Plan: Пилот GTrack R1 — проекты, задачи, CRM
 
 - **Spec:** ./spec.md (v0.15, все OI закрыты, включая OI-103…OI-118 по §9 этого плана; протокол решений — ./consensus-2026-10-13.md)
 - **Статус:** DRAFT (v2, 2026-10-13 — синхронизирован со spec v0.15)
@@ -40,7 +40,7 @@
 представлениях — атомарность «изменение + история + лента + аудит» получается по построению,
 а аудит физически не возвращает значений по бизнес-сущностям. Команды оператора (первый
 запуск, демо-данные, экспорт/импорт, обслуживание, восстановление CRM, генератор нагрузки)
-— один CLI `gostracker` внутри образа API; бэкап и восстановление — скрипты поверх
+— один CLI `gtrack` внутри образа API; бэкап и восстановление — скрипты поверх
 служебного сервиса compose `ops`. Новые внешние библиотеки добавляются только там, где своё
 решение было бы рискованнее (Argon2id, разбор multipart, tzdata); определение типа файла,
 очистка HTML, CLI, замер NFR-2 — на стандартной библиотеке.
@@ -59,17 +59,17 @@
 | D-8 | Неизменяемость журнала | Триггер `BEFORE UPDATE OR DELETE` и `BEFORE TRUNCATE` на `domain_event` → исключение; в API нет операций изменения; FK из событий на доменные сущности нет | Отдельная роль БД без UPDATE/DELETE | Одна роль БД в compose; триггер защищает и от ошибок кода, и от команд обслуживания (FR-41, AC-66); **известное ограничение R1 (ревью T07):** роль приложения — суперпользователь и владелец таблицы, поэтому триггеры обходятся (`session_replication_role = replica`, `ALTER TABLE … DISABLE TRIGGER`, `DROP TABLE`); защита от злонамеренного DBA — отдельная роль без SUPERUSER и владения + `REVOKE UPDATE, DELETE, TRUNCATE`, в бэклог до корпоративного внедрения |
 | D-9 | Первый запуск не пишет аудит | Создание первого ТА, пространства и стадий по умолчанию (автор «система») событий **не** создаёт | Писать события с автором «система» | Импорт обязан «заменить» автоданные (FR-40), а журнал нельзя очищать никакой операцией (FR-41). Факт создания виден по `created_by = NULL`. Подтверждено spec FR-41 (OI-110), AC-114 |
 | D-10 | Аутентификация | Протокол `AuthProvider` (`domain/auth/provider.py`), реализация `LocalPasswordProvider`; блокировка учётной записи и создание сессии — вне провайдера, в `LoginService` | Логика пароля прямо в роутере | FR-3: OIDC-провайдер добавляется новой реализацией протокола |
-| D-11 | Хеш пароля | Argon2id через `argon2-cffi`, параметры из env (`ARGON2_TIME_COST=3`, `ARGON2_MEMORY_COST_KIB=131072`, `ARGON2_PARALLELISM=2` — стартовые, калибруются командой `gostracker hash-bench` на стенде C-2 в R1.4); хеширование в пуле потоков | passlib; bcrypt; hashlib.scrypt | ADR-0004 прямо называет argon2-cffi |
+| D-11 | Хеш пароля | Argon2id через `argon2-cffi`, параметры из env (`ARGON2_TIME_COST=3`, `ARGON2_MEMORY_COST_KIB=131072`, `ARGON2_PARALLELISM=2` — стартовые, калибруются командой `gtrack hash-bench` на стенде C-2 в R1.4); хеширование в пуле потоков | passlib; bcrypt; hashlib.scrypt | ADR-0004 прямо называет argon2-cffi |
 | D-12 | Список частых паролей | Первые 10 000 строк `Passwords/Common-Credentials/10k-most-common.txt` из SecLists (MIT), коммит `913b327317496d062bcc7cace524aaad8a693be2`; файл в репозитории, сверка sha256 тестом; сравнение точное, с учётом регистра (FR-53, OI-111) | NCSC Top100k; списки zxcvbn; HIBP API | См. §7.3. HIBP — внешний вызов (NFR-4) |
 | D-13 | Сессии | Таблица `user_session`; cookie `gt_session` = 32 случайных байта (base64url); в БД хранится `HMAC-SHA256(secret_key, token)`; права не кешируются — роль читается из БД на каждый запрос | JWT; Redis | ADR-0004 (мгновенный отзыв), FR-67; секретный ключ FR-6 получает смысл: утечка БД не даёт рабочих токенов |
 | D-14 | Фоновый опрос | Клиент ставит заголовок `X-GT-Background: 1` на повторные (не первые) загрузки запросов опроса; сервер для `GET` с этим заголовком не обновляет `last_activity_at`; для изменяющих методов заголовок игнорируется | Отдельный префикс `/poll/*`; учёт по типу эндпоинта | FR-59/AC-79: сервер не знает намерения пользователя, клиент знает. Злоупотребление заголовком только сокращает собственную сессию |
 | D-15 | Одноразовый пароль | ТА передаёт одноразовый пароль в **запросе** создания/сброса (интерфейс генерирует его в браузере через `crypto.getRandomValues` и показывает администратору); API паролей не возвращает | Сервер генерирует и возвращает пароль в ответе | FR-57 запрещает пароли в ответах API без исключений. Закреплено spec FR-55, FR-65 (OI-108): одноразовый пароль подчиняется FR-52/FR-53 |
 | D-16 | CSRF | Cookie `SameSite=Lax` + проверка заголовка `Origin` для POST/PUT/PATCH/DELETE: если `Origin` есть и его хост:порт не совпадает с `Host` — 403 `origin_mismatch`; тела запросов — только JSON (кроме загрузки вложений) | CSRF-токен; без проверки | Lax не защищает от запросов с других портов того же сайта (`localhost:*`); проверка Origin — 10 строк кода; **ревью T12:** nginx обязан передавать `Host` с портом (`proxy_set_header Host $http_host`, не `$host`) — иначе при `HTTPS_PORT≠443` любой POST получит 403 `origin_mismatch`; сверять также схему Origin с `request.url.scheme` (T13) |
 | D-17 | TLS и статика | Контейнер `web` = nginx (stable-alpine): TLS 1.2+1.3, редирект 80→443, раздача собранного фронтенда, прокси `/api/` → `api:8000`; самоподписанный сертификат генерируется `openssl` скриптом entrypoint при отсутствии сертификата оператора | Caddy (`tls internal`); TLS в uvicorn; Traefik | nginx: явная конфигурация протоколов (AC-40), без внутреннего CA и попыток установки доверия; один контейнер вместо двух (фронт + прокси) |
-| D-18 | Поставляемый compose и dev | `docker-compose.yml` (поставка): порты публикует только `web`; `db` и `api` без `ports`; `COOKIE_SECURE: "true"` задан литералом в `environment` api (не из `.env`). Dev: `deploy/compose.dev.yml`, подключается только явно: `docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db` → `127.0.0.1:5432` | Профиль compose (профиль не может менять `ports` существующего сервиса); `docker-compose.override.yml` | FR-6a, FR-58, N-7. Тест запрещает файлы `docker-compose.override.y*ml` и `compose.override.y*ml` (оба автоподхватываются Compose) |
+| D-18 | Поставляемый compose и dev | `docker-compose.yml` (поставка): порты публикует только `web`; `db` и `api` без `ports`; `COOKIE_SECURE: "true"` задан литералом в `environment` api (не из `.env`). Dev: `deploy/compose.dev.yml`, подключается только явно: `docker compose -p gtrack-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db` → `127.0.0.1:5432` | Профиль compose (профиль не может менять `ports` существующего сервиса); `docker-compose.override.yml` | FR-6a, FR-58, N-7. Тест запрещает файлы `docker-compose.override.y*ml` и `compose.override.y*ml` (оба автоподхватываются Compose) |
 | D-19 | Тома и секреты | Именованный том `appdata` → `/data` контейнера api (uid 10001): `secrets/secret_key`, `secrets/initial-admin-password.txt`, `secrets/demo-passwords.txt`, `attachments/`, `exports/`; файлы секретов и выгрузок — режим `0600`, процесс с `umask 077` | Bind mount `./data` | Именованный том не зависит от uid хоста; оператор читает файл командой `docker compose exec api cat /data/secrets/...` (README) |
 | D-20 | Секретный ключ | Если `SECRET_KEY` в окружении пуст — читается/создаётся `/data/secrets/secret_key` (32 байта, hex); `SECRET_KEY` удаляется из `.env.example` | Генерация в `.env` скриптом | FR-6, AC-23: ключ из поставки не совпадает с `.env.example`, перезапуск его не меняет |
-| D-21 | Миграции при старте | Entry point образа api: `gostracker bootstrap` (ожидание БД, `alembic upgrade head`, идемпотентная инициализация под advisory lock) → `exec uvicorn` | Отдельный сервис-мигратор | Одна команда `docker compose up` (FR-48, NFR-3) |
+| D-21 | Миграции при старте | Entry point образа api: `gtrack bootstrap` (ожидание БД, `alembic upgrade head`, идемпотентная инициализация под advisory lock) → `exec uvicorn` | Отдельный сервис-мигратор | Одна команда `docker compose up` (FR-48, NFR-3) |
 | D-22 | Позиции карточек | `task.position bigint` только у задач верхнего уровня, шаг 1024; перемещение по соседям; сериализация на колонку `pg_advisory_xact_lock`; перенумерация колонки в той же транзакции | Дробные позиции; LexoRank | Указание заказчика (FR-28a) |
 | D-23 | Связь сделка ↔ проект 1:1 | Столбец `deal.project_id uuid NULL UNIQUE REFERENCES project ON DELETE RESTRICT`. Мягкое удаление сделки и уход из корзины столбец **не** трогают (OI-115): UNIQUE продолжает занимать проект, новая связь → 422 `project_linked_to_deleted_deal`. Снять связь с удалённой сделкой (в корзине или после 30 дней) — отдельный эндпоинт по проекту `DELETE /api/v1/crm/project-links/{project_id}` (§4.15), единственное API-действие с такой сделкой (FR-25c); после снятия `project_id = NULL`, восстановление сделки связь не возвращает (OI-118). Окончательное удаление проекта (кнопкой или командой) сначала снимает связь событием с автором «система» (FR-16) — поэтому RESTRICT | Таблица связи; `project.deal_id`; `ON DELETE SET NULL` (снятие без события) | Одно место хранения, UNIQUE даёт 1:1 (OI-29); направление CRM → проект: модуль проектов не зависит от CRM-таблиц при записи; RESTRICT не даёт снять связь без записи в историю |
 | D-24 | Поиск | `pg_trgm`, индексы GIN `gin_trgm_ops` по названиям, условие `ILIKE '%q%'` с экранированием `%`/`_`/`\` | Полнотекстовый `tsvector`; внешний движок | FR-39: подстрока без учёта регистра; `pg_trgm` входит в образ postgres:16 |
@@ -77,15 +77,15 @@
 | D-26 | FK при окончательном удалении | Все FK `DEFERRABLE INITIALLY IMMEDIATE`; дочерние бизнес-объекты задачи/проекта — `ON DELETE CASCADE`; FK на `app_user` — `RESTRICT` (пользователи не удаляются); `deal.project_id` — `RESTRICT` (снимается явно с событием «система»); у `domain_event` FK только на `workspace` и `app_user` | Без FK; `SET NULL` | ADR-0010, FR-25b, FR-16; `DEFERRABLE` нужен импорту (самоссылки `task.parent_id`) |
 | D-27 | Тип вложения | Свой детектор на стандартной библиотеке (`domain/attachments/filetype.py`): сигнатуры, разбор ZIP (`zipfile`) и OOXML, текстовая эвристика; рекурсивная проверка вложенных ZIP (загружаемый архив — уровень 1, проверяются уровни 1–3, ZIP на уровне 4, зашифрованный или повреждённый элемент → 422; FR-24, OI-113) | python-magic (системная libmagic); puremagic; filetype | Всё равно нужна собственная логика «архив с исполняемым файлом» и соответствия расширению; без системной библиотеки и новых зависимостей |
 | D-28 | Очистка HTML в комментариях | Свой фильтр на `html.parser.HTMLParser` (удаляет теги, комментарии, содержимое `script`/`style`; текст сохраняет как есть) | nh3/ammonia; bleach | nh3 экранирует `<`/`>` и ломает markdown (цитаты `>`); bleach устарел. Фронтенд дополнительно рендерит markdown без HTML (`react-markdown`, `skipHtml`) |
-| D-29 | CLI оператора | `argparse`, точка входа `gostracker` (`[project.scripts]`), логика команд — в `domain/*` сервисах, CLI тонкий | Typer/Click | Десяток команд; без зависимости |
+| D-29 | CLI оператора | `argparse`, точка входа `gtrack` (`[project.scripts]`), логика команд — в `domain/*` сервисах, CLI тонкий | Typer/Click | Десяток команд; без зависимости |
 | D-30 | Ошибки API | Иерархия `AppError` → `{"detail": ..., "code": ...}`; обработчик 422 удаляет `input`/`ctx`/`url` из ошибок Pydantic | Стандартные ответы FastAPI | FR-45; FR-57 — стандартный 422 FastAPI возвращает введённое значение, т.е. пароль |
 | D-31 | Логи | stdlib `logging`, JSON в stdout, свой access-лог (метод, путь без query, статус, длительность, user_id), фильтр-редактор ключей `password|secret|token|cookie`; `hide_parameters=True` в движке SQLAlchemy; uvicorn `--no-access-log` | structlog | FR-57; ротация — драйвером Docker (FR-51); **Ревью T09:** маскирование работает по именам ключей, а не по значениям; ключи вне списка (`passwd`, `pwd`, `api_key`, `apikey`) не покрыты — расширить список при необходимости; объекты с собственным `__str__`/`__repr__` не должны печатать секрет без ключа; `configure_logging` при импорте `app.main` — при программном `uvicorn.run(app)` dictConfig вернёт свои обработчики без фильтра (запускать через CLI/`app.main:app`). |
-| D-32 | Swagger в поставке | `/docs` и `/openapi.json` выключены, если не `EXPOSE_API_DOCS=true` (dev); OpenAPI выгружается командой `gostracker openapi` в `docs/api/openapi.json` | Публичный `/docs` | FR-7: любой эндпоинт, кроме входа и живости, — 401; FR-44 и NFR-11 закрыты файлом в репозитории |
+| D-32 | Swagger в поставке | `/docs` и `/openapi.json` выключены, если не `EXPOSE_API_DOCS=true` (dev); OpenAPI выгружается командой `gtrack openapi` в `docs/api/openapi.json` | Публичный `/docs` | FR-7: любой эндпоинт, кроме входа и живости, — 401; FR-44 и NFR-11 закрыты файлом в репозитории |
 | D-33 | TS-типы | `openapi-typescript` генерирует `frontend/src/shared/api/schema.d.ts` из `docs/api/openapi.json`; клиент — `openapi-fetch`; CI проверяет отсутствие расхождений | orval; ручные типы | AGENTS.md: типы только генерируются; `openapi-fetch` ~6 КБ, типизирован схемой |
 | D-34 | Пагинация | `?page=1&page_size=50` (1…100), ответ `{"items", "page", "page_size", "has_next"}`; `has_next` через выборку `page_size + 1`; общего количества нет | Курсоры; `total` | FR-47, AC-22 («признак следующей страницы»); без COUNT по 50 000 задач |
 | D-35 | Бэкап | `scripts/backup.sh` / `scripts/restore.sh` на хосте вызывают сервис `ops` (профиль `ops`, образ `postgres:16`: `pg_dump -Fc` + `tar` тома `appdata`) | pg_dump в образе api; копия томов | Тот же мажор pg_dump, что у сервера; без PGDG-репозитория в образе api |
 | D-36 | Замер NFR-2 | Свой скрипт `backend/tools/nfr2_bench.py` на `httpx` + `asyncio` (5 воркеров, прогрев, ≥100 замеров, p95) | locust; k6 (AGPL); JMeter | Методика простая; без новых зависимостей; k6 по лицензии в репозиторий не берём |
-| D-37 | Генератор нагрузки | `gostracker loadgen --seed N`: `random.Random(seed)`, UUID и метки времени из того же генератора, вставка пачками; пароли нагрузочных пользователей — в файл `0600` | Faker | Детерминизм (AC-96) без зависимости; Faker не нужен для синтетики из словарей |
+| D-37 | Генератор нагрузки | `gtrack loadgen --seed N`: `random.Random(seed)`, UUID и метки времени из того же генератора, вставка пачками; пароли нагрузочных пользователей — в файл `0600` | Faker | Детерминизм (AC-96) без зависимости; Faker не нужен для синтетики из словарей |
 | D-38 | Связь задача → цель | Не закладывается; добавляется позже аддитивной миграцией (новая таблица `task_objective(task_id, objective_id)` или nullable-столбец), версия схемы выгрузки при этом меняется | Поле `objective_id` в R1 | ADR-0011, OI-2 |
 | D-39 | Формат логина | FR-73 (OI-112): ввод приводится к нижнему регистру, затем проверяется шаблон `^[a-z0-9][a-z0-9._-]{2,63}$` (при создании; нарушение → 422 `login_invalid`, занят → 422 `login_taken`); при входе логин только приводится к нижнему регистру (несоответствие шаблону = неверные учётные данные, 401); БД: `UNIQUE(login)` + `CHECK (login ~ шаблон)`; упоминание — `@` + тот же шаблон без учёта регистра | Свободный логин; `citext` | Однозначный разбор `@логин` (FR-71); хранение в нижнем регистре делает уникальность регистронезависимой без расширения citext |
 
@@ -95,7 +95,7 @@
 
 ```
 backend/
-  pyproject.toml                         изм. [0] зависимости, setuptools packages, mypy 3.12, маркеры pytest, script gostracker
+  pyproject.toml                         изм. [0] зависимости, setuptools packages, mypy 3.12, маркеры pytest, script gtrack
   alembic.ini                            нов. [0]
   Dockerfile, docker-entrypoint.sh, .dockerignore   нов. [0]
   migrations/env.py, script.py.mako      нов. [0] async env, naming convention
@@ -171,7 +171,7 @@ frontend/                                [0] каркас; фичи по эта�
 deploy/
   compose.dev.yml                        [0] публикует 127.0.0.1:5432 для разработки
   dev.env.example                        [0] COOKIE_SECURE=false, EXPOSE_API_DOCS=true, DATABASE_URL на localhost
-  web/Dockerfile, web/default.conf.template, web/10-gostracker-tls.sh   [0]
+  web/Dockerfile, web/default.conf.template, web/10-gtrack-tls.sh   [0]
   tls/README.md (+ .gitignore *.crt *.key)                              [0]
   ops/run.sh                             [4] backup/restore внутри контейнера ops
 docker-compose.yml                       изм. [0] поставляемая конфигурация
@@ -701,7 +701,7 @@ def remove_initial_admin_file_if_for(settings: Settings, login: str) -> None
 0600), с R1.3 — воронку по умолчанию. Если пространство есть — ничего не делать. Пароль в
 лог/stdout не пишется; stdout: «Создан первый техадминистратор, пароль в
 /data/secrets/initial-admin-password.txt». Событий аудита не пишет (D-9).
-`gostracker bootstrap` = ожидание БД (до 60 с) → `ensure_secret_key` → `alembic upgrade head` → `run_bootstrap`.
+`gtrack bootstrap` = ожидание БД (до 60 с) → `ensure_secret_key` → `alembic upgrade head` → `run_bootstrap`.
 Путь к `alembic.ini` — переменная `ALEMBIC_CONFIG` (по умолчанию `backend/alembic.ini` рядом с пакетом);
 в образе исходники лежат в `/app`, `ALEMBIC_CONFIG=/app/alembic.ini`. Порядок записи файла пароля:
 сгенерировать пароль → записать файл (0600) → зафиксировать транзакцию; при ошибке фиксации файл удаляется.
@@ -755,7 +755,7 @@ OI-66). Новая задача — `append_position(project, todo)`. Подза
   OI-107; для deal/account/contact → 422 `permanent_delete_not_allowed`). Окончательное
   удаление проекта кнопкой выполняет тот же сервис, что и команда обслуживания (п.1 ниже),
   включая снятие связи со сделкой с автором «система» (FR-16).
-- Команда обслуживания `gostracker maintenance` (идемпотентна, `--dry-run`):
+- Команда обслуживания `gtrack maintenance` (идемпотентна, `--dry-run`):
   1. задачи, комментарии, вложения, проекты с `deleted_at <= now − 30 дней` — окончательно:
      собрать `storage_key` вложений (включая вложения задач удаляемых проектов) → для
      проекта, связанного со сделкой, `deal.project_id = NULL` + `record_event(deal.project_unlinked, actor_id=None)`
@@ -764,17 +764,17 @@ OI-66). Новая задача — `append_position(project, todo)`. Подза
      `trash_expired_at = now` (запись остаётся, FR-25b);
   3. удалить файлы в `attachments/` без строки в БД старше 1 часа (сироты после сбоев).
   `domain_event` не трогается (триггер это гарантирует, AC-66).
-- `gostracker restore-crm {deal|account|contact} <id>`: снимает `deleted_at`,
+- `gtrack restore-crm {deal|account|contact} <id>`: снимает `deleted_at`,
   `deleted_batch_id`, `trash_expired_at` (для клиента — и контакты его пакета) с теми же
   проверками, что и API (сделка при удалённом клиенте — ошибка); событие `deal.restored` с
   `actor_id = NULL` для сделки — одно, в историю, ленту и аудит (FR-25c, FR-35, OI-116, AC-120).
   `project_id` не меняется: если связь была снята по OI-118, она не возвращается.
-- Экспорт/импорт (R1.4): `gostracker export [--out PATH]` → tar-архив (`data.json` + `files/<storage_key>`),
-  режим 0600. `data.json` = `{"format": "gostracker-export", "schema_version": "<alembic head>",
+- Экспорт/импорт (R1.4): `gtrack export [--out PATH]` → tar-архив (`data.json` + `files/<storage_key>`),
+  режим 0600. `data.json` = `{"format": "gtrack-export", "schema_version": "<alembic head>",
   "exported_at": "<UTC>", "tables": {"<table>": [rows…]}}`, строки отсортированы по PK,
   ключи отсортированы, `ensure_ascii=False`, `indent=2`; uuid — строки, `timestamptz` —
   ISO 8601 UTC с микросекундами и `Z`, `date` — `YYYY-MM-DD`, `bytea` нет (сессии не
-  выгружаются). `gostracker import PATH`: проверка `schema_version == head` (иначе код 2);
+  выгружаются). `gtrack import PATH`: проверка `schema_version == head` (иначе код 2);
   проверка «пустоты» (в бизнес-таблицах и `domain_event` нет строк; ровно один пользователь с
   `created_by IS NULL`; стадии — только созданные системой и не изменённые; иначе код 2);
   безопасное чтение архива (только `data.json` и `files/<hex>`); в одной транзакции
@@ -831,7 +831,7 @@ services:
         COOKIE_SECURE: "true" (литерал), DATA_DIR: /data, ARGON2_* из .env с умолчаниями;
         том appdata:/data; depends_on db healthy; healthcheck /api/v1/health; logging; ports — НЕТ
   web:  build deploy/web/Dockerfile (контекст — корень репозитория); ports "${HTTP_PORT:-80}:80", "${HTTPS_PORT:-443}:443";
-        env HTTPS_PORT, TLS_SERVER_NAME; тома ./deploy/tls:/etc/gostracker/tls:ro, tls-generated:/var/lib/gostracker/tls;
+        env HTTPS_PORT, TLS_SERVER_NAME; тома ./deploy/tls:/etc/gtrack/tls:ro, tls-generated:/var/lib/gtrack/tls;
         depends_on api healthy; logging
   ops:  profiles [ops] (R1.4); image postgres:16; тома appdata:/data, ./backups:/backups, ./deploy/ops:/ops:ro; logging
 volumes: pgdata, appdata, tls-generated
@@ -849,9 +849,9 @@ volumes: pgdata, appdata, tls-generated
 `deploy/web/Dockerfile`: stage 1 `node:22-alpine` — `npm ci && npm run build` в `frontend/`;
 stage 2 `nginx:<stable>-alpine` + `apk add --no-cache openssl`; статика →
 `/usr/share/nginx/html`; `default.conf.template` → `/etc/nginx/templates/`;
-`10-gostracker-tls.sh` → `/docker-entrypoint.d/`. Скрипт: если есть
-`/etc/gostracker/tls/tls.crt` и `tls.key` (сертификат оператора) — использовать их; иначе
-если в `/var/lib/gostracker/tls/` уже есть самоподписанный — использовать; иначе сгенерировать
+`10-gtrack-tls.sh` → `/docker-entrypoint.d/`. Скрипт: если есть
+`/etc/gtrack/tls/tls.crt` и `tls.key` (сертификат оператора) — использовать их; иначе
+если в `/var/lib/gtrack/tls/` уже есть самоподписанный — использовать; иначе сгенерировать
 `openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 825
 -subj "/CN=${TLS_SERVER_NAME}" -addext "subjectAltName=DNS:${TLS_SERVER_NAME},DNS:localhost,IP:127.0.0.1"`
 (ключ 0600). Конфигурация: сервер 80 — только `return 308 https://$host:${HTTPS_PORT}$request_uri`
@@ -865,7 +865,7 @@ HSTS не включается (самоподписанный сертифик�
 
 `backend/Dockerfile`: `python:3.12-slim-bookworm`, пользователь uid 10001, `pip install .`
 (не editable), `/data` принадлежит 10001, `VOLUME /data`; `docker-entrypoint.sh`: `umask 077`,
-`gostracker bootstrap`, `exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+`gtrack bootstrap`, `exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
 --forwarded-allow-ips='*' --no-access-log`. Внешних вызовов и телеметрии нет (NFR-4):
 `opentelemetry-api`, который тянет FastAPI, без SDK — no-op; тест проверяет, что SDK не установлен.
 
@@ -875,18 +875,18 @@ HSTS не включается (самоподписанный сертифик�
 `deploy/dev.env.example`: `DATABASE_URL=postgresql+asyncpg://tracker:tracker@localhost:5432/tracker`,
 `COOKIE_SECURE=false`, `ENV=local`, `EXPOSE_API_DOCS=true`, `DATA_DIR=./.data`.
 
-### 4.13. Команды оператора (CLI `gostracker`)
+### 4.13. Команды оператора (CLI `gtrack`)
 
 | Команда | Этап | Назначение | Где запускается |
 |---|---|---|---|
-| `gostracker bootstrap` | 0 | миграции + первый запуск (FR-6) | entrypoint api |
-| `gostracker openapi [--out docs/api/openapi.json]` | 0 | выгрузка OpenAPI (FR-44), без подключения к БД | dev/CI |
-| `gostracker hash-bench [--iterations 20]` | 0 (замер — 4) | p50/p95 времени Argon2id с текущими параметрами (AC-38) | `docker compose exec api` на стенде |
-| `gostracker maintenance [--dry-run]` | 1, 3 | автоочистка корзины (FR-25b) | `docker compose exec api` / cron оператора |
-| `gostracker restore-crm {deal\|account\|contact} ID` | 3 | FR-25c | `docker compose exec api` |
-| `gostracker demo-data [--seed 1]` | 4 | FR-49, FR-64; роли: 1 ТА, 4 БА, 7 П (фича 002, 002/FR-22: `demo.ba4` вместо `demo.mixed`; до 002 — 1 ТА, 1 СМ, 3 БА, 7 П); пароли → `/data/secrets/demo-passwords.txt` (0600), в stdout — только путь | `docker compose exec api` |
-| `gostracker export [--out PATH]`, `gostracker import PATH` | 4 | FR-40 | `docker compose exec api`; `docker compose cp` |
-| `gostracker loadgen --seed N [--tasks 50000 --deals 10000 --accounts 5000]` | 4 | FR-72 | `docker compose exec api` |
+| `gtrack bootstrap` | 0 | миграции + первый запуск (FR-6) | entrypoint api |
+| `gtrack openapi [--out docs/api/openapi.json]` | 0 | выгрузка OpenAPI (FR-44), без подключения к БД | dev/CI |
+| `gtrack hash-bench [--iterations 20]` | 0 (замер — 4) | p50/p95 времени Argon2id с текущими параметрами (AC-38) | `docker compose exec api` на стенде |
+| `gtrack maintenance [--dry-run]` | 1, 3 | автоочистка корзины (FR-25b) | `docker compose exec api` / cron оператора |
+| `gtrack restore-crm {deal\|account\|contact} ID` | 3 | FR-25c | `docker compose exec api` |
+| `gtrack demo-data [--seed 1]` | 4 | FR-49, FR-64; роли: 1 ТА, 4 БА, 7 П (фича 002, 002/FR-22: `demo.ba4` вместо `demo.mixed`; до 002 — 1 ТА, 1 СМ, 3 БА, 7 П); пароли → `/data/secrets/demo-passwords.txt` (0600), в stdout — только путь | `docker compose exec api` |
+| `gtrack export [--out PATH]`, `gtrack import PATH` | 4 | FR-40 | `docker compose exec api`; `docker compose cp` |
+| `gtrack loadgen --seed N [--tasks 50000 --deals 10000 --accounts 5000]` | 4 | FR-72 | `docker compose exec api` |
 | `scripts/backup.sh [DIR]`, `scripts/restore.sh FILE` | 4 | FR-50: `docker compose --profile ops run --rm ops backup|restore` (`pg_dump -Fc` + tar `appdata/attachments` в один `.tar`) | хост |
 | `backend/tools/nfr2_bench.py` | 4 | NFR-2 | dev-окружение на хосте стенда |
 
@@ -896,7 +896,7 @@ HSTS не включается (самоподписанный сертифик�
 
 ### 4.14. Фронтенд и генерация TS-типов
 
-- `scripts/gen-api.sh`: `gostracker openapi --out docs/api/openapi.json` →
+- `scripts/gen-api.sh`: `gtrack openapi --out docs/api/openapi.json` →
   `npm --prefix frontend run gen:api` (`openapi-typescript ../docs/api/openapi.json -o src/shared/api/schema.d.ts`).
   `operationId` = имя функции роутера (`generate_unique_id_function=lambda r: r.name`).
   CI: генерация + `git diff --exit-code docs/api frontend/src/shared/api/schema.d.ts`.
@@ -966,7 +966,7 @@ HSTS не включается (самоподписанный сертифик�
 
 Инструмент: `backend/tools/nfr2_bench.py` (httpx.AsyncClient, HTTP/1.1 keep-alive, через
 поставляемый HTTPS-вход `https://<host>` с `verify=False` для самоподписанного сертификата).
-Подготовка: чистая система → `gostracker loadgen --seed 42` (50 000 задач в 20 проектах,
+Подготовка: чистая система → `gtrack loadgen --seed 42` (50 000 задач в 20 проектах,
 ~30 % — подзадачи; 10 000 сделок; 5 000 клиентов; 15 000 контактов; события: создание каждой
 задачи и сделки + 2–3 изменения → ~250 000 строк `domain_event`; 12 пользователей, пароли в
 `/data/secrets/loadgen-passwords.txt`) → `VACUUM ANALYZE`. Параметры: 5 параллельных
@@ -1272,7 +1272,7 @@ ruff (MIT), mypy (MIT). `psycopg` (LGPL) **не** добавляется. Все
 |---|---|---|---|---|
 | D-40 | Ожидание блокировки БД и взаимоблокировка | Ошибка БД с SQLSTATE `55P03` (`lock_not_available`, превышен `lock_timeout=30s`, §4.12) или `40P01` (`deadlock_detected`) → **503** `{"detail": "Сервер занят, повторите запрос", "code": "service_busy"}` + `Retry-After: 5`; распознаётся в `core/errors.py` по `sqlstate`/`pgcode` у `sqlalchemy.exc.DBAPIError.orig` (и у `orig.__cause__`); лог — warning без текста SQL и параметров; транзакция откатывается `get_db`; в OpenAPI по маршрутам не объявляется (как 500), код добавляется в словарь фронтенда | 409 (FR-45 закрепляет 409 за `project_archived`); 500 `internal_error` (как сейчас: клиент не отличает «повторите» от сбоя); повтор транзакции на сервере (удваивает ожидание 30 с, скрывает зависание) | Состояние временное, клиент может повторить; FR-45 перечисляет коды клиентских ошибок, 5xx — решение плана. **Вопрос Q-1 (заказчику, Д-8)** |
 | D-41 | Каталог событий R1.1 и белые списки | `EventSpec` дополняется `fields: frozenset[str]` (допустимые `changed_fields`) и `value_fields: frozenset[str]` (допустимые `changes[].field`); `record_event` → `ValueError`, если поле вне списка, если `changes` передан событию с пустым `value_fields`, если у события с `feed="project"` нет `project_id`. Миграция 0004 добавляет `CHECK ck_domain_event_entity_type_valid` (7 значений `EntityType`). Чтение журнала: строка с `entity_type` вне `EntityType` пропускается с warning (без значений), страница не падает | только CHECK (не спасает откат кода к версии без нового типа); `entity_type: str` в схеме (меняет контракт) | BR-2: в `changed_fields` только имена из белого списка; ревью T18/T19 |
-| D-42 | Команда обслуживания | `domain/ops/maintenance.py::run_maintenance` — шаги: истёкшие сессии (R1.0), корзина (T54), файлы-сироты (T54); `--dry-run` считает, ничего не меняя; stdout — строки `ключ=число`; регулярный запуск — cron оператора на хосте (`docker compose exec -T api gostracker maintenance`, README) | сервис compose с циклом или запуск из lifespan api | FR-25b и Scope: «фонового планировщика в R1 нет» (OI-12) — сервис с циклом им и был бы |
+| D-42 | Команда обслуживания | `domain/ops/maintenance.py::run_maintenance` — шаги: истёкшие сессии (R1.0), корзина (T54), файлы-сироты (T54); `--dry-run` считает, ничего не меняя; stdout — строки `ключ=число`; регулярный запуск — cron оператора на хосте (`docker compose exec -T api gtrack maintenance`, README) | сервис compose с циклом или запуск из lifespan api | FR-25b и Scope: «фонового планировщика в R1 нет» (OI-12) — сервис с циклом им и был бы |
 | D-43 | Каскад мягкого удаления | Все неудалённые зависимые строки получают те же `deleted_at` и `deleted_batch_id`: проект → его задачи и подзадачи → их комментарии и вложения; задача → подзадачи → комментарии и вложения задачи и подзадач | помечать только корень, зависимые скрывать join-ами | восстановление и автоочистка работают по одному batch (D-25); одинаковое `deleted_at` у пакета |
 | D-44 | Корзина проекта | `GET /trash?project_id=` — корзина пространства с фильтром по проекту | отдельный эндпоинт | FR-25a; вопрос 14 `open-questions.md` — **Q-3 (аналитику)** |
 | D-45 | Видимость проекта | Карточка проекта и состав участников видны тем, кто видит проект в списке (БА — все неудалённые проекты; П — где участник; до фичи 002 — «БА, СМ»); содержимое (задачи, комментарии, вложения, лента) — только участникам, иначе 403 | карточка только участникам | БА-неучастник (до фичи 002 — СМ-неучастник; 002/FR-8) архивирует, передаёт владение, правит название и состав (FR-14a/b/c, FR-15) — ему нужны данные проекта; FR-17 относит к содержимому только задачи, комментарии, вложения |
@@ -1621,7 +1621,7 @@ NFR-2; Playwright-e2e. Реестр с исходными номерами — `
 | D-60 | Комментарии | Сервер вырезает HTML (`strip_html`, D-28) — AC-58 сохраняется; фронтенд показывает текст как простой текст (`white-space: pre-wrap`, React экранирует), **без** `react-markdown`; упоминаний нет; правка с `edited_at` и мягкое удаление с заглушкой — как FR-23 | `react-markdown`; хранить HTML как есть | Без новой зависимости; XSS исключён экранированием React; markdown хранится и будет отрисован позже. SPEC_CHANGES SC-11 |
 | D-61 | Доска | Оставить минимальную доску: `GET /projects/{id}/board` (4 колонки, задачи верхнего уровня, порядок FR-28a, без пагинации — исключение из FR-47, как поиск) и `POST /tasks/{id}/move` по соседям (§4.8, D-22). Фронтенд — `@dnd-kit` с клавиатурной заменой (NFR-7) и опросом (FR-29) | Отложить доску; доска без ручного порядка (сортировка по времени создания) | Доска — визуальный центр таск-трекера и пункт ТЗ §6 п.5; без неё демо не продаётся. Ручной порядок просил владелец; позиции всё равно нужны для FR-28a |
 | D-62 | Фильтры | `GET /projects/{id}/tasks?assignee_id=&status=` (И), пагинация 50. Фильтров по сроку (FR-27a), общего списка `GET /tasks` и фильтра архива нет | Полный B1.2-B | Исполнитель нужен для FR-5/AC-43 (найти задачи заблокированного), статус — для демо; часовые пояса FR-27a — отдельная работа |
-| D-63 | Демо-данные | `gostracker demo-data [--seed 1]` (§11.8): 12 пользователей (1 ТА, 4 БА, 7 П — фича 002, 002/FR-22: `demo.ba4` вместо `demo.mixed`; до 002 — 1 ТА, 1 СМ, 3 БА, 7 П) + первый ТА = 13; 2 проекта; 30 задач, из них 6 подзадач; ~20 комментариев; без сделок. Прямые вставки ORM в одной транзакции (не через сервисы с `Actor`), события аудита `user.created`/`user.role_assigned` с `actor_id = NULL` (FR-41: создание учётных записей аудируется; автор — «система», D-6) | Через HTTP API; через сервисы | Одна транзакция, детерминизм по seed, без подделки сессий |
+| D-63 | Демо-данные | `gtrack demo-data [--seed 1]` (§11.8): 12 пользователей (1 ТА, 4 БА, 7 П — фича 002, 002/FR-22: `demo.ba4` вместо `demo.mixed`; до 002 — 1 ТА, 1 СМ, 3 БА, 7 П) + первый ТА = 13; 2 проекта; 30 задач, из них 6 подзадач; ~20 комментариев; без сделок. Прямые вставки ORM в одной транзакции (не через сервисы с `Actor`), события аудита `user.created`/`user.role_assigned` с `actor_id = NULL` (FR-41: создание учётных записей аудируется; автор — «система», D-6) | Через HTTP API; через сервисы | Одна транзакция, детерминизм по seed, без подделки сессий |
 | D-64 | Приёмка MVP | Ручной чек-лист `docs/acceptance/mvp-demo.md` (AC-1, AC-5, AC-97 в объёме MVP, AC-98, сценарий демо UF-2…UF-6, проверка опроса вместо AC-107) + автотесты; без замеров NFR-2, бэкапа, экспорта, Playwright | Полный R1.4 | Прототип; отложенное — в реестре |
 | D-65 | Невалидный JSON (Д-7, Q-9, решение владельца) | Обработчик `RequestValidationError` (`core/errors.py`): если **все** ошибки имеют `type == "json_invalid"` — **400** `{"detail": "Некорректный JSON в теле запроса", "code": "bad_request"}` без эха тела; иначе — прежний 422 `validation_error`. Действует для всех эндпоинтов с телом, с сессией и без: FastAPI разбирает тело до зависимостей, поэтому 400 приходит раньше 401/403 — это принято владельцем («отбрасывается быстро и дёшево, без бизнес-логики»). Валидный JSON с неверными полями — 401/403 гейтов раньше 422 (как сейчас). Размер тела ограничивает nginx (`client_max_body_size 12m`); приложение тело дополнительно не читает. OpenAPI: у маршрутов с телом объявлен 400 (`error_responses(400, …)`) | Своё `APIRoute`/middleware со строгим порядком 401 → 400; оставить 422 | Решение владельца; обработчик — 10 строк в одном месте. **SUPERSEDES** §4.5 п.5 «битый JSON даёт 422». SPEC_CHANGES SC-21 |
 | D-66 | Отображаемый логин (spec v0.17: FR-73, FR-73a, OI-128 — решение владельца продукта 2026-10-16; OI-129 и OI-130 — ответы владельца через оркестратора 2026-10-16). **SUPERSEDES D-39** в части хранения и показа логина | `app_user.login` остаётся **ключом** (нормализованный вид, строчными) без изменений: вход, `UNIQUE(login)`, поиск `ILIKE`, `ORDER BY login, id` (OI-129 вариант а — «как до v0.17»), счётчик FR-61. Новый столбец `app_user.login_display varchar(64) NOT NULL` — написание при создании, `CHECK (lower(login_display COLLATE "C") = login)`; миграция **0005** с заполнением `login_display = login`. ORM: отдельный атрибут `AppUser.login_display`; все места **показа** логина (10 выборок в 7 файлах, §11.12.4) читают его; поле API `login` (`UserRef`, `DirectoryUser`, `AdminUser`, `SessionUser`, `Me`, `AuditActor`) несёт отображаемое значение — имена полей и **контракт OpenAPI не меняются**. Python-default `login_display = login`, если значение не передано (демо, тестовые фабрики). Занятый логин — 422 `login_taken` (не 409). Первый ТА — в написании из `INITIAL_ADMIN_LOGIN` (OI-130 вариант а). Детали — §11.12 | (1) ORM-перестановка: атрибут `login` → столбец `login_display`, атрибут `login_key` → столбец `login` (8 правок в 5 файлах вместо 10 в 7, но слово `login` в ORM и в SQL/Core — фабрики, `get_table("app_user")`, raw SQL тестов — означало бы разные столбцы: ловушка для исполнителей и ревью); (2) новое поле `login_display` в схемах API (меняет контракт и фронтенд; spec требует, чтобы *поле логина* несло отображаемое значение); (3) хранить как введено + `citext` или уникальный индекс по `lower(login)` (расширение либо переписывание входа, поиска, сортировки и CHECK; ломает инварианты D-39); (4) генерируемый столбец `login GENERATED ALWAYS AS (lower(…))` (в PG16 существующий столбец не превратить в генерируемый без пересоздания); (5) ADR (D-39 — решение plan, изменение требования уже оформлено в spec, OI-128) | Минимум правок: логика входа, уникальности, поиска и сортировки не трогается, контракт не меняется. CHECK держит ключ и показ согласованными на уровне БД; `COLLATE "C"` делает `lower()` ASCII-only и независимым от локали БД — проверено на PG 16 (en_US.utf8): `lower('Kivan')` (знак Кельвина) = `kivan`, с `COLLATE "C"` — без изменений; ICU tr-TR: `lower('I')` = `ı`. Вместе с `ck_app_user_login_format` CHECK гарантирует, что `login_display` — ASCII по шаблону FR-73 без учёта регистра |
@@ -1794,7 +1794,7 @@ AC-95, AC-105, AC-113…AC-116 в части R1.0, AC-121) — закрыты R1
 ### 11.8. Демо-данные (D-63, FR-49, FR-64)
 
 `domain/ops/demo.py::load_demo_data(sessionmaker, settings, *, clock: Clock, seed: int) -> DemoReport`
-и `cli/commands/demo_data.py` (`gostracker demo-data [--seed 1]`, ожидание БД как у `maintenance`).
+и `cli/commands/demo_data.py` (`gtrack demo-data [--seed 1]`, ожидание БД как у `maintenance`).
 - Отказ с кодом 2 и без изменений, если в пространстве есть хоть одна строка `project` или `task`
   (включая мягко удалённые) или любой не-системный пользователь сверх первого ТА.
 - Пользователи (в редакции фичи 002, 002/FR-22, 002 plan §4.7): 1 ТА, 4 БА, 7 П; логины
@@ -1944,7 +1944,7 @@ def downgrade() -> None:
 
 Блокировки: `ADD COLUMN` без `DEFAULT` — только каталог; `UPDATE`, `SET NOT NULL` и `ADD
 CONSTRAINT CHECK` сканируют `app_user` под `ACCESS EXCLUSIVE` — единицы–десятки строк
-(пилот: 13 пользователей демо), миллисекунды. Миграции выполняет `gostracker bootstrap` до
+(пилот: 13 пользователей демо), миллисекунды. Миграции выполняет `gtrack bootstrap` до
 старта API под advisory-блокировкой (§4.7, §4.12), `env.py` ставит `lock_timeout = 0`. Схема
 `NOT VALID` + `VALIDATE` и пакетный backfill отвергнуты: выигрыша на таком объёме нет, а шагов
 и точек отказа больше. Оператору ничего делать не нужно (FR-73a): обновление образа →

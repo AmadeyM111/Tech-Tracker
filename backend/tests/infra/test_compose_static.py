@@ -199,8 +199,8 @@ def test_d19_service_volume_mounts(compose: dict[str, Any]) -> None:
     assert "pgdata:/var/lib/postgresql/data" in _mounts(_svc(compose, "db"))
     assert "appdata:/data" in _mounts(_svc(compose, "api"))
     web = _mounts(_svc(compose, "web"))
-    assert "tls-generated:/var/lib/gostracker/tls" in web
-    assert "./deploy/tls:/etc/gostracker/tls:ro" in web
+    assert "tls-generated:/var/lib/gtrack/tls" in web
+    assert "./deploy/tls:/etc/gtrack/tls:ro" in web
 
 
 def test_fr6a_only_web_publishes_ports(compose: dict[str, Any]) -> None:

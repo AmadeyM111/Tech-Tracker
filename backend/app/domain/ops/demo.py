@@ -132,7 +132,7 @@ class DemoDataRefused(Exception):
 
 
 class WorkspaceMissing(DemoDataRefused):
-    """Пространства нет: ``gostracker bootstrap`` не выполнялся (ошибка установки, не отказ)."""
+    """Пространства нет: ``gtrack bootstrap`` не выполнялся (ошибка установки, не отказ)."""
 
 
 @dataclass(frozen=True)
@@ -292,7 +292,7 @@ async def _check_empty(session: AsyncSession) -> UUID:
         )
     ).scalar_one_or_none()
     if workspace_id is None:
-        raise WorkspaceMissing("Пространства нет: сначала выполните gostracker bootstrap")
+        raise WorkspaceMissing("Пространства нет: сначала выполните gtrack bootstrap")
     projects = (await session.execute(select(func.count()).select_from(Project))).scalar_one()
     tasks = (await session.execute(select(func.count()).select_from(Task))).scalar_one()
     users = (await session.execute(select(func.count()).select_from(AppUser))).scalar_one()

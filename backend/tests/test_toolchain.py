@@ -87,7 +87,7 @@ def test_setuptools_packages_and_package_data(cfg: dict[str, Any]) -> None:
 
 
 def test_entry_point_declared_in_pyproject(cfg: dict[str, Any]) -> None:
-    assert cfg["project"]["scripts"]["gostracker"] == "app.cli.main:main"
+    assert cfg["project"]["scripts"]["gtrack"] == "app.cli.main:main"
 
 
 def test_pytest_ini_options(cfg: dict[str, Any]) -> None:
@@ -129,8 +129,8 @@ def test_package_installed_with_dependencies() -> None:
     assert zoneinfo.ZoneInfo("Europe/Moscow").key == "Europe/Moscow"
 
 
-def test_installed_console_script_gostracker() -> None:
-    eps = [e for e in md.entry_points(group="console_scripts") if e.name == "gostracker"]
+def test_installed_console_script_gtrack() -> None:
+    eps = [e for e in md.entry_points(group="console_scripts") if e.name == "gtrack"]
     assert len(eps) == 1
     assert eps[0].value == "app.cli.main:main"
     assert eps[0].dist is not None and eps[0].dist.metadata["Name"] == "tracker-backend"

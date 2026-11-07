@@ -92,11 +92,11 @@ def test_t22_schema_matches_fresh_generation(tmp_path: Path) -> None:
 def test_t22_gen_api_script_has_frontend_part() -> None:
     text = GEN.read_text(encoding="utf-8")
     assert "set -euo pipefail" in text
-    assert "gostracker openapi --out docs/api/openapi.json" in text
+    assert "gtrack openapi --out docs/api/openapi.json" in text
     assert re.search(r"npm\s+(--prefix\s+frontend\s+run\s+gen:api|run\s+gen:api)", text)
     assert "|| true" not in text
     # порядок: сначала openapi.json, потом типы
-    assert text.index("gostracker openapi") < text.index("gen:api")
+    assert text.index("gtrack openapi") < text.index("gen:api")
 
 
 def test_t22_gen_api_is_idempotent_and_leaves_openapi_unchanged() -> None:
@@ -104,8 +104,8 @@ def test_t22_gen_api_is_idempotent_and_leaves_openapi_unchanged() -> None:
     _need_generator()
     _schema_text()  # schema.d.ts должен быть закоммичен до запуска генерации
     venv_bin = Path(sys.executable).parent
-    if not (venv_bin / "gostracker").exists():
-        pytest.skip("gostracker не установлен в окружении теста")
+    if not (venv_bin / "gtrack").exists():
+        pytest.skip("gtrack не установлен в окружении теста")
     env = {**os.environ, "PATH": f"{venv_bin}{os.pathsep}{os.environ['PATH']}"}
     before = {p: p.read_bytes() for p in (OPENAPI, SCHEMA)}
     try:

@@ -1,4 +1,4 @@
-# Образ web GOSTracker (plan §4.12, D-17, D-20): статика SPA и TLS-прокси nginx.
+# Образ web GTrack (plan §4.12, D-17, D-20): статика SPA и TLS-прокси nginx.
 # Контекст сборки - корень репозитория; в него попадает только то, что разрешает
 # корневой .dockerignore (frontend/ и deploy/web/). Ключей и сертификатов в образе нет.
 
@@ -17,7 +17,7 @@ RUN npm run build
 # --- этап 2: nginx ---------------------------------------------------------------------
 FROM nginx:stable-alpine
 
-# Каталоги /etc/gostracker/tls и /var/lib/gostracker/tls создаются при монтировании томов
+# Каталоги /etc/gtrack/tls и /var/lib/gtrack/tls создаются при монтировании томов
 # и скриптом выбора сертификата; в образе их нет.
 RUN apk add --no-cache openssl
 
@@ -28,7 +28,7 @@ ENV HTTPS_PORT=443 \
 
 COPY --from=frontend-build /src/frontend/dist /usr/share/nginx/html
 COPY deploy/web/default.conf.template /etc/nginx/templates/default.conf.template
-COPY --chmod=0755 deploy/web/10-gostracker-tls.sh /docker-entrypoint.d/10-gostracker-tls.sh
+COPY --chmod=0755 deploy/web/10-gtrack-tls.sh /docker-entrypoint.d/10-gtrack-tls.sh
 
 EXPOSE 80 443
 

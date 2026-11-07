@@ -6,7 +6,7 @@ set -e
 umask 077
 
 # Ошибка bootstrap (set -e) останавливает контейнер с ненулевым кодом; в stdout — только путь к файлу.
-gostracker bootstrap
+gtrack bootstrap
 
 # exec: uvicorn становится PID 1 и получает SIGTERM для штатной остановки.
 exec uvicorn app.main:app \

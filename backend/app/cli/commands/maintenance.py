@@ -1,4 +1,4 @@
-"""Подкоманда ``gostracker maintenance`` (plan §4.13; ревью T11, T16a).
+"""Подкоманда ``gtrack maintenance`` (plan §4.13; ревью T11, T16a).
 
 Ждёт БД (до 60 с, как ``bootstrap``) и выполняет обслуживание (plan §10.4, D-42): удаляет
 истёкшие сессии пользователей. ``--dry-run`` только считает. Секретный ключ не нужен, события
@@ -69,7 +69,7 @@ def _quiet_asyncio_logger() -> Iterator[None]:
 
 
 def run(args: argparse.Namespace) -> int:
-    """Выполняет ``gostracker maintenance``; возвращает код выхода (0 — успех)."""
+    """Выполняет ``gtrack maintenance``; возвращает код выхода (0 — успех)."""
     step = "настройки"
     try:
         settings = get_settings()

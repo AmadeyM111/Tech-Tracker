@@ -2,15 +2,15 @@
 
 Стек поднимает исполнитель, тесты только обращаются к нему:
 
-    HTTP_PORT=18080 HTTPS_PORT=18443 docker compose -p gostracker-infratest up -d --build --wait
-    GT_INFRA_STACK=1 GT_INFRA_PROJECT=gostracker-infratest HTTP_PORT=18080 HTTPS_PORT=18443 \
+    HTTP_PORT=18080 HTTPS_PORT=18443 docker compose -p gtrack-infratest up -d --build --wait
+    GT_INFRA_STACK=1 GT_INFRA_PROJECT=gtrack-infratest HTTP_PORT=18080 HTTPS_PORT=18443 \
         pytest -q -m infra_stack backend/tests/infra
 
 Тесты ``test_stack_first_run.py`` рассчитаны на СВЕЖИЙ стек (чистые тома): они идут по сценарию
 первого запуска по порядку определения в файле и меняют состояние (смена пароля первого ТА).
 
-Защита: проект обязан начинаться с ``gostracker-infratest``; стек пользователя
-(``gostracker``/``gostracker-dev``) и БД ``tracker`` не затрагиваются. Дополнительные контейнеры,
+Защита: проект обязан начинаться с ``gtrack-infratest``; стек пользователя
+(``gtrack``/``gtrack-dev``) и БД ``tracker`` не затрагиваются. Дополнительные контейнеры,
 тома и каталоги тестов называются ``gt-t26-*``.
 """
 
@@ -32,7 +32,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 ENABLED = os.environ.get("GT_INFRA_STACK") == "1"
-PROJECT = os.environ.get("GT_INFRA_PROJECT", "gostracker-infratest")
+PROJECT = os.environ.get("GT_INFRA_PROJECT", "gtrack-infratest")
 HTTP_PORT = int(os.environ.get("HTTP_PORT", "18080"))
 HTTPS_PORT = int(os.environ.get("HTTPS_PORT", "18443"))
 HOST = "127.0.0.1"
@@ -50,8 +50,8 @@ def stack_marks() -> list[Any]:
 
 
 def _guard() -> None:
-    assert PROJECT.startswith("gostracker-infratest"), (
-        f"GT_INFRA_PROJECT={PROJECT!r}: допустим только проект gostracker-infratest*"
+    assert PROJECT.startswith("gtrack-infratest"), (
+        f"GT_INFRA_PROJECT={PROJECT!r}: допустим только проект gtrack-infratest*"
     )
     assert HTTP_PORT != 80 and HTTPS_PORT != 443 and HTTPS_PORT not in (5432,), (
         "порты тестового стека должны отличаться от стандартных (18080/18443)"

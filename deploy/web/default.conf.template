@@ -15,9 +15,9 @@ server {
     listen 443 ssl default_server;
     server_name _;
 
-    # Сертификат выбирает /docker-entrypoint.d/10-gostracker-tls.sh (символьные ссылки).
-    ssl_certificate     /run/gostracker-tls/tls.crt;
-    ssl_certificate_key /run/gostracker-tls/tls.key;
+    # Сертификат выбирает /docker-entrypoint.d/10-gtrack-tls.sh (символьные ссылки).
+    ssl_certificate     /run/gtrack-tls/tls.crt;
+    ssl_certificate_key /run/gtrack-tls/tls.key;
 
     ssl_protocols TLSv1.2 TLSv1.3;
     # Mozilla intermediate без DHE (нет собственных параметров DH).
