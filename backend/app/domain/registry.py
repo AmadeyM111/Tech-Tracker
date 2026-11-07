@@ -9,5 +9,6 @@ from app.domain.comments import models as comments_models  # noqa: F401
 from app.domain.events import models as events_models  # noqa: F401
 from app.domain.projects import models as projects_models  # noqa: F401
 from app.domain.tasks import models as tasks_models  # noqa: F401
+from app.domain.tokens import models as tokens_models  # noqa: F401
 from app.domain.users import models as users_models  # noqa: F401
 from app.domain.workspaces import models as workspaces_models  # noqa: F401

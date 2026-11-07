@@ -959,7 +959,7 @@ def test_002_migration_0006_file_chain_and_single_head() -> None:
         if isinstance(node, ast.ImportFrom):
             assert not (node.module or "").startswith("app"), "миграция импортирует app.*"
     script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
-    assert script.get_heads() == ["0008"]  # 007: голова теперь 0008 (цепочка 0007 -> 0008)
+    assert script.get_heads() == ["0009"]  # 020: голова теперь 0009 (цепочка 0008 -> 0009)
     revision = script.get_revision("0006")
     assert revision is not None and revision.down_revision == "0005"
 
@@ -993,7 +993,7 @@ async def _version(maker: Any) -> list[str]:
 async def test_002_alembic_check_clean_at_head(committed: Any, test_database_url: str) -> None:
     """002/AC-2, plan §4.5 («alembic check чист»): на head=0006 модель (CHECK из трёх значений)
     и миграция не расходятся; CHECK в БД - без `mixed`."""
-    assert await _version(committed) == ["0008"], "голова БД должна быть 0008"
+    assert await _version(committed) == ["0009"], "голова БД должна быть 0009"
     assert "mixed" not in await _role_check_def(committed)
     await _alembic_ok(test_database_url, "check")
 
@@ -1007,7 +1007,7 @@ async def test_002_downgrade_0005_restores_four_value_check_and_keeps_data_then_
     ставит CHECK из трёх значений, версия 0006, ``alembic check`` чист."""
     from tests.factories import make_domain_event, make_user
 
-    assert await _version(committed) == ["0008"]
+    assert await _version(committed) == ["0009"]
     async with committed() as s, s.begin():
         ta = await make_user(s, role="tech_admin")
         ba = await make_user(s, role="business_admin", workspace=None)
@@ -1027,7 +1027,17 @@ async def test_002_downgrade_0005_restores_four_value_check_and_keeps_data_then_
                     text("SELECT user_id::text, role FROM workspace_member ORDER BY user_id")
                 )
             ).all()
-            events = (await s.execute(text("SELECT t::text FROM domain_event t ORDER BY id"))).all()
+            # Явный список колонок: строка целиком (t::text) меняется при добавлении
+            # domain_event.client_name (миграция 0009, ADR-0018); данные сравниваются те же.
+            events = (
+                await s.execute(
+                    text(
+                        "SELECT id::text, workspace_id::text, action, entity_type, "
+                        "entity_id::text, COALESCE(details::text, '') "
+                        "FROM domain_event ORDER BY id"
+                    )
+                )
+            ).all()
         return [tuple(r) for r in roles], [tuple(r) for r in events]
 
     before = await snapshot()
@@ -1057,7 +1067,7 @@ async def test_002_downgrade_0005_restores_four_value_check_and_keeps_data_then_
 
     await _alembic_ok(test_database_url, "upgrade", "head")
     await db_engine.dispose()
-    assert await _version(committed) == ["0008"]
+    assert await _version(committed) == ["0009"]
     assert "mixed" not in await _role_check_def(committed)
     assert await snapshot() == before
     await _alembic_ok(test_database_url, "check")

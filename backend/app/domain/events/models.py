@@ -39,6 +39,11 @@ class DomainEvent(Base):
     __table_args__ = (
         # D-41, D-58: тип объекта — одно из значений EntityType (в БД их 7, как в каталоге).
         CheckConstraint(f"entity_type IN ({_ENTITY_TYPES_SQL})", name="entity_type_valid"),
+        # PN-6 (ADR-0018): имя клиента агента — до 64 символов, непустое, если задано.
+        CheckConstraint(
+            "client_name IS NULL OR char_length(client_name) BETWEEN 1 AND 64",
+            name="client_name_length",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
@@ -66,6 +71,8 @@ class DomainEvent(Base):
         JSONB(none_as_null=True), nullable=True
     )
     details: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
+    # Имя токена агента, через который сделано действие (PN-6); NULL — веб-интерфейс.
+    client_name: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 # Лента проекта (FR-38), история и лента сделки (FR-35), аудит (FR-41), события объекта.
