@@ -61,9 +61,14 @@ M20-T10 → M20-T11 → M20-T12. Задачи последовательные (
 - **Зависит от:** M20-T02
 
 ## M20-T04 — Аудит токенов и атрибуция клиента в событиях
-- **Файлы:** `backend/app/domain/events/catalog.py`, `backend/app/domain/events/writer.py`,
-  `backend/app/domain/events/queries.py`, `backend/app/domain/activity/service.py`,
-  `backend/app/api/v1/schemas/activity.py`.
+- **Файлы:** `backend/app/domain/events/client_context.py` (новый), `backend/app/domain/events/writer.py`,
+  `backend/app/domain/activity/service.py`, `backend/app/api/v1/schemas/activity.py`,
+  `backend/app/api/v1/projects.py` (только `_activity_item`), `docs/api/openapi.json` (через `gen-api.sh`,
+  регенерирован `gostracker openapi`), `backend/tests/domain/test_m20_t04_client_name.py` (новый),
+  `backend/tests/api/test_activity.py` (только `ITEM_FIELDS`: добавлено `via_client`).
+- **Решение по PN-6 (уточнение 2026-11-08):** имя клиента передаётся контекстной переменной
+  (`client_name_scope`), а не полем `Actor`: иначе пришлось бы менять 23 вызова `record_event`
+  в сервисах. Вне MCP-вызова поле `NULL`.
 - **AC:** AC-8 (поле `via_client` в ленте проекта), PN-5 (`user.token_created`, `user.token_revoked` — аудит),
   PN-6 (`client_name` ≤ 64, пустая строка и управляющие символы отвергаются на границе — Fail Fast).
   Существующие записи ленты не меняются.

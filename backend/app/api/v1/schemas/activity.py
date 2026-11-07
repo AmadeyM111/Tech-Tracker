@@ -44,3 +44,5 @@ class ActivityItem(BaseModel):
     entity: ActivityEntity
     changed_fields: list[str]
     changes: list[ActivityChange] | None
+    # Имя токена агента, через который сделано действие (ADR-0018, FR-7); null — веб-интерфейс.
+    via_client: str | None = None

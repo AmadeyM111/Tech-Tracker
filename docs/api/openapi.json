@@ -141,6 +141,17 @@
             "format": "date-time",
             "title": "Occurred At",
             "type": "string"
+          },
+          "via_client": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Client"
           }
         },
         "required": [

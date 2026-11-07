@@ -16,7 +16,16 @@ from tests.projects_api_support import (
     send,
 )
 
-ITEM_FIELDS = {"id", "occurred_at", "actor", "action", "entity", "changed_fields", "changes"}
+ITEM_FIELDS = {
+    "id",
+    "occurred_at",
+    "actor",
+    "action",
+    "entity",
+    "changed_fields",
+    "changes",
+    "via_client",
+}
 SECRET_BODY = "секретный-текст-комментария"
 
 

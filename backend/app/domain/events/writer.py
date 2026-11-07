@@ -14,6 +14,7 @@ from sqlalchemy import insert
 
 from app.core.clock import utcnow
 from app.domain.events.catalog import EVENT_CATALOG, EntityType, EventAction, EventSpec
+from app.domain.events.client_context import current_client_name
 from app.domain.events.models import DomainEvent
 
 if TYPE_CHECKING:
@@ -116,6 +117,8 @@ async def record_event(
     (``fields``/``value_fields``), повторы в ``changed_fields``, ``changes`` без
     ``value_fields``, событие ленты проекта без ``project_id`` — ``ValueError``; строка не
     пишется (проверки до INSERT, транзакция вызывающего не затрагивается).
+
+    ``client_name`` берётся из контекста MCP-вызова (ADR-0018, PN-6); вне его — ``NULL``.
     """
     resolved = EventAction(action)  # неизвестное значение → ValueError
     spec = EVENT_CATALOG.get(resolved)
@@ -139,6 +142,7 @@ async def record_event(
             in_audit=spec.audit,
             changes=None if changes is None else [dict(c) for c in changes],
             details=checked_details,
+            client_name=current_client_name(),
         )
         .returning(DomainEvent.id)
     )

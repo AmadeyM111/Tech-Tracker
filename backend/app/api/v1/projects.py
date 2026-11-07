@@ -176,6 +176,7 @@ def _activity_item(row: activity.FeedRow) -> ActivityItem:
         ),
         changed_fields=row.changed_fields,
         changes=None if row.changes is None else [ActivityChange(**c) for c in row.changes],
+        via_client=row.via_client,
     )
 
 

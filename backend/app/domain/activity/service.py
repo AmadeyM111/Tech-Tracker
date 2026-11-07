@@ -48,6 +48,7 @@ class FeedRow:
     entity: FeedEntity
     changed_fields: list[str]
     changes: list[dict[str, Any]] | None
+    via_client: str | None  # имя токена агента; NULL — веб-интерфейс (ADR-0018, FR-7)
 
 
 EntityState = tuple[bool, str | None]  # (удалён, название)
@@ -128,6 +129,7 @@ async def project_feed(
                 ),
                 changed_fields=list(event.changed_fields),
                 changes=None if deleted or event.changes is None else list(event.changes),
+                via_client=event.client_name,
             )
         )
     return rows, has_next
