@@ -163,13 +163,12 @@ describe("LoginPage (T23)", () => {
   });
 });
 
-// Spec 005-login-help. Dictionary keys fixed by this test: auth.help_title, auth.help_p1, auth.help_p2.
-const HELP_KEYS = ["auth.help_title", "auth.help_p1", "auth.help_p2"] as const;
+// Spec 005-login-help. Dictionary keys fixed by this test: auth.help_title, auth.help_p1.
+const HELP_KEYS = ["auth.help_title", "auth.help_p1"] as const;
 const HELP_TITLE = "О системе";
 const HELP_P1 =
-  "GOSTracker — трекер задач для команды. Проекты, задачи с подзадачами и комментариями, список и канбан-доска.";
-const HELP_P2 =
-  "Учётную запись и первый пароль выдаёт технический администратор. После первого входа пароль нужно сменить.";
+  "GTrack — интеллектуальный трекер задач для команд и компаний. Проекты, задачи с подзадачами со статусами с канбан-доской.";
+const LOGIN_TITLE = "Войти в GTrack";
 const dict = ru as Record<string, string>;
 
 function helpBlock(): HTMLElement {
@@ -188,11 +187,24 @@ function jsonResponse(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
+describe("LoginPage GTrack logo", () => {
+  it("logo_is_decorative_svg_next_to_the_title", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    const logo = container.querySelector("svg.ui-logo");
+    expect(logo).not.toBeNull();
+    expect(logo!.getAttribute("aria-hidden")).toBe("true");
+    expect(logo!.querySelectorAll("path").length).toBeGreaterThan(0);
+    const brand = container.querySelector(".ui-brand")!;
+    expect(brand.contains(logo)).toBe(true);
+    expect(brand.querySelector("h1")!.textContent).toBe(LOGIN_TITLE);
+    expect(logo!.querySelector("[tabindex], a, button")).toBeNull();
+  });
+});
+
 describe("LoginPage help block (spec 005)", () => {
   it("ac2_dictionary_values_equal_fr2_strings", () => {
     expect(dict["auth.help_title"]).toBe(HELP_TITLE);
     expect(dict["auth.help_p1"]).toBe(HELP_P1);
-    expect(dict["auth.help_p2"]).toBe(HELP_P2);
     for (const k of HELP_KEYS) expect(t(k as never)).toBe(dict[k]);
   });
 
@@ -215,15 +227,15 @@ describe("LoginPage help block (spec 005)", () => {
 
     const h1 = container.querySelectorAll("h1");
     expect(h1.length).toBe(1);
-    expect(h1[0]!.textContent).toBe("Вход в систему");
+    expect(h1[0]!.textContent).toBe(LOGIN_TITLE);
   });
 
-  it("ac2_block_has_exactly_one_h2_and_two_paragraphs_with_exact_text", () => {
+  it("ac2_block_has_exactly_one_h2_and_one_paragraph_with_exact_text", () => {
     renderAt("/login", <LoginPage />);
     const block = helpBlock();
     expect(block.querySelectorAll("h2").length).toBe(1);
     const ps = Array.from(block.querySelectorAll("p"));
-    expect(ps.map((p) => p.textContent)).toEqual([HELP_P1, HELP_P2]);
+    expect(ps.map((p) => p.textContent)).toEqual([HELP_P1]);
     expect(within(block).getByRole("heading", { level: 2 }).textContent).toBe(HELP_TITLE);
   });
 
@@ -231,7 +243,7 @@ describe("LoginPage help block (spec 005)", () => {
     renderAt("/login", <LoginPage />);
     const block = helpBlock();
     expect(block.querySelectorAll("a, button, input, select, textarea, [tabindex]").length).toBe(0);
-    expect(block.textContent).toBe(HELP_TITLE + HELP_P1 + HELP_P2);
+    expect(block.textContent).toBe(HELP_TITLE + HELP_P1);
   });
 
   it("ac4_standalone_login_page_makes_no_network_requests", () => {
@@ -271,7 +283,7 @@ describe("LoginPage help block (spec 005)", () => {
     try {
       renderAt("/login", <AppRoutes />, "*");
       expect(helpBlock()).toBeTruthy();
-      expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Вход в систему");
+      expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(LOGIN_TITLE);
       d.resolve(jsonResponse(401, { detail: "x", code: "not_authenticated" }));
       await waitFor(() => expect(fetchMock).toHaveBeenCalled());
       expect(helpBlock()).toBeTruthy();

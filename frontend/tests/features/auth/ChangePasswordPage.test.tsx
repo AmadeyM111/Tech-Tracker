@@ -234,16 +234,13 @@ describe("NoRolePage (T23, FR-66)", () => {
 
 // Spec 005-login-help, AC-6 (FR-7): the help block exists only on /login.
 describe("login help block is absent elsewhere (spec 005, AC-6)", () => {
-  const P1_PART = "трекер задач для команды";
-  const P2_PART = "выдаёт технический администратор";
-
+  const P1_PART = "трекер задач для команд и компаний";
   function expectNoHelp() {
     expect(screen.queryByRole("region", { name: "О системе" })).toBeNull();
     expect(screen.queryByRole("complementary", { name: "О системе" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "О системе" })).toBeNull();
     expect(document.body.textContent).not.toContain(P1_PART);
-    expect(document.body.textContent).not.toContain(P2_PART);
-    expect(document.body.textContent).not.toContain("GOSTracker — ");
+    expect(document.body.textContent).not.toContain("GTrack — ");
   }
 
   it("ac6_change_password_page_has_no_help_block", () => {
