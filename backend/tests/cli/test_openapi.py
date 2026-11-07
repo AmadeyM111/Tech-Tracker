@@ -412,6 +412,7 @@ BODY_ROUTES_400 = {
     ("POST", "/api/v1/tasks/{user_id}/move"),  # T78
     ("POST", "/api/v1/tasks/{user_id}/comments"),  # T80
     ("PATCH", "/api/v1/comments/{user_id}"),  # T80
+    ("POST", "/api/v1/me/tokens"),  # 020/M20-T06
 }
 BAD_JSON_DESCRIPTION = "Некорректный JSON в теле запроса (code: bad_request)"
 

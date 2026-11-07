@@ -27,6 +27,7 @@ _DESCRIPTIONS: Final[dict[int, str]] = {
     401: "Не выполнен вход или сессия недействительна (code: not_authenticated)",
     403: ("Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"),
     404: "Объект не найден или принадлежит другому пространству (code: not_found)",
+    409: "Конфликт состояния (code из каталога, например token_limit_reached, email_taken)",
     422: "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)",
 }
 

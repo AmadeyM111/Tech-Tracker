@@ -84,8 +84,10 @@ M20-T10 → M20-T11 → M20-T12. Задачи последовательные (
 
 ## M20-T06 — REST управления токенами
 - **Файлы:** `backend/app/api/v1/tokens.py` (новый), `backend/app/api/v1/schemas/tokens.py` (новый),
-  `backend/app/api/v1/__init__.py`, `docs/api/openapi.json` (только через `gen-api.sh`),
-  `frontend/src/shared/api/schema.d.ts` (только через `gen-api.sh`).
+  `backend/app/api/v1/__init__.py`, `backend/app/api/openapi.py` (описание кода 409 для схемы; перенесено
+  сюда, потому что без него `error_responses(409)` падает), `docs/api/openapi.json` (через `gostracker openapi`),
+  `backend/tests/api/test_m20_t06_tokens_api.py` (новый).
+  `frontend/src/shared/api/schema.d.ts` — в M20-T10 (нужен `npm`-модуль фронтенда).
 - **AC:** AC-1, AC-3 (API). Маршруты cookie-only (PN-2): запрос с `Authorization: Bearer` → 401.
   Ошибки в формате `{"detail","code"}`. Каждый сценарий: успех, 401, валидация, граничный случай.
 - **Тест:** `test_m20_t06_*`.
