@@ -272,6 +272,9 @@ def test_t21_src_files_only_expected() -> None:
         "features/auth/session.ts",
         # 007/R7-T17
         "features/auth/PasswordResetRequestPage.tsx",
+        # PN-15 (MCP): «Доступ для агентов» (ADR-0018)
+        "features/tokens/api.ts", "features/tokens/model.ts", "features/tokens/AgentAccessPage.tsx",
+        "features/tokens/TokenList.tsx", "features/tokens/IssuedToken.tsx",
     }  # fmt: skip
     assert {"main.tsx", "app/App.tsx", "app/providers.tsx"} <= found
     assert found <= allowed, f"лишние файлы: {sorted(found - allowed)}"

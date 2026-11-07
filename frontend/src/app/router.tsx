@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 
+import { AgentAccessPage } from "../features/tokens/AgentAccessPage";
 import { AuditPage } from "../features/admin/AuditPage";
 import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
@@ -229,6 +230,7 @@ function StartRedirect({ insideMain }: { insideMain: boolean }) {
 /**
  * Screen with a role (003/FR-10, FR-11, FR-14): the session guard, the shell with the Sidebar,
  * then the content or a refusal. Without the capability no section data is requested.
+ * No `capability`: any signed-in user with a role may open the screen (e.g. the agent access section).
  */
 function RoleScreen({
   insideMain,
@@ -236,7 +238,7 @@ function RoleScreen({
   children,
 }: {
   insideMain: boolean;
-  capability: Capability;
+  capability?: Capability;
   children: (profile: MeResponse) => ReactNode;
 }) {
   return (
@@ -244,7 +246,7 @@ function RoleScreen({
       {(profile) => (
         <Landmark insideMain={insideMain} shell>
           <Sidebar profile={profile} />
-          {profile.capabilities.includes(capability) ? (
+          {capability === undefined || profile.capabilities.includes(capability) ? (
             children(profile)
           ) : (
             <ErrorAlert message={errorMessage("forbidden")} />
@@ -413,6 +415,12 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           <RoleScreen insideMain={insideMain} capability="business_access">
             {() => <TaskPage />}
           </RoleScreen>
+        }
+      />
+      <Route
+        path="/profile/agents"
+        element={
+          <RoleScreen insideMain={insideMain}>{() => <AgentAccessPage />}</RoleScreen>
         }
       />
       <Route
