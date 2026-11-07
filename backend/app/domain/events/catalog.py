@@ -35,6 +35,8 @@ class EventAction(StrEnum):
     USER_EMAIL_CHANGED = "user.email_changed"
     USER_PASSWORD_RESET_REQUESTED = "user.password_reset_requested"
     USER_PASSWORD_RESET_COMPLETED = "user.password_reset_completed"
+    USER_TOKEN_CREATED = "user.token_created"
+    USER_TOKEN_REVOKED = "user.token_revoked"
     PROJECT_UPDATED = "project.updated"
     PROJECT_OWNERSHIP_TRANSFERRED = "project.ownership_transferred"
     PROJECT_ARCHIVED = "project.archived"
@@ -83,6 +85,8 @@ EVENT_CATALOG: Final[Mapping[EventAction, EventSpec]] = {
     EventAction.USER_EMAIL_CHANGED: _USER_AUDITED,
     EventAction.USER_PASSWORD_RESET_REQUESTED: _USER_AUDITED,
     EventAction.USER_PASSWORD_RESET_COMPLETED: _USER_AUDITED,
+    EventAction.USER_TOKEN_CREATED: _USER_AUDITED,
+    EventAction.USER_TOKEN_REVOKED: _USER_AUDITED,
     EventAction.PROJECT_UPDATED: _feed(
         EntityType.PROJECT, fields=frozenset({"name", "description"})
     ),

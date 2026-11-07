@@ -26,6 +26,9 @@ USER_ACTIONS = {
     "user.email_changed",
     "user.password_reset_requested",
     "user.password_reset_completed",
+    # 020 (ADR-0018, PN-5): выдача и отзыв токена агента — аудит учётной записи
+    "user.token_created",
+    "user.token_revoked",
 }
 
 F = frozenset

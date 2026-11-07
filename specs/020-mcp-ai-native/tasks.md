@@ -50,7 +50,10 @@ M20-T10 → M20-T11 → M20-T12. Задачи последовательные (
 - **Зависит от:** M20-T01
 
 ## M20-T03 — Домен токенов
-- **Файлы:** `backend/app/domain/tokens/service.py` (новый), `backend/app/domain/tokens/__init__.py`.
+- **Файлы:** `backend/app/domain/tokens/service.py` (новый), `backend/app/domain/tokens/__init__.py`,
+  `backend/app/domain/events/catalog.py` (только два действия `user.token_created`, `user.token_revoked`
+  с аудитом; перенесено из M20-T04, потому что сервис выдачи пишет эти события),
+  `backend/tests/domain/test_m20_t03_tokens_service.py` (новый).
 - **AC:** AC-1 (токен виден один раз, в БД хеш), AC-3 (отзыв), NFR-1 (хеш SHA-256, формат `gtrk_`), NFR-2
   (фильтр `workspace_id`), лимит 10 активных и срок 90 дней (PN-1). `resolve_token` отвергает
   отозванный, истёкший, неизвестный токен одним и тем же исключением.
