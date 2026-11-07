@@ -112,7 +112,8 @@ async def _call_tool(name: str, arguments: dict[str, Any] | None) -> types.CallT
 def build_session_manager() -> StreamableHTTPSessionManager:
     server = Server(SERVER_NAME)
     server.list_tools()(_list_tools)  # type: ignore[no-untyped-call]  # декоратор SDK без типов
-    server.call_tool()(_call_tool)
+    # Проверку входа делают модели инструментов (422 в формате API), а не SDK по JSON Schema.
+    server.call_tool(validate_input=False)(_call_tool)
     return StreamableHTTPSessionManager(app=server, stateless=True, json_response=True)
 
 

@@ -47,7 +47,7 @@ def _page(
     )
 
 
-def _create_data(body: TaskCreate) -> service.TaskCreateData:
+def create_data(body: TaskCreate) -> service.TaskCreateData:
     """«Исполнитель не передан» и «передан null» различаются по ``model_fields_set``."""
     return service.TaskCreateData(
         title=body.title,
@@ -58,7 +58,7 @@ def _create_data(body: TaskCreate) -> service.TaskCreateData:
     )
 
 
-def _patch_data(body: TaskUpdate) -> service.TaskPatch:
+def patch_data(body: TaskUpdate) -> service.TaskPatch:
     """Не переданное поле — ``UNSET``; ``null`` у ``assignee_id``/``due_date`` снимает значение."""
     given = body.model_fields_set
 
@@ -100,7 +100,7 @@ async def create_task(
     project_id: UUID, body: TaskCreate, db: DbSession, actor: CurrentActor
 ) -> TaskDetail:
     """Создаёт задачу в конце колонки «К выполнению» (FR-18, FR-28a)."""
-    task_id = await service.create_task(db, actor, project_id, _create_data(body))
+    task_id = await service.create_task(db, actor, project_id, create_data(body))
     return TaskDetail.model_validate(await queries.get_task(db, actor, task_id))
 
 
@@ -126,7 +126,7 @@ async def update_task(
     task_id: UUID, body: TaskUpdate, db: DbSession, actor: CurrentActor
 ) -> TaskDetail:
     """Меняет переданные поля; права — по реально меняющимся (D-46), всё или ничего."""
-    await service.update_task(db, actor, task_id, _patch_data(body))
+    await service.update_task(db, actor, task_id, patch_data(body))
     return TaskDetail.model_validate(await queries.get_task(db, actor, task_id))
 
 
@@ -152,5 +152,5 @@ async def create_subtask(
     task_id: UUID, body: TaskCreate, db: DbSession, actor: CurrentActor
 ) -> TaskDetail:
     """Создаёт подзадачу; родитель — задача верхнего уровня (FR-21)."""
-    sub_id = await service.create_subtask(db, actor, task_id, _create_data(body))
+    sub_id = await service.create_subtask(db, actor, task_id, create_data(body))
     return TaskDetail.model_validate(await queries.get_task(db, actor, sub_id))

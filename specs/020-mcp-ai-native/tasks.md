@@ -108,9 +108,12 @@ M20-T10 → M20-T11 → M20-T12. Задачи последовательные (
 - **Зависит от:** M20-T03, M20-T01
 
 ## M20-T08 — Инструменты MCP
-- **Файлы:** `backend/app/api/mcp/tools/__init__.py` (новый), `backend/app/api/mcp/tools/tasks.py` (новый),
+- **Файлы:** `backend/app/api/mcp/tools/base.py` (новый), `backend/app/api/mcp/tools/tasks.py` (новый),
   `backend/app/api/mcp/tools/projects.py` (новый), `backend/app/api/mcp/tools/comments.py` (новый),
-  `backend/app/api/mcp/server.py` (только регистрация инструментов).
+  `backend/app/api/mcp/tools/__init__.py` (реестр из трёх доменов), `backend/app/api/mcp/server.py`
+  (`validate_input=False`: проверку делают модели инструментов, ошибки — в формате API; SDK возвращала бы
+  текст вне `{"detail","code"}`), `backend/app/api/v1/tasks.py` (переименованы `_create_data`/`_patch_data`
+  в `create_data`/`patch_data`, чтобы MCP использовал тот же маппинг), `backend/tests/api/test_m20_t08_mcp_tools.py` (новый).
 - **AC:** AC-5 (создание задачи другому → 403 `forbidden`, задача не создана), AC-7 (изменения видны в REST),
   AC-8 (`client_name` передаётся в `record_event` через `Actor`), PN-10 (список инструментов), PN-12.
 - **Тест:** `test_m20_t08_*` — по одному успешному вызову на инструмент и по одному отказу.
