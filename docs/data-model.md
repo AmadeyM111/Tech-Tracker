@@ -120,6 +120,25 @@
 Внешних ключей нет. Индексы: `ix_password_reset_attempt_scope_key_hash_created_at` на
 `(scope, key_hash, created_at)`; `ix_password_reset_attempt_created_at` на `(created_at)`.
 
+### api_token
+
+Персональные токены доступа AI-агентов к MCP (миграция 0009, ADR-0018). Сам токен не хранится, только
+его SHA-256. Токен действует только на `/mcp`; срок — 90 дней; до 10 активных на пользователя.
+
+| Столбец | Тип | NULL | Описание |
+|---|---|---|---|
+| `id` | uuid | нет | первичный ключ `pk_api_token` |
+| `workspace_id` | uuid | нет | FK `fk_api_token_workspace_id_workspace` → `workspace.id`, `RESTRICT`; индекс `ix_api_token_workspace_id` |
+| `user_id` | uuid | нет | FK `fk_api_token_user_id_app_user` → `app_user.id`, `ON DELETE CASCADE`, `DEFERRABLE INITIALLY IMMEDIATE` |
+| `name` | text | нет | имя токена, 1–64 символа; `CHECK` `ck_api_token_name_length` |
+| `token_hash` | bytea | нет | SHA-256 токена (32 байта); `UNIQUE` `uq_api_token_token_hash`; `CHECK` `ck_api_token_token_hash_length` |
+| `created_at` | timestamptz | нет | момент выдачи |
+| `expires_at` | timestamptz | нет | момент истечения срока (выдача + 90 дней) |
+| `last_used_at` | timestamptz | да | последнее использование; записывается не чаще раза в минуту |
+| `revoked_at` | timestamptz | да | момент отзыва; `NULL` — токен не отозван |
+
+Индекс `ix_api_token_user_id_active` на `(user_id)` с условием `revoked_at IS NULL`.
+
 ## Проекты, задачи, комментарии (MVP)
 
 Миграция 0004 (plan §11.6). Общее для четырёх таблиц: `workspace_id uuid NOT NULL` (FK →
@@ -273,6 +292,7 @@
 | `in_audit` | boolean | нет | событие попадает в журнал аудита |
 | `changes` | jsonb | да | список `{field, old, new}` (с R1.1); в API аудита не отдаётся |
 | `details` | jsonb | да | только для `entity_type = user`: `role_from`, `role_to`; паролей и секретов нет |
+| `client_name` | text | да | имя токена агента, через который сделано действие (миграция 0009, ADR-0018); `NULL` — веб-интерфейс; `CHECK` `ck_domain_event_client_name_length`: `client_name IS NULL OR char_length(client_name) BETWEEN 1 AND 64` |
 
 #### Индексы
 

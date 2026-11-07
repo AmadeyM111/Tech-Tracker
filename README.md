@@ -327,6 +327,14 @@ Docker:
 - Фонового планировщика в R1 нет: сервиса compose для обслуживания нет, `api` его сам не
   запускает. Запуск по расписанию остаётся за оператором.
 
+## Работа с AI-агентами (MCP)
+
+Трекер отдаёт задачи, проекты и комментарии по протоколу MCP: кодовые агенты (Claude Code,
+Codex CLI и другие) работают с ними на той же машине. Пользователь создаёт токен в разделе
+«Доступ для агентов», агент действует с правами этого пользователя. Подробности и команды
+подключения — в [docs/ai-integration.md](docs/ai-integration.md). Облачные чат-сервисы (например
+ChatGPT) в R1 не поддерживаются, см. ADR-0018.
+
 ## Разработка
 
 Dev-конфигурация `deploy/compose.dev.yml` подключается только явно и публикует порт БД
@@ -736,6 +744,14 @@ who has access to Docker:
   requests are skipped, and a repeated run breaks nothing.
 - There is no background scheduler in R1 and no compose service for maintenance; `api` does
   not start it by itself. Scheduled runs are up to the operator.
+
+## AI agents (MCP)
+
+The tracker exposes tasks, projects and comments over MCP, so coding agents (Claude Code,
+Codex CLI and others) can work with them on the same machine. A user creates a token in the
+"Доступ для агентов" section; the agent acts with that user's rights. Setup commands are in
+[docs/ai-integration.md](docs/ai-integration.md) (Russian). Cloud chat services such as ChatGPT
+are not supported in R1, see ADR-0018.
 
 ## Development
 

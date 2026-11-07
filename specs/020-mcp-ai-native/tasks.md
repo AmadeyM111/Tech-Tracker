@@ -139,7 +139,10 @@ M20-T10 → M20-T11 → M20-T12. Задачи последовательные (
 - **Зависит от:** M20-T06
 
 ## M20-T11 — Документация интеграции
-- **Файлы:** `docs/ai-integration.md` (новый), `README.md` (новый короткий раздел на двух языках).
+- **Файлы:** `docs/ai-integration.md` (новый), `README.md` (раздел на двух языках),
+  `docs/data-model.md` (разделы `api_token` и `domain_event.client_name`: тест полноты документации
+  NFR-11 требует их), `backend/tests/infra/test_m20_t11_docs.py` (новый).
+  Команды проверены по локальным `claude mcp add --help` и `codex mcp add --help`.
 - **AC:** AC-12 (фрагменты Claude Code и Codex CLI, ограничения ChatGPT из ADR-0018).
 - **Тест:** `test_m20_t11_docs_*` — файл существует и содержит фрагменты для обоих клиентов.
 - **Зависит от:** M20-T09
