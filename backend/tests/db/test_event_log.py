@@ -66,6 +66,7 @@ COLUMNS = {
     "in_audit",
     "changes",
     "details",
+    "client_name",  # 020/0009: имя токена агента
 }
 
 
@@ -146,6 +147,7 @@ async def test_t07_table_columns_types_and_nullability(db: AsyncSession) -> None
         "in_audit": ("boolean", "NO"),
         "changes": ("jsonb", "YES"),
         "details": ("jsonb", "YES"),
+        "client_name": ("text", "YES"),
     }
     for name, (data_type, nullable) in expected.items():
         assert (cols[name].data_type, cols[name].is_nullable) == (data_type, nullable), name

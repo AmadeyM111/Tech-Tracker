@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 from uuid import UUID
 
 from sqlalchemy import insert
@@ -127,6 +127,10 @@ async def record_event(
     _validate_fields(resolved, spec, changed_fields, changes, project_id)
     checked_details = None if details is None else _validate_details(details, spec.entity_type)
 
+    # client_name — только для вызовов MCP: веб-события не передают колонку, чтобы не зависеть от
+    # схемы (до миграции 0009 её нет при откате ``downgrade``).
+    client_name = current_client_name()
+    extra: dict[str, Any] = {} if client_name is None else {"client_name": client_name}
     result = await db.execute(
         insert(DomainEvent)
         .values(
@@ -142,7 +146,7 @@ async def record_event(
             in_audit=spec.audit,
             changes=None if changes is None else [dict(c) for c in changes],
             details=checked_details,
-            client_name=current_client_name(),
+            **extra,
         )
         .returning(DomainEvent.id)
     )

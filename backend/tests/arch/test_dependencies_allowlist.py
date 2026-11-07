@@ -19,6 +19,7 @@ BACKEND_RUNTIME = {
     "argon2-cffi",
     "tzdata",
     "greenlet",
+    "mcp",  # 020/PN-9: официальный SDK MCP (ADR-0018)
 }
 BACKEND_DEV = {
     "pytest",
