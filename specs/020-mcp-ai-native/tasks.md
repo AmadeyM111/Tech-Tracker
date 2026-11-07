@@ -120,7 +120,11 @@ M20-T10 → M20-T11 → M20-T12. Задачи последовательные (
 - **Зависит от:** M20-T04, M20-T07
 
 ## M20-T09 — Команда `gtrack mcp` (stdio-мост)
-- **Файлы:** `backend/app/cli/commands/mcp.py` (новый), `backend/app/cli/main.py`.
+- **Файлы:** `backend/app/cli/commands/mcp.py` (новый), `backend/app/cli/main.py` (регистрация подкоманды),
+  `backend/tests/cli/test_m20_t09_mcp_bridge.py` (новый).
+  Уточнения (2026-11-08): команда называется `gostracker mcp` (как остальные подкоманды; в ADR и ТЗ
+  написано `gtrack`). SDK 1.30 берёт готовый `httpx.AsyncClient`, поэтому Bearer-заголовок и CA задаются
+  клиентом, а не фабрикой.
 - **AC:** AC-9 (ручная проверка с Claude Code), PN-8 (токен только из окружения; `GTRACK_CA_FILE`;
   отказ при отсутствии `GTRACK_TOKEN` с понятной причиной — Fail Fast).
 - **Тест:** `test_m20_t09_*` — отказ без токена; мост пересылает вызов `tools/list` на тестовый `/mcp`.
