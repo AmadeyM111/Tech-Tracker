@@ -305,7 +305,7 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Тесты: 65 passed; ruff, mypy, scope чисты. Ревью PASS. Изменён индекс в test_007_archive_constants_describe_exclusions: AUTO_TABLES[:2] → [2:4] (сдвиг по plan §4.5, точное равенство сохранено; префикс проверяется в test_019_export_names.py).
 
 ## R8-T14 — Бэкенд: сквозные сценарии, утечки, аудит, управление ТА
-- **Статус:** TODO
+- **Статус:** DONE (только тесты; ревью — самопроверка исполнителя и повторный прогон оркестратором; 2026-11-08)
 - **AC:** AC-12, AC-13 (сброс пароля после регистрации), AC-19, AC-20, AC-22, AC-24, AC-25, AC-26 (ТА), AC-32
 - **Файлы:** тесты: `backend/tests/api/test_019_registration_leaks.py` (новый), `backend/tests/api/test_019_ta_manages_self_registered.py` (новый), `backend/tests/unit/test_019_settings.py` (новый)
 - **Зависит от:** R8-T11, R8-T04, R8-T07
@@ -317,7 +317,7 @@ T17, T19, T20, T21), тоже последовательно.
   пароль, назначает каждую из трёх ролей; ТА создаёт учётную запись с именами, одноразовым паролем и обязательной
   сменой; `Settings.model_fields` без отдельного выключателя и списков допуска (AC-32).
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/api/test_019_registration_leaks.py backend/tests/api/test_019_ta_manages_self_registered.py backend/tests/unit/test_019_settings.py backend/tests/arch backend/tests/unit/test_no_telemetry.py` зелёный
-- **Попытки:** 0
+- **Попытки:** 1. Тесты: 77 passed (14 новых + arch + no_telemetry); ruff чист; scope exit 0. Дефектов в коде не выявлено. Замечание: SecretsFilter маскирует секреты до caplog — добавлен перехватчик перед фильтром. Не покрыто: AC-20 (nginx, R8-T22), AC-21/AC-23 (фронтенд).
 
 ## R8-T15 — Фронтенд: ключи i18n и подписи аудита
 - **Статус:** TODO
@@ -518,7 +518,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T11 | DONE |
 | R8-T12 | DONE |
 | R8-T13 | DONE |
-| R8-T14 | TODO |
+| R8-T14 | DONE |
 | R8-T15 | TODO |
 | R8-T16 | TODO |
 | R8-T17 | TODO |
