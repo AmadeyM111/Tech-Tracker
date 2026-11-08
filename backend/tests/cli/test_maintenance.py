@@ -57,6 +57,7 @@ REPORT_KEYS = [
     "attachments_purged",
     "files_removed",
     "orphan_files_removed",
+    "registration_requests_expired",
     "notifications_purged",  # spec 012 FR-9
 ]
 
@@ -168,6 +169,52 @@ async def test_t16a_maintenance_deletes_only_expired_sessions(
         assert sid.hex() not in out + err + caplog.text
     assert await _event_count(committed) == 0
     assert not (cli_env / "secrets").exists(), "команда не создаёт секретный ключ"
+
+
+@pytest.mark.committed
+async def test_019_nfr9_maintenance_reports_expired_registration_requests(
+    committed: async_sessionmaker[AsyncSession],
+    cli_env: Path,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    """NFR-9: ``gtrack maintenance`` удаляет истёкшие заявки и печатает их число."""
+    from app.domain.auth.models import RegistrationRequest
+
+    now = datetime.now(UTC)
+    async with committed() as session:
+        for expires_at in (
+            now - timedelta(minutes=5),
+            now - timedelta(days=1),
+            now + timedelta(hours=1),
+        ):
+            rid = os.urandom(6).hex()
+            session.add(
+                RegistrationRequest(
+                    email=f"{rid}@example.test",
+                    login=f"u{rid}",
+                    login_display=f"U{rid}",
+                    first_name="Иван",
+                    last_name="Петров",
+                    password_hash="hash",
+                    token_hash=os.urandom(32),
+                    created_at=now - timedelta(days=2),
+                    expires_at=expires_at,
+                )
+            )
+        await session.commit()
+    capfd.readouterr()
+
+    assert await asyncio.to_thread(_run, ["maintenance", "--dry-run"]) == 0
+    assert _report(capfd.readouterr().out)["registration_requests_expired"] == 2
+    async with committed() as session:
+        assert len((await session.execute(select(RegistrationRequest.id))).all()) == 3
+
+    assert await asyncio.to_thread(_run, ["maintenance"]) == 0
+    report = _report(capfd.readouterr().out)
+    assert report["registration_requests_expired"] == 2
+    assert report["sessions_expired"] == 0
+    async with committed() as session:
+        assert len((await session.execute(select(RegistrationRequest.id))).all()) == 1
 
 
 @pytest.mark.committed

@@ -64,7 +64,7 @@ __all__ = [
 ]
 
 PREFIX = "u002."
-HEAD_REVISION = "0013"  # голова цепочки миграций (012: notification; 011: attachment)
+HEAD_REVISION = "0013"  # голова цепочки миграций (012: notification; 011: attachment; 009; 019)
 FAILURE_MARK = "gt_test_injected_failure"
 _FAIL_FUNCTION = "gt_test_fail_0006"
 _PAST = datetime(2026, 10, 1, 8, 0, 0, tzinfo=UTC)
@@ -439,14 +439,17 @@ async def data_fingerprint(
     for table in UNTOUCHED_TABLES:
         # 006/PD-18: приоритет задачи приводится по FR-10 (base -> medium), остальное - побайтно
         # 007: app_user.email появляется миграцией 0008 (NULL по умолчанию), в схеме 0005 её нет -
-        # отпечаток app_user сравнивается без этой колонки
+        # отпечаток app_user сравнивается без этой колонки; first_name/last_name/self_registered
+        # появляются миграцией 0010 - так же исключаются
         if table == "task":
             row_text = (
                 "(to_jsonb(t) || jsonb_build_object('priority', "
                 "CASE t.priority WHEN 'base' THEN 'medium' ELSE t.priority END))::text"
             )
         elif table == "app_user":
-            row_text = "(to_jsonb(t) - 'email')::text"
+            row_text = (
+                "(to_jsonb(t) - 'email' - 'first_name' - 'last_name' - 'self_registered')::text"
+            )
         else:
             row_text = "t::text"
         rows = await env.execute(

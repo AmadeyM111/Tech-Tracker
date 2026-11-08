@@ -11,6 +11,7 @@ import { errorMessage, t, type MessageKey } from "../../shared/i18n";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import type { AlertState } from "../../shared/ui/ErrorAlert";
 import { contentUrl, deleteAttachment, listAttachments, uploadAttachment, type Attachment } from "./api";
+import "./attachments.css";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 /** Server default ATTACHMENTS_PER_TASK (FR-3). */

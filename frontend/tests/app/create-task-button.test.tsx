@@ -332,12 +332,11 @@ describe("AC-12 order in the document and Tab sequence", () => {
       document.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
     const form = document.querySelector<HTMLElement>('form[data-form="create-project"]')!;
-    // 012/FR-5: «Уведомления» — третья ссылка меню
-    expect(tabbable.slice(0, 3).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks", "/notifications"]);
-    expect(tabbable[3]?.getAttribute("href")).toBe("/profile/agents");
-    expect(tabbable[4]?.getAttribute("data-action")).toBe("create-task");
-    expect(tabbable[5]?.getAttribute("data-action")).toBe("logout");
-    expect(tabbable[6]).toBe(tabbable.find((el) => form.contains(el)));
+    // 008/FR-1, 012/FR-5: «Сводка» и «Уведомления» — третья и четвёртая ссылки меню
+    expect(tabbable.slice(0, 6).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks", "/summary", "/notifications", "/profile/agents", "/profile"]);
+    expect(tabbable[6]?.getAttribute("data-action")).toBe("create-task");
+    expect(tabbable[7]?.getAttribute("data-action")).toBe("logout");
+    expect(tabbable[8]).toBe(tabbable.find((el) => form.contains(el)));
   });
 });
 

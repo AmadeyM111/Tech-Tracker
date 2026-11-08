@@ -45,7 +45,10 @@ BUSINESS_TABLES: Final = (
     "domain_event",
 )
 # Автоданные установки, которые импорт заменяет; domain_event не трогается (триггер запрещает).
+# Заявки и попытки регистрации в архив не входят, поэтому очищаются первыми (у них нет FK).
 AUTO_TABLES: Final = (
+    "registration_request",
+    "registration_attempt",
     "password_reset_token",
     "password_reset_attempt",
     "user_session",

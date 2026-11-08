@@ -56,7 +56,9 @@ def _common_entry(minimum: int = 12) -> str:
 
 async def _create(env: ApiEnv, token: str, login: str, password: str = OTP) -> httpx.Response:
     return await env.client.post(
-        ADMIN_USERS, json={"login": login, OTP_FIELD: password}, headers=env.auth(token)
+        ADMIN_USERS,
+        json={"login": login, "first_name": "Иван", "last_name": "Петров", OTP_FIELD: password},
+        headers=env.auth(token),
     )
 
 
@@ -539,9 +541,20 @@ async def test_t16_review_create_checks_login_before_taken_before_password(
         {},
         {"login": "ivan.petrov"},
         {OTP_FIELD: OTP},
-        {"login": 5, OTP_FIELD: OTP},
-        {"login": "ivan.petrov", OTP_FIELD: 12345678901234},
-        {"login": "ivan.petrov", OTP_FIELD: OTP, "role": "tech_admin"},
+        {"login": 5, "first_name": "Иван", "last_name": "Петров", OTP_FIELD: OTP},
+        {
+            "login": "ivan.petrov",
+            "first_name": "Иван",
+            "last_name": "Петров",
+            OTP_FIELD: 12345678901234,
+        },
+        {
+            "login": "ivan.petrov",
+            "first_name": "Иван",
+            "last_name": "Петров",
+            OTP_FIELD: OTP,
+            "role": "tech_admin",
+        },
     ],
     ids=["empty", "no-password", "no-login", "login-int", "password-int", "extra-field-role"],
 )
@@ -561,7 +574,13 @@ async def test_ac121_create_does_not_accept_role_in_body(api_env: ApiEnv) -> Non
     _, _, token = await admin_in_new_workspace(env)
     response = await env.client.post(
         ADMIN_USERS,
-        json={"login": "ivan.petrov", OTP_FIELD: OTP, "role": "user"},
+        json={
+            "login": "ivan.petrov",
+            "first_name": "Иван",
+            "last_name": "Петров",
+            OTP_FIELD: OTP,
+            "role": "user",
+        },
         headers=env.auth(token),
     )
     assert response.status_code == 422
@@ -924,7 +943,12 @@ def _endpoints(target: Any) -> list[tuple[str, str, str, Any]]:
     base = f"{ADMIN_USERS}/{target}"
     return [
         ("list", "GET", ADMIN_USERS, None),
-        ("create", "POST", ADMIN_USERS, {"login": "gate.check", OTP_FIELD: OTP}),
+        (
+            "create",
+            "POST",
+            ADMIN_USERS,
+            {"login": "gate.check", "first_name": "Иван", "last_name": "Петров", OTP_FIELD: OTP},
+        ),
         ("get", "GET", base, None),
         ("block", "POST", f"{base}/block", None),
         ("unblock", "POST", f"{base}/unblock", None),
@@ -1101,6 +1125,7 @@ async def test_t17_openapi_declares_all_admin_user_operations(api_env: ApiEnv) -
         ("POST", "/api/v1/admin/users/{user_id}/revoke-sessions"),
         ("PUT", "/api/v1/admin/users/{user_id}/role"),
         ("PUT", "/api/v1/admin/users/{user_id}/email"),
+        ("PUT", "/api/v1/admin/users/{user_id}/name"),
     }
     normalized = {(m, re.sub(r"\{[^}]+\}", "{user_id}", p)) for (m, p) in ops}
     assert normalized == expected
@@ -1110,7 +1135,7 @@ async def test_t17_operation_id_equals_function_name_and_is_unique(api_env: ApiE
     from tests.api.test_route_guards import _iter_routes
 
     ops = _admin_operations(api_env)
-    assert len(ops) == 9
+    assert len(ops) == 10
     ids = [op["operationId"] for op in ops.values()]
     assert len(ids) == len(set(ids))
     by_path: dict[tuple[str, str], str] = {}
@@ -1127,7 +1152,7 @@ async def test_d15_t17_openapi_responses_have_no_password_fields(api_env: ApiEnv
     schema = api_env.app.openapi()
     schemas = schema["components"]["schemas"]
     operations = _admin_operations(api_env)
-    assert len(operations) == 9
+    assert len(operations) == 10
     for key, op in operations.items():
         seen: set[str] = set()
         _collect_refs(op.get("responses", {}), schemas, seen)

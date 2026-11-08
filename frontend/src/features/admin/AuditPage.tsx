@@ -58,10 +58,12 @@ const ACTION_CODES: readonly string[] = [
   "user.role_assigned",
   "user.role_changed",
   "user.role_removed",
+  "user.self_registered",
+  "user.name_changed",
   "project.ownership_transferred",
 ];
 // Field names with a readable text; any other name is shown as it is.
-const FIELD_CODES: readonly string[] = ["owner_id"];
+const FIELD_CODES: readonly string[] = ["owner_id", "first_name", "last_name"];
 const ROLE_VALUES: readonly string[] = ["tech_admin", "business_admin", "mixed", "user"];
 
 // An unknown action code is shown as it is.

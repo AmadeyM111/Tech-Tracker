@@ -30,7 +30,7 @@ async def test_009_migration_0011_upgrade_downgrade_upgrade_and_check(
         )
 
     await alembic("upgrade", "head")
-    await alembic("downgrade", "0009")
+    await alembic("downgrade", "0010")
     await alembic("upgrade", "head")
     await alembic("check")
 

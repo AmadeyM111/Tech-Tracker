@@ -8,7 +8,10 @@
 Строки отсортированы по первичному ключу; ключи JSON отсортированы; ``uuid`` — строки,
 ``timestamptz`` — ISO 8601 UTC с микросекундами и ``Z``, ``date`` — ``YYYY-MM-DD``.
 Сессии (``user_session``), таблицы сброса пароля (``password_reset_token``,
-``password_reset_attempt``) и колонка ``app_user.email`` не выгружаются.
+``password_reset_attempt``), заявки и попытки самостоятельной регистрации
+(``registration_request``, ``registration_attempt``) и колонка ``app_user.email``
+не выгружаются. Неподтверждённые заявки и токены в архив не попадают; имя, фамилия
+и ``self_registered`` учётных записей выгружаются (ADR-0019).
 Файлы живых вложений (spec 011 FR-11) — члены ``files/<storage_key>``; при импорте их набор и sha256
 сверяются со строками ``attachment`` из ``data.json``.
 Всё, что не совпадает с ожидаемым форматом, отвергается как ``ImportRefused``.
@@ -45,10 +48,19 @@ FORMAT: Final = "gtrack-export"
 LEGACY_FORMAT: Final = "gostracker-export"
 ACCEPTED_FORMATS: Final = frozenset({FORMAT, LEGACY_FORMAT})
 DATA_MEMBER: Final = "data.json"
-# Сессии входа не переносятся: их идентификаторы — секреты текущей установки.
+# Сессии входа не переносятся: их идентификаторы — секреты текущей установки. Заявки регистрации
+# содержат email и токены до подтверждения (NFR-7, ADR-0019). Попытки хранят только хеши ключей
+# лимитов: IP и токены в них не записываются, но таблица служебная и в архив не входит.
 # ``backup_run`` (spec 009) — журнал эксплуатации установки, не данные пространства.
 EXCLUDED_TABLES: Final = frozenset(
-    {"user_session", "password_reset_token", "password_reset_attempt", "backup_run"}
+    {
+        "user_session",
+        "password_reset_token",
+        "password_reset_attempt",
+        "registration_request",
+        "registration_attempt",
+        "backup_run",
+    }
 )
 # Колонки, не попадающие в архив (персональные данные); после импорта они NULL.
 EXCLUDED_COLUMNS: Final[Mapping[str, frozenset[str]]] = {"app_user": frozenset({"email"})}

@@ -75,7 +75,12 @@ async def test_ac114_bootstrap_login_password_change_and_create_user_audit(
     # создание учётной записи — ровно одна запись user.created, автор — первый ТА
     created = await env.client.post(
         "/api/v1/admin/users",
-        json={"login": "first.created", "one_time_password": OTP},
+        json={
+            "login": "first.created",
+            "first_name": "Иван",
+            "last_name": "Петров",
+            "one_time_password": OTP,
+        },
         headers=env.auth(token),
     )
     assert created.status_code == 201, created.text

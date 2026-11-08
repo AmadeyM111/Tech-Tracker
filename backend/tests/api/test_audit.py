@@ -99,7 +99,9 @@ async def test_ac64_ac121_create_and_assign_role_give_exactly_two_entries(api_en
     ws, admin, token = await admin_in_new_workspace(env)
     login = f"new.{uuid.uuid4().hex[:10]}"
     created = await env.client.post(
-        ADMIN_USERS, json={"login": login, OTP_FIELD: OTP}, headers=env.auth(token)
+        ADMIN_USERS,
+        json={"login": login, "first_name": "Иван", "last_name": "Петров", OTP_FIELD: OTP},
+        headers=env.auth(token),
     )
     assert created.status_code == 201, created.text
     new_id = created.json()["id"]
@@ -559,7 +561,9 @@ async def test_br2_response_has_no_secrets_fields(api_env: ApiEnv) -> None:
     env = api_env
     ws, admin, token = await admin_in_new_workspace(env)
     created = await env.client.post(
-        ADMIN_USERS, json={"login": "audit.target", OTP_FIELD: OTP}, headers=env.auth(token)
+        ADMIN_USERS,
+        json={"login": "audit.target", "first_name": "Иван", "last_name": "Петров", OTP_FIELD: OTP},
+        headers=env.auth(token),
     )
     assert created.status_code == 201
     await env.client.post(

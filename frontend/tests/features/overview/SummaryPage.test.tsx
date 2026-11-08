@@ -1,0 +1,132 @@
+// 008 «Сводка»: AC-12 (пустое состояние, пункт меню), AC-13 (клик по плитке), FR-6...FR-9 (UI).
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { CAPS_ALL, installFetch, j, meWith, page, renderApp } from "../admin/helpers";
+
+const ME = "GET /api/v1/me";
+const COUNTS = "GET /api/v1/me/overview";
+const TASKS = "GET /api/v1/me/overview/tasks";
+const PROJECTS = "GET /api/v1/projects";
+const BA_CAPS = ["business_access", "project_create", "task_assign_others"];
+const P1 = "33333333-3333-4333-8333-333333333333";
+
+const COUNTS_24 = { total: 24, todo: 6, in_progress: 9, review: 4, done: 5, needs_review: 2 };
+const ZERO = { total: 0, todo: 0, in_progress: 0, review: 0, done: 0, needs_review: 0 };
+
+function item(id: string, over: Record<string, unknown> = {}) {
+  return {
+    id,
+    title: `Задача ${id.slice(0, 4)}`,
+    project: { id: P1, name: "Клиника" },
+    parent_id: null,
+    status: "todo",
+    priority: "medium",
+    due_date: null,
+    assignee: null,
+    hot: false,
+    ...over,
+  };
+}
+
+function tasksPage(items: unknown[], total: number) {
+  return { items, page: 1, page_size: 50, has_next: false, total };
+}
+
+function setup(counts = COUNTS_24, items: unknown[] = [], total = items.length) {
+  return installFetch({
+    [ME]: () => j(200, meWith(BA_CAPS, "business_admin")),
+    [COUNTS]: () => j(200, counts),
+    [TASKS]: () => j(200, tasksPage(items, total)),
+    [PROJECTS]: () => j(200, page([])),
+  });
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("SummaryPage", () => {
+  it("ac12_empty_state_keeps_zero_tiles_and_shows_approved_text", async () => {
+    setup(ZERO);
+    renderApp("/summary");
+    expect(
+      await screen.findByText(
+        "Задач пока нет. Они появятся, когда вас добавят в проект или вы создадите задачу.",
+      ),
+    ).toBeTruthy();
+    const tiles = screen.getByRole("list", { name: "Счётчики задач" });
+    expect(within(tiles).getAllByText("0")).toHaveLength(6);
+    expect(screen.queryByRole("form", { name: "Фильтры" })).toBeNull();
+  });
+
+  it("tiles_order_counts_and_accent_on_needs_review", async () => {
+    setup(COUNTS_24, [item("aaaaaaaa-0000-4000-8000-000000000001")], 1);
+    const { container } = renderApp("/summary");
+    await screen.findByText("24");
+    const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>("button[data-tile]"));
+    expect(buttons.map((b) => b.dataset.tile)).toEqual([
+      "needs_review", "total", "todo", "in_progress", "review", "done",
+    ]);
+    expect(buttons[0]?.className).toContain("sum-tile--review");
+    expect(buttons[0]?.textContent).toBe("Нужно проверить2");
+    expect(buttons[1]?.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("ac13_tile_click_sets_status_filter", async () => {
+    const f = setup(COUNTS_24, [], 0);
+    const { container } = renderApp("/summary");
+    await screen.findByText("24");
+    fireEvent.click(container.querySelector<HTMLButtonElement>('button[data-tile="in_progress"]')!);
+    await waitFor(() => expect(f.query(f.last(TASKS)).get("status")).toBe("in_progress"));
+    expect(container.querySelector('button[data-tile="in_progress"]')?.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(container.querySelector<HTMLButtonElement>('button[data-tile="needs_review"]')!);
+    await waitFor(() => expect(f.query(f.last(TASKS)).get("needs_review")).toBe("true"));
+    expect(f.query(f.last(TASKS)).get("status")).toBeNull();
+  });
+
+  it("priority_is_multiselect_and_due_preset_single_choice", async () => {
+    const f = setup(COUNTS_24, [], 0);
+    const { container } = renderApp("/summary");
+    await screen.findByRole("form", { name: "Фильтры" });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Низкий" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Высокий" }));
+    await waitFor(() => expect(f.query(f.last(TASKS)).getAll("priority")).toEqual(["low", "high"]));
+    const today = container.querySelector<HTMLButtonElement>('button[data-due="today"]')!;
+    const week = container.querySelector<HTMLButtonElement>('button[data-due="week"]')!;
+    fireEvent.click(today);
+    await waitFor(() => expect(f.query(f.last(TASKS)).get("due")).toBe("today"));
+    fireEvent.click(week);
+    await waitFor(() => expect(f.query(f.last(TASKS)).getAll("due")).toEqual(["week"]));
+    expect(today.getAttribute("aria-pressed")).toBe("false");
+    expect(week.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(week);
+    await waitFor(() => expect(f.query(f.last(TASKS)).get("due")).toBeNull());
+  });
+
+  it("shows_count_hot_mark_and_overdue_text", async () => {
+    setup(
+      COUNTS_24,
+      [
+        item("aaaaaaaa-0000-4000-8000-000000000001", { priority: "high", due_date: "2020-01-01", hot: true }),
+        item("aaaaaaaa-0000-4000-8000-000000000002"),
+      ],
+      7,
+    );
+    const { container } = renderApp("/summary");
+    expect(await screen.findByText("Показано 2 из 7")).toBeTruthy();
+    const hotRow = container.querySelector('tr[data-task-id="aaaaaaaa-0000-4000-8000-000000000001"]')!;
+    expect(within(hotRow as HTMLElement).getByText("Горит")).toBeTruthy();
+    expect(hotRow.querySelector('[data-field="due_date"]')?.textContent).toBe("01.01.2020 · просрочено");
+    const plain = container.querySelector('tr[data-task-id="aaaaaaaa-0000-4000-8000-000000000002"]')!;
+    expect(within(plain as HTMLElement).queryByText("Горит")).toBeNull();
+  });
+
+  it("tech_admin_has_no_summary_menu_item", async () => {
+    installFetch({
+      [ME]: () => j(200, meWith(CAPS_ALL)),
+      "GET /api/v1/admin/users": () => j(200, page([])),
+    });
+    const { container } = renderApp("/admin/users");
+    await waitFor(() => expect(container.querySelector('nav a[href="/admin/users"]')).not.toBeNull());
+    expect(container.querySelector('a[href="/summary"]')).toBeNull();
+  });
+});

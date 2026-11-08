@@ -17,13 +17,14 @@ from sqlalchemy.ext.asyncio import (
 from app.core.config import Settings
 
 
-def create_engine(settings: Settings) -> AsyncEngine:
+def create_engine(settings: Settings, *, url: str | None = None) -> AsyncEngine:
     """Создаёт асинхронный движок (asyncpg). Соединение не открывается до первого запроса.
 
     ``hide_parameters=True`` — значения параметров не попадают в текст исключений и логи.
+    ``url`` — другой DSN (процесс API под рабочей ролью, spec 010); по умолчанию ``DATABASE_URL``.
     """
     return create_async_engine(
-        settings.database_url,
+        settings.database_url if url is None else url,
         hide_parameters=True,
         pool_pre_ping=True,
     )
@@ -69,7 +70,9 @@ async def commit_durably(session: AsyncSession) -> None:
     """Фиксирует транзакцию запроса до броска исключения (plan §4.1, исключение T11).
 
     Единственный санкционированный способ зафиксировать транзакцию внутри запроса (``app/**``);
-    разрешён только в ``domain/auth/service.py`` и ``api/deps.py`` (AST-тест).
+    разрешён только в ``domain/auth/service.py``, ``api/deps.py`` и ``domain/auth/registration.py``
+    (AST-тест). В регистрации (spec 019, RG-6) вызов один: сразу после записи попытки лимита заявок
+    с IP, чтобы отказ 422 не отменял учёт попытки.
     Причина: ``get_db`` откатывает транзакцию на любом исключении, а отказ входа — это
     исключение (``InvalidCredentials``), поэтому счётчик неудачных попыток и
     ``login_locked_until`` (FR-61) без явной фиксации терялись бы вместе с откатом, и блокировка

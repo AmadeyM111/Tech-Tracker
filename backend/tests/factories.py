@@ -18,6 +18,9 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
+from sqlalchemy import column as sa_column
+from sqlalchemy import table as sa_table
+
 from app.core.clock import utcnow
 
 if TYPE_CHECKING:
@@ -97,6 +100,9 @@ async def make_user(
     blocked: bool = False,
     must_change_password: bool = False,
     email: str | None = None,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    self_registered: bool | None = None,
 ) -> UserRow:
     """Пользователь + строка ``workspace_member`` (роль ``None`` = «без роли», FR-66).
 
@@ -105,33 +111,46 @@ async def make_user(
     Логин (D-66, FR-73a): допускается смешанный регистр. В столбец ``login`` (ключ) пишется
     ``login.lower()``, в ``login_display`` — написание как передано; ``UserRow.login`` — написание
     (им же тест входит и сверяет ответы API).
+
+    Столбцы email/first_name/last_name/self_registered пишутся только если переданы явно (не None) —
+    иначе тесты старых ревизий схемы падают на отсутствующих колонках.
     """
     ws = workspace or await make_workspace(db)
     now = utcnow()
     user_id = uuid.uuid4()
     the_hash = password_hash or _hash_password(password)
     the_login = login or next_login()
-    email_values: dict[str, str] = {} if email is None else {"email": email}
-    await db.execute(
-        get_table("app_user")
-        .insert()
-        .values(
-            **email_values,
-            id=user_id,
-            login=the_login.lower(),
-            login_display=the_login,
-            password_hash=the_hash,
-            must_change_password=must_change_password,
-            is_blocked=blocked,
-            blocked_at=now if blocked else None,
-            failed_login_count=0,
-            login_locked_until=None,
-            password_changed_at=now,
-            created_at=now,
-            updated_at=now,
-            created_by=None,
+    optional_values: dict[str, object] = {
+        k: v
+        for k, v in (
+            ("email", email),
+            ("first_name", first_name),
+            ("last_name", last_name),
+            ("self_registered", self_registered),
         )
+        if v is not None
+    }
+    values: dict[str, object] = dict(
+        **optional_values,
+        id=user_id,
+        login=the_login.lower(),
+        login_display=the_login,
+        password_hash=the_hash,
+        must_change_password=must_change_password,
+        is_blocked=blocked,
+        blocked_at=now if blocked else None,
+        failed_login_count=0,
+        login_locked_until=None,
+        password_changed_at=now,
+        created_at=now,
+        updated_at=now,
+        created_by=None,
     )
+    # Лёгкая таблица только из передаваемых столбцов: Python-default модели (self_registered)
+    # иначе подставил бы колонку, которой нет в старых ревизиях схемы.
+    real = get_table("app_user")
+    light = sa_table("app_user", *[sa_column(k, real.c[k].type) for k in values])
+    await db.execute(light.insert().values(**values))
     await db.execute(
         get_table("workspace_member")
         .insert()

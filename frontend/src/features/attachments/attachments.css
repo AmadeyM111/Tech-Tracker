@@ -1,0 +1,145 @@
+/* 011 «Вложения»: стили раздела (макеты Shared/Design/gtrack-r2-attachments-notifications; UI-кит 2026-11-08).
+   Общий ui.css в ветках R2 не правится (решение 2026-11-08). */
+.sec-title {
+  margin: 12px 0 8px;
+}
+.att-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.att-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.att-item:last-child {
+  border-bottom: none;
+}
+.att-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.att-kind {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--text-muted);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.att-meta {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+}
+.att-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.att-actions button,
+.att-actions a {
+  min-height: 44px;
+  padding: 8px 14px;
+}
+.att-actions a,
+.ui-secondary {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  font-weight: 400;
+}
+.att-drop {
+  padding: 18px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px dashed var(--text-muted);
+  border-radius: var(--radius);
+}
+.att-drop strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.att-drop p {
+  margin: 10px 0 0;
+}
+.att-drop.is-disabled {
+  border-style: solid;
+}
+.att-hint {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+}
+.att-progress {
+  margin: 12px 0 0;
+}
+.att-progress-row {
+  color: var(--text-muted);
+}
+.att-track {
+  height: 10px;
+  margin-top: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.att-fill {
+  height: 100%;
+  background: var(--accent);
+}
+/* Без процентов (fetch не отдаёт прогресс отправки): движущаяся полоса */
+.att-fill--busy {
+  width: 40%;
+  animation: att-busy 1.2s ease-in-out infinite alternate;
+}
+@keyframes att-busy {
+  from {
+    transform: translateX(-60%);
+  }
+  to {
+    transform: translateX(210%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .att-fill--busy {
+    width: 100%;
+    animation: none;
+  }
+}
+.att-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: var(--surface-2);
+}
+.att-note {
+  margin: 0;
+  padding: 16px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+@media (max-width: 719px) {
+  .att-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .att-actions {
+    justify-content: flex-start;
+  }
+}

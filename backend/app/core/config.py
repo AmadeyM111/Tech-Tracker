@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     smtp_starttls: bool = True
     public_base_url: str | None = None
+    # [010] рабочая роль БД процесса API; пусто — API под DATABASE_URL (только не production)
+    db_app_role: str | None = None
     # [009] резервные копии: каталог (том /backups), сколько хранить, порог «устарела», ч
     backup_dir: Path = Path("/backups")
     backup_keep: int = Field(14, ge=1)
@@ -89,6 +91,7 @@ class Settings(BaseSettings):
         "smtp_password",
         "smtp_from",
         "public_base_url",
+        "db_app_role",
         mode="before",
     )
     @classmethod
