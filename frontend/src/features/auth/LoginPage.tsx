@@ -6,10 +6,19 @@ import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { GTrackLogo } from "../../shared/ui/GTrackLogo";
+import { Icon } from "../../shared/ui/Icon";
 import { TextField } from "../../shared/ui/TextField";
 import { login, passwordResetStatus } from "./api";
 import { FOCUS_HEADING_STATE } from "./session";
 import "./auth-screens.css";
+
+// Help block list (spec 005 v0.3, design brief section 3): the dictionary keys in document order.
+const HELP_ITEM_KEYS = [
+  "auth.help_item_1",
+  "auth.help_item_2",
+  "auth.help_item_3",
+  "auth.help_item_4",
+] as const;
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -69,7 +78,6 @@ export function LoginPage() {
         <h1>{t("auth.login_title")}</h1>
       </div>
       <form onSubmit={(e) => void onSubmit(e)} noValidate>
-        <ErrorAlert message={alert.message} seq={alert.seq} />
         <TextField
           label={t("auth.login_label")}
           value={loginValue}
@@ -91,7 +99,10 @@ export function LoginPage() {
             onToggle: () => setShown((v) => !v),
           }}
         />
+        {/* Error sits directly above the submit button (design, login-error state). */}
+        <ErrorAlert message={alert.message} seq={alert.seq} />
         <button type="submit" className="login-submit" disabled={pending}>
+          {pending && <Icon name="spinner" className="login-spin" />}
           {t("auth.login_submit")}
         </button>
       </form>
@@ -105,6 +116,11 @@ export function LoginPage() {
       <section className="ui-login-help" aria-labelledby="login-help-title">
         <h2 id="login-help-title">{t("auth.help_title")}</h2>
         <p>{t("auth.help_p1")}</p>
+        <ol>
+          {HELP_ITEM_KEYS.map((key) => (
+            <li key={key}>{t(key)}</li>
+          ))}
+        </ol>
         {resetStatus.data?.enabled === true && <p>{t("auth.help_p2_registration")}</p>}
       </section>
     </section>

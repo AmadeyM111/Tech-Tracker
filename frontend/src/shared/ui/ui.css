@@ -109,12 +109,13 @@ button:disabled {
   stroke-linejoin: round;
 }
 
+/* Spec 005 v0.3 (P-1): the edge of a field is --text-muted (6.66:1 on --surface-2, WCAG 1.4.11); was --border (1.36:1). */
 input,
 textarea,
 select {
   background: var(--surface-2);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid var(--text-muted);
   border-radius: 8px;
   font: inherit;
   max-width: 100%;
@@ -161,10 +162,16 @@ select:disabled {
   min-width: 0;
 }
 
+/* Spec 005 v0.3 (P-2): show/hide button is a 44 by 44 px touch target (UI kit, rule 6). */
 .ui-reveal {
-  min-width: 24px;
-  min-height: 24px;
-  padding: 4px 10px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ui-reveal .ui-icon {
@@ -185,6 +192,28 @@ select:disabled {
 .ui-error {
   color: var(--danger);
   margin: 0 0 12px;
+}
+
+/* ErrorAlert (UI kit, section 5): one form for a form-level error. Border --danger, icon, text (not colour alone, WCAG 1.4.1). */
+.ui-error-alert {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+
+.ui-error-alert .ui-icon {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+  color: var(--danger);
+  stroke: var(--danger);
 }
 
 /* Page containers. */
