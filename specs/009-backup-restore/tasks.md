@@ -72,9 +72,9 @@
 ## B09-T07 — Эксплуатация: образ, compose, таймер, README, протокол
 - **Статус:** TODO
 - **AC:** FR-10, AC-14, NFR-4
-- **Файлы:** `backend/Dockerfile`, `docker-compose.yml`, `deploy/backup/gtrack-backup.service`, `deploy/backup/gtrack-backup.timer`, `deploy/backup/host/gtrack-backup`, `deploy/backup/host/README.md`, `README.md`, `.github/workflows/ci.yml`, `docs/acceptance/backup-restore-drill.md`, `backend/tests/infra/test_009_backup_ops.py`
+- **Файлы:** `backend/Dockerfile`, `backend/app/domain/ops/backup.py` (проверка записи в каталог), `deploy/backup/README.md`, `deploy/backup/compose.backup.yml`, `deploy/backup/gtrack-backup.service`, `deploy/backup/gtrack-backup.timer`, `deploy/backup/host/gtrack-backup`, `deploy/backup/host/gtrack-backup.service`, `deploy/backup/host/gtrack-backup.timer`, `README.md`, `.github/workflows/ci.yml`, `docs/acceptance/backup-restore-drill.md`, `backend/tests/infra/test_009_backup_ops.py`
 - **Зависит от:** B09-T04
-- **Описание:** PGDG-клиент 16 в образе; том `backups`; юниты таймера для CLI; временный скрипт хоста (как на проде с 2026-11-08); раздел README; протокол учения 2026-11-08.
+- **Описание:** PGDG-клиент 16 в образе; каталог копий — override `deploy/backup/compose.backup.yml` (поставляемый compose и его тома не меняются, 001/FR-48); юниты таймера для CLI; временный скрипт хоста (как на проде с 2026-11-08); раздел README; протокол учения 2026-11-08.
 - **Готово, когда:** `bash scripts/check.sh` зелёный; `docker build backend` проходит, `pg_dump --version` в образе — 16.
 - **Оценка:** 0,5 дня
 - **Попытки:** 0

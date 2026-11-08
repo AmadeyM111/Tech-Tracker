@@ -33,7 +33,7 @@
 - `backend/app/cli/commands/backup.py`, `restore.py`, `backend/app/cli/main.py`; `bootstrap.py` (FR-9).
 - `backend/app/api/v1/admin_system.py`, `schemas/admin_system.py`, `api/v1/__init__.py`; OpenAPI через `scripts/gen-api.sh`.
 - `frontend/src/features/admin/BackupBanner.tsx`, `api.ts`, `app/router.tsx`, `shared/i18n/ru.ts`; плашка — один запрос при открытии экрана ТА, без опроса.
-- `backend/Dockerfile` (postgresql-client-16), `docker-compose.yml` (том `backups:/backups`), `deploy/backup/*` (юниты хоста), `README.md`, `docs/data-model.md`, `docs/acceptance/backup-restore-drill.md`.
+- `backend/Dockerfile` (postgresql-client-16), `deploy/backup/compose.backup.yml` (bind каталога хоста в `/backups`; поставляемый compose не меняется), `deploy/backup/*` (юниты хоста), `README.md`, `docs/data-model.md`, `docs/acceptance/backup-restore-drill.md`.
 - `.github/workflows/ci.yml` — установка `postgresql-client-16` для интеграционных тестов.
 
 ## 4. Интерфейсы

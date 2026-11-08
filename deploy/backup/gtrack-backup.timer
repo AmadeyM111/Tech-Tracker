@@ -1,0 +1,11 @@
+# Ежедневно в 02:30 по Москве (spec 009, Q-1); пропущенный запуск выполняется после включения.
+[Unit]
+Description=GTrack daily backup at 02:30 Europe/Moscow
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Europe/Moscow
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

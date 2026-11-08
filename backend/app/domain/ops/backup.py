@@ -284,7 +284,14 @@ def create_backup(
     runner: Runner = run_tool,
 ) -> BackupResult:
     """Снимает, проверяет и публикует копию, затем ротирует (FR-1…FR-3, FR-5)."""
-    out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    try:
+        out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        probe = Path(tempfile.mkdtemp(prefix=".gtrack-probe-", dir=out_dir))
+        probe.rmdir()
+    except OSError as exc:
+        raise BackupError(
+            "backup_dir_unavailable", f"каталог копий недоступен для записи: {type(exc).__name__}"
+        ) from exc
     final = out_dir / backup_name(now)
     if final.exists():
         raise BackupError("exists", f"файл уже существует: {final.name}")

@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# GTrack T-01: ежедневная копия БД (pg_dump -Fc) и тома appdata на хосте.
+# Рабочие контейнеры не меняются: из db читается только pg_dump и версия схемы;
+# проверка дампа и tar тома — во временных контейнерах без сети.
+# Хранит GTRACK_BACKUP_KEEP последних копий; старые удаляются только после проверки новой
+# и только каталоги вида YYYYmmddTHHMMSSZ внутри GTRACK_BACKUP_DIR.
+set -euo pipefail
+umask 077
+
+ROOT="${GTRACK_BACKUP_DIR:-/var/backups/gtrack}"
+KEEP="${GTRACK_BACKUP_KEEP:-14}"
+DB_CONTAINER="${GTRACK_DB_CONTAINER:-task-tracker-db-1}"
+APPDATA_VOLUME="${GTRACK_APPDATA_VOLUME:-task-tracker_appdata}"
+MIN_FREE_MB="${GTRACK_BACKUP_MIN_FREE_MB:-300}"
+
+log() { printf '%s gtrack-backup: %s\n' "$(date -u +%FT%TZ)" "$*"; }
+die() { log "ERROR: $*" >&2; exit 1; }
+
+[[ "$KEEP" =~ ^[1-9][0-9]*$ ]] || die "GTRACK_BACKUP_KEEP должен быть > 0"
+mkdir -p -m 700 "$ROOT"
+chmod 700 "$ROOT"
+exec 9>"$ROOT/.lock"
+flock -n 9 || die "копия уже выполняется"
+
+free_mb="$(df -Pm "$ROOT" | awk 'NR==2 {print $4}')"
+[ "$free_mb" -ge "$MIN_FREE_MB" ] || die "мало места: ${free_mb} МБ < ${MIN_FREE_MB} МБ"
+
+[ "$(docker inspect -f '{{.State.Running}}' "$DB_CONTAINER" 2>/dev/null)" = true ] \
+  || die "контейнер $DB_CONTAINER не запущен"
+IMAGE="$(docker inspect -f '{{.Config.Image}}' "$DB_CONTAINER")"
+
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+TMP="$ROOT/.tmp-$STAMP"
+DEST="$ROOT/$STAMP"
+trap 'rm -rf -- "$TMP"' EXIT
+mkdir -m 700 "$TMP"
+started="$(date +%s)"
+
+docker exec "$DB_CONTAINER" sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$TMP/db.dump"
+[ -s "$TMP/db.dump" ] || die "дамп пуст"
+docker run --rm -i --network none --entrypoint pg_restore "$IMAGE" --list \
+  < "$TMP/db.dump" > /dev/null || die "дамп не читается pg_restore"
+SCHEMA="$(docker exec "$DB_CONTAINER" sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select version_num from alembic_version"')"
+
+if docker volume inspect "$APPDATA_VOLUME" > /dev/null 2>&1; then
+  docker run --rm --network none -v "$APPDATA_VOLUME:/data:ro" --entrypoint tar "$IMAGE" \
+    -C /data -cf - . > "$TMP/appdata.tar"
+  tar -tf "$TMP/appdata.tar" > /dev/null || die "архив appdata не читается"
+else
+  log "WARNING: том $APPDATA_VOLUME не найден, копия только БД"
+fi
+
+(
+  cd "$TMP"
+  sha256sum -- db.dump $( [ -f appdata.tar ] && echo appdata.tar ) > SHA256SUMS
+  {
+    echo "created_at_utc=$STAMP"
+    echo "alembic_revision=$SCHEMA"
+    echo "db_container=$DB_CONTAINER"
+    echo "image=$IMAGE"
+  } > MANIFEST
+  sha256sum -c --quiet SHA256SUMS
+)
+chmod 600 "$TMP"/*
+mv -- "$TMP" "$DEST"
+trap - EXIT
+
+printf '%s\n' "$STAMP" > "$ROOT/.LAST_OK.tmp" && mv -- "$ROOT/.LAST_OK.tmp" "$ROOT/LAST_OK"
+chmod 600 "$ROOT/LAST_OK"
+
+# Ротация: только каталоги-копии этого скрипта, самые новые KEEP остаются.
+mapfile -t copies < <(find "$ROOT" -mindepth 1 -maxdepth 1 -type d \
+  -regextype posix-extended -regex '.*/[0-9]{8}T[0-9]{6}Z' -printf '%f\n' | sort)
+removed=0
+if [ "${#copies[@]}" -gt "$KEEP" ]; then
+  for old in "${copies[@]:0:${#copies[@]}-KEEP}"; do
+    rm -rf -- "${ROOT:?}/$old"
+    removed=$((removed + 1))
+  done
+fi
+
+size="$(du -sk "$DEST" | awk '{print $1}')"
+log "OK copy=$DEST size_kb=$size schema=$SCHEMA seconds=$(( $(date +%s) - started )) kept=$(( ${#copies[@]} - removed )) removed=$removed"
