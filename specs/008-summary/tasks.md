@@ -3,7 +3,7 @@
 Статусы: TODO | IN_PROGRESS | DONE | BLOCKED. Статусы ведёт оркестратор.
 
 ## Общие условия
-- Источник истины — `spec.md`; старт кода — после ответов на §8 и статуса APPROVED.
+- Источник истины — `spec.md` (APPROVED 2026-11-08).
 - ID задач с префиксом `S08-`. Проверка рамок: `python scripts/task_scope.py S08-Tnn`.
 - Не трогать: `CLAUDE.md`, `AGENTS.md`, `docs/adr/**`, `specs/008-summary/spec.md`, применённые миграции.
 - Тесты: `test_008_*`; БД — только `*_test` (`TEST_DATABASE_URL=…/tracker_test`). Сеть не используется.
