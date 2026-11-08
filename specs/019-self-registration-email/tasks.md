@@ -363,7 +363,7 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Тесты: tests/features/auth — 176 passed (12 новых); lint чист; typecheck — только 4 ожидаемые ошибки T20; scaffold 44 passed; scope ок. Отклонения: (1) статус регистрации не запрашивается — enabled:false видно по ответу confirm (404 feature_disabled) → auth.register_disabled; (2) login_taken показывает auth.register_login_taken, а не error.login_taken; (3) текст ссылки auth.register_again взят из ключей плана. Долг: отдельное ревью T17.
 
 ## R8-T18 — Фронтенд: ссылка «Зарегистрироваться» и справка на `/login`
-- **Статус:** TODO
+- **Статус:** DONE (ревью: самопроверка оркестратора; отдельный ревьюер не запускался; 2026-11-08)
 - **AC:** AC-1 (ссылка), AC-21
 - **Файлы:** `frontend/src/features/auth/LoginPage.tsx`;
   тесты: `frontend/tests/features/auth/LoginPage.test.tsx`
@@ -377,7 +377,7 @@ T17, T19, T20, T21), тоже последовательно.
   `enabled:false`. Если тест сейчас мокает `enabled:true`, test-writer разносит случаи явно, не ослабляя проверки.
   Сведение с 005 v0.2 из `main` (один `p`) — в R8-T00, не здесь.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/auth` зелёный; `npm run lint` чист
-- **Попытки:** 0
+- **Попытки:** 1. Тесты: tests/features/auth — 184 passed (8 новых); lint чист; typecheck — только 4 ожидаемые ошибки T20; scope ок. Изменены LoginPage.tsx (+3/−1) и LoginPage.test.tsx. Долг (minor, T22): в новых строках LoginPage.test.tsx два комментария на русском (английский по правилу) — перевести; ожидаемый текст «Зарегистрироваться» в тесте — литерал из словаря, оставлен.
 
 ## R8-T19 — Фронтенд: экран профиля `/profile` и пункт меню
 - **Статус:** TODO
@@ -522,7 +522,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T15 | DONE |
 | R8-T16 | DONE |
 | R8-T17 | DONE |
-| R8-T18 | TODO |
+| R8-T18 | DONE |
 | R8-T19 | TODO |
 | R8-T20 | TODO |
 | R8-T21 | TODO |

@@ -87,10 +87,12 @@ export function LoginPage() {
         </button>
       </form>
       {resetStatus.data?.enabled === true && <Link to="/password-reset">{t("auth.forgot_password")}</Link>}
+      {/* Registration is enabled by the same flag as password reset (RG-13). */}
+      {resetStatus.data?.enabled === true && <Link to="/register">{t("auth.register_link")}</Link>}
       <section className="ui-login-help" aria-labelledby="login-help-title">
         <h2 id="login-help-title">{t("auth.help_title")}</h2>
         <p>{t("auth.help_p1")}</p>
-        <p>{t("auth.help_p2")}</p>
+        <p>{t(resetStatus.data?.enabled === true ? "auth.help_p2_registration" : "auth.help_p2")}</p>
       </section>
     </section>
   );
