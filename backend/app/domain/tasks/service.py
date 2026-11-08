@@ -550,6 +550,9 @@ async def move(
         raise _invalid(positions.SUBTASK_NOT_ON_BOARD)
     target = _status(status)
     task = await _load_task(db, task_id)
+    # статус «до» — по строке под блокировками колонок (перечитывается), а не по снимку без
+    # блокировки: параллельный перенос не исказит переход для уведомлений (ревью 012, п. 3)
+    await positions.lock_task_columns(db, task, target)
     old_status = task.status
     await positions.move_task(
         db, task, status=target, before_task_id=before_task_id, after_task_id=after_task_id

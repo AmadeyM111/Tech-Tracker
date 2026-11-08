@@ -49,6 +49,8 @@ async def _world(sm: Any) -> dict[str, Any]:
             "no_assignee": await task(date(2026, 11, 1), assignee=None),
             "blocked": await task(date(2026, 11, 1), assignee=blocked),
             "subtask_parent": await task(None),
+            # просрочена больше 30 дней — без напоминания (ревью 012, п. 2)
+            "ancient": await task(date(2026, 9, 1)),
         }
         t["subtask"] = await make_task(
             s,

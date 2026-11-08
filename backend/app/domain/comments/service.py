@@ -220,6 +220,10 @@ async def create_comment(db: AsyncSession, actor: Actor, task_id: UUID, body: st
         entity_id=comment.id,
         project_id=ctx.project.project_id,
     )
+    # исполнитель и автор — по строке под блокировкой (_lock_task_rows), не по снимку ctx
+    fresh = (
+        await db.execute(select(Task.created_by, Task.assignee_id).where(Task.id == task_id))
+    ).one()
     await notifications.on_comment(
         db,
         actor,
@@ -227,8 +231,8 @@ async def create_comment(db: AsyncSession, actor: Actor, task_id: UUID, body: st
         body=comment.body,
         task_id=task_id,
         project_id=ctx.project.project_id,
-        created_by=ctx.task.created_by,
-        assignee_id=ctx.task.assignee_id,
+        created_by=fresh.created_by,
+        assignee_id=fresh.assignee_id,
         is_new=True,
     )
     return await _view(db, actor, ctx.project, comment)

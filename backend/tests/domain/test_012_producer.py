@@ -151,3 +151,16 @@ async def test_012_ac3_edit_notifies_only_new_mentions_and_delete_hides(api_env:
     assert r.status_code == 200, r.text
     mentioned = [n for n in await _notes(api_env) if n[0] == "mentioned"]
     assert sorted(mentioned) == sorted([("mentioned", w.owner.id), ("mentioned", w.u4.id)])
+
+
+async def test_012_fr7_tech_admin_gets_no_notifications(api_env: ApiEnv) -> None:
+    """Роль сменили на ТА, членство и назначение остались — уведомлений нет (ревью 012, п. 4)."""
+    from app.domain.workspaces.models import WorkspaceMember
+
+    w = await _users(api_env)
+    task = await _create_task(w, w.u2)
+    await api_env.execute(
+        update(WorkspaceMember).where(WorkspaceMember.user_id == w.u2.id).values(role="tech_admin")
+    )
+    await _comment(w, "u3", task, "новости по задаче")
+    assert ("commented", w.u2.id) not in await _notes(api_env)

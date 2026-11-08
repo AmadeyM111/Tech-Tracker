@@ -23,10 +23,16 @@ from app.domain.tasks.models import Task, TaskStatus
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import WorkspaceMember
 
+# ТА уведомлений не получает (FR-7): только роли с бизнес-доступом
+BUSINESS_ROLES: Final = ("user", "business_admin")
+
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 RETENTION: Final = timedelta(days=90)
+# «Срок прошёл» — только для сроков не старше 30 дней: первый запуск не засыпает старыми задачами,
+# а после очистки (90 дней) напоминание не приходит повторно (ревью 012, п. 1–2; Q-2 «один раз»).
+OVERDUE_WINDOW: Final = timedelta(days=30)
 
 
 @dataclass(frozen=True)
@@ -66,7 +72,7 @@ def _candidates(kind: NotificationKind, condition: Any, now: datetime) -> Any:
             Task.status != TaskStatus.DONE,
             Project.deleted_at.is_(None),
             AppUser.is_blocked.is_(False),
-            WorkspaceMember.role.is_not(None),
+            WorkspaceMember.role.in_(BUSINESS_ROLES),
             member,
         )
     )
@@ -101,7 +107,12 @@ async def notify_due(sessionmaker: async_sessionmaker[AsyncSession], *, now: dat
         tomorrow = await _insert(
             db, NotificationKind.DUE_TOMORROW, Task.due_date == today + timedelta(days=1), now
         )
-        overdue = await _insert(db, NotificationKind.OVERDUE, Task.due_date < today, now)
+        overdue = await _insert(
+            db,
+            NotificationKind.OVERDUE,
+            Task.due_date.between(today - OVERDUE_WINDOW, today - timedelta(days=1)),
+            now,
+        )
     return DueReport(tomorrow, overdue)
 
 

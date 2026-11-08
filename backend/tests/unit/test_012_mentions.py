@@ -12,7 +12,8 @@ from app.domain.notifications.mentions import parse_mentions
     [
         ("@Ivanov посмотри", {"ivanov"}),
         ("Привет, @ivanov.petr и @sidorova!", {"ivanov.petr", "sidorova"}),
-        ("Конец предложения @petrov.", {"petrov"}),
+        ("Конец предложения @petrov.", {"petrov.", "petrov"}),
+        ("@ivan- в конце логина дефис", {"ivan-", "ivan"}),
         ("почта x@ivanov.ru не упоминание", set()),
         ("@ab слишком короткий", set()),
         ("@-bad и @_bad", set()),

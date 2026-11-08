@@ -2,7 +2,7 @@
 
 Логин — по шаблону FR-73 (``LOGIN_RE``), без учёта регистра. Перед ``@``
 не может стоять буква, цифра, ``.``, ``@`` — e-mail ``x@ivanov.ru`` упоминанием не считается.
-Точка в конце (конец предложения) в логин не входит.
+Точка или дефис в конце дают два кандидата (с ними и без), лишний не найдётся среди логинов.
 """
 
 from __future__ import annotations
@@ -19,7 +19,10 @@ def parse_mentions(text: str) -> set[str]:
     """Нормализованные логины (нижний регистр) упомянутых в тексте."""
     found: set[str] = set()
     for match in _MENTION.finditer(text):
-        login = match.group(1).rstrip(".-").lower()
-        if LOGIN_RE.fullmatch(login):
-            found.add(login)
+        raw = match.group(1).lower()
+        # точка/дефис в конце — либо конец предложения, либо часть логина: берём оба варианта,
+        # лишний отсеется при поиске пользователей (ревью 012, п. 5)
+        for login in {raw, raw.rstrip(".-")}:
+            if LOGIN_RE.fullmatch(login):
+                found.add(login)
     return found

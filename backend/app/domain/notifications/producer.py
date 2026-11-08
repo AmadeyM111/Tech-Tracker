@@ -21,6 +21,9 @@ from app.domain.tasks.models import TaskStatus
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import WorkspaceMember
 
+# ТА уведомлений не получает (FR-7): только роли с бизнес-доступом
+BUSINESS_ROLES = ("user", "business_admin")
+
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,7 +51,7 @@ async def eligible(
             AppUser.id.in_(wanted),
             AppUser.is_blocked.is_(False),
             WorkspaceMember.workspace_id == workspace_id,
-            WorkspaceMember.role.is_not(None),
+            WorkspaceMember.role.in_(BUSINESS_ROLES),
             _member_filter(project_id),
         )
     )
