@@ -66,7 +66,7 @@ describe("AC-19 business sidebar", () => {
     const hrefs = within(nav)
       .getAllByRole("link")
       .map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["/projects", "/my-tasks"]);
+    expect(hrefs).toEqual(["/projects", "/my-tasks", "/profile"]);
     expect(within(nav).queryByRole("link", { name: ru["admin.home_users_link"] })).toBeNull();
     expect(within(nav).queryByRole("link", { name: ru["admin.home_audit_link"] })).toBeNull();
 
@@ -210,12 +210,12 @@ describe("AC-30 tab order of the BA /projects screen", () => {
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
     const form = container.querySelector<HTMLElement>('form[data-form="create-project"]')!;
     const firstInForm = tabbable.find((el) => form.contains(el))!;
-    const labels = tabbable.slice(0, 5);
-    expect(labels.slice(0, 2).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks"]);
+    const labels = tabbable.slice(0, 6);
+    expect(labels.slice(0, 3).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks", "/profile"]);
     // 004/AC-12: ссылки меню, «Задача», «Выйти», затем содержимое
-    expect(labels[2]?.getAttribute("data-action")).toBe("create-task");
-    expect(labels[3]?.getAttribute("data-action")).toBe("logout");
-    expect(labels[4]).toBe(firstInForm);
+    expect(labels[3]?.getAttribute("data-action")).toBe("create-task");
+    expect(labels[4]?.getAttribute("data-action")).toBe("logout");
+    expect(labels[5]).toBe(firstInForm);
   });
 });
 
@@ -228,12 +228,12 @@ describe("AC-30 tab order of the U /my-tasks screen (004/AC-12)", () => {
     const tabbable = Array.from(
       container.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
-    expect(tabbable.slice(0, 2).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks"]);
-    expect(tabbable[2]?.getAttribute("data-action")).toBe("create-task");
-    expect(tabbable[3]?.getAttribute("data-action")).toBe("logout");
+    expect(tabbable.slice(0, 3).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks", "/profile"]);
+    expect(tabbable[3]?.getAttribute("data-action")).toBe("create-task");
+    expect(tabbable[4]?.getAttribute("data-action")).toBe("logout");
     // дальше - содержимое экрана, не меню
-    expect(tabbable[4]).toBe(taskLink);
-    expect(tabbable[4]?.closest(".ui-sidebar") ?? null).toBeNull();
+    expect(tabbable[5]).toBe(taskLink);
+    expect(tabbable[5]?.closest(".ui-sidebar") ?? null).toBeNull();
   });
 });
 
@@ -258,7 +258,7 @@ describe("AC-20 tech admin sidebar", () => {
   it.each([USERS, AUDIT_PATH])("003_ac20_ta_%s_links_by_capabilities_one_logout_after_links", async (path) => {
     setupTa();
     const { container, nav } = await openMenu(path);
-    expect(hrefsOf(nav)).toEqual([USERS, AUDIT_PATH]);
+    expect(hrefsOf(nav)).toEqual([USERS, AUDIT_PATH, "/profile"]);
     expect(within(nav).queryByRole("link", { name: ru["nav.projects"] })).toBeNull();
     expect(within(nav).queryByRole("link", { name: ru["nav.my_tasks"] })).toBeNull();
     expect(screen.queryByRole("button", { name: CREATE_TASK })).toBeNull(); // 004/AC-10
@@ -290,7 +290,7 @@ describe("AC-20 tech admin sidebar", () => {
     fireEvent.click(within(nav).getByRole("link", { name: ru["admin.home_audit_link"] }));
     await expectAt(AUDIT_PATH);
     const after = await screen.findByRole("navigation", { name: MENU });
-    expect(hrefsOf(after)).toEqual([USERS, AUDIT_PATH]);
+    expect(hrefsOf(after)).toEqual([USERS, AUDIT_PATH, "/profile"]);
     await waitFor(() =>
       expect(within(after).getByRole("link", { name: ru["admin.home_audit_link"] }).getAttribute("aria-current")).toBe("page"),
     );
@@ -302,7 +302,7 @@ describe("AC-21 partial capabilities", () => {
   it("003_ac21_only_manage_accounts_users_link_no_audit_link_logout_present", async () => {
     setupTa({}, ["manage_accounts"]);
     const { nav } = await openMenu(USERS);
-    expect(hrefsOf(nav)).toEqual([USERS]);
+    expect(hrefsOf(nav)).toEqual([USERS, "/profile"]);
     expect(within(nav).queryByRole("link", { name: ru["admin.home_audit_link"] })).toBeNull();
     expect(screen.getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
   });
@@ -341,7 +341,7 @@ describe("AC-27 tech admin on business paths", () => {
     const alerts = screen.getAllByRole("alert");
     expect(alerts).toHaveLength(1);
     expect(alerts[0]?.textContent).toBe(ru["error.forbidden"]);
-    expect(hrefsOf(nav)).toEqual([USERS, AUDIT_PATH]);
+    expect(hrefsOf(nav)).toEqual([USERS, AUDIT_PATH, "/profile"]);
     expect(container.querySelector<HTMLElement>(".ui-sidebar")!.parentElement?.classList.contains("ui-shell")).toBe(true);
     expect(within(container.querySelector<HTMLElement>(".ui-sidebar")!).getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
     expect(screen.queryByRole("button", { name: CREATE_TASK })).toBeNull(); // 004/AC-10
@@ -375,7 +375,7 @@ describe("AC-28 business roles on tech admin paths", () => {
     const alerts = screen.getAllByRole("alert");
     expect(alerts).toHaveLength(1);
     expect(alerts[0]?.textContent).toBe(ru["error.forbidden"]);
-    expect(hrefsOf(nav)).toEqual(["/projects", "/my-tasks"]);
+    expect(hrefsOf(nav)).toEqual(["/projects", "/my-tasks", "/profile"]);
     expect(container.querySelector<HTMLElement>(".ui-sidebar")!.parentElement?.classList.contains("ui-shell")).toBe(true);
     expect(within(nav).getByRole("link", { name: ru["nav.projects"] })).toBeTruthy();
     expect(within(nav).getByRole("link", { name: ru["nav.my_tasks"] })).toBeTruthy();
@@ -406,9 +406,26 @@ describe("AC-30 tab order of the TA /admin/users screen", () => {
     const tabbable = Array.from(
       container.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
-    expect(tabbable.slice(0, 2).map((el) => el.getAttribute("href"))).toEqual([USERS, AUDIT_PATH]);
-    expect(tabbable[2]?.getAttribute("data-action")).toBe("logout");
+    expect(tabbable.slice(0, 3).map((el) => el.getAttribute("href"))).toEqual([USERS, AUDIT_PATH, "/profile"]);
+    expect(tabbable[3]?.getAttribute("data-action")).toBe("logout");
     const form = container.querySelector<HTMLElement>("form")!;
-    expect(tabbable[3]).toBe(form.querySelector('input[name="login"]'));
+    expect(tabbable[4]).toBe(form.querySelector('input[name="login"]'));
+  });
+});
+
+// ---------------------------------------------------------------- 019/R8-T19: пункт «Профиль» у всех ролей (RG-16)
+describe("019 AC-34 profile menu item", () => {
+  it.each(["business_admin", "user"])("019_ac34_%s_menu_profile_is_last_link_and_marked_on_profile", async (role) => {
+    setup(role);
+    const { nav } = await openMenu("/profile");
+    expect(hrefsOf(nav).at(-1)).toBe("/profile");
+    expect(within(nav).getByRole("link", { name: ru["nav.profile"] }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("019_ac34_ta_menu_profile_is_last_link", async () => {
+    setupTa();
+    const { nav } = await openMenu("/profile");
+    expect(hrefsOf(nav)).toEqual([USERS, AUDIT_PATH, "/profile"]);
+    expect(within(nav).getByRole("link", { name: ru["nav.profile"] }).getAttribute("aria-current")).toBe("page");
   });
 });

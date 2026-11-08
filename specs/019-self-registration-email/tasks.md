@@ -380,10 +380,10 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Тесты: tests/features/auth — 184 passed (8 новых); lint чист; typecheck — только 4 ожидаемые ошибки T20; scope ок. Изменены LoginPage.tsx (+3/−1) и LoginPage.test.tsx. Долг (minor, T22): в новых строках LoginPage.test.tsx два комментария на русском (английский по правилу) — перевести; ожидаемый текст «Зарегистрироваться» в тесте — литерал из словаря, оставлен.
 
 ## R8-T19 — Фронтенд: экран профиля `/profile` и пункт меню
-- **Статус:** TODO
+- **Статус:** DONE (ревью: PLAN_ISSUE по трём тестам вне списка → список расширен; самопроверка оркестратора; отдельный ревьюер не запускался; 2026-11-08)
 - **AC:** AC-34 (экран)
 - **Файлы:** `frontend/src/features/auth/ProfilePage.tsx` (новый), `frontend/src/features/auth/api.ts`, `frontend/src/app/router.tsx`;
-  тесты: `frontend/tests/features/auth/ProfilePage.test.tsx` (новый), `frontend/tests/app/sidebar.test.tsx`, `frontend/tests/app/navigation.test.tsx`, `frontend/tests/app/start-screen.test.tsx`, `backend/tests/infra/test_frontend_scaffold.py`
+  тесты: `frontend/tests/features/auth/ProfilePage.test.tsx` (новый), `frontend/tests/app/sidebar.test.tsx`, `frontend/tests/app/navigation.test.tsx`, `frontend/tests/app/start-screen.test.tsx`, `backend/tests/infra/test_frontend_scaffold.py`, `frontend/tests/features/admin/AuditPage.test.tsx` (списки путей ТА: добавить `/profile`), `frontend/tests/features/auth/SessionGate.test.tsx` (ссылка «Профиль» у роли без возможностей, RG-16), `frontend/tests/app/create-task-button.test.tsx` (индексы табуляции БА, как в sidebar) — правки обусловлены пунктом меню «Профиль» у всех ролей (AC-34, RG-16), ревью PLAN_ISSUE 2026-11-08
 - **Зависит от:** R8-T05, R8-T15, R8-T18
 - **Описание:** `updateMyName` в `api.ts`. `ProfilePage` по plan §4.7. В `router.tsx`: `RoleScreen` получает
   необязательный `capability` (без него показывает содержимое любой роли, RG-16), маршрут `/profile` и пункт меню
@@ -391,7 +391,7 @@ T17, T19, T20, T21), тоже последовательно.
   Test-writer: поля заполнены из профиля; сохранение и `role="status"`; 422 `first_name_invalid` → текст ошибки;
   меню ТА, БА и П содержит «Профиль» (существующие списки меню дополняются, порядок прочих пунктов прежний).
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/auth tests/app` зелёный; `npm run lint` чист; `source .venv/bin/activate && pytest -q backend/tests/infra/test_frontend_scaffold.py` зелёный
-- **Попытки:** 0
+- **Попытки:** 2. Полный vitest: 61 файл, 1630 passed; lint чист; typecheck — 4 ожидаемые ошибки T20; pytest scaffold 44 passed; scope ок. Исправлены тесты вне списка: AuditPage (пути ТА), SessionGate (единственная ссылка /profile), create-task-button (индексы табуляции). Решения: RoleScreen уже имел capability; иконка пункта «Профиль» — 'password' (Icon.tsx вне списка); ProfilePage получает профиль пропсом. Долг: иконка профиля (отдельная правка Icon.tsx). Ревью отдельно не запускалось.
 
 ## R8-T20 — Фронтенд: имена в `UsersPage`, диалог «Изменить имя»
 - **Статус:** TODO
@@ -523,7 +523,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T16 | DONE |
 | R8-T17 | DONE |
 | R8-T18 | DONE |
-| R8-T19 | TODO |
+| R8-T19 | DONE |
 | R8-T20 | TODO |
 | R8-T21 | TODO |
 | R8-T22 | TODO |

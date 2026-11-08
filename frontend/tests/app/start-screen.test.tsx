@@ -416,7 +416,7 @@ describe("AC-35 only view_audit (AUD)", () => {
     await h1(ru["admin.audit.title"]);
     expect(where()).toBe("/admin/audit");
     const nav = await menu();
-    expect(hrefsOf(nav)).toEqual(["/admin/audit"]);
+    expect(hrefsOf(nav)).toEqual(["/admin/audit", "/profile"]);
     expect(screen.getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
     await settle();
     expect(f.count(USERS)).toBe(0);
@@ -457,7 +457,7 @@ describe("AC-36 a role without capabilities (NOCAP)", () => {
     expect(alert.textContent).toBe(ru["error.forbidden"]);
     expect(where()).toBe("/admin/users");
     const nav = await menu();
-    expect(nav.querySelectorAll("a")).toHaveLength(0);
+    expect(hrefsOf(nav)).toEqual(["/profile"]);
     expect(screen.getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
     await settle();
     expect(f.calls).toHaveLength(1);

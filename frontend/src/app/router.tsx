@@ -10,6 +10,7 @@ import { LoginPage } from "../features/auth/LoginPage";
 import { PasswordResetConfirmPage } from "../features/auth/PasswordResetConfirmPage";
 import { PasswordResetRequestPage } from "../features/auth/PasswordResetRequestPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
+import { ProfilePage } from "../features/auth/ProfilePage";
 import { RegisterConfirmPage } from "../features/auth/RegisterConfirmPage";
 import { RegisterPage } from "../features/auth/RegisterPage";
 import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
@@ -156,6 +157,13 @@ function MenuItems({ profile }: { profile: MeResponse }) {
           </NavLink>
         </p>
       ) : null}
+      {/* 019/RG-16: the profile item is shown to every role. */}
+      <p>
+        <NavLink to="/profile" end>
+          <Icon name="password" />
+          {t("nav.profile")}
+        </NavLink>
+      </p>
     </>
   );
 }
@@ -427,6 +435,13 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           <RoleScreen insideMain={insideMain} capability="business_access">
             {() => <TaskPage />}
           </RoleScreen>
+        }
+      />
+      {/* 019/RG-16: no capability, so every role with a profile may open its own screen. */}
+      <Route
+        path="/profile"
+        element={
+          <RoleScreen insideMain={insideMain}>{(profile) => <ProfilePage profile={profile} />}</RoleScreen>
         }
       />
       <Route
