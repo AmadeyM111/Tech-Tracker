@@ -365,6 +365,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/registration/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Registration
+         * @description Подтверждение регистрации по ссылке; успех — 204 без тела и без cookie (AC-16).
+         *
+         *     Неверная, просроченная или использованная ссылка и занятый адрес — 400
+         *     ``registration_token_invalid``. Занятый логин — 409 ``login_taken``. Сессия не создаётся:
+         *     вход отдельным действием.
+         */
+        post: operations["confirm_registration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/registration/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Registration
+         * @description Заявка на регистрацию; ответ одинаков, занят адрес или свободен (FR-4).
+         *
+         *     Ошибки формы (адрес, имя, фамилия, логин, пароль) и лимит IP отвечают кодами из каталога.
+         *     Письмо со ссылкой уходит только на свободный адрес и только после ответа.
+         */
+        post: operations["request_registration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/comments/{comment_id}": {
         parameters: {
             query?: never;
@@ -1433,6 +1480,47 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+        };
+        /**
+         * RegistrationAccepted
+         * @description Единый ответ на заявку (FR-4, RG-20): одинаков для свободного и занятого адреса.
+         */
+        RegistrationAccepted: {
+            /**
+             * Detail
+             * @default Если адрес можно использовать для регистрации, мы отправили на него письмо с подтверждением. Ссылка действует 30 минут.
+             */
+            detail: string;
+        };
+        /**
+         * RegistrationConfirm
+         * @description ``POST /auth/registration/confirm``: токен из ссылки (FR-8).
+         */
+        RegistrationConfirm: {
+            /**
+             * Token
+             * Format: password
+             */
+            token: string;
+        };
+        /**
+         * RegistrationRequest
+         * @description ``POST /auth/registration/request``: заявка на регистрацию (FR-3).
+         */
+        RegistrationRequest: {
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Login */
+            login: string;
+            /**
+             * Password
+             * Format: password
+             */
+            password: string;
         };
         /**
          * ResetPasswordRequest
@@ -2800,6 +2888,151 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PasswordResetStatus"];
+                };
+            };
+        };
+    };
+    confirm_registration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Функция отключена или пространство не единственное (code: feature_disabled) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Логин занят учётной записью (code: login_taken) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Слишком много запросов с этого IP-адреса или по этой ссылке (code: rate_limited) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    request_registration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationAccepted"];
+                };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Функция отключена или пространство не единственное (code: feature_disabled) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Слишком много запросов с этого IP-адреса или по этой ссылке (code: rate_limited) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

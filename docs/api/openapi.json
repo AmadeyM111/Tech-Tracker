@@ -1476,6 +1476,78 @@
         "title": "ProjectRef",
         "type": "object"
       },
+      "RegistrationAccepted": {
+        "description": "Единый ответ на заявку (FR-4, RG-20): одинаков для свободного и занятого адреса.",
+        "properties": {
+          "detail": {
+            "default": "Если адрес можно использовать для регистрации, мы отправили на него письмо с подтверждением. Ссылка действует 30 минут.",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "title": "RegistrationAccepted",
+        "type": "object"
+      },
+      "RegistrationConfirm": {
+        "additionalProperties": false,
+        "description": "``POST /auth/registration/confirm``: токен из ссылки (FR-8).",
+        "properties": {
+          "token": {
+            "format": "password",
+            "maxLength": 128,
+            "title": "Token",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "RegistrationConfirm",
+        "type": "object"
+      },
+      "RegistrationRequest": {
+        "additionalProperties": false,
+        "description": "``POST /auth/registration/request``: заявка на регистрацию (FR-3).",
+        "properties": {
+          "email": {
+            "maxLength": 1024,
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "maxLength": 1024,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 1024,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "maxLength": 1024,
+            "title": "Login",
+            "type": "string"
+          },
+          "password": {
+            "format": "password",
+            "maxLength": 1024,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "email",
+          "first_name",
+          "last_name",
+          "login",
+          "password"
+        ],
+        "title": "RegistrationRequest",
+        "type": "object"
+      },
       "ResetPasswordRequest": {
         "additionalProperties": false,
         "description": "``POST /admin/users/{user_id}/reset-password`` (FR-65).",
@@ -3594,6 +3666,173 @@
           }
         },
         "summary": "Password Reset Status",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/registration/confirm": {
+      "post": {
+        "description": "Подтверждение регистрации по ссылке; успех — 204 без тела и без cookie (AC-16).\n\nНеверная, просроченная или использованная ссылка и занятый адрес — 400\n``registration_token_invalid``. Занятый логин — 409 ``login_taken``. Сессия не создаётся:\nвход отдельным действием.",
+        "operationId": "confirm_registration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Функция отключена или пространство не единственное (code: feature_disabled)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Логин занят учётной записью (code: login_taken)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Слишком много запросов с этого IP-адреса или по этой ссылке (code: rate_limited)"
+          }
+        },
+        "summary": "Confirm Registration",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/registration/request": {
+      "post": {
+        "description": "Заявка на регистрацию; ответ одинаков, занят адрес или свободен (FR-4).\n\nОшибки формы (адрес, имя, фамилия, логин, пароль) и лимит IP отвечают кодами из каталога.\nПисьмо со ссылкой уходит только на свободный адрес и только после ответа.",
+        "operationId": "request_registration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Функция отключена или пространство не единственное (code: feature_disabled)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Слишком много запросов с этого IP-адреса или по этой ссылке (code: rate_limited)"
+          }
+        },
+        "summary": "Request Registration",
         "tags": [
           "auth"
         ]

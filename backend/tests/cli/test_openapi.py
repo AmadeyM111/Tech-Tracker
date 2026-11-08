@@ -294,6 +294,8 @@ def test_d33_error_responses_declared(spec: dict[str, Any]) -> None:
         ("GET", "/api/v1/auth/password-reset/status"),  # R7-T11
         ("POST", "/api/v1/auth/password-reset/request"),  # R7-T11
         ("POST", "/api/v1/auth/password-reset/confirm"),  # R7-T12
+        ("POST", "/api/v1/auth/registration/request"),  # R8-T11
+        ("POST", "/api/v1/auth/registration/confirm"),  # R8-T11
     }
     for method, path, op in _operations(spec):
         responses = op["responses"]
@@ -403,6 +405,8 @@ BODY_ROUTES_400 = {
     ("PUT", "/api/v1/admin/users/{user_id}/name"),  # R8-T04
     ("POST", "/api/v1/auth/password-reset/request"),  # R7-T11
     ("POST", "/api/v1/auth/password-reset/confirm"),  # R7-T12
+    ("POST", "/api/v1/auth/registration/request"),  # R8-T11
+    ("POST", "/api/v1/auth/registration/confirm"),  # R8-T11
     ("POST", "/api/v1/projects"),
     ("PATCH", "/api/v1/projects/{user_id}"),
     ("PUT", "/api/v1/projects/{user_id}/owner"),
