@@ -7,6 +7,7 @@ import sys
 from collections.abc import Callable, Sequence
 
 from app.cli.commands import (
+    backup,
     bootstrap,
     demo_data,
     export,
@@ -15,6 +16,7 @@ from app.cli.commands import (
     maintenance,
     mcp,
     openapi,
+    restore,
 )
 
 
@@ -32,6 +34,8 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_parser(subparsers)
     import_.add_parser(subparsers)
     mcp.add_parser(subparsers)
+    backup.add_parser(subparsers)
+    restore.add_parser(subparsers)
     return parser
 
 

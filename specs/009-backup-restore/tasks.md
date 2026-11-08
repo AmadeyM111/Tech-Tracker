@@ -42,7 +42,7 @@
 ## B09-T04 — CLI и предупреждение bootstrap
 - **Статус:** TODO
 - **AC:** AC-1, AC-3, AC-9…AC-11
-- **Файлы:** `backend/app/cli/commands/backup.py`, `backend/app/cli/commands/restore.py`, `backend/app/cli/main.py`, `backend/app/cli/commands/bootstrap.py`, `backend/tests/cli/test_009_cli.py`
+- **Файлы:** `backend/app/cli/commands/backup.py`, `backend/app/cli/commands/restore.py`, `backend/app/cli/main.py`, `backend/app/cli/commands/bootstrap.py`, `backend/app/domain/ops/backup_status.py` (`last_success_at`, `bootstrap_warning`), `backend/tests/cli/test_009_cli.py`
 - **Зависит от:** B09-T03
 - **Описание:** `gtrack backup [--out]`, `gtrack restore ARCHIVE --yes`; вывод `ключ=значение`; FR-9.
 - **Готово, когда:** CLI-тесты зелёные.
