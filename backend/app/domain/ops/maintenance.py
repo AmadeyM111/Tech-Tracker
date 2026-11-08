@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.domain.attachments.purge import purge_attachments
+from app.domain.notifications.due import purge_notifications
 from app.domain.system.maintenance import purge_expired_sessions
 
 if TYPE_CHECKING:
@@ -32,6 +33,7 @@ class MaintenanceReport:
     attachments_purged: int = 0
     files_removed: int = 0
     orphan_files_removed: int = 0
+    notifications_purged: int = 0  # spec 012 FR-9: старше 90 дней
 
 
 async def run_maintenance(
@@ -49,10 +51,12 @@ async def run_maintenance(
         dry_run=dry_run,
     )
     files = await purge_attachments(sessionmaker, settings, now=clock.now(), dry_run=dry_run)
+    notes = await purge_notifications(sessionmaker, now=clock.now(), dry_run=dry_run)
     return MaintenanceReport(
         dry_run=dry_run,
         sessions_expired=sessions_expired,
         attachments_purged=files.attachments_purged,
         files_removed=files.files_removed,
         orphan_files_removed=files.orphan_files_removed,
+        notifications_purged=notes,
     )

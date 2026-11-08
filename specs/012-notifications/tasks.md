@@ -21,7 +21,7 @@
 
 ## N12-T04 — `gtrack notify-due` и таймер
 - **Статус:** TODO · **AC:** AC-5 · **Оценка:** 0,5 дня · **Зависит от:** N12-T02
-- **Файлы:** `backend/app/domain/notifications/due.py`, `backend/app/cli/commands/notify_due.py`, `backend/app/cli/main.py`, `deploy/backup/gtrack-notify-due.service`, `deploy/backup/gtrack-notify-due.timer`, `backend/tests/cli/test_012_notify_due.py`
+- **Файлы:** `backend/app/domain/notifications/due.py`, `backend/app/cli/commands/notify_due.py`, `backend/app/cli/main.py`, `backend/app/domain/ops/maintenance.py` (FR-9), `backend/tests/cli/test_maintenance.py` (строка `notifications_purged`), `deploy/backup/gtrack-notify-due.service`, `deploy/backup/gtrack-notify-due.timer`, `deploy/backup/README.md`, `backend/tests/cli/test_012_notify_due.py`
 
 ## N12-T05 — Интерфейс: значок, список, подсказка `@`
 - **Статус:** TODO · **AC:** AC-8, FR-2 · **Оценка:** 1,25 дня · **Зависит от:** N12-T03

@@ -57,6 +57,7 @@ REPORT_KEYS = [
     "attachments_purged",
     "files_removed",
     "orphan_files_removed",
+    "notifications_purged",  # spec 012 FR-9
 ]
 
 
