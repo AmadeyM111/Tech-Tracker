@@ -142,3 +142,17 @@
 .login-card .ui-login-help li {
   margin: 4px 0;
 }
+
+/* Register screens: the card title is 1.5 rem (UI-kit §7); the head sits in the same brand row as the login card. */
+.login-card > h1 {
+  font-size: 1.5rem;
+  margin: 0 0 20px;
+}
+
+/* 360 px: the card keeps 12 px from each edge of the screen (prod check 2026-11-08). */
+@media (max-width: 440px) {
+  .login-card {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+}
