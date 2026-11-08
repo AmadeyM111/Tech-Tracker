@@ -68,8 +68,17 @@ function createButton(c: HTMLElement): HTMLButtonElement {
   return btn;
 }
 
-function submitCreate(c: HTMLElement, login: string) {
+// 019/R8-T20: first and last name are required in the create form (AC-33).
+function fieldInput(c: HTMLElement, name: string): HTMLInputElement {
+  const el = c.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+  if (!el) throw new Error(`no input[name=${name}]`);
+  return el;
+}
+
+function submitCreate(c: HTMLElement, login: string, first = "Ivan", last = "Ivanov") {
   fireEvent.change(loginInput(c), { target: { value: login } });
+  fireEvent.change(fieldInput(c, "first_name"), { target: { value: first } });
+  fireEvent.change(fieldInput(c, "last_name"), { target: { value: last } });
   fireEvent.click(createButton(c));
 }
 
@@ -239,9 +248,11 @@ describe("create user (FR-4, FR-55, FR-65, FR-73, OI-108)", () => {
     expect(new URL(req.url).search).toBe("");
     const body = (await req.clone().json()) as Record<string, string | null>;
     // R7-T19: контракт добавил необязательный email; пустое поле уходит как null
-    expect(Object.keys(body).sort()).toEqual(["email", "login", "one_time_password"]);
+    expect(Object.keys(body).sort()).toEqual(["email", "first_name", "last_name", "login", "one_time_password"]);
     expect(body["email"]).toBeNull();
     expect(body["login"]).toBe("sidorov");
+    expect(body["first_name"]).toBe("Ivan");
+    expect(body["last_name"]).toBe("Ivanov");
     expect(body["one_time_password"]?.length).toBeGreaterThanOrEqual(PASSWORD_MIN_LENGTH);
     expect(body["one_time_password"]).toMatch(/^\S+$/);
     expect(spy).toHaveBeenCalled();
@@ -332,7 +343,7 @@ describe("create user (FR-4, FR-55, FR-65, FR-73, OI-108)", () => {
   it("double_submit_while_request_in_flight_sends_one_post", async () => {
     const d = deferred<Response>();
     const { container } = await open({ [CREATE]: () => d.promise });
-    fireEvent.change(loginInput(container), { target: { value: "sidorov" } });
+    submitCreate(container, "sidorov");
     const btn = createButton(container);
     fireEvent.click(btn);
     fireEvent.click(btn);
@@ -836,5 +847,118 @@ describe("email dialog in row (007, R7-T20)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: ru["admin.users.email_cancel"] }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(f.count(EMAIL_PUT)).toBe(0);
+  });
+});
+
+// 019/R8-T20: names and origin columns, required name fields, NameDialog in the row.
+describe("names and origin (019, R8-T20)", () => {
+  const NAME_PUT = `PUT ${url(ID_IVANOV, "name")}`;
+  const nameLabel = () => ru["admin.users.first_name_label"];
+  const lastLabel = () => ru["admin.users.last_name_label"];
+
+  it("019_ac22_columns_show_names_missing_placeholder_and_origin", async () => {
+    const { container } = await open({
+      [LIST]: () =>
+        j(200, page([
+          { ...U_ADMIN, first_name: "Admin", last_name: "Root" },
+          { ...U_IVANOV, first_name: "Ivan", last_name: "Ivanov", self_registered: true },
+          { ...U_PETROV, first_name: null, last_name: null, self_registered: false },
+        ])),
+    });
+    const iv = row(container, ID_IVANOV);
+    expect(cell(iv, "first_name").textContent).toBe("Ivan");
+    expect(cell(iv, "last_name").textContent).toBe("Ivanov");
+    expect(cell(iv, "origin").textContent).toBe(ru["admin.users.self_registered"]);
+    const pe = row(container, ID_PETROV);
+    expect(cell(pe, "first_name").textContent).toBe(ru["admin.users.name_missing"]);
+    expect(cell(pe, "last_name").textContent).toBe(ru["admin.users.name_missing"]);
+    expect(cell(pe, "origin").textContent).toBe("");
+    expect(cell(row(container, U_ADMIN.id), "origin").textContent).toBe("");
+    const headers = Array.from(container.querySelectorAll("th")).map((th) => th.textContent);
+    expect(headers).toEqual(
+      expect.arrayContaining([
+        ru["admin.users.first_name_column"],
+        ru["admin.users.last_name_column"],
+        ru["admin.users.origin_column"],
+      ]),
+    );
+  });
+
+  it("019_ac33_create_form_has_first_and_last_name_fields_in_same_form", async () => {
+    const { container } = await open();
+    expect(screen.getByLabelText(nameLabel())).toBe(fieldInput(container, "first_name"));
+    expect(screen.getByLabelText(lastLabel())).toBe(fieldInput(container, "last_name"));
+    expect(fieldInput(container, "first_name").form).toBe(loginInput(container).form);
+    expect(fieldInput(container, "last_name").form).toBe(loginInput(container).form);
+  });
+
+  it.each([
+    ["first", "   ", "Ivanov", "first_name_invalid"],
+    ["last", "Ivan", "", "last_name_invalid"],
+  ])("019_ac33_empty_%s_name_sends_nothing_and_shows_error", async (_n, first, last, code) => {
+    const { container } = await open({ [CREATE]: () => j(201, created) });
+    submitCreate(container, "sidorov", first, last);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(errorMessage(code));
+    await waitFor(() => expect(document.activeElement).toBe(alert));
+    expect(f.count(CREATE)).toBe(0);
+    expect(shownPassword()).toBeNull();
+  });
+
+  it("019_ac33_create_sends_trimmed_names", async () => {
+    const { container } = await open({ [CREATE]: () => j(201, created) });
+    submitCreate(container, "sidorov", "  Ivan ", " Ivanov  ");
+    await waitFor(() => expect(f.count(CREATE)).toBe(1));
+    const body = (await f.last(CREATE).clone().json()) as Record<string, unknown>;
+    expect(body["first_name"]).toBe("Ivan");
+    expect(body["last_name"]).toBe("Ivanov");
+  });
+
+  it("019_ac33_server_name_error_on_create_is_shown_via_error_message", async () => {
+    const { container } = await open({ [CREATE]: () => err(422, "last_name_invalid") });
+    submitCreate(container, "sidorov");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(ru["error.last_name_invalid"]);
+    expect(shownPassword()).toBeNull();
+  });
+
+  it("019_ac35_edit_name_button_opens_name_dialog_for_the_row_user", async () => {
+    const { container } = await open();
+    const opener = within(row(container, ID_IVANOV)).getByRole("button", {
+      name: ru["admin.users.edit_name_aria"].replace("{login}", "ivanov"),
+    });
+    fireEvent.click(opener);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain(ru["admin.users.name_dialog_title"].replace("{login}", "ivanov"));
+    expect(within(dialog).getByLabelText(nameLabel())).toBeTruthy();
+    expect(within(dialog).getByLabelText(lastLabel())).toBeTruthy();
+    expect(f.count(NAME_PUT)).toBe(0);
+  });
+
+  it("019_ac35_save_name_puts_trimmed_names_closes_dialog_and_reloads_list", async () => {
+    let stored: { first_name: string; last_name: string } | null = null;
+    const { container } = await open({
+      [LIST]: () =>
+        j(200, page([U_ADMIN, { ...U_IVANOV, ...(stored ?? {}) }, U_PETROV])),
+      [NAME_PUT]: async (r) => {
+        stored = (await r.clone().json()) as { first_name: string; last_name: string };
+        return j(200, { ...U_IVANOV, ...stored });
+      },
+    });
+    fireEvent.click(
+      within(row(container, ID_IVANOV)).getByRole("button", {
+        name: ru["admin.users.edit_name_aria"].replace("{login}", "ivanov"),
+      }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(nameLabel()), { target: { value: " Ivan " } });
+    fireEvent.change(within(dialog).getByLabelText(lastLabel()), { target: { value: "Ivanov" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: ru["admin.users.name_save"] }));
+    await waitFor(() => expect(f.count(NAME_PUT)).toBe(1));
+    expect(await f.last(NAME_PUT).clone().json()).toEqual({ first_name: "Ivan", last_name: "Ivanov" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(cell(row(container, ID_IVANOV), "first_name").textContent).toBe("Ivan"));
+    expect(cell(row(container, ID_IVANOV), "last_name").textContent).toBe("Ivanov");
+    expect(f.last(LIST).headers.get("X-GT-Background")).toBeNull();
   });
 });

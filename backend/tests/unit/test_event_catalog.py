@@ -29,6 +29,9 @@ USER_ACTIONS = {
     # 020 (ADR-0018, PN-5): выдача и отзыв токена агента — аудит учётной записи
     "user.token_created",
     "user.token_revoked",
+    # 019 (plan RG-10)
+    "user.self_registered",
+    "user.name_changed",
 }
 
 F = frozenset
@@ -105,7 +108,7 @@ def test_fr41_r11_catalog_entry_matches_plan_table(action: str) -> None:
     assert spec.value_fields == value_fields
 
 
-@pytest.mark.parametrize("action", sorted(USER_ACTIONS))
+@pytest.mark.parametrize("action", sorted(USER_ACTIONS - {"user.name_changed"}))
 def test_t30_user_actions_unchanged(action: str) -> None:
     spec = _spec(action)
     assert spec.entity_type == EntityType.USER
@@ -200,3 +203,31 @@ def test_007_legacy_password_reset_kept_distinct_from_new_events() -> None:
     """Старое user.password_reset (админский сброс) не заменено и не переименовано."""
     assert "user.password_reset" in {m.value for m in EventAction}
     assert len({m.value for m in EventAction}) == len(list(EventAction))
+
+
+def test_019_ac34_user_name_changed_spec() -> None:
+    """RG-10: user.name_changed - аудит, без ленты, поля first_name/last_name, значений нет."""
+    assert EventAction("user.name_changed") is EventAction.USER_NAME_CHANGED
+    spec = _spec("user.name_changed")
+    assert spec.entity_type == EntityType.USER
+    assert spec.audit is True
+    assert spec.feed is None
+    assert spec.deal_history is False
+    assert spec.fields == frozenset({"first_name", "last_name"})
+    assert spec.value_fields == frozenset()
+
+
+def test_019_ac38_user_self_registered_spec() -> None:
+    """RG-10: user.self_registered - обычное аудируемое user-событие без полей."""
+    assert EventAction("user.self_registered") is EventAction.USER_SELF_REGISTERED
+    spec = _spec("user.self_registered")
+    assert spec.entity_type == EntityType.USER
+    assert spec.audit is True
+    assert spec.feed is None
+    assert spec.deal_history is False
+    assert spec.fields == frozenset()
+    assert spec.value_fields == frozenset()
+
+
+def test_019_rg10_underscore_variant_absent() -> None:
+    assert "user_self_registered" not in {m.value for m in EventAction}

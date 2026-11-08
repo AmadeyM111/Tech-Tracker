@@ -63,6 +63,7 @@ HOLDERS: dict[str, frozenset[str]] = {
     "CRM_READ": frozenset({"business_admin"}),
     "CRM_WRITE": frozenset({"business_admin"}),
     "PIPELINE_MANAGE": frozenset({"business_admin"}),
+    "ONBOARD_ACCOUNTS": frozenset({"business_admin"}),  # 019 (plan RG-11)
 }
 GATE_CELLS = [(r, c) for c in HOLDERS for r in ALL_ROLES]
 

@@ -111,7 +111,7 @@ describe("T81 routes under the session gate", () => {
     expect(f.calls.length).toBe(1);
     // 003/AC-27: меню ТА, «Выйти», нет «На главную»
     const nav = await screen.findByRole("navigation", { name: ru["app.menu_label"] });
-    expect(Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/admin/users", "/admin/audit", "/profile/agents"]);
+    expect(Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/admin/users", "/admin/audit", "/profile/agents", "/profile"]);
     expect(screen.getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
     expect(screen.queryByRole("button", { name: CREATE_TASK })).toBeNull(); // 004/AC-10
     expect(screen.queryByRole("link", { name: REMOVED_HOME_LINK })).toBeNull();
@@ -208,5 +208,29 @@ describe("T82 projects screens in the shell", () => {
     renderApp(`/projects/${PROJECT_ID}`);
     await waitFor(() => expect(link()).toBeTruthy());
     expect(link().getAttribute("aria-current")).toBeNull();
+  });
+});
+
+// 019/R8-T21: the "Without role" item is shown only with onboard_accounts (AC-30, FR-13a).
+describe("019 AC-30 menu item unassigned accounts by capability", () => {
+  it("019_ac30_menu_unassigned_item_for_onboard_accounts", async () => {
+    installFetch({
+      [ME]: () => j(200, meWith([...BUSINESS, "onboard_accounts"], "business_admin")),
+      ...PROJECT_ROUTES,
+    });
+    renderApp("/");
+    await expectAt("/projects");
+    await screen.findByRole("navigation", { name: ru["app.menu_label"] });
+    expect(hrefs()).toContain("/unassigned-accounts");
+    expect(screen.getByRole("link", { name: ru["nav.unassigned"] }).getAttribute("href")).toBe("/unassigned-accounts");
+  });
+
+  it("019_ac30_menu_no_unassigned_item_without_onboard_accounts", async () => {
+    installFetch({ [ME]: () => j(200, meWith(BUSINESS, "business_admin")), ...PROJECT_ROUTES });
+    renderApp("/");
+    await expectAt("/projects");
+    await screen.findByRole("navigation", { name: ru["app.menu_label"] });
+    expect(hrefs()).not.toContain("/unassigned-accounts");
+    expect(screen.queryByRole("link", { name: ru["nav.unassigned"] })).toBeNull();
   });
 });

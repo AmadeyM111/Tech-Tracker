@@ -22,6 +22,7 @@ from app.api.v1.schemas.admin import (
     CreateUserRequest,
     ResetPasswordRequest,
     SetEmailRequest,
+    SetNameRequest,
     SetRoleRequest,
 )
 from app.core.db import DbSession
@@ -74,6 +75,8 @@ async def create_user(
         hasher,
         login=body.login,
         one_time_password=body.one_time_password,
+        first_name=body.first_name,
+        last_name=body.last_name,
         email=body.email,
     )
     return AdminUser.model_validate(account)
@@ -174,4 +177,17 @@ async def set_email(
 ) -> AdminUser:
     """Задаёт или очищает email пользователя (FR-2); сессии не затрагиваются."""
     account = await service.set_email(db, actor, user_id, body.email)
+    return AdminUser.model_validate(account)
+
+
+@router.put(
+    "/{user_id}/name",
+    response_model=AdminUser,
+    responses=error_responses(400, 404, 422),
+)
+async def set_name(
+    user_id: UUID, body: SetNameRequest, db: DbSession, actor: CurrentActor
+) -> AdminUser:
+    """Задаёт имя и фамилию пользователя (FR-3c); сессии не затрагиваются."""
+    account = await service.set_name(db, actor, user_id, body.first_name, body.last_name)
     return AdminUser.model_validate(account)

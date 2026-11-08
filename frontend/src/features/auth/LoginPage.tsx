@@ -9,6 +9,7 @@ import { GTrackLogo } from "../../shared/ui/GTrackLogo";
 import { TextField } from "../../shared/ui/TextField";
 import { login, passwordResetStatus } from "./api";
 import { FOCUS_HEADING_STATE } from "./session";
+import "./auth-screens.css";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -62,7 +63,7 @@ export function LoginPage() {
   }
 
   return (
-    <section className="ui-form">
+    <section className="ui-form login-card">
       <div className="ui-brand">
         <GTrackLogo />
         <h1>{t("auth.login_title")}</h1>
@@ -84,16 +85,27 @@ export function LoginPage() {
           onChange={setPassword}
           autoComplete="current-password"
           disabled={pending}
-          reveal={{ label: t("auth.show_password"), shown, onToggle: () => setShown((v) => !v) }}
+          reveal={{
+            label: shown ? t("auth.hide_password") : t("auth.show_password"),
+            shown,
+            onToggle: () => setShown((v) => !v),
+          }}
         />
-        <button type="submit" disabled={pending}>
+        <button type="submit" className="login-submit" disabled={pending}>
           {t("auth.login_submit")}
         </button>
       </form>
-      {resetStatus.data?.enabled === true && <Link to="/password-reset">{t("auth.forgot_password")}</Link>}
+      {/* Registration is enabled by the same flag as password reset (RG-13). */}
+      {resetStatus.data?.enabled === true && (
+        <div className="login-links">
+          <Link to="/password-reset">{t("auth.forgot_password")}</Link>
+          <Link to="/register">{t("auth.register_link")}</Link>
+        </div>
+      )}
       <section className="ui-login-help" aria-labelledby="login-help-title">
         <h2 id="login-help-title">{t("auth.help_title")}</h2>
         <p>{t("auth.help_p1")}</p>
+        {resetStatus.data?.enabled === true && <p>{t("auth.help_p2_registration")}</p>}
       </section>
     </section>
   );
