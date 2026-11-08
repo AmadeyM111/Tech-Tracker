@@ -11,10 +11,13 @@ WORKDIR /app
 # Клиент PostgreSQL 16 для `gtrack backup`/`gtrack restore` (spec 009, plan PB-1, NFR-4): major-версия
 # совпадает с сервером (клиент 15 из bookworm не дампит сервер 16). Репозиторий PGDG — только на этапе
 # сборки; в рантайме внешних обращений нет.
-RUN apt-get update \
+# Сеть при сборке ненадёжна (curl exit 18 в CI 2026-11-08): повторы для curl и apt.
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries \
+    && apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
     && install -d -m 0755 /usr/share/postgresql-common/pgdg \
-    && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && curl -fsSL --retry 8 --retry-all-errors --retry-delay 3 --connect-timeout 20 \
+        -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
         https://www.postgresql.org/media/keys/ACCC4CF8.asc \
     && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
         > /etc/apt/sources.list.d/pgdg.list \
