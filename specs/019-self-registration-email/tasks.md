@@ -211,10 +211,11 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Тесты: 27 passed; ruff, mypy чисты; task_scope exit 0. Ревью PASS. Долг (minor, в T22): (a) «нет IP/токена в дампе» сравнивать с сырыми байтами key_hash, не подстрокой; (b) тест порядка блокировок по возрастанию (удаление sorted() не ловится); (c) тест шаблона письма с другим ttl (TTL «30» жёстко зашит). Плюрализация «минут» фиксирована — при других TTL поправить.
 
 ## R8-T09 — Домен: заявка на регистрацию, политика в `lifespan`
-- **Статус:** TODO
+- **Статус:** DONE (ревью: FAIL по client_ip=None → исправлено; ждёт подтверждения владельца, 2026-11-08)
 - **AC:** AC-4, AC-5, AC-6, AC-7 (домен), AC-8, AC-9 (upsert), AC-11, AC-15, AC-18, AC-27, AC-29
 - **Файлы:** `backend/app/domain/auth/registration.py` (новый), `backend/app/main.py`, `backend/app/core/db.py` (только docstring `commit_durably`);
-  тесты: `backend/tests/domain/test_019_request_registration.py` (новый), `backend/tests/db/test_migrations.py` (разрешённый список `commit_durably`)
+  тесты: `backend/tests/domain/test_019_request_registration.py` (новый), `backend/tests/db/test_migrations.py` (разрешённый список `commit_durably`);
+  `specs/019-self-registration-email/plan.md` — только примечание к RG-5 о `client_ip=None` (ревью R8-T09, добавлено в рамки задачи)
 - **Зависит от:** R8-T08, R8-T02
 - **Описание:** `RegistrationPolicy`, `RegistrationForm`, `confirm_link`, `ACCEPTED_DETAIL`, `request_registration`
   строго в порядке RG-7: после успешного `register_attempt` вызывается `commit_durably(db)` (RG-5, RG-6), затем
@@ -230,7 +231,7 @@ T17, T19, T20, T21), тоже последовательно.
   заявка → `RateLimited`, в том числе когда предыдущие 10 получили 422 (`login_taken`, `email_invalid`, пароль) —
   решение владельца, RG-5; два пространства и ноль пространств → `FeatureDisabled` (RG-9).
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/domain/test_019_request_registration.py backend/tests/db/test_migrations.py::test_commit_durably_used_only_by_auth_service backend/tests/unit/test_config.py backend/tests/api/test_007_password_reset_api.py` зелёный; «Линт бэкенда» чист
-- **Попытки:** 0
+- **Попытки:** 2. Тесты: 101 passed (T09 + T08 + миграции-список + unit); ruff, mypy, task_scope чисты. Исправления ревью: (1) client_ip=None → общая корзина «no-ip» (тест test_019_ac18_unknown_ip_shares_one_bucket), требует подтверждения владельца; (2) repr=False у полей _Checked; (3) шаблон письма зафиксирован явными строками; (4) контрольная проверка caplog. Открыто: вопрос владельцу о client_ip=None (вариант A — общая корзина, принят по умолчанию).
 
 ## R8-T10 — Домен: подтверждение регистрации
 - **Статус:** TODO
@@ -511,7 +512,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T06 | DONE |
 | R8-T07 | DONE |
 | R8-T08 | DONE |
-| R8-T09 | TODO |
+| R8-T09 | DONE |
 | R8-T10 | TODO |
 | R8-T11 | TODO |
 | R8-T12 | TODO |
