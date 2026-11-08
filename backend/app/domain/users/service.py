@@ -58,6 +58,7 @@ from app.domain.events.writer import UserEventDetails, record_event
 from app.domain.tokens.service import revoke_all_for_user as revoke_agent_tokens
 from app.domain.users.email import normalize_email
 from app.domain.users.models import AppUser
+from app.domain.users.names import normalize_person_name
 from app.domain.workspaces.models import WorkspaceMember
 
 if TYPE_CHECKING:
@@ -83,6 +84,9 @@ class UserAccount:
     must_change_password: bool
     created_at: datetime
     email: str | None
+    first_name: str | None = None
+    last_name: str | None = None
+    self_registered: bool = False
 
 
 @dataclass(frozen=True)
@@ -94,6 +98,9 @@ class _Target:
     must_change_password: bool
     created_at: datetime
     email: str | None
+    first_name: str | None
+    last_name: str | None
+    self_registered: bool
 
     @property
     def is_active_account_admin(self) -> bool:
@@ -108,6 +115,9 @@ class _Target:
             must_change_password=self.must_change_password,
             created_at=self.created_at,
             email=self.email,
+            first_name=self.first_name,
+            last_name=self.last_name,
+            self_registered=self.self_registered,
         )
 
 
@@ -152,6 +162,9 @@ async def _load_target(db: AsyncSession, workspace_id: UUID, user_id: UUID) -> _
             AppUser.must_change_password,
             AppUser.created_at,
             AppUser.email,
+            AppUser.first_name,
+            AppUser.last_name,
+            AppUser.self_registered,
             WorkspaceMember.role,
         )
         .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
@@ -168,6 +181,9 @@ async def _load_target(db: AsyncSession, workspace_id: UUID, user_id: UUID) -> _
         must_change_password=row.must_change_password,
         created_at=row.created_at,
         email=row.email,
+        first_name=row.first_name,
+        last_name=row.last_name,
+        self_registered=row.self_registered,
     )
 
 
@@ -290,6 +306,8 @@ async def create_user(
     *,
     login: str,
     one_time_password: SecretStr,
+    first_name: str,
+    last_name: str,
     email: str | None = None,
 ) -> UserAccount:
     """Создаёт пользователя без роли с одноразовым паролем (FR-4, FR-66, FR-73, AC-121).
@@ -299,7 +317,8 @@ async def create_user(
     ``login``); занят — ``login_taken`` (в том числе пользователем другого пространства:
     логин глобален).
     ``must_change_password = true``. Событие ``user.created``. Порядок проверок:
-    ``login_invalid`` -> ``login_taken`` -> ``email_invalid`` (422) -> ``email_taken`` (409) ->
+    ``login_invalid`` -> ``login_taken`` -> ``first_name_invalid`` -> ``last_name_invalid`` ->
+    ``email_invalid`` (422) -> ``email_taken`` (409) ->
     политика пароля (FR-52/FR-53). Пустой ``email`` (``None``, ``""``) допустим и хранится
     как NULL. Протокол блокировок
     (с автором в роли цели) — после хеширования; одновременное создание того же логина
@@ -314,6 +333,12 @@ async def create_user(
     ).scalar_one_or_none()
     if taken is not None:
         raise Unprocessable("Логин уже занят", code=ErrorCode.login_taken)
+    first = normalize_person_name(first_name)
+    if first is None:
+        raise Unprocessable("Недопустимое имя", code=ErrorCode.first_name_invalid)
+    last = normalize_person_name(last_name)
+    if last is None:
+        raise Unprocessable("Недопустимая фамилия", code=ErrorCode.last_name_invalid)
     normalized_email = _parse_email(email)
     if normalized_email is not None:
         await _ensure_email_free(db, normalized_email, None)
@@ -332,6 +357,9 @@ async def create_user(
             login=normalized,
             login_display=login,
             email=normalized_email,
+            first_name=first,
+            last_name=last,
+            self_registered=False,
             password_hash=password_hash,
             must_change_password=True,
             is_blocked=False,
@@ -377,7 +405,54 @@ async def create_user(
         must_change_password=True,
         created_at=inserted.created_at,
         email=normalized_email,
+        first_name=first,
+        last_name=last,
     )
+
+
+async def set_name(
+    db: AsyncSession, actor: Actor, user_id: UUID, first_name: str, last_name: str, /
+) -> UserAccount:
+    """Задаёт имя и фамилию учётной записи (FR-3c, AC-35).
+
+    Порядок: права (403) -> проверка имени и фамилии (422, без значений) -> блокировки ->
+    загрузка цели (404). Без изменений -- без UPDATE и без события; иначе событие
+    ``user.name_changed`` с именами изменённых полей (значения в событие не попадают).
+    """
+    _require(actor, Capability.MANAGE_ACCOUNTS)
+    first = normalize_person_name(first_name)
+    if first is None:
+        raise Unprocessable("Недопустимое имя", code=ErrorCode.first_name_invalid)
+    last = normalize_person_name(last_name)
+    if last is None:
+        raise Unprocessable("Недопустимая фамилия", code=ErrorCode.last_name_invalid)
+    await _lock_for_account_change(db, actor.workspace_id, user_id, actor.user_id)
+    target = await _load_target(db, actor.workspace_id, user_id)
+    changed = [
+        field
+        for field, old, new in (
+            ("first_name", target.first_name, first),
+            ("last_name", target.last_name, last),
+        )
+        if old != new
+    ]
+    if not changed:
+        return target.to_account(role=target.role)
+    await db.execute(
+        update(AppUser)
+        .where(AppUser.id == target.id)
+        .values(first_name=first, last_name=last, updated_at=utcnow())
+        .execution_options(synchronize_session=False)
+    )
+    await record_event(
+        db,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.user_id,
+        action=EventAction.USER_NAME_CHANGED,
+        entity_id=target.id,
+        changed_fields=changed,
+    )
+    return replace(target, first_name=first, last_name=last).to_account(role=target.role)
 
 
 async def block_user(
@@ -577,6 +652,9 @@ async def list_accounts(
                 AppUser.must_change_password,
                 AppUser.created_at,
                 AppUser.email,
+                AppUser.first_name,
+                AppUser.last_name,
+                AppUser.self_registered,
             )
         )
         .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
@@ -602,6 +680,9 @@ async def list_accounts(
             must_change_password=user.must_change_password,
             created_at=user.created_at,
             email=user.email,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            self_registered=user.self_registered,
         )
         for user in users
     ]

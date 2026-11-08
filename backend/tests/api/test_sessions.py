@@ -31,6 +31,7 @@ EXPECTED_CAPABILITIES: dict[str, list[str]] = {
         "crm_read",
         "crm_write",
         "labels_manage",
+        "onboard_accounts",  # 019 (plan RG-11)
         "pipeline_manage",
         "project_create",
         "project_manage_any",  # 002/FR-8, D-1
@@ -72,7 +73,15 @@ async def test_me_returns_profile_and_sorted_capabilities_for_each_role(
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert set(body) == {"id", "login", "role", "must_change_password", "capabilities"}
+    assert set(body) == {
+        "id",
+        "login",
+        "role",
+        "must_change_password",
+        "capabilities",
+        "first_name",
+        "last_name",
+    }
     assert body["id"] == str(user.id)
     assert body["login"] == user.login
     assert body["role"] == role

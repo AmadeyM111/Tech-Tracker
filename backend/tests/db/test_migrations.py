@@ -589,7 +589,7 @@ def test_commit_durably_used_only_by_auth_service() -> None:
     ``commit_durably``; определён в core/db.py, вызывается только из domain/auth/service.py
     и (T16a) api/deps.py (``get_actor`` фиксирует активность сессии до обработчика)."""
     required_users = {"domain/auth/service.py"}
-    allowed_users = required_users | {"api/deps.py"}
+    allowed_users = required_users | {"api/deps.py", "domain/auth/registration.py"}
     definition = "core/db.py"
     users: set[str] = set()
     defined_in: set[str] = set()
@@ -959,7 +959,7 @@ def test_002_migration_0006_file_chain_and_single_head() -> None:
         if isinstance(node, ast.ImportFrom):
             assert not (node.module or "").startswith("app"), "миграция импортирует app.*"
     script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
-    assert script.get_heads() == ["0011"]  # 009: голова теперь 0011 (цепочка 0009 -> 0011)
+    assert script.get_heads() == ["0011"]  # 009: голова теперь 0011 (цепочка 0010 -> 0011)
     revision = script.get_revision("0006")
     assert revision is not None and revision.down_revision == "0005"
 

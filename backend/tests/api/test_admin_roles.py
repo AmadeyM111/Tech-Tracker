@@ -60,7 +60,9 @@ async def test_ac121_ac75_create_then_assign_role_are_two_separate_events(
     env = api_env
     _, admin, token = await admin_in_new_workspace(env)
     created = await env.client.post(
-        ADMIN_USERS, json={"login": "ivan.petrov", OTP_FIELD: OTP}, headers=env.auth(token)
+        ADMIN_USERS,
+        json={"login": "ivan.petrov", "first_name": "Иван", "last_name": "Петров", OTP_FIELD: OTP},
+        headers=env.auth(token),
     )
     assert created.status_code == 201
     new_id = uuid.UUID(created.json()["id"])
@@ -81,6 +83,9 @@ async def test_ac121_ac75_create_then_assign_role_are_two_separate_events(
         "is_blocked",
         "must_change_password",
         "created_at",
+        "first_name",
+        "last_name",
+        "self_registered",
     }
     assert await member_role(env, new_id) == "user"
     log = await events(env, entity_id=new_id)

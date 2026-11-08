@@ -74,3 +74,5 @@ class MeResponse(BaseModel):
     role: Role
     must_change_password: bool
     capabilities: list[Capability]
+    first_name: str | None
+    last_name: str | None

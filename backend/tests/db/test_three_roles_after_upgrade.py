@@ -216,7 +216,12 @@ async def test_002_ac22_new_tech_admins_m1_m3_log_in_and_create_accounts(
         token1,
         "POST",
         ADMIN_USERS,
-        {"login": "u002.created.by.m1", "one_time_password": NEW_ACCOUNT_OTP},
+        {
+            "login": "u002.created.by.m1",
+            "first_name": "Иван",
+            "last_name": "Петров",
+            "one_time_password": NEW_ACCOUNT_OTP,
+        },
     )
     assert created.status_code == 201, created.text
     assert created.json()["login"] == "u002.created.by.m1"
@@ -255,7 +260,12 @@ async def test_002_ac22_new_tech_admins_m1_m3_log_in_and_create_accounts(
         token3b,
         "POST",
         ADMIN_USERS,
-        {"login": "u002.created.by.m3", "one_time_password": NEW_ACCOUNT_OTP},
+        {
+            "login": "u002.created.by.m3",
+            "first_name": "Иван",
+            "last_name": "Петров",
+            "one_time_password": NEW_ACCOUNT_OTP,
+        },
     )
     assert created3.status_code == 201, created3.text
     assert (await send(env, token3b, "GET", PROJECTS)).status_code == 403

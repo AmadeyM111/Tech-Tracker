@@ -116,7 +116,13 @@ async def _build_previous_version_installation(env: ApiEnv) -> dict[str, str]:
     )
     async with env.sessionmaker() as s, s.begin():
         created = await create_user(
-            s, actor, hasher, login="ivan.petrov", one_time_password=SecretStr(IVAN_OTP)
+            s,
+            actor,
+            hasher,
+            login="ivan.petrov",
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(IVAN_OTP),
         )
     assert created.login == "ivan.petrov"
 
@@ -211,7 +217,12 @@ async def test_ac131_upgrade_keeps_logins_passwords_data_and_makes_case_variants
     for attempt in ("Demo.BA1", "DEMO.ba1"):
         taken = await env.client.post(
             ADMIN_USERS,
-            json={"login": attempt, "one_time_password": IVAN_OTP},
+            json={
+                "login": attempt,
+                "first_name": "Иван",
+                "last_name": "Петров",
+                "one_time_password": IVAN_OTP,
+            },
             headers=env.auth(token),
         )
         assert taken.status_code == 422, taken.text
@@ -222,7 +233,12 @@ async def test_ac131_upgrade_keeps_logins_passwords_data_and_makes_case_variants
     # --- новая учётная запись после обновления: написание сохраняется ---
     fresh = await env.client.post(
         ADMIN_USERS,
-        json={"login": "Ivanov.Petr", "one_time_password": IVAN_OTP},
+        json={
+            "login": "Ivanov.Petr",
+            "first_name": "Иван",
+            "last_name": "Петров",
+            "one_time_password": IVAN_OTP,
+        },
         headers=env.auth(token),
     )
     assert fresh.status_code == 201, fresh.text

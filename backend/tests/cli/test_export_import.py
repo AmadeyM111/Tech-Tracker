@@ -327,7 +327,8 @@ def test_007_archive_constants_describe_exclusions() -> None:
     assert set(RESET_TABLES) <= set(archive.EXCLUDED_TABLES)
     assert "user_session" in archive.EXCLUDED_TABLES
     assert {"app_user": frozenset({"email"})} == archive.EXCLUDED_COLUMNS
-    assert tuple(importer.AUTO_TABLES[:2]) == RESET_TABLES
+    # 019: заявки регистрации очищаются первыми (AUTO_TABLES[:2]), затем таблицы сброса пароля
+    assert tuple(importer.AUTO_TABLES[2:4]) == RESET_TABLES
     assert {"user_session", "workspace_member", "app_user", "workspace"} <= set(
         importer.AUTO_TABLES
     )

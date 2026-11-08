@@ -10,6 +10,7 @@ import {
   revokeSessions,
   setRole,
   setUserEmail,
+  setUserName,
   unblockUser,
 } from "../../../src/features/admin/api";
 import { ApiError } from "../../../src/shared/api/client";
@@ -43,11 +44,21 @@ describe("admin api (T24)", () => {
 
   it("create_user_posts_exact_body_and_returns_user", async () => {
     const calls = stub(() => j(201, U_IVANOV));
-    const res = await createUser({ login: "ivanov", one_time_password: "Qw3rty-uiop-9" });
+    const res = await createUser({
+      login: "ivanov",
+      first_name: "Ivan",
+      last_name: "Ivanov",
+      one_time_password: "Qw3rty-uiop-9",
+    });
     expect(res.id).toBe(ID_IVANOV);
     expect(path(calls[0]!)).toBe("/api/v1/admin/users");
     expect(calls[0]!.method).toBe("POST");
-    expect(await calls[0]!.json()).toEqual({ login: "ivanov", one_time_password: "Qw3rty-uiop-9" });
+    expect(await calls[0]!.json()).toEqual({
+      login: "ivanov",
+      first_name: "Ivan",
+      last_name: "Ivanov",
+      one_time_password: "Qw3rty-uiop-9",
+    });
     expect(calls[0]!.url).not.toContain("Qw3rty");
   });
 
@@ -106,10 +117,12 @@ describe("admin api (T24)", () => {
 describe("admin api email (007, R7-T19)", () => {
   it("007_create_user_sends_email_and_null_when_empty", async () => {
     const calls = stub(() => j(201, U_IVANOV));
-    await createUser({ login: "ivanov", one_time_password: "Qw3rty-uiop-9", email: "a@x.ru" });
-    await createUser({ login: "ivanov", one_time_password: "Qw3rty-uiop-9", email: null });
+    const names = { first_name: "Ivan", last_name: "Ivanov" };
+    await createUser({ login: "ivanov", ...names, one_time_password: "Qw3rty-uiop-9", email: "a@x.ru" });
+    await createUser({ login: "ivanov", ...names, one_time_password: "Qw3rty-uiop-9", email: null });
     expect(await calls[0]!.json()).toEqual({
       login: "ivanov",
+      ...names,
       one_time_password: "Qw3rty-uiop-9",
       email: "a@x.ru",
     });
@@ -131,6 +144,25 @@ describe("admin api email (007, R7-T19)", () => {
     await expect(setUserEmail(ID_IVANOV, "a@x.ru")).rejects.toMatchObject({
       status: 409,
       code: "email_taken",
+    });
+  });
+});
+
+describe("admin api names (019, R8-T20)", () => {
+  it("019_ac35_set_user_name_puts_to_name_path_with_both_fields", async () => {
+    const calls = stub(() => j(200, { ...U_IVANOV, first_name: "Ivan", last_name: "Ivanov" }));
+    const res = await setUserName(ID_IVANOV, { first_name: "Ivan", last_name: "Ivanov" });
+    expect(res.first_name).toBe("Ivan");
+    expect(path(calls[0]!)).toBe(`/api/v1/admin/users/${ID_IVANOV}/name`);
+    expect(calls[0]!.method).toBe("PUT");
+    expect(await calls[0]!.json()).toEqual({ first_name: "Ivan", last_name: "Ivanov" });
+  });
+
+  it("019_ac35_set_user_name_422_rejects_with_field_error_code", async () => {
+    stub(() => j(422, { detail: "x", code: "first_name_invalid" }));
+    await expect(setUserName(ID_IVANOV, { first_name: "", last_name: "Ivanov" })).rejects.toMatchObject({
+      status: 422,
+      code: "first_name_invalid",
     });
   });
 });

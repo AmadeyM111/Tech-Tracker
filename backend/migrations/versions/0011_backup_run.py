@@ -1,11 +1,10 @@
 """Журнал запусков резервного копирования: ``backup_run`` (spec 009 FR-4, plan PB-5).
 
 Аддитивно; литералы вместо импорта кода приложения. Глобальная таблица без ``workspace_id``.
-``down_revision`` — ``0009`` (main); при слиянии с веткой фичи 019 (``0010``) меняется на ``0010``
-до применения на любой установке. Downgrade удаляет всё созданное.
+``down_revision`` — ``0010`` (фича 019 влита в main первой, решение 2026-11-08). Downgrade удаляет всё созданное.
 
 Revision ID: 0011
-Revises: 0009
+Revises: 0010
 Create Date: 2026-11-08
 """
 
@@ -15,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0011"
-down_revision: str | None = "0009"
+down_revision: str | None = "0010"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
