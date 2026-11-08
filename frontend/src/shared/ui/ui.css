@@ -296,6 +296,14 @@ h1,
   overflow-wrap: break-word;
 }
 
+.ui-table td[data-field="login"],
+.ui-table td[data-field="name"],
+.ui-table td[data-field="title"],
+.ui-table td[data-field="email"] {
+  /* Long unbroken identifiers and names still wrap anywhere (NFR-6). */
+  overflow-wrap: anywhere;
+}
+
 /* Tables. */
 .ui-table {
   border-collapse: collapse;
