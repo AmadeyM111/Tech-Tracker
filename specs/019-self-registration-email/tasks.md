@@ -194,7 +194,7 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Тесты: 193 passed (наборы из задачи), ruff, mypy чисты, task_scope exit 0. Ревью PASS. Долг (minor, добавить в T22): тест AC-30 через /admin/users/{id}/role для записи, назначенной БА; тест роль-less → 403 no_role; заблокированный БА → 401 not_authenticated (поведение deps, план §4.4 даёт 401); docstring unassigned_accounts.py про 403 «для любого тела» уточнить (битый JSON даёт 400).
 
 ## R8-T08 — Лимиты регистрации и шаблон письма
-- **Статус:** TODO
+- **Статус:** DONE (ревью: PASS, 2026-11-08)
 - **AC:** AC-18, AC-38 (домен), AC-8 (шаблон)
 - **Файлы:** `backend/app/domain/auth/registration_limits.py` (новый), `backend/app/domain/auth/registration_mail.py` (новый);
   тесты: `backend/tests/domain/test_019_registration_limits.py` (новый), `backend/tests/unit/test_019_registration_mail.py` (новый)
@@ -208,7 +208,7 @@ T17, T19, T20, T21), тоже последовательно.
   через 61 минуту снова True; разные значения не мешают друг другу; `key_hash` длиной 32 байта, не равен открытому
   значению; шаблон без логина, имени, фамилии и пароля.
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/domain/test_019_registration_limits.py backend/tests/unit/test_019_registration_mail.py` зелёный; «Линт бэкенда» чист
-- **Попытки:** 0
+- **Попытки:** 1. Тесты: 27 passed; ruff, mypy чисты; task_scope exit 0. Ревью PASS. Долг (minor, в T22): (a) «нет IP/токена в дампе» сравнивать с сырыми байтами key_hash, не подстрокой; (b) тест порядка блокировок по возрастанию (удаление sorted() не ловится); (c) тест шаблона письма с другим ttl (TTL «30» жёстко зашит). Плюрализация «минут» фиксирована — при других TTL поправить.
 
 ## R8-T09 — Домен: заявка на регистрацию, политика в `lifespan`
 - **Статус:** TODO
@@ -510,7 +510,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T05 | DONE |
 | R8-T06 | DONE |
 | R8-T07 | DONE |
-| R8-T08 | TODO |
+| R8-T08 | DONE |
 | R8-T09 | TODO |
 | R8-T10 | TODO |
 | R8-T11 | TODO |
