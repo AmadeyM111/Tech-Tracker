@@ -1,0 +1,10 @@
+# Каталог копий хоста для `gtrack backup` (spec 009). Подключается явно:
+#   docker compose -f docker-compose.yml -f deploy/backup/compose.backup.yml up -d
+# Каталог хоста: вне клона, владелец uid/gid 10001 (пользователь api), режим 0700.
+services:
+  api:
+    environment:
+      BACKUP_DIR: /backups
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+    volumes:
+      - ${GTRACK_BACKUP_HOST_DIR:-/var/backups/gtrack-app}:/backups

@@ -99,7 +99,7 @@ export function EmailDialog(props: EmailDialogProps) {
           <button type="submit" data-action="save" ref={saveRef} disabled={pending}>
             {t("admin.users.email_save")}
           </button>{" "}
-          <button type="button" data-action="cancel" ref={cancelRef} disabled={pending} onClick={onClose}>
+          <button type="button" className="ui-btn-secondary" data-action="cancel" ref={cancelRef} disabled={pending} onClick={onClose}>
             {t("admin.users.email_cancel")}
           </button>
         </form>

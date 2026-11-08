@@ -379,6 +379,14 @@ gtrack import /backup/gtrack-export.tar         # только в пустую �
 заново при каждом старте. Переход действующей установки — обычное обновление: снимите копию,
 затем `docker compose up -d --build --wait`; ручных SQL-шагов нет. Миграции и команды оператора
 (`backup`, `restore`, `import`) по-прежнему работают под `POSTGRES_USER`.
+Резервная копия (оператор, CLI; расписание, хранение и восстановление — `deploy/backup/README.md`):
+
+```bash
+docker exec <проект>-api-1 gtrack backup      # копия БД и данных, проверка, 14 последних
+gtrack restore /backups/gtrack-backup-<UTC>.tar --yes   # только чистый стенд
+```
+
+Перед обновлением стека снимите копию: `docker exec <проект>-api-1 gtrack backup`.
 
 ### Node.js
 
@@ -809,6 +817,14 @@ as `DB_APP_ROLE` (default `gtrack_app`): no SUPERUSER, CREATEDB, CREATEROLE, own
 Existing installs migrate with a normal upgrade: take a backup, then
 `docker compose up -d --build --wait`; no manual SQL. Migrations and operator commands
 (`backup`, `restore`, `import`) still run as `POSTGRES_USER`.
+Backup (operator, CLI; schedule, retention and restore — `deploy/backup/README.md`):
+
+```bash
+docker exec <project>-api-1 gtrack backup     # DB and data copy, verified, last 14 kept
+gtrack restore /backups/gtrack-backup-<UTC>.tar --yes   # clean stand only
+```
+
+Before upgrading the stack take a copy: `docker exec <project>-api-1 gtrack backup`.
 
 ### Node.js
 

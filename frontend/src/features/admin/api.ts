@@ -137,3 +137,12 @@ export async function listAudit(p: AuditParams): Promise<Page<AuditEntry>> {
   if (data === undefined) throw invalidBody(200);
   return data;
 }
+
+export type BackupStatus = components["schemas"]["BackupStatusOut"];
+
+/** Backup state for the tech admin banner (009/FR-6); metadata only. */
+export async function getBackupStatus(): Promise<BackupStatus> {
+  const { data } = await getAppClient().GET("/api/v1/admin/system/backup");
+  if (data === undefined) throw invalidBody(200);
+  return data;
+}

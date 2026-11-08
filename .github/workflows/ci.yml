@@ -63,7 +63,11 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://tracker:tracker@localhost:5432/tracker_test
           ENV: test
         run: alembic -c backend/alembic.ini check
+      - name: Клиент PostgreSQL 16 (spec 009, тесты gtrack backup/restore)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client-16
       - name: pytest (без infra_stack)
+        env:
+          PG_BIN_DIR: /usr/lib/postgresql/16/bin
         run: pytest -q backend/tests -m "not infra_stack"
 
   frontend:

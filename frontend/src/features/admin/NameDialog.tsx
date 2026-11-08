@@ -121,7 +121,7 @@ export function NameDialog(props: NameDialogProps) {
           <button type="submit" data-action="save" ref={saveRef} disabled={pending}>
             {t("admin.users.name_save")}
           </button>{" "}
-          <button type="button" data-action="cancel" ref={cancelRef} disabled={pending} onClick={onClose}>
+          <button type="button" className="ui-btn-secondary" data-action="cancel" ref={cancelRef} disabled={pending} onClick={onClose}>
             {t("admin.users.name_cancel")}
           </button>
         </form>

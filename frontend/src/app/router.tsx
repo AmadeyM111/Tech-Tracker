@@ -4,6 +4,7 @@ import { Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } 
 
 import { AgentAccessPage } from "../features/tokens/AgentAccessPage";
 import { AuditPage } from "../features/admin/AuditPage";
+import { BackupBanner } from "../features/admin/BackupBanner";
 import { UnassignedAccountsPage } from "../features/admin/UnassignedAccountsPage";
 import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
@@ -254,6 +255,11 @@ function StartRedirect({ insideMain }: { insideMain: boolean }) {
   );
 }
 
+/** 009/FR-7: the backup warning goes on every screen of a user who manages accounts (TA). */
+function showsBackupBanner(profile: MeResponse): boolean {
+  return profile.capabilities.includes("manage_accounts");
+}
+
 /**
  * Screen with a role (003/FR-10, FR-11, FR-14): the session guard, the shell with the Sidebar,
  * then the content or a refusal. Without the capability no section data is requested.
@@ -274,7 +280,10 @@ function RoleScreen({
         <Landmark insideMain={insideMain} shell>
           <Sidebar profile={profile} />
           {capability === undefined || profile.capabilities.includes(capability) ? (
-            children(profile)
+            <>
+              {showsBackupBanner(profile) ? <BackupBanner /> : null}
+              {children(profile)}
+            </>
           ) : (
             <ErrorAlert message={errorMessage("forbidden")} />
           )}
