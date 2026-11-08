@@ -128,6 +128,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users/{user_id}/name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Name
+         * @description Задаёт имя и фамилию пользователя (FR-3c); сессии не затрагиваются.
+         */
+        put: operations["set_name"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/{user_id}/reset-password": {
         parameters: {
             query?: never;
@@ -405,6 +425,26 @@ export interface paths {
          */
         get: operations["me"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Own Name
+         * @description Меняет собственные имя и фамилию (FR-3c); доступно любой роли с сессией.
+         */
+        put: operations["set_own_name"];
         post?: never;
         delete?: never;
         options?: never;
@@ -839,6 +879,8 @@ export interface components {
             created_at: string;
             /** Email */
             email: string | null;
+            /** First Name */
+            first_name: string | null;
             /**
              * Id
              * Format: uuid
@@ -846,11 +888,15 @@ export interface components {
             id: string;
             /** Is Blocked */
             is_blocked: boolean;
+            /** Last Name */
+            last_name: string | null;
             /** Login */
             login: string;
             /** Must Change Password */
             must_change_password: boolean;
             role: components["schemas"]["Role"] | null;
+            /** Self Registered */
+            self_registered: boolean;
         };
         /**
          * AuditActor
@@ -932,7 +978,7 @@ export interface components {
          * @description Возможность; значение — имя члена в нижнем регистре (``auto()`` у ``StrEnum``).
          * @enum {string}
          */
-        Capability: "manage_accounts" | "assign_roles" | "view_audit" | "business_access" | "project_create" | "project_manage_any" | "task_assign_others" | "labels_manage" | "crm_read" | "crm_write" | "pipeline_manage";
+        Capability: "manage_accounts" | "assign_roles" | "view_audit" | "business_access" | "project_create" | "project_manage_any" | "task_assign_others" | "labels_manage" | "crm_read" | "crm_write" | "pipeline_manage" | "onboard_accounts";
         /**
          * ChangePasswordRequest
          * @description ``POST /auth/password`` (FR-56): ответ 204 без тела.
@@ -999,6 +1045,10 @@ export interface components {
         CreateUserRequest: {
             /** Email */
             email?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
             /** Login */
             login: string;
             /**
@@ -1073,11 +1123,15 @@ export interface components {
         MeResponse: {
             /** Capabilities */
             capabilities: components["schemas"]["Capability"][];
+            /** First Name */
+            first_name: string | null;
             /**
              * Id
              * Format: uuid
              */
             id: string;
+            /** Last Name */
+            last_name: string | null;
             /** Login */
             login: string;
             /** Must Change Password */
@@ -1369,6 +1423,16 @@ export interface components {
         SetEmailRequest: {
             /** Email */
             email: string | null;
+        };
+        /**
+         * SetNameRequest
+         * @description ``PUT /admin/users/{user_id}/name``: имя и фамилия, оба обязательны (FR-3c).
+         */
+        SetNameRequest: {
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
         };
         /**
          * SetRoleRequest
@@ -2034,6 +2098,77 @@ export interface operations {
             };
             /** @description Email уже используется (code: email_taken) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_name: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetNameRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"];
+                };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2774,6 +2909,66 @@ export interface operations {
             };
             /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_own_name: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetNameRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

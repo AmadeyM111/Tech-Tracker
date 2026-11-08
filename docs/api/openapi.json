@@ -185,6 +185,17 @@
             ],
             "title": "Email"
           },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -193,6 +204,17 @@
           "is_blocked": {
             "title": "Is Blocked",
             "type": "boolean"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
           },
           "login": {
             "title": "Login",
@@ -211,6 +233,10 @@
                 "type": "null"
               }
             ]
+          },
+          "self_registered": {
+            "title": "Self Registered",
+            "type": "boolean"
           }
         },
         "required": [
@@ -220,7 +246,10 @@
           "is_blocked",
           "must_change_password",
           "created_at",
-          "email"
+          "email",
+          "first_name",
+          "last_name",
+          "self_registered"
         ],
         "title": "AdminUser",
         "type": "object"
@@ -467,7 +496,8 @@
           "labels_manage",
           "crm_read",
           "crm_write",
-          "pipeline_manage"
+          "pipeline_manage",
+          "onboard_accounts"
         ],
         "title": "Capability",
         "type": "string"
@@ -630,6 +660,16 @@
             ],
             "title": "Email"
           },
+          "first_name": {
+            "maxLength": 1024,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 1024,
+            "title": "Last Name",
+            "type": "string"
+          },
           "login": {
             "maxLength": 1024,
             "title": "Login",
@@ -645,7 +685,9 @@
         },
         "required": [
           "login",
-          "one_time_password"
+          "one_time_password",
+          "first_name",
+          "last_name"
         ],
         "title": "CreateUserRequest",
         "type": "object"
@@ -797,10 +839,32 @@
             "title": "Capabilities",
             "type": "array"
           },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
           },
           "login": {
             "title": "Login",
@@ -819,7 +883,9 @@
           "login",
           "role",
           "must_change_password",
-          "capabilities"
+          "capabilities",
+          "first_name",
+          "last_name"
         ],
         "title": "MeResponse",
         "type": "object"
@@ -1464,6 +1530,28 @@
           "email"
         ],
         "title": "SetEmailRequest",
+        "type": "object"
+      },
+      "SetNameRequest": {
+        "additionalProperties": false,
+        "description": "``PUT /admin/users/{user_id}/name``: имя и фамилия, оба обязательны (FR-3c).",
+        "properties": {
+          "first_name": {
+            "maxLength": 1024,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 1024,
+            "title": "Last Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name"
+        ],
+        "title": "SetNameRequest",
         "type": "object"
       },
       "SetRoleRequest": {
@@ -2692,6 +2780,100 @@
         ]
       }
     },
+    "/api/v1/admin/users/{user_id}/name": {
+      "put": {
+        "description": "Задаёт имя и фамилию пользователя (FR-3c); сессии не затрагиваются.",
+        "operationId": "set_name",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Set Name",
+        "tags": [
+          "admin-users"
+        ]
+      }
+    },
     "/api/v1/admin/users/{user_id}/reset-password": {
       "post": {
         "description": "Задаёт новый одноразовый пароль из запроса, завершает сессии (FR-65, D-15).",
@@ -3557,6 +3739,78 @@
           }
         },
         "summary": "Me",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/me/name": {
+      "put": {
+        "description": "Меняет собственные имя и фамилию (FR-3c); доступно любой роли с сессией.",
+        "operationId": "set_own_name",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Set Own Name",
         "tags": [
           "me"
         ]

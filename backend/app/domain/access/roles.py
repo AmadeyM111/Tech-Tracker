@@ -37,6 +37,7 @@ class Capability(StrEnum):
     CRM_READ = auto()
     CRM_WRITE = auto()  # включая удаление/восстановление CRM, связь с проектом
     PIPELINE_MANAGE = auto()  # FR-34
+    ONBOARD_ACCOUNTS = auto()  # 019/RG-11: только БА
 
 
 _TECH_ADMIN_CAPS: Final = frozenset(
@@ -52,6 +53,7 @@ _BUSINESS_ADMIN_CAPS: Final = frozenset(
         Capability.CRM_READ,
         Capability.CRM_WRITE,
         Capability.PIPELINE_MANAGE,
+        Capability.ONBOARD_ACCOUNTS,
     }
 )
 
