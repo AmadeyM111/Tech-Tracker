@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import signal
 import sys
+import threading
 from importlib import metadata
 from pathlib import Path
 
@@ -108,6 +109,11 @@ def _warn_result(result: BackupResult) -> None:
         )
 
 
+def _install_sigterm() -> None:
+    if threading.current_thread() is threading.main_thread():  # signal — только главный поток
+        signal.signal(signal.SIGTERM, _terminate)
+
+
 def _terminate(signum: int, _frame: object) -> None:
     """SIGTERM (``docker stop``, пересоздание api) → исключение: ``finally`` уберёт временные."""
     raise SystemExit(128 + signum)
@@ -115,7 +121,7 @@ def _terminate(signum: int, _frame: object) -> None:
 
 def run(args: argparse.Namespace) -> int:
     """Выполняет ``gtrack backup``; возвращает код выхода."""
-    signal.signal(signal.SIGTERM, _terminate)
+    _install_sigterm()
     step = "настройки"
     settings: Settings | None = None
     started = utcnow()

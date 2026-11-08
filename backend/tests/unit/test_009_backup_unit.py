@@ -142,10 +142,10 @@ def test_009_ac4_rotation_keeps_newest_and_foreign_files(env: Settings, tmp_path
 def test_009_ac4_failed_backup_removes_nothing(env: Settings, tmp_path: Path) -> None:
     out = tmp_path / "b"
     _seed_copies(out, 15)
-    before = sorted(p.name for p in out.iterdir())
+    before = _visible(out)
     with pytest.raises(BackupError):
         _backup(env, out, FakeRunner(fail="pg_dump"))
-    assert sorted(p.name for p in out.iterdir()) == before
+    assert _visible(out) == before
 
 
 def test_009_rotate_rejects_zero(tmp_path: Path) -> None:
