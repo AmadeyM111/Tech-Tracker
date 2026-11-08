@@ -51,6 +51,11 @@ const API_CODES = [
   "reset_token_invalid",
   "email_taken",
   "email_invalid",
+  // 019 (FR-10, FR-3, FR-13): регистрация, имена
+  "rate_limited",
+  "registration_token_invalid",
+  "first_name_invalid",
+  "last_name_invalid",
 ];
 const CLIENT_CODES = ["network_error", "invalid_response"];
 // Коды из общего обработчика HTTP-ошибок backend (core/errors.py, _HTTP_STATUS_MAP).
@@ -263,6 +268,89 @@ describe("errorMessage()", () => {
   it("falls back to error.unknown for an unknown code", () => {
     expect(errorMessage("brand_new_code")).toBe(dict["error.unknown"]);
     expect(errorMessage("")).toBe(dict["error.unknown"]);
+  });
+});
+
+// 019 (plan §4.7): ключи регистрации, справки, профиля, имён и журнала. Набор ключей фиксирован планом.
+const KEYS_019 = [
+  "auth.register_link",
+  "auth.register_title",
+  "auth.register_email_label",
+  "auth.register_first_name_label",
+  "auth.register_last_name_label",
+  "auth.register_login_label",
+  "auth.register_password_label",
+  "auth.register_submit",
+  "auth.register_sent",
+  "auth.register_disabled",
+  "auth.register_back_to_login",
+  "auth.register_confirm_title",
+  "auth.register_confirm_submit",
+  "auth.register_confirmed",
+  "auth.register_login_link",
+  "auth.register_link_invalid",
+  "auth.register_login_taken",
+  "auth.register_again",
+  "auth.help_p2_registration",
+  "profile.title",
+  "profile.login_label",
+  "profile.first_name_label",
+  "profile.last_name_label",
+  "profile.save",
+  "profile.saved",
+  "nav.profile",
+  "nav.unassigned",
+  "accounts.unassigned_title",
+  "accounts.assign_user",
+  "accounts.assign_title",
+  "accounts.assign_message",
+  "accounts.unassigned_empty",
+  "admin.users.first_name_column",
+  "admin.users.last_name_column",
+  "admin.users.origin_column",
+  "admin.users.self_registered",
+  "admin.users.name_missing",
+  "admin.users.first_name_label",
+  "admin.users.last_name_label",
+  "admin.users.edit_name",
+  "admin.users.edit_name_aria",
+  "admin.users.name_dialog_title",
+  "admin.users.name_save",
+  "admin.users.name_cancel",
+  "error.rate_limited",
+  "error.registration_token_invalid",
+  "error.first_name_invalid",
+  "error.last_name_invalid",
+  "admin.audit.action.user.self_registered",
+  "admin.audit.action.user.name_changed",
+  "admin.audit.field.first_name",
+  "admin.audit.field.last_name",
+];
+
+describe("019 dictionary (plan §4.7, FR-4, FR-12, Q-1)", () => {
+  // «Email» — общепринятое написание поля (plan §4.7, как admin.users.email_column); других исключений нет.
+  const LATIN_WORD_ALLOWED = new Set<string>(["Email"]);
+  it.each(KEYS_019)("has a Russian value for %s", (key) => {
+    expect(dict[key], key).toBeDefined();
+    const value = dict[key]!;
+    expect(CYRILLIC.test(value) || LATIN_WORD_ALLOWED.has(value), key).toBe(true);
+  });
+
+  it("registration status text is the FR-4 wording verbatim", () => {
+    expect(dict["auth.register_sent"]).toBe(
+      "Если адрес можно использовать для регистрации, мы отправили на него письмо с подтверждением. Ссылка действует 30 минут.",
+    );
+  });
+
+  it("registration help paragraph is the FR-12 wording accepted by the owner (plan §9, Q-1)", () => {
+    expect(dict["auth.help_p2_registration"]).toBe(
+      "Учётную запись выдаёт технический администратор, или её можно создать самостоятельно через «Зарегистрироваться». Роль после регистрации назначает технический или бизнес-администратор.",
+    );
+  });
+
+  it("005 v0.1 help paragraph auth.help_p2 is kept (not removed)", () => {
+    expect(dict["auth.help_p2"]).toBeDefined();
+    expect(dict["auth.help_p2"]).not.toBe(dict["auth.help_p2_registration"]);
   });
 });
 

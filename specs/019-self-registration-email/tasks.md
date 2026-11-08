@@ -320,7 +320,7 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Тесты: 77 passed (14 новых + arch + no_telemetry); ruff чист; scope exit 0. Дефектов в коде не выявлено. Замечание: SecretsFilter маскирует секреты до caplog — добавлен перехватчик перед фильтром. Не покрыто: AC-20 (nginx, R8-T22), AC-21/AC-23 (фронтенд).
 
 ## R8-T15 — Фронтенд: ключи i18n и подписи аудита
-- **Статус:** TODO
+- **Статус:** DONE (ревью: PASS; 2026-11-08)
 - **AC:** основа для AC-2, AC-16, AC-21, AC-30, AC-34, AC-35; AC-19 (подпись события в журнале)
 - **Файлы:** `frontend/src/shared/i18n/ru.ts`, `frontend/src/features/admin/AuditPage.tsx`;
   тесты: `frontend/tests/shared/i18n.test.ts`, `frontend/tests/features/admin/AuditPage.test.tsx`
@@ -330,7 +330,7 @@ T17, T19, T20, T21), тоже последовательно.
   `last_name_invalid`. `ACTION_CODES` += `user.self_registered`, `user.name_changed`, `FIELD_CODES` +=
   `first_name`, `last_name`. Если в словаре есть подписи возможностей, добавить `onboard_accounts`.
 - **Готово, когда:** `cd frontend && npx vitest run tests/shared/i18n.test.ts tests/features/admin/AuditPage.test.tsx` зелёный; `cd frontend && npm run lint` чист
-- **Попытки:** 0
+- **Попытки:** 1. Тесты: i18n + AuditPage 304 passed; полный vitest 1578 passed; lint чист; typecheck — 4 ожидаемые ошибки (UsersPage.tsx:244 до T20; tests/features/admin/api.test.ts:46,109,110 — T20 обязан их закрыть). Ревью PASS. Долг (minor): русские комментарии в ru.ts:393 и i18n.test.ts:54,274,331 — перевести на английский; самоссылочные ожидания в AuditPage.test.tsx:532–546; accounts.assign_title = «Назначить роль?» (взято по образцу, план не задал — подтвердить владельцем). admin.capability.onboard_accounts не добавлен: подписей возможностей в ru.ts нет.
 
 ## R8-T16 — Фронтенд: API регистрации и экран `/register`
 - **Статус:** TODO
@@ -519,7 +519,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T12 | DONE |
 | R8-T13 | DONE |
 | R8-T14 | DONE |
-| R8-T15 | TODO |
+| R8-T15 | DONE |
 | R8-T16 | TODO |
 | R8-T17 | TODO |
 | R8-T18 | TODO |

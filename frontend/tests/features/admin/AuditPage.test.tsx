@@ -506,3 +506,45 @@ describe("007 audit actions (FR-15)", () => {
     expect(text).not.toContain(code);
   });
 });
+
+describe("019 audit labels (FR-11, AC-19)", () => {
+  const SELF = {
+    id: 500,
+    occurred_at: "2026-10-13T09:00:00Z",
+    actor: { kind: "user", id: ID_IVANOV, login: "ivanov" },
+    action: "user.self_registered",
+    entity_type: "user",
+    entity_id: ID_IVANOV,
+    entity_deleted: false,
+    changed_fields: [],
+    details: null,
+  };
+  const NAME = {
+    ...SELF,
+    id: 501,
+    action: "user.name_changed",
+    changed_fields: ["first_name", "last_name"],
+  };
+
+  it("self_registration_and_name_change_show_dictionary_texts_not_codes", async () => {
+    const { container } = await open({ [AUDIT]: () => j(200, page([SELF, NAME])) });
+    const selfAction = cell(entry(container, 500), "action").textContent ?? "";
+    expect(selfAction).toBe(ru["admin.audit.action.user.self_registered"]);
+    expect(selfAction).toMatch(/[Ѐ-ӿ]/);
+    expect(cell(entry(container, 500), "details").textContent).toBe("");
+    const nameAction = cell(entry(container, 501), "action").textContent ?? "";
+    expect(nameAction).toBe(ru["admin.audit.action.user.name_changed"]);
+    expect(nameAction).toMatch(/[Ѐ-ӿ]/);
+    expect(entry(container, 500).textContent).not.toMatch(/user\.self_registered/);
+    expect(entry(container, 501).textContent).not.toMatch(/user\.name_changed/);
+  });
+
+  it("name_fields_show_dictionary_labels_not_raw_field_names", async () => {
+    const { container } = await open({ [AUDIT]: () => j(200, page([NAME])) });
+    const fields = cell(entry(container, 501), "changed_fields");
+    expect(fields.textContent).toBe(
+      `${ru["admin.audit.field.first_name"]}, ${ru["admin.audit.field.last_name"]}`,
+    );
+    expect(fields.textContent).not.toMatch(/first_name|last_name/);
+  });
+});
