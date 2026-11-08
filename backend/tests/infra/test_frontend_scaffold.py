@@ -256,6 +256,8 @@ def test_t21_src_files_only_expected() -> None:
         "features/admin/NameDialog.tsx",
         # 019/R8-T21: accounts without a role, /unassigned-accounts (AC-30)
         "features/admin/UnassignedAccountsPage.tsx",
+        # 019: layout of the auth screens by the mockups (2026-11-08, доводка по макетам)
+        "features/auth/auth-screens.css",
         # T81
         "shared/ui/UserPicker.tsx", "features/users/api.ts",
         # T82

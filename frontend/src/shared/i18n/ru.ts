@@ -44,6 +44,7 @@ export const ru = {
   "auth.login_label": "Логин",
   "auth.password_label": "Пароль",
   "auth.show_password": "Показать пароль",
+  "auth.hide_password": "Скрыть пароль",
   "auth.show_current_password": "Показать текущий пароль",
   "auth.show_new_password": "Показать новый пароль",
   "auth.show_confirm_password": "Показать повтор нового пароля",

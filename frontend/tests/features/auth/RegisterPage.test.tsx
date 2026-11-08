@@ -168,17 +168,61 @@ describe("RegisterPage (019/R8-T16)", () => {
     ["login_taken", 422],
     ["email_invalid", 422],
     ["rate_limited", 429],
-    ["feature_disabled", 404],
   ])("019_ac2_error_%s_shows_dictionary_text_and_keeps_form", async (code, status) => {
     stubNet({ ...STATUS_ON, [REQUEST]: () => json(status, { detail: "x", code }) });
     const { container } = open();
     await screen.findByRole("heading", { level: 1 });
     fill(container);
     fireEvent.click(submitButton(container));
-    const expected = code === "feature_disabled" ? t("auth.register_disabled") : errorMessage(code);
-    expect(await screen.findByText(expected)).toBeTruthy();
+    expect(await screen.findByText(errorMessage(code))).toBeTruthy();
     expect(container.querySelector('input[autocomplete="email"]')).not.toBeNull();
     expect(screen.queryByText(t("auth.register_sent"))).toBeNull();
+  });
+
+  // Design 2026-11-08 (registration-019-design.md, §4.1): the field that caused the error is marked invalid.
+  it.each([
+    ["login_taken", 422, "username"],
+    ["email_invalid", 422, "email"],
+  ])("019_ac2_error_%s_marks_only_the_%s_field_invalid", async (code, status, autocomplete) => {
+    stubNet({ ...STATUS_ON, [REQUEST]: () => json(status, { detail: "x", code }) });
+    const { container } = open();
+    await screen.findByRole("heading", { level: 1 });
+    fill(container);
+    fireEvent.click(submitButton(container));
+    await screen.findByText(errorMessage(code));
+    expect(field(container, autocomplete).getAttribute("aria-invalid")).toBe("true");
+    const others = ["email", "username", "given-name", "family-name", "new-password"].filter((a) => a !== autocomplete);
+    for (const other of others) {
+      expect(field(container, other).getAttribute("aria-invalid")).toBeNull();
+    }
+  });
+
+  // Owner decision 2026-11-08 (plan §10, p. 2): the form is hidden, the same text as with registration disabled.
+  it("019_ac1_feature_disabled_on_submit_hides_form_and_shows_register_disabled", async () => {
+    stubNet({ ...STATUS_ON, [REQUEST]: () => json(404, { detail: "x", code: "feature_disabled" }) });
+    const { container } = open();
+    await screen.findByRole("heading", { level: 1 });
+    fill(container);
+    fireEvent.click(submitButton(container));
+    expect(await screen.findByText(t("auth.register_disabled"))).toBeTruthy();
+    expect(container.querySelector("input")).toBeNull();
+    expect(container.querySelector("form")).toBeNull();
+    expect(screen.queryByText(t("auth.register_sent"))).toBeNull();
+  });
+
+  // Owner decision 2026-11-08 (plan §10, p. 5): the reveal button names the action for the current state.
+  it("019_ac2_reveal_button_name_switches_to_hide_while_password_is_shown", async () => {
+    const { container } = open();
+    await screen.findByRole("heading", { level: 1 });
+    const eye = revealButtons(container)[0]!;
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.show_password"));
+    fireEvent.click(eye);
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.hide_password"));
+    expect(eye.getAttribute("aria-pressed")).toBe("true");
+    expect(field(container, "new-password").type).toBe("text");
+    fireEvent.click(eye);
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.show_password"));
+    expect(field(container, "new-password").type).toBe("password");
   });
 
   it("019_ac1_disabled_registration_shows_register_disabled_instead_of_form", async () => {

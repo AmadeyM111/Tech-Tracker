@@ -336,6 +336,7 @@ T17, T19, T20, T21), тоже последовательно.
 - **Статус:** DONE (ревью: FAIL по кириллице в тесте и незаписанному отклонению → исправлено; 2026-11-08)
 - **AC:** AC-1 (экран), AC-2, AC-3
 - **Файлы:** `frontend/src/features/auth/api.ts`, `frontend/src/features/auth/RegisterPage.tsx` (новый), `frontend/src/app/router.tsx`, `specs/019-self-registration-email/plan.md` (примечание о типе поля Email, ревью);
+  доводка по макетам (2026-11-08): `frontend/src/features/auth/LoginPage.tsx`, `frontend/src/features/auth/RegisterConfirmPage.tsx`, `frontend/src/features/auth/auth-screens.css` (новый, классы экранов 019), `frontend/src/shared/i18n/ru.ts` (ключ `auth.hide_password`), `frontend/tests/features/auth/LoginPage.test.tsx`;
   тесты: `frontend/tests/features/auth/RegisterPage.test.tsx` (новый), `frontend/tests/features/auth/api.test.ts`, `backend/tests/infra/test_frontend_scaffold.py`
 - **Зависит от:** R8-T15
 - **Описание:** В `api.ts` — `requestRegistration`, `confirmRegistration` (типы только из `components["schemas"]`).
@@ -347,10 +348,13 @@ T17, T19, T20, T21), тоже последовательно.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/auth tests/app` зелёный; «Линт фронтенда»: `npm run lint` чист, `npm run typecheck` чист или падает только на `src/features/admin/UsersPage.tsx` (до R8-T20); `source .venv/bin/activate && pytest -q backend/tests/infra/test_frontend_scaffold.py` зелёный
 - **Попытки:** 1. Тесты: vitest tests/features/auth + tests/app — 499 passed; RegisterPage.test — 17 passed; lint чист; pytest test_frontend_scaffold — 44 passed; scope ок. Typecheck: 4 ошибки (UsersPage.tsx:244 — до T20; tests/features/admin/api.test.ts:46,109,110 — из-за CreateUserRequest после T04; закрыть в T20). Отклонения (записаны в plan §4.7): поле Email без type="email" (TextField text|password); на форме кнопка reveal рядом с паролем. Решения: trim логина и имён; feature_disabled → auth.register_disabled (план §4.7). Долг (minor, T22): тесты на пробелы в пароле, имя из пробелов, состояние загрузки и ошибки статуса. Кириллица в новых файлах устранена. В frontend/src вне ru.ts есть кириллица в файлах более ранних задач (features/tasks/api.ts, shared/ui/TextField.tsx, shared/api/schema.d.ts) — проверить, кто внёс.
 
+- **Доводка по макетам 2026-11-08 (R8-T16):** ошибка `feature_disabled` на `/register` скрывает форму (`auth.register_disabled`), решение владельца 2 (ранее только текст ошибки). Поле, вызвавшее ошибку (`login_taken` → Логин, `email_invalid` → Email), помечено `aria-invalid`; `ErrorAlert` перенесён над кнопкой (макет). Подпись кнопки показа пароля: «Скрыть пароль» при показанном пароле, решение 5 (ключ `auth.hide_password`). Классы макетов (`login-card`, `login-submit`, `reg-status`, `login-links`, `reg-form`) и `auth-screens.css`. Тесты: `RegisterPage.test.tsx` (новые `019_ac1_feature_disabled_*`, `019_ac2_reveal_*`, `019_ac2_error_*_marks_*`), обновлён `019_ac2_error_*` (feature_disabled вынесен). Vitest полный 64 файла / 1674 passed, lint 0, typecheck 0. Отклонено / не сделано: звёздочки обязательных полей и значок ошибки требуют правок общих `TextField` и `ErrorAlert` (вне рамок); P-1 не сделан.
+
 ## R8-T17 — Фронтенд: экран `/register/confirm`
 - **Статус:** DONE (ревью: самопроверка оркестратора — тесты, кириллица, scope; отдельный ревьюер не запускался; 2026-11-08)
 - **AC:** AC-16 (экран), AC-9, AC-10, AC-28 (сообщения)
 - **Файлы:** `frontend/src/features/auth/RegisterConfirmPage.tsx` (новый), `frontend/src/app/router.tsx`;
+  доводка по макетам (2026-11-08): `frontend/src/features/auth/auth-screens.css` (новый, классы экранов 019), `frontend/src/features/auth/LoginPage.tsx`, `frontend/src/features/auth/RegisterPage.tsx`, `frontend/src/shared/i18n/ru.ts`, `frontend/tests/features/auth/LoginPage.test.tsx`, `frontend/tests/features/auth/RegisterPage.test.tsx`;
   тесты: `frontend/tests/features/auth/RegisterConfirmPage.test.tsx` (новый), `backend/tests/infra/test_frontend_scaffold.py`
 - **Зависит от:** R8-T16
 - **Описание:** По plan §4.7 и RG-15: токен из `#token=` читается один раз, фрагмент убирается
@@ -362,10 +366,13 @@ T17, T19, T20, T21), тоже последовательно.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/auth` зелёный; `npm run lint` чист; `source .venv/bin/activate && pytest -q backend/tests/infra/test_frontend_scaffold.py` зелёный
 - **Попытки:** 1. Тесты: tests/features/auth — 176 passed (12 новых); lint чист; typecheck — только 4 ожидаемые ошибки T20; scaffold 44 passed; scope ок. Отклонения: (1) статус регистрации не запрашивается — enabled:false видно по ответу confirm (404 feature_disabled) → auth.register_disabled; (2) login_taken показывает auth.register_login_taken, а не error.login_taken; (3) текст ссылки auth.register_again взят из ключей плана. Долг: отдельное ревью T17.
 
+- **Доводка по макетам 2026-11-08 (R8-T17):** классы макетов (`login-card`, `login-submit` у «Войти» как ссылки на всю ширину, `reg-status` у плашки успеха, `login-links`), `auth-screens.css`. Поведение не меняется; отдельных тестов на стили нет (проверено скриншотами стенда `/tmp/019-shots`).
+
 ## R8-T18 — Фронтенд: ссылка «Зарегистрироваться» и справка на `/login`
 - **Статус:** DONE (ревью: самопроверка оркестратора; отдельный ревьюер не запускался; 2026-11-08)
 - **AC:** AC-1 (ссылка), AC-21
 - **Файлы:** `frontend/src/features/auth/LoginPage.tsx`;
+  доводка по макетам (2026-11-08): `frontend/src/features/auth/RegisterConfirmPage.tsx`, `backend/tests/infra/test_frontend_scaffold.py` (белый список `auth-screens.css`), `frontend/src/features/auth/RegisterPage.tsx`, `frontend/tests/features/auth/RegisterPage.test.tsx`, `frontend/src/app/router.tsx` (пункт меню «Учётные записи» по `admin.users.title`), `frontend/src/shared/i18n/ru.ts`, `frontend/src/features/auth/auth-screens.css` (новый, классы экранов 019);
   тесты: `frontend/tests/features/auth/LoginPage.test.tsx`
 - **Зависит от:** R8-T16
 - **Описание:** При `resetStatus.data?.enabled === true` после ссылки «Забыли пароль?» добавить `<Link to="/register">`
@@ -378,6 +385,8 @@ T17, T19, T20, T21), тоже последовательно.
   Сведение с 005 v0.2 из `main` (один `p`) — в R8-T00, не здесь.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/auth` зелёный; `npm run lint` чист
 - **Попытки:** 1. Тесты: tests/features/auth — 184 passed (8 новых); lint чист; typecheck — только 4 ожидаемые ошибки T20; scope ок. Изменены LoginPage.tsx (+3/−1) и LoginPage.test.tsx. Долг (minor, T22): в новых строках LoginPage.test.tsx два комментария на русском (английский по правилу) — перевести; ожидаемый текст «Зарегистрироваться» в тесте — литерал из словаря, оставлен.
+
+- **Доводка по макетам 2026-11-08 (R8-T18):** решение владельца 5: `aria-label` кнопки показа пароля на `/login` — «Скрыть пароль» при показанном пароле (`auth.hide_password`); в `LoginPage.test.tsx` обновлена одна проверка 006 (`ac3_mouse_toggles_type_keeps_value_focus_and_name`: имя при показанном пароле «Скрыть пароль»), добавлен `019_ac2_reveal_*`. Справка: абзац регистрации остаётся последним `<p>` блока «О системе», после `help_p1` (список из макета в `ru.ts` отсутствует, текст не менялся). Кнопка «Войти» и кнопка показа пароля приведены к макету (P-2, P-3); P-1 не сделан. Классы: `login-card`, `login-submit`, `login-links`, `auth-screens.css`.
 
 ## R8-T19 — Фронтенд: экран профиля `/profile` и пункт меню
 - **Статус:** DONE (ревью: PLAN_ISSUE по трём тестам вне списка → список расширен; самопроверка оркестратора; отдельный ревьюер не запускался; 2026-11-08)

@@ -8,10 +8,13 @@ import { PASSWORD_MIN_LENGTH, errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { TextField } from "../../shared/ui/TextField";
 import { passwordResetStatus, requestRegistration, type RegistrationRequest } from "./api";
+import "./auth-screens.css";
 
-// feature_disabled means the registration is off (FR-1): the screen says so instead of the generic text.
-function messageFor(code: string): string {
-  return code === "feature_disabled" ? t("auth.register_disabled") : errorMessage(code);
+// The field the error refers to; it is marked invalid, the text stays above the submit button (design 2026-11-08).
+function badFieldFor(code: string): "email" | "username" | null {
+  if (code === "login_taken") return "username";
+  if (code === "email_invalid") return "email";
+  return null;
 }
 
 export function RegisterPage() {
@@ -26,6 +29,9 @@ export function RegisterPage() {
   const [shown, setShown] = useState(false);
   const [pending, setPending] = useState(false);
   const [sent, setSent] = useState(false);
+  // feature_disabled on submit (FR-1): the form is hidden as if registration were off (plan §10, p. 2).
+  const [off, setOff] = useState(false);
+  const [badField, setBadField] = useState<"email" | "username" | null>(null);
 
   // The same query and key as on /login (RG-13): the status is shared, no extra request is made.
   const status = useQuery({
@@ -34,7 +40,7 @@ export function RegisterPage() {
     retry: false,
     refetchOnWindowFocus: false,
   });
-  const registrationOff = status.data?.enabled === false;
+  const registrationOff = off || status.data?.enabled === false;
 
   useEffect(() => {
     emailRef.current?.focus();
@@ -57,11 +63,18 @@ export function RegisterPage() {
     busy.current = true;
     setPending(true);
     alert.clear();
+    setBadField(null);
     try {
       await requestRegistration(body);
       setSent(true);
     } catch (e) {
-      alert.show(messageFor(e instanceof ApiError ? e.code : "unknown"));
+      const code = e instanceof ApiError ? e.code : "unknown";
+      if (code === "feature_disabled") {
+        setOff(true);
+      } else {
+        setBadField(badFieldFor(code));
+        alert.show(errorMessage(code));
+      }
     } finally {
       busy.current = false;
       setPending(false);
@@ -69,21 +82,23 @@ export function RegisterPage() {
   }
 
   return (
-    <section className="ui-form">
+    <section className="ui-form login-card">
       <h1>{t("auth.register_title")}</h1>
       {registrationOff ? (
         <p>{t("auth.register_disabled")}</p>
       ) : sent ? (
-        <p role="status">{t("auth.register_sent")}</p>
+        <p role="status" className="reg-status">
+          {t("auth.register_sent")}
+        </p>
       ) : (
-        <form onSubmit={(e) => void onSubmit(e)} noValidate>
-          <ErrorAlert message={alert.message} seq={alert.seq} />
+        <form className="reg-form" onSubmit={(e) => void onSubmit(e)} noValidate>
           <TextField
             label={t("auth.register_email_label")}
             value={email}
             onChange={setEmail}
             autoComplete="email"
             inputRef={emailRef}
+            invalid={badField === "email"}
             disabled={pending}
           />
           <TextField
@@ -105,6 +120,7 @@ export function RegisterPage() {
             value={login}
             onChange={setLogin}
             autoComplete="username"
+            invalid={badField === "username"}
             disabled={pending}
           />
           <TextField
@@ -115,14 +131,21 @@ export function RegisterPage() {
             autoComplete="new-password"
             hint={t("auth.password_min_length_hint", { min: PASSWORD_MIN_LENGTH })}
             disabled={pending}
-            reveal={{ label: t("auth.show_password"), shown, onToggle: () => setShown((v) => !v) }}
+            reveal={{
+              label: shown ? t("auth.hide_password") : t("auth.show_password"),
+              shown,
+              onToggle: () => setShown((v) => !v),
+            }}
           />
-          <button type="submit" disabled={pending}>
+          <ErrorAlert message={alert.message} seq={alert.seq} />
+          <button type="submit" className="login-submit" disabled={pending}>
             {t("auth.register_submit")}
           </button>
         </form>
       )}
-      <Link to="/login">{t("auth.register_back_to_login")}</Link>
+      <div className="login-links">
+        <Link to="/login">{t("auth.register_back_to_login")}</Link>
+      </div>
     </section>
   );
 }

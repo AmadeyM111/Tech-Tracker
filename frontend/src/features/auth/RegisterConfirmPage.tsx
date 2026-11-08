@@ -7,6 +7,7 @@ import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { confirmRegistration } from "./api";
+import "./auth-screens.css";
 
 /** The one-time token from the address fragment (`#token=...`); null if absent or empty. */
 function readToken(): string | null {
@@ -55,11 +56,15 @@ export function RegisterConfirmPage() {
     }
   }
 
-  const registerAgain = <Link to="/register">{t("auth.register_again")}</Link>;
+  const registerAgain = (
+    <div className="login-links">
+      <Link to="/register">{t("auth.register_again")}</Link>
+    </div>
+  );
 
   if (token === null) {
     return (
-      <section className="ui-form">
+      <section className="ui-form login-card">
         <h1>{t("auth.register_confirm_title")}</h1>
         <p>{t("auth.register_link_invalid")}</p>
         {registerAgain}
@@ -70,20 +75,26 @@ export function RegisterConfirmPage() {
   // AC-16: no session is created here, so the success state only points to the login screen.
   if (done) {
     return (
-      <section className="ui-form">
+      <section className="ui-form login-card">
         <h1>{t("auth.register_confirm_title")}</h1>
-        <p role="status">{t("auth.register_confirmed")}</p>
-        <Link to="/login">{t("auth.register_login_link")}</Link>
+        <p role="status" className="reg-status">
+          {t("auth.register_confirmed")}
+        </p>
+        <div className="login-links">
+          <Link to="/login" className="login-submit">
+            {t("auth.register_login_link")}
+          </Link>
+        </div>
       </section>
     );
   }
 
   return (
-    <section className="ui-form">
+    <section className="ui-form login-card">
       <h1>{t("auth.register_confirm_title")}</h1>
       <form onSubmit={(e) => void onSubmit(e)} noValidate>
         <ErrorAlert message={alert.message} seq={alert.seq} />
-        <button type="submit" disabled={pending}>
+        <button type="submit" className="login-submit" disabled={pending}>
           {t("auth.register_confirm_submit")}
         </button>
       </form>

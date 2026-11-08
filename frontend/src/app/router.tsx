@@ -146,7 +146,7 @@ function MenuItems({ profile }: { profile: MeResponse }) {
         <p>
           <NavLink to="/admin/users">
             <Icon name="users" />
-            {t("admin.home_users_link")}
+            {t("admin.users.title")}
           </NavLink>
         </p>
       ) : null}

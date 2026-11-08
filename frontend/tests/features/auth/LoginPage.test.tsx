@@ -315,6 +315,7 @@ describe("LoginPage help block (spec 005)", () => {
 // 006-bugreport-ch1, R6-T02: «глазок» на экране входа (AC-1, AC-3, AC-5, AC-6, AC-7, AC-8, AC-9, AC-10).
 const SECRET = "Secret-Pass-123";
 const SHOW = "Показать пароль";
+const HIDE = "Скрыть пароль";
 const pwd = (c: HTMLElement) => field(c, "current-password");
 const eye = (c: HTMLElement) => {
   const b = revealButtons(c)[0];
@@ -360,7 +361,8 @@ describe("LoginPage password reveal (006)", () => {
     expect(pwd(container).value).toBe(SECRET);
     expect(b.getAttribute("aria-pressed")).toBe("true");
     expect(document.activeElement).toBe(b);
-    expect(screen.getByRole("button", { name: SHOW })).toBe(b);
+    // Owner decision 2026-11-08 (plan §10, p. 5): while the password is shown, the button is named «Скрыть пароль».
+    expect(screen.getByRole("button", { name: HIDE })).toBe(b);
     fireEvent.click(b);
     expect(pwd(container).type).toBe("password");
     expect(b.getAttribute("aria-pressed")).toBe("false");
@@ -649,5 +651,20 @@ describe("LoginPage registration link and help (spec 019)", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(register()).toBeNull();
     expect(helpTexts()).toEqual([HELP_P1]);
+  });
+
+  // Owner decision 2026-11-08 (plan §10, p. 5): the reveal button names the action for the current state (login too).
+  it("019_ac2_reveal_button_name_switches_to_hide_while_password_is_shown", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    const { container } = renderAt("/login", <LoginPage />);
+    await screen.findByRole("link", { name: t("auth.register_link") });
+    const eye = revealButtons(container)[0]!;
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.show_password"));
+    fireEvent.click(eye);
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.hide_password"));
+    expect(field(container, "current-password").type).toBe("text");
+    fireEvent.click(eye);
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.show_password"));
+    expect(field(container, "current-password").type).toBe("password");
   });
 });
