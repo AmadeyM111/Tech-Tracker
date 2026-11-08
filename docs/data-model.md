@@ -358,6 +358,29 @@ TRUNCATE` — в бэклоге (plan D-8).
 событие. Первый запуск (создание первого администратора) событий аудита не пишет.
 
 
+
+### attachment
+Вложение к задаче (spec 011). Файл — в `DATA_DIR/attachments/<storage_key[:2]>/<storage_key>`;
+исходное имя — только метаданные. Тип определяет сервер по сигнатуре. Удаление мягкое; файл и строка
+удаляются `gtrack maintenance` через `TRASH_RETENTION` (ADR-0010).
+
+| Столбец | Тип | NULL | Примечание |
+|---|---|---|---|
+| `id` | uuid | нет | PK `pk_attachment` |
+| `workspace_id` | uuid | нет | FK → `workspace.id`; индекс |
+| `task_id` | uuid | нет | FK → `task.id`, `CASCADE` |
+| `project_id` | uuid | нет | FK → `project.id`, `CASCADE` |
+| `created_by` | uuid | да | автор, FK → `app_user.id`, `RESTRICT` |
+| `original_name` | varchar(255) | нет | 1..255 символов (`ck_attachment_name_length`) |
+| `kind` | text | нет | `pdf, docx, xlsx, pptx, txt, csv, png, jpeg, gif, webp` (`ck_attachment_kind_valid`) |
+| `content_type` | text | нет | MIME по `kind` |
+| `size_bytes` | bigint | нет | > 0 |
+| `sha256` | text | нет | 64 hex |
+| `storage_key` | text | нет | 32 hex, уникален |
+| `created_at`, `updated_at`, `deleted_at`, `deleted_batch_id` | | | как у задач |
+
+Индексы: `ix_attachment_task_id_created_at` (живые), `ix_attachment_deleted_at` (удалённые).
+
 ## Эксплуатация
 
 ### backup_run
@@ -391,6 +414,7 @@ TRUNCATE` — в бэклоге (plan D-8).
 | `0008` | сброс пароля по email: `app_user.email` с `uq_app_user_email` и `ck_app_user_email_lower`, таблицы `password_reset_token` и `password_reset_attempt` с индексами (откат удаляет всё созданное) |
 | `0009` | MCP-доступ агентов: `api_token`, `domain_event.client_name` (ADR-0018) |
 | `0011` | журнал резервного копирования `backup_run` (spec 009; `down_revision` `0009`, при слиянии с 019 — `0010`); откат удаляет таблицу |
+| `0012` | вложения `attachment` (spec 011): файл в `DATA_DIR/attachments/<ключ[:2]>/<ключ>`, метаданные в БД; откат удаляет таблицу, файлы остаются |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия
 моделей миграциям — `alembic -c backend/alembic.ini check` (входит в `scripts/check.sh` и CI).

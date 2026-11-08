@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     initial_admin_login: str = "admin"
     attachment_max_bytes: int = 10 * 1024 * 1024  # 10 485 760, включительно
     attachments_per_task: int = 20
+    # [011] загрузка вложений запрещена, если свободно меньше (МБ) в DATA_DIR (R2-40, Q-2)
+    attachments_min_free_mb: int = 500
     trash_retention: timedelta = timedelta(days=30)
     # [007] отправка писем; без smtp_host функция сброса пароля выключена
     smtp_host: str | None = None

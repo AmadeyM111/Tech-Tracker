@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     admin_system,
     admin_users,
+    attachments,
     audit,
     auth,
     boards,
@@ -32,3 +33,4 @@ router.include_router(projects.router)
 router.include_router(tasks.router)
 router.include_router(boards.router)
 router.include_router(comments.router)
+router.include_router(attachments.router)
