@@ -2,7 +2,8 @@
 
 Одноразовый пароль приходит только в запросе (``SecretStr``: в ``repr``, ``model_dump`` и
 сообщения 422 значение не попадает; в OpenAPI поле — ``format: password``, ``writeOnly``).
-В ответах паролей, хешей и счётчиков входа нет: ``AdminUser`` — ровно семь полей, включая ``email``.
+В ответах паролей, хешей и счётчиков входа нет: ``AdminUser`` — ровно десять полей,
+включая ``email``, имена и ``self_registered``.
 """
 
 from __future__ import annotations
@@ -31,6 +32,9 @@ class AdminUser(BaseModel):
     must_change_password: bool
     created_at: datetime
     email: str | None
+    first_name: str | None
+    last_name: str | None
+    self_registered: bool
 
 
 class CreateUserRequest(BaseModel):
@@ -40,6 +44,8 @@ class CreateUserRequest(BaseModel):
 
     login: Annotated[str, Field(max_length=MAX_CREDENTIAL_LENGTH)]
     one_time_password: Password
+    first_name: Annotated[str, Field(max_length=MAX_CREDENTIAL_LENGTH)]
+    last_name: Annotated[str, Field(max_length=MAX_CREDENTIAL_LENGTH)]
     email: Annotated[str | None, Field(max_length=EMAIL_MAX_LENGTH)] = None
 
 
@@ -65,3 +71,14 @@ class SetEmailRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: Annotated[str | None, Field(max_length=EMAIL_MAX_LENGTH)]
+
+
+class SetNameRequest(BaseModel):
+    """``PUT /admin/users/{user_id}/name``: имя и фамилия, оба обязательны (FR-3c)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Длину 1…100 проверяет домен (RG-3): ошибка — first_name_invalid / last_name_invalid,
+    # а не validation_error схемы.
+    first_name: str
+    last_name: str

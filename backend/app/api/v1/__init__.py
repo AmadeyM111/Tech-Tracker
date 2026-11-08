@@ -12,8 +12,10 @@ from app.api.v1 import (
     me,
     password_reset,
     projects,
+    registration,
     tasks,
     tokens,
+    unassigned_accounts,
     users,
 )
 
@@ -23,8 +25,10 @@ router.include_router(auth.router)
 router.include_router(me.router)
 router.include_router(tokens.router)
 router.include_router(password_reset.router)
+router.include_router(registration.router)
 router.include_router(admin_users.router)
 router.include_router(audit.router)
+router.include_router(unassigned_accounts.router)
 router.include_router(users.router)
 router.include_router(projects.router)
 router.include_router(tasks.router)

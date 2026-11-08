@@ -332,11 +332,10 @@ describe("AC-12 order in the document and Tab sequence", () => {
       document.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
     const form = document.querySelector<HTMLElement>('form[data-form="create-project"]')!;
-    expect(tabbable.slice(0, 2).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks"]);
-    expect(tabbable[2]?.getAttribute("href")).toBe("/profile/agents");
-    expect(tabbable[3]?.getAttribute("data-action")).toBe("create-task");
-    expect(tabbable[4]?.getAttribute("data-action")).toBe("logout");
-    expect(tabbable[5]).toBe(tabbable.find((el) => form.contains(el)));
+    expect(tabbable.slice(0, 4).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks", "/profile/agents", "/profile"]);
+    expect(tabbable[4]?.getAttribute("data-action")).toBe("create-task");
+    expect(tabbable[5]?.getAttribute("data-action")).toBe("logout");
+    expect(tabbable[6]).toBe(tabbable.find((el) => form.contains(el)));
   });
 });
 

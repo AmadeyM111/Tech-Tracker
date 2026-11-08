@@ -34,6 +34,7 @@ ALL_CAPS = (
     "CRM_READ",
     "CRM_WRITE",
     "PIPELINE_MANAGE",
+    "ONBOARD_ACCOUNTS",  # 019 (plan RG-11): только БА
 )
 _TA = {"MANAGE_ACCOUNTS", "ASSIGN_ROLES", "VIEW_AUDIT"}
 _BA = {
@@ -49,10 +50,10 @@ _BA = {
 EXPECTED: dict[str, frozenset[str]] = {
     "TECH_ADMIN": frozenset(_TA),
     # 002/FR-8 (R3-T01): БА получает PROJECT_MANAGE_ANY
-    "BUSINESS_ADMIN": frozenset(_BA | {"PROJECT_MANAGE_ANY"}),
+    "BUSINESS_ADMIN": frozenset(_BA | {"PROJECT_MANAGE_ANY", "ONBOARD_ACCOUNTS"}),
     "USER": frozenset({"BUSINESS_ACCESS"}),
 }
-BUSINESS_CAPS = frozenset(_BA | {"PROJECT_MANAGE_ANY"})
+BUSINESS_CAPS = frozenset(_BA | {"PROJECT_MANAGE_ANY", "ONBOARD_ACCOUNTS"})
 CELLS = [(r, c) for r in ALL_ROLES for c in ALL_CAPS]
 
 
@@ -252,3 +253,14 @@ def test_002_fr8_only_business_roles_hold_project_manage_any(roles: ModuleType) 
     assert cap in caps[roles.Role.BUSINESS_ADMIN]
     assert cap not in caps[roles.Role.TECH_ADMIN]
     assert cap not in caps[roles.Role.USER]
+
+
+def test_019_ac30_onboard_accounts_only_business_admin(roles: ModuleType) -> None:
+    """019/RG-11: ONBOARD_ACCOUNTS только у БА, у ТА и П её нет."""
+    holders = {
+        r.name
+        for r in roles.Role
+        if roles.Capability.ONBOARD_ACCOUNTS in roles.ROLE_CAPABILITIES[r]
+    }
+    assert holders == {"BUSINESS_ADMIN"}
+    assert roles.Capability.ONBOARD_ACCOUNTS.value == "onboard_accounts"

@@ -77,7 +77,9 @@ async def test_002_ac3_ta_assigns_ta_role_and_new_ta_has_all_ta_rights(api_env: 
 
     # создать, заблокировать, разблокировать, сбросить пароль, завершить сессии, читать журнал
     created = await env.client.post(
-        ADMIN_USERS, json={"login": "ac3.created", OTP_FIELD: OTP}, headers=env.auth(tok_x)
+        ADMIN_USERS,
+        json={"login": "ac3.created", "first_name": "Иван", "last_name": "Петров", OTP_FIELD: OTP},
+        headers=env.auth(tok_x),
     )
     assert created.status_code == 201, created.text
     cid = created.json()["id"]

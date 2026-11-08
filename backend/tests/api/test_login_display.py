@@ -66,7 +66,12 @@ async def _post(env: ApiEnv, token: str, url: str, body: dict[str, Any]) -> Any:
 
 async def _create_account(env: ApiEnv, admin_token: str, login: str, role: str) -> str:
     """Создаёт учётную запись и назначает роль через API; возвращает id."""
-    created = await _post(env, admin_token, ADMIN_USERS, {"login": login, "one_time_password": OTP})
+    created = await _post(
+        env,
+        admin_token,
+        ADMIN_USERS,
+        {"login": login, "first_name": "Иван", "last_name": "Петров", "one_time_password": OTP},
+    )
     assert created["login"] == login
     uid = str(created["id"])
     assigned = await env.client.put(
