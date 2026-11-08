@@ -381,6 +381,15 @@ TRUNCATE` — в бэклоге (plan D-8).
 
 Индексы: `ix_attachment_task_id_created_at` (живые), `ix_attachment_deleted_at` (удалённые).
 
+
+### comment_mention, notification
+Упоминания и уведомления (spec 012). `comment_mention` — PK `(comment_id, user_id)`, удаляется вместе с
+комментарием. `notification`: получатель, вид (`assigned`, `review_requested`, `review_returned`,
+`mentioned`, `commented`, `due_tomorrow`, `overdue`), задача, проект, автор действия (NULL — «система»,
+напоминание о сроке), комментарий (без текста), `dedup_key`, `created_at`, `read_at`.
+`UNIQUE (recipient_id, kind, task_id, dedup_key)` — от повторов (напоминания о сроке: ключ — дата срока).
+Индексы: `(recipient_id, read_at, created_at DESC)` — список и счётчик; `created_at` — очистка старше 90 дней.
+
 ## Эксплуатация
 
 ### backup_run
@@ -415,6 +424,7 @@ TRUNCATE` — в бэклоге (plan D-8).
 | `0009` | MCP-доступ агентов: `api_token`, `domain_event.client_name` (ADR-0018) |
 | `0011` | журнал резервного копирования `backup_run` (spec 009; `down_revision` `0009`, при слиянии с 019 — `0010`); откат удаляет таблицу |
 | `0012` | вложения `attachment` (spec 011): файл в `DATA_DIR/attachments/<ключ[:2]>/<ключ>`, метаданные в БД; откат удаляет таблицу, файлы остаются |
+| `0013` | упоминания и уведомления: `comment_mention`, `notification` (spec 012); откат удаляет обе таблицы |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия
 моделей миграциям — `alembic -c backend/alembic.ini check` (входит в `scripts/check.sh` и CI).

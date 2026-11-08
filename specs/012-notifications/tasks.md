@@ -9,7 +9,7 @@
 
 ## N12-T01 — Схема и разбор упоминаний
 - **Статус:** TODO · **AC:** AC-2 · **Оценка:** 0,5 дня
-- **Файлы:** `backend/app/domain/notifications/{__init__,models,mentions}.py`, `backend/app/domain/registry.py`, `backend/migrations/versions/0013_notifications.py`, `docs/data-model.md`, `backend/tests/unit/test_012_mentions.py`, `backend/tests/db/test_012_schema.py`, тесты головы миграций
+- **Файлы:** `backend/app/domain/notifications/__init__.py`, `backend/app/domain/notifications/models.py`, `backend/app/domain/notifications/mentions.py`, `backend/app/domain/registry.py`, `backend/migrations/versions/0013_notifications.py`, `docs/data-model.md`, `backend/tests/unit/test_012_mentions.py`, `backend/tests/db/test_012_schema.py`, `backend/tests/db/test_migrations.py`, `backend/tests/db/test_007_schema.py`, `backend/tests/upgrade002_support.py`
 
 ## N12-T02 — Правила создания уведомлений
 - **Статус:** TODO · **AC:** AC-1, AC-3, AC-4 · **Оценка:** 1 день · **Зависит от:** N12-T01

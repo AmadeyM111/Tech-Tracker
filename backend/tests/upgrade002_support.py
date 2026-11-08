@@ -64,7 +64,7 @@ __all__ = [
 ]
 
 PREFIX = "u002."
-HEAD_REVISION = "0012"  # голова цепочки миграций (011: attachment; 009: backup_run)
+HEAD_REVISION = "0013"  # голова цепочки миграций (012: notification; 011: attachment)
 FAILURE_MARK = "gt_test_injected_failure"
 _FAIL_FUNCTION = "gt_test_fail_0006"
 _PAST = datetime(2026, 10, 1, 8, 0, 0, tzinfo=UTC)
