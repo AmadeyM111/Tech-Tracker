@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import hashlib
 import io
 import json
@@ -20,7 +22,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -44,6 +46,9 @@ APPDATA_MEMBER: Final = "appdata.tar"
 MEMBERS: Final = (MANIFEST, DB_MEMBER, APPDATA_MEMBER)
 NAME_RE: Final = re.compile(r"gtrack-backup-(\d{8}T\d{6}Z)\.tar")
 EXCLUDED_DATA: Final = frozenset({"exports", "lost+found"})
+LOCK_FILE: Final = ".gtrack-backup.lock"
+TEMP_PREFIXES: Final = (".gtrack-backup-", ".gtrack-probe-")
+RESTORE_PREFIX: Final = ".gtrack-restore-"
 _CHUNK: Final = 1024 * 1024
 MAX_MANIFEST_BYTES: Final = 64 * 1024
 
@@ -70,6 +75,7 @@ class BackupResult:
     schema_revision: str
     same_device: bool
     removed: tuple[str, ...]
+    rotate_error: bool = False
 
 
 @dataclass(frozen=True)
@@ -97,6 +103,14 @@ def libpq_env(database_url: str) -> dict[str, str]:
         env["PGUSER"] = url.username
     if url.password:
         env["PGPASSWORD"] = str(url.password)
+    # Параметры DSN asyncpg, которые меняют подключение: TLS и сокет (ревью 009, п. 8).
+    query = dict(url.query)
+    ssl = query.get("sslmode") or query.get("ssl")
+    if isinstance(ssl, str) and ssl:
+        env["PGSSLMODE"] = "require" if ssl in {"true", "1", "on"} else ssl
+    host = query.get("host")
+    if isinstance(host, str) and host:
+        env["PGHOST"] = host
     return env
 
 
@@ -244,9 +258,12 @@ def verify_backup(
                     raise BackupError("verify_failed", f"контрольная сумма {name} не совпадает")
     except tarfile.TarError as exc:
         raise BackupError("verify_failed", "файл не является архивом копии") from exc
+    except OSError as exc:
+        raise BackupError("io_error", f"чтение копии: {type(exc).__name__}") from exc
+    pg_restore = tool(settings, "pg_restore")  # tool_missing — не «дамп повреждён»
     with (extract_to / DB_MEMBER).open("rb") as dump:
         try:
-            runner([tool(settings, "pg_restore"), "--list"], {}, dump, None)
+            runner([pg_restore, "--list"], {}, dump, None)
         except BackupError as exc:
             raise BackupError("verify_failed", "дамп не читается pg_restore") from exc
     try:
@@ -258,12 +275,12 @@ def verify_backup(
     return manifest
 
 
-def rotate(out_dir: Path, keep: int) -> tuple[str, ...]:
-    """Оставляет ``keep`` самых новых копий; другие файлы каталога не трогает."""
+def rotate(out_dir: Path, keep: int, *, protect: str | None = None) -> tuple[str, ...]:
+    """Оставляет ``keep`` самых новых копий; другие файлы и ``protect`` не трогает."""
     if keep < 1:
         raise ValueError("keep должен быть >= 1")
     copies = sorted(p.name for p in out_dir.iterdir() if p.is_file() and NAME_RE.fullmatch(p.name))
-    stale = copies[: max(0, len(copies) - keep)]
+    stale = [n for n in copies[: max(0, len(copies) - keep)] if n != protect]
     for name in stale:
         (out_dir / name).unlink()
     return tuple(stale)
@@ -271,6 +288,62 @@ def rotate(out_dir: Path, keep: int) -> tuple[str, ...]:
 
 def same_device(a: Path, b: Path) -> bool:
     return os.stat(a).st_dev == os.stat(b).st_dev
+
+
+@contextlib.contextmanager
+def _exclusive(out_dir: Path) -> Iterator[None]:
+    """Один запуск на каталог: ``flock`` на ``.gtrack-backup.lock`` (иначе ``busy``)."""
+    fd = os.open(out_dir / LOCK_FILE, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise BackupError("busy", "копия уже снимается в этот каталог") from None
+        yield
+    finally:
+        os.close(fd)
+
+
+def _sweep_leftovers(out_dir: Path) -> None:
+    """Остатки прерванных запусков (SIGKILL, OOM): только наши временные каталоги."""
+    for p in out_dir.iterdir():
+        if p.is_dir() and not p.is_symlink() and p.name.startswith(TEMP_PREFIXES):
+            shutil.rmtree(p, ignore_errors=True)
+
+
+def _build(
+    settings: Settings,
+    work: Path,
+    *,
+    schema_revision: str,
+    app_version: str,
+    now: datetime,
+    runner: Runner,
+) -> Path:
+    with _private_file(work / DB_MEMBER) as dump:
+        runner(
+            [tool(settings, "pg_dump"), "-Fc", "--no-password"],
+            libpq_env(settings.database_url),
+            None,
+            dump,
+        )
+    if (work / DB_MEMBER).stat().st_size == 0:
+        raise BackupError("pg_dump_failed", "дамп пуст")
+    _write_appdata(settings.data_dir, work / APPDATA_MEMBER)
+    manifest = {
+        "format": FORMAT,
+        "format_version": FORMAT_VERSION,
+        "created_at": iso_utc(now),
+        "schema_revision": schema_revision,
+        "app_version": app_version,
+        "members": {n: _file_digest(work / n) for n in (DB_MEMBER, APPDATA_MEMBER)},
+    }
+    partial = work / "archive.partial"
+    _write_outer(work, json.dumps(manifest, sort_keys=True, indent=2).encode(), partial)
+    check = work / "verify"
+    check.mkdir(mode=0o700)
+    verify_backup(settings, partial, extract_to=check, runner=runner)
+    return partial
 
 
 def create_backup(
@@ -283,7 +356,11 @@ def create_backup(
     keep: int,
     runner: Runner = run_tool,
 ) -> BackupResult:
-    """Снимает, проверяет и публикует копию, затем ротирует (FR-1…FR-3, FR-5)."""
+    """Снимает, проверяет и публикует копию, затем ротирует (FR-1…FR-3, FR-5).
+
+    Ошибки до публикации — ``BackupError`` (файл под итоговым именем не появляется). После
+    публикации копия считается снятой: сбой ротации — ``rotate_error``, а не ошибка копии.
+    """
     try:
         out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         probe = Path(tempfile.mkdtemp(prefix=".gtrack-probe-", dir=out_dir))
@@ -292,51 +369,49 @@ def create_backup(
         raise BackupError(
             "backup_dir_unavailable", f"каталог копий недоступен для записи: {type(exc).__name__}"
         ) from exc
-    final = out_dir / backup_name(now)
-    if final.exists():
-        raise BackupError("exists", f"файл уже существует: {final.name}")
-    work = Path(tempfile.mkdtemp(prefix=".gtrack-backup-", dir=out_dir))
-    try:
-        with _private_file(work / DB_MEMBER) as dump:
-            runner(
-                [tool(settings, "pg_dump"), "-Fc", "--no-password"],
-                libpq_env(settings.database_url),
-                None,
-                dump,
+    with _exclusive(out_dir):
+        _sweep_leftovers(out_dir)
+        final = out_dir / backup_name(now)
+        if final.exists():
+            raise BackupError("exists", f"файл уже существует: {final.name}")
+        work = Path(tempfile.mkdtemp(prefix=".gtrack-backup-", dir=out_dir))
+        try:
+            partial = _build(
+                settings,
+                work,
+                schema_revision=schema_revision,
+                app_version=app_version,
+                now=now,
+                runner=runner,
             )
-        if (work / DB_MEMBER).stat().st_size == 0:
-            raise BackupError("pg_dump_failed", "дамп пуст")
-        _write_appdata(settings.data_dir, work / APPDATA_MEMBER)
-        manifest = {
-            "format": FORMAT,
-            "format_version": FORMAT_VERSION,
-            "created_at": iso_utc(now),
-            "schema_revision": schema_revision,
-            "app_version": app_version,
-            "members": {n: _file_digest(work / n) for n in (DB_MEMBER, APPDATA_MEMBER)},
-        }
-        partial = work / "archive.partial"
-        _write_outer(work, json.dumps(manifest, sort_keys=True, indent=2).encode(), partial)
-        check = work / "verify"
-        check.mkdir(mode=0o700)
-        verify_backup(settings, partial, extract_to=check, runner=runner)
-        os.replace(partial, final)
-    finally:
-        shutil.rmtree(work, ignore_errors=True)
-    removed = rotate(out_dir, keep)
+            os.replace(partial, final)
+        except OSError as exc:
+            raise BackupError("io_error", f"запись копии: {type(exc).__name__}") from exc
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+        size = final.stat().st_size
+        try:
+            removed, rotate_error = rotate(out_dir, keep, protect=final.name), False
+        except OSError:
+            removed, rotate_error = (), True
     return BackupResult(
         path=final,
-        size_bytes=final.stat().st_size,
+        size_bytes=size,
         schema_revision=schema_revision,
         same_device=same_device(out_dir, settings.data_dir),
         removed=removed,
+        rotate_error=rotate_error,
     )
 
 
 def _data_dir_entries(data_dir: Path) -> list[str]:
     if not data_dir.exists():
         return []
-    return [p.name for p in data_dir.iterdir() if p.name != "lost+found"]
+    return [
+        p.name
+        for p in data_dir.iterdir()
+        if p.name != "lost+found" and not p.name.startswith(RESTORE_PREFIX)
+    ]
 
 
 async def public_tables(conn: Any) -> list[str]:
@@ -348,6 +423,24 @@ async def public_tables(conn: Any) -> list[str]:
         )
     )
     return [str(r[0]) for r in rows]
+
+
+def _restore_appdata(data_dir: Path, archive: Path) -> None:
+    """Распаковка во временный каталог внутри ``data_dir`` и перенос записей (ревью 009, п. 2).
+
+    Сбой распаковки оставляет ``data_dir`` пустым: повторный ``restore`` не упирается в отказ.
+    """
+    data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for leftover in data_dir.glob(f"{RESTORE_PREFIX}*"):  # прерванный прошлый restore
+        shutil.rmtree(leftover, ignore_errors=True)
+    stage = Path(tempfile.mkdtemp(prefix=RESTORE_PREFIX, dir=data_dir))
+    try:
+        with tarfile.open(archive, mode="r:") as inner:
+            inner.extractall(stage, filter="data")
+        for entry in sorted(stage.iterdir()):
+            os.replace(entry, data_dir / entry.name)
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
 
 
 def restore_backup(
@@ -375,6 +468,7 @@ def restore_backup(
                     "--no-owner",
                     "--no-privileges",
                     "--exit-on-error",
+                    "--single-transaction",
                     "--no-password",
                     "--dbname",
                     env["PGDATABASE"],
@@ -383,9 +477,7 @@ def restore_backup(
                 dump,
                 None,
             )
-        settings.data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-        with tarfile.open(work / APPDATA_MEMBER, mode="r:") as inner:
-            inner.extractall(settings.data_dir, filter="data")
+        _restore_appdata(settings.data_dir, work / APPDATA_MEMBER)
         return manifest
     finally:
         shutil.rmtree(work, ignore_errors=True)

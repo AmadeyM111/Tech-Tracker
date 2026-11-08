@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import signal
 import sys
 from importlib import metadata
 from pathlib import Path
@@ -79,6 +80,7 @@ def _report(result: BackupResult) -> None:
     print(f"schema_revision={result.schema_revision}")
     print(f"same_device={int(result.same_device)}")
     print(f"removed={len(result.removed)}")
+    print(f"rotate_error={int(result.rotate_error)}")
     sys.stdout.flush()
 
 
@@ -95,8 +97,25 @@ def _save_run(settings: Settings, run: BackupRunRecord) -> bool:
     return True
 
 
+def _warn_result(result: BackupResult) -> None:
+    if result.rotate_error:
+        print("ВНИМАНИЕ: копия снята, старые копии удалить не удалось", file=sys.stderr, flush=True)
+    if result.same_device:
+        print(
+            "ВНИМАНИЕ: каталог копий на том же устройстве, что и данные",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
+def _terminate(signum: int, _frame: object) -> None:
+    """SIGTERM (``docker stop``, пересоздание api) → исключение: ``finally`` уберёт временные."""
+    raise SystemExit(128 + signum)
+
+
 def run(args: argparse.Namespace) -> int:
     """Выполняет ``gtrack backup``; возвращает код выхода."""
+    signal.signal(signal.SIGTERM, _terminate)
     step = "настройки"
     settings: Settings | None = None
     started = utcnow()
@@ -133,12 +152,7 @@ def run(args: argparse.Namespace) -> int:
             with _quiet_asyncio_logger():
                 _save_run(settings, BackupRunRecord(started, utcnow(), error_code="unexpected"))
         return 1
-    if result.same_device:
-        print(
-            "ВНИМАНИЕ: каталог копий на том же устройстве, что и данные",
-            file=sys.stderr,
-            flush=True,
-        )
+    _warn_result(result)
     record = BackupRunRecord(
         started,
         utcnow(),
