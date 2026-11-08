@@ -10,6 +10,7 @@ export type Role = components["schemas"]["Role"];
 export type EntityType = components["schemas"]["EntityType"];
 export type CreateUserRequest = components["schemas"]["CreateUserRequest"];
 export type ResetPasswordRequest = components["schemas"]["ResetPasswordRequest"];
+export type SetNameRequest = components["schemas"]["SetNameRequest"];
 
 export interface Page<T> {
   items: T[];
@@ -56,6 +57,16 @@ export async function setUserEmail(id: string, email: string | null): Promise<Ad
   const { data } = await getAppClient().PUT("/api/v1/admin/users/{user_id}/email", {
     params: { path: { user_id: id } },
     body: { email: value },
+  });
+  if (data === undefined) throw invalidBody(200);
+  return data;
+}
+
+/** Sets both names (AC-35); the server checks the length and rejects with first_name_invalid / last_name_invalid. */
+export async function setUserName(id: string, body: SetNameRequest): Promise<AdminUser> {
+  const { data } = await getAppClient().PUT("/api/v1/admin/users/{user_id}/name", {
+    params: { path: { user_id: id } },
+    body,
   });
   if (data === undefined) throw invalidBody(200);
   return data;

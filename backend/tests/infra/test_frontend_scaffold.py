@@ -252,6 +252,8 @@ def test_t21_src_files_only_expected() -> None:
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
         "features/admin/password.ts", "features/admin/EmailDialog.tsx",
         "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
+        # 019/R8-T20: dialog for changing first and last name
+        "features/admin/NameDialog.tsx",
         # T81
         "shared/ui/UserPicker.tsx", "features/users/api.ts",
         # T82

@@ -394,7 +394,7 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 2. Полный vitest: 61 файл, 1630 passed; lint чист; typecheck — 4 ожидаемые ошибки T20; pytest scaffold 44 passed; scope ок. Исправлены тесты вне списка: AuditPage (пути ТА), SessionGate (единственная ссылка /profile), create-task-button (индексы табуляции). Решения: RoleScreen уже имел capability; иконка пункта «Профиль» — 'password' (Icon.tsx вне списка); ProfilePage получает профиль пропсом. Долг: иконка профиля (отдельная правка Icon.tsx). Ревью отдельно не запускалось.
 
 ## R8-T20 — Фронтенд: имена в `UsersPage`, диалог «Изменить имя»
-- **Статус:** TODO
+- **Статус:** DONE (самопроверка оркестратора; отдельный ревьюер не запускался; 2026-11-08)
 - **AC:** AC-22 (экран), AC-33 (форма), AC-35 (экран)
 - **Файлы:** `frontend/src/features/admin/UsersPage.tsx`, `frontend/src/features/admin/api.ts`, `frontend/src/features/admin/NameDialog.tsx` (новый);
   тесты: `frontend/tests/features/admin/UsersPage.test.tsx`, `frontend/tests/features/admin/NameDialog.test.tsx` (новый), `frontend/tests/features/admin/api.test.ts`, `frontend/tests/features/admin/helpers.tsx`, `backend/tests/infra/test_frontend_scaffold.py`
@@ -404,7 +404,7 @@ T17, T19, T20, T21), тоже последовательно.
   `api.ts`, кнопка «Изменить имя» в строке открывает `NameDialog` (образец — `EmailDialog.tsx`). После этой задачи
   `npm run typecheck` должен быть чист (закрывает plan R-3).
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/admin` зелёный; «Линт фронтенда» чист; `source .venv/bin/activate && pytest -q backend/tests/infra/test_frontend_scaffold.py` зелёный
-- **Попытки:** 0
+- **Попытки:** 1. Полный vitest: 62 файла, 1649 passed; lint 0; typecheck 0 (R-3 закрыт); scaffold 44 passed; scope ок. Колонки имён, origin, NameDialog (образец EmailDialog), setUserName, обязательные Имя/Фамилия в форме создания. Отклонения (не из плана): пустые имя/фамилия в форме и диалоге не отправляются, дают first_name_invalid/last_name_invalid; trim на клиенте. Порядок колонок выбран свободно.
 
 ## R8-T21 — Фронтенд: раздел БА «Учётные записи без роли»
 - **Статус:** TODO
@@ -524,7 +524,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T17 | DONE |
 | R8-T18 | DONE |
 | R8-T19 | DONE |
-| R8-T20 | TODO |
+| R8-T20 | DONE |
 | R8-T21 | TODO |
 | R8-T22 | TODO |
 | R8-T00 | TODO |

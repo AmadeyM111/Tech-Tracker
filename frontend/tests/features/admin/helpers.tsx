@@ -12,6 +12,7 @@
 //         POST /admin/users/{id}/block | unblock | revoke-sessions
 //     resetPassword(id, b: { one_time_password: string }): Promise<void>  POST .../reset-password
 //     setRole(id, role: Role | null): Promise<AdminUser>   PUT .../role  тело { role }
+//     setUserName(id, b: { first_name: string; last_name: string }): Promise<AdminUser>   PUT .../name (019)
 //     listAudit(p: { page: number; pageSize?: number; entityType?: EntityType; actorId?: string }):
 //         Promise<Page<AuditEntry>>   GET /api/v1/admin/audit?page&page_size&entity_type&actor_id
 //         (параметр в запросе только если задан)

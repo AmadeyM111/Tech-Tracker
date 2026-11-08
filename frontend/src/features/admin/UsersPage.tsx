@@ -15,6 +15,7 @@ import {
   revokeSessions,
   setRole,
   setUserEmail,
+  setUserName,
   unblockUser,
   type AdminUser,
   type Role,
@@ -22,6 +23,7 @@ import {
 import { useFocusHeadingOnArrival } from "../auth/session";
 import { generateOneTimePassword } from "./password";
 import { EmailDialog } from "./EmailDialog";
+import { NameDialog } from "./NameDialog";
 
 const USERS_KEY = ["admin", "users"] as const;
 const ROLES: readonly Role[] = ["tech_admin", "business_admin", "user"];
@@ -58,6 +60,7 @@ interface RowProps {
   onReset: () => void;
   onRevoke: () => void;
   onEditEmail: () => void;
+  onEditName: () => void;
   onSetRole: (role: Role | null) => void;
 }
 
@@ -71,6 +74,9 @@ function UserRow(props: RowProps) {
   return (
     <tr data-user-id={user.id}>
       <td data-field="login">{user.login}</td>
+      <td data-field="first_name">{user.first_name || t("admin.users.name_missing")}</td>
+      <td data-field="last_name">{user.last_name || t("admin.users.name_missing")}</td>
+      <td data-field="origin">{user.self_registered ? t("admin.users.self_registered") : ""}</td>
       <td data-field="email">{user.email ?? t("admin.users.email_missing")}</td>
       <td data-field="role">{roleText(user.role)}</td>
       <td data-field="status">
@@ -126,6 +132,15 @@ function UserRow(props: RowProps) {
           >
             {t("admin.users.edit_email")}
           </button>
+          <button
+            type="button"
+            data-action="edit-name"
+            aria-label={t("admin.users.edit_name_aria", params)}
+            disabled={disabled}
+            onClick={props.onEditName}
+          >
+            {t("admin.users.edit_name")}
+          </button>
           {canAssignRoles ? (
             <>
               <select
@@ -169,9 +184,12 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
   const [page, setPage] = useState(1);
   const [login, setLogin] = useState("");
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [emailUser, setEmailUser] = useState<AdminUser | null>(null);
+  const [nameUser, setNameUser] = useState<AdminUser | null>(null);
   const [shown, setShown] = useState<ShownPassword | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   useFocusHeadingOnArrival(headingRef);
@@ -238,13 +256,32 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
       alert.show(errorMessage("validation_error"));
       return;
     }
+    // AC-33: both names are required; an empty one is refused here, without a request.
+    const first = firstName.trim();
+    if (first === "") {
+      alert.show(errorMessage("first_name_invalid"));
+      return;
+    }
+    const last = lastName.trim();
+    if (last === "") {
+      alert.show(errorMessage("last_name_invalid"));
+      return;
+    }
     // The password lives in this closure and, after success, in `shown` only.
     const password = generateOneTimePassword();
     void run(async () => {
-      const created = await createUser({ login: name, one_time_password: password, email: email.trim() === "" ? null : email.trim() });
+      const created = await createUser({
+        login: name,
+        first_name: first,
+        last_name: last,
+        one_time_password: password,
+        email: email.trim() === "" ? null : email.trim(),
+      });
       // The login as the server stored it (FR-73a), not the typed one.
       setShown({ login: created.login, password });
       setLogin("");
+      setFirstName("");
+      setLastName("");
       setEmail("");
     });
   }
@@ -312,6 +349,22 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
           disabled={disabled}
         />
         <TextField
+          label={t("admin.users.first_name_label")}
+          name="first_name"
+          value={firstName}
+          onChange={setFirstName}
+          autoComplete="given-name"
+          disabled={disabled}
+        />
+        <TextField
+          label={t("admin.users.last_name_label")}
+          name="last_name"
+          value={lastName}
+          onChange={setLastName}
+          autoComplete="family-name"
+          disabled={disabled}
+        />
+        <TextField
           label={t("admin.users.email_label")}
           name="email"
           value={email}
@@ -335,6 +388,9 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
           <thead>
             <tr>
               <th scope="col">{t("admin.users.col_login")}</th>
+              <th scope="col">{t("admin.users.first_name_column")}</th>
+              <th scope="col">{t("admin.users.last_name_column")}</th>
+              <th scope="col">{t("admin.users.origin_column")}</th>
               <th scope="col">{t("admin.users.email_column")}</th>
               <th scope="col">{t("admin.users.col_role")}</th>
               <th scope="col">{t("admin.users.col_status")}</th>
@@ -353,6 +409,7 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
                 onReset={() => setConfirmation({ kind: "reset", user })}
                 onRevoke={() => setConfirmation({ kind: "revoke", user })}
                 onEditEmail={() => setEmailUser(user)}
+                onEditName={() => setNameUser(user)}
                 onSetRole={(role) => {
                   if (role === null) {
                     setConfirmation({ kind: "remove_role", user });
@@ -384,6 +441,19 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
             await queryClient.invalidateQueries({ queryKey: USERS_KEY });
           }}
           onClose={() => setEmailUser(null)}
+        />
+      )}
+
+      {nameUser === null ? null : (
+        <NameDialog
+          login={nameUser.login}
+          firstName={nameUser.first_name ?? ""}
+          lastName={nameUser.last_name ?? ""}
+          onSave={async (first, last) => {
+            await setUserName(nameUser.id, { first_name: first, last_name: last });
+            await queryClient.invalidateQueries({ queryKey: USERS_KEY });
+          }}
+          onClose={() => setNameUser(null)}
         />
       )}
 
