@@ -228,7 +228,7 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
 Claude Code подключается через локальный процесс `backend/app/agent_mcp.py` (протокол MCP по
 stdio, только стандартная библиотека Python, 11 инструментов), который обращается к API
 трекера по HTTPS. Пошаговая инструкция - `docs/agents.md`, решение и риски -
-`docs/adr/0015-agent-access.md`. Ключ - секрет наравне с паролем: не вставляйте его в текст
+`docs/adr/0020-agent-access.md`. Ключ - секрет наравне с паролем: не вставляйте его в текст
 запроса к модели, не коммитьте и не пересылайте. Прокси с Basic-аутентификацией перед стеком
 не поддерживается: любой заголовок `Authorization` считается ключом агента.
 
@@ -265,7 +265,7 @@ Compose). Веб-часть (frontend внутри образа `web`) при э
 событиях) только добавляет столбцы и таблицу и выполняется автоматически при старте, до
 запуска `api`; перед обновлением сделайте копию БД. Откат ниже `0008`
 (`alembic downgrade 0007`) удаляет все ключи агентов и признак «агент». Порядок и команды - в
-`docs/adr/0015-agent-access.md`, раздел «Порядок обновления».
+`docs/adr/0020-agent-access.md`, раздел «Порядок обновления».
 
 Миграция `0005` (столбец с написанием логина) применяется при старте, до запуска `api`, без
 действий оператора. Прежние логины не меняются: у существующих записей написание равно
@@ -298,7 +298,7 @@ Compose). Веб-часть (frontend внутри образа `web`) при э
 - **Рост журнала событий.** Каждое создание и изменение задачи, создание и прямое удаление
   комментария (людьми и ИИ-агентами) добавляет строку в таблицу событий `domain_event`. Таблица
   только дописывается, `gostracker maintenance` её не очищает: следите за размером БД
-  (`docs/adr/0015-agent-access.md`, «Последствия»).
+  (`docs/adr/0020-agent-access.md`, «Последствия»).
 - **Таймауты.** У `db` заданы `lock_timeout=30s` и `idle_in_transaction_session_timeout=60s`:
   при ожидании блокировки дольше 30 с или при взаимоблокировке запрос получает ответ 503 с кодом
   `service_busy` и заголовком `Retry-After: 5` (повторите через 5 с; интерфейс показывает
@@ -650,7 +650,7 @@ is a member, within its role (editing and deleting comments with a key is forbid
 Claude Code connects through a local process `backend/app/agent_mcp.py` (the MCP protocol over
 stdio, Python standard library only, 11 tools) that calls the tracker API over HTTPS. The
 step-by-step guide (in Russian) is `docs/agents.md`; the decision and its risks are in
-`docs/adr/0015-agent-access.md`. A key is a secret just like a password: do not paste it into a
+`docs/adr/0020-agent-access.md`. A key is a secret just like a password: do not paste it into a
 prompt to the model, do not commit it and do not forward it. A proxy with Basic authentication
 in front of the stack is not supported: any `Authorization` header is treated as an agent key.
 
@@ -688,7 +688,7 @@ Migration `0008` (AI agents: the agent account flag, the access key table, the k
 only adds columns and a table and runs automatically at start, before `api` runs; back up the
 database before upgrading. A downgrade below `0008`
 (`alembic downgrade 0007`) deletes all agent keys and the agent flag. The order and the
-commands are in `docs/adr/0015-agent-access.md`, section "Порядок обновления" (Upgrade order).
+commands are in `docs/adr/0020-agent-access.md`, section "Порядок обновления" (Upgrade order).
 
 Migration `0005` (the column with the login spelling) is applied at start, before `api` runs,
 with no operator action. Existing logins stay unchanged: for existing accounts the
@@ -725,7 +725,7 @@ before a downgrade.
 - **Event log growth.** Every task creation and change, and every comment creation and direct
   deletion (by people and AI agents), adds a row to the `domain_event` event table. The table is
   append-only and `gostracker maintenance` does not clean it: keep an eye on the database size
-  (`docs/adr/0015-agent-access.md`, "Последствия" (Consequences)).
+  (`docs/adr/0020-agent-access.md`, "Последствия" (Consequences)).
 - **Timeouts.** `db` runs with `lock_timeout=30s` and `idle_in_transaction_session_timeout=60s`:
   a request that waits for a lock longer than 30 s, or hits a deadlock, gets a 503 response
   with the code `service_busy` and the `Retry-After: 5` header (retry in 5 s; the UI shows

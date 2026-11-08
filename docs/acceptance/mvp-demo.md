@@ -271,7 +271,7 @@ AC-37 и AC-46 — *ручные*, AC-48 — *вне CI*) и ручные про
   повторе проверки сгенерируйте новый `$FAKE` и учитывайте прежние вхождения):
   `docker compose logs web api | grep -c -- "$FAKE"` — 0;
   `docker compose logs web api | grep -cE 'gtk_[A-Za-z0-9_-]{8}'` — 0. (6) Остаточный риск
-  (принят, ADR-0015):
+  (принят, ADR-0020):
   `curl -s -o /dev/null -w '%{http_code}\n' "http://localhost/api/v1/me?key=$FAKE"` — 308, после
   чего `docker compose logs web | grep -c -- "$FAKE"` — не меньше 1 (журнал сервера 80 пишет
   строку запроса); записать результат как сведения для владельца, не как дефект. В конце —
