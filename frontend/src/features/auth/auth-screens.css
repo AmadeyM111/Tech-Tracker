@@ -151,7 +151,8 @@
 
 /* 360 px: the card keeps 12 px from each edge of the screen (prod check 2026-11-08). */
 @media (max-width: 440px) {
-  .login-card {
+  /* .ui-form sets margin: 2rem auto later in the bundle; two classes beat it (prod check 2026-11-08). */
+  .ui-form.login-card {
     margin-left: 12px;
     margin-right: 12px;
   }
