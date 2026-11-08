@@ -415,6 +415,7 @@ BODY_ROUTES_400 = {
     ("PATCH", "/api/v1/comments/{user_id}"),  # T80
     ("POST", "/api/v1/me/tokens"),  # 020/M20-T06
     ("PUT", "/api/v1/me/name"),  # R8-T05
+    ("PUT", "/api/v1/unassigned-accounts/{user_id}/role"),  # R8-T07
 }
 BAD_JSON_DESCRIPTION = "Некорректный JSON в теле запроса (code: bad_request)"
 

@@ -177,7 +177,7 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Тесты: test_019_onboarding.py 25 passed; с test_user_admin_service.py 149 passed; ruff, mypy чисты; task_scope exit 0. Отклонение: plan §4.3 просит FOR NO KEY UPDATE, в коде `with_for_update(key_share=True)` (SQLAlchemy даёт FOR NO KEY UPDATE этим вызовом; text() не используется). Сериализация обеспечивается advisory-ключом. Принято ревью. Долг: тест на вызов pg_advisory_xact_lock не добавлен (minor).
 
 ## R8-T07 — API: `/unassigned-accounts`
-- **Статус:** TODO
+- **Статус:** DONE (ревью: PASS, 2026-11-08)
 - **AC:** AC-30, AC-26 (API)
 - **Файлы:** `backend/app/api/v1/unassigned_accounts.py` (новый), `backend/app/api/v1/schemas/accounts.py` (новый), `backend/app/api/v1/__init__.py`, `docs/api/openapi.json`, `frontend/src/shared/api/schema.d.ts` (перегенерация);
   тесты: `backend/tests/api/test_019_onboarding_api.py` (новый), `backend/tests/cli/test_openapi.py`, `backend/tests/cli/test_openapi_roles.py`
@@ -191,7 +191,7 @@ T17, T19, T20, T21), тоже последовательно.
   и `GET /admin/audit`; ответ списка без ключа `email`; AC-26: после назначения от БА `GET /projects` той же сессией
   пользователя → 200, в `/admin/audit` (от ТА) `user.role_assigned` с `actor_id` = БА.
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/api/test_019_onboarding_api.py backend/tests/api/test_route_guards.py backend/tests/api/test_admin_roles.py` зелёный; «Перегенерация API» выполнена; «Линт бэкенда» чист
-- **Попытки:** 0
+- **Попытки:** 1. Тесты: 193 passed (наборы из задачи), ruff, mypy чисты, task_scope exit 0. Ревью PASS. Долг (minor, добавить в T22): тест AC-30 через /admin/users/{id}/role для записи, назначенной БА; тест роль-less → 403 no_role; заблокированный БА → 401 not_authenticated (поведение deps, план §4.4 даёт 401); docstring unassigned_accounts.py про 403 «для любого тела» уточнить (битый JSON даёт 400).
 
 ## R8-T08 — Лимиты регистрации и шаблон письма
 - **Статус:** TODO
@@ -509,7 +509,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T04 | DONE |
 | R8-T05 | DONE |
 | R8-T06 | DONE |
-| R8-T07 | TODO |
+| R8-T07 | DONE |
 | R8-T08 | TODO |
 | R8-T09 | TODO |
 | R8-T10 | TODO |
