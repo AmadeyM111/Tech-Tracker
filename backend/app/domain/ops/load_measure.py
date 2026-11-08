@@ -16,8 +16,7 @@ from __future__ import annotations
 import asyncio
 import math
 import random
-from collections.abc import AsyncIterator, Sequence
-from contextlib import asynccontextmanager
+from collections.abc import Sequence
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Any, Final, Literal
@@ -136,25 +135,25 @@ def _request(
     return path, []
 
 
+def _describe(response: httpx.Response) -> str:
+    """Статус и код ошибки API (``code``) без тела и без секретов."""
+    try:
+        code = response.json().get("code", "")
+    except ValueError:
+        code = ""
+    return f"HTTP {response.status_code}" + (f" ({code})" if code else "")
+
+
 async def _login(client: httpx.AsyncClient, login: str, password: str) -> None:
     response = await client.post(f"{API}/auth/login", json={"login": login, "password": password})
     if response.status_code != 200:
-        raise MeasureError(f"вход отклонён: HTTP {response.status_code}")
-
-
-@asynccontextmanager
-async def _session(
-    base_url: str, transport: httpx.AsyncBaseTransport | None, login: str, password: str
-) -> AsyncIterator[httpx.AsyncClient]:
-    async with httpx.AsyncClient(base_url=base_url, transport=transport, timeout=30.0) as client:
-        await _login(client, login, password)
-        yield client
+        raise MeasureError(f"вход отклонён: {_describe(response)}")
 
 
 async def _get_json(client: httpx.AsyncClient, path: str, params: Sequence[tuple[str, str]]) -> Any:
     response = await client.get(path, params=tuple(params))
     if response.status_code != 200:
-        raise MeasureError(f"подготовка пула: HTTP {response.status_code}")
+        raise MeasureError(f"подготовка пула: {_describe(response)}")
     return response.json()
 
 
@@ -193,17 +192,40 @@ async def _timed_get(
     response = await client.get(path, params=tuple(params))
     elapsed_ms = (perf_counter() - started) * 1000
     if response.status_code != 200:
-        raise MeasureError(f"{op.name}: HTTP {response.status_code}")
+        raise MeasureError(f"{op.name}: {_describe(response)}")
     return elapsed_ms
 
 
-async def _client_run(
-    index: int,
-    *,
+async def _open_clients(
     base_url: str,
     transport: httpx.AsyncBaseTransport | None,
     login: str,
     password: str,
+    count: int,
+) -> list[httpx.AsyncClient]:
+    """Клиенты с сессиями. Входы строго по очереди: параллельные входы одного пользователя
+    занимают попытки перебора (FR-61), пятый вход получает блокировку на 15 минут."""
+    sessions: list[httpx.AsyncClient] = []
+    try:
+        for _ in range(count):
+            client = httpx.AsyncClient(base_url=base_url, transport=transport, timeout=30.0)
+            sessions.append(client)
+            await _login(client, login, password)
+    except BaseException:
+        await _close_all(sessions)
+        raise
+    return sessions
+
+
+async def _close_all(clients: Sequence[httpx.AsyncClient]) -> None:
+    for client in clients:
+        await client.aclose()
+
+
+async def _client_run(
+    client: httpx.AsyncClient,
+    index: int,
+    *,
     operations: Sequence[Operation],
     pool: _Pool,
     samples: int,
@@ -211,31 +233,11 @@ async def _client_run(
 ) -> dict[str, list[float]]:
     rng = random.Random(seed * 1000 + index)
     recorded: dict[str, list[float]] = {op.name: [] for op in operations}
-    async with _session(base_url, transport, login, password) as client:
-        for round_no in range(samples):
-            for op in operations:
-                path, params = _request(op, round_no, pool, rng)
-                recorded[op.name].append(await _timed_get(client, op, path, params))
+    for round_no in range(samples):
+        for op in operations:
+            path, params = _request(op, round_no, pool, rng)
+            recorded[op.name].append(await _timed_get(client, op, path, params))
     return recorded
-
-
-async def _warm_up(
-    base_url: str,
-    transport: httpx.AsyncBaseTransport | None,
-    login: str,
-    password: str,
-    operations: Sequence[Operation],
-    rounds: int,
-    seed: int,
-) -> _Pool:
-    rng = random.Random(seed)
-    async with _session(base_url, transport, login, password) as client:
-        pool = await _build_pool(client, rng)
-        for round_no in range(rounds):
-            for op in operations:
-                path, params = _request(op, round_no, pool, rng)
-                await _timed_get(client, op, path, params)
-    return pool
 
 
 async def measure(
@@ -250,26 +252,32 @@ async def measure(
     seed: int = 0,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> list[OperationStats]:
-    """Прогрев, затем ``clients`` параллельных клиентов по ``samples`` раундов; статистика."""
+    """Сессии, прогрев, затем ``clients`` параллельных клиентов по ``samples`` раундам."""
     if clients < 1 or samples < 1 or warmup_rounds < 0:
         raise ValueError("clients и samples должны быть не меньше 1, warmup_rounds — не меньше 0")
-    pool = await _warm_up(base_url, transport, login, password, operations, warmup_rounds, seed)
-    runs = await asyncio.gather(
-        *(
-            _client_run(
-                index,
-                base_url=base_url,
-                transport=transport,
-                login=login,
-                password=password,
-                operations=operations,
-                pool=pool,
-                samples=samples,
-                seed=seed,
+    sessions = await _open_clients(base_url, transport, login, password, clients)
+    try:
+        warm = random.Random(seed)
+        pool = await _build_pool(sessions[0], warm)
+        for round_no in range(warmup_rounds):
+            for op in operations:
+                path, params = _request(op, round_no, pool, warm)
+                await _timed_get(sessions[0], op, path, params)
+        runs = await asyncio.gather(
+            *(
+                _client_run(
+                    client,
+                    index,
+                    operations=operations,
+                    pool=pool,
+                    samples=samples,
+                    seed=seed,
+                )
+                for index, client in enumerate(sessions)
             )
-            for index in range(clients)
         )
-    )
+    finally:
+        await _close_all(sessions)
     stats: list[OperationStats] = []
     for op in operations:
         merged = [value for run in runs for value in run[op.name]]
