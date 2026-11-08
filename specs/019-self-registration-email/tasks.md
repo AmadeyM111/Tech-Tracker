@@ -290,7 +290,7 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Тесты: 262 passed; ruff, mypy, scope чисты. Ревью PASS. Правки по ревью: фразы README (RU/EN) и справка CLI уточнены, data-model.md фраза про команду. Долг (minor, T22): тест сохранности сессий при очистке заявок; имя теста test_t88_readme_maintenance_is_sessions_only_no_trash в test_docs_static.py устарело; сигнатура принимает sessionmaker (соответствует plan §4.3).
 
 ## R8-T13 — Экспорт и импорт: имена есть, заявок и попыток нет
-- **Статус:** TODO
+- **Статус:** DONE (ревью: PASS; 2026-11-08)
 - **AC:** AC-37
 - **Файлы:** `backend/app/domain/ops/archive.py`, `backend/app/domain/ops/importer.py`;
   тесты: `backend/tests/cli/test_019_export_names.py` (новый), `backend/tests/cli/test_export_import.py`
@@ -302,7 +302,7 @@ T17, T19, T20, T21), тоже последовательно.
   содержит `email`, заявок и попыток (даже если строки есть в БД); импорт в пустую БД восстанавливает имена, email
   NULL; цикл export→import→export идентичен.
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/cli/test_019_export_names.py backend/tests/cli/test_export_import.py backend/tests/cli/test_demo_data.py` зелёный; «Линт бэкенда» чист
-- **Попытки:** 0
+- **Попытки:** 1. Тесты: 65 passed; ruff, mypy, scope чисты. Ревью PASS. Изменён индекс в test_007_archive_constants_describe_exclusions: AUTO_TABLES[:2] → [2:4] (сдвиг по plan §4.5, точное равенство сохранено; префикс проверяется в test_019_export_names.py).
 
 ## R8-T14 — Бэкенд: сквозные сценарии, утечки, аудит, управление ТА
 - **Статус:** TODO
@@ -517,7 +517,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T10 | DONE |
 | R8-T11 | DONE |
 | R8-T12 | DONE |
-| R8-T13 | TODO |
+| R8-T13 | DONE |
 | R8-T14 | TODO |
 | R8-T15 | TODO |
 | R8-T16 | TODO |
