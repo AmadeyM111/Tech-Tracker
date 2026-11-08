@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     initial_admin_login: str = "admin"
     attachment_max_bytes: int = 10 * 1024 * 1024  # 10 485 760, включительно
     attachments_per_task: int = 20
+    # [011] загрузка вложений запрещена, если свободно меньше (МБ) в DATA_DIR (R2-40, Q-2)
+    attachments_min_free_mb: int = 500
     trash_retention: timedelta = timedelta(days=30)
     # [007] отправка писем; без smtp_host функция сброса пароля выключена
     smtp_host: str | None = None
@@ -57,6 +59,8 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     smtp_starttls: bool = True
     public_base_url: str | None = None
+    # [010] рабочая роль БД процесса API; пусто — API под DATABASE_URL (только не production)
+    db_app_role: str | None = None
     # [009] резервные копии: каталог (том /backups), сколько хранить, порог «устарела», ч
     backup_dir: Path = Path("/backups")
     backup_keep: int = Field(14, ge=1)
@@ -87,6 +91,7 @@ class Settings(BaseSettings):
         "smtp_password",
         "smtp_from",
         "public_base_url",
+        "db_app_role",
         mode="before",
     )
     @classmethod

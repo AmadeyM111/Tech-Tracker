@@ -89,6 +89,8 @@ def start_api(name: str, volume: str, dsn: str = DSN) -> None:
         "-e",
         "COOKIE_SECURE=true",
         "-e",
+        "DB_APP_ROLE=gtrack_app",  # 010: в production API идёт под рабочей ролью
+        "-e",
         "DATA_DIR=/data",
         "-e",
         "ARGON2_TIME_COST=1",

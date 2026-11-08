@@ -58,6 +58,7 @@ REPORT_KEYS = [
     "files_removed",
     "orphan_files_removed",
     "registration_requests_expired",
+    "notifications_purged",  # spec 012 FR-9
 ]
 
 

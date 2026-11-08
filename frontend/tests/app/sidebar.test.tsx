@@ -23,8 +23,9 @@ const CREATE_TASK = ru["nav.create_task"];
 const DICT = Object.values(ru) as string[];
 // 019/R8-T21: the business admin holds onboard_accounts (RG-11), so the BA menu has the "Without role" item.
 const BA_CAPS = ["business_access", "project_create", "task_assign_others", "onboard_accounts"];
-const BA_MENU = ["/projects", "/my-tasks", AGENTS_PATH, "/unassigned-accounts", "/profile"];
-const U_MENU = ["/projects", "/my-tasks", AGENTS_PATH, "/profile"];
+// 008/FR-1: «Сводка» — третья ссылка меню бизнес-ролей
+const BA_MENU = ["/projects", "/my-tasks", "/summary", "/notifications", AGENTS_PATH, "/unassigned-accounts", "/profile"];
+const U_MENU = ["/projects", "/my-tasks", "/summary", "/notifications", AGENTS_PATH, "/profile"];
 const U_CAPS = ["business_access"];
 const capsFor = (role: string) => (role === "business_admin" ? BA_CAPS : U_CAPS);
 const TASK_ID = "44444444-4444-4444-8444-444444444444";
@@ -214,13 +215,13 @@ describe("AC-30 tab order of the BA /projects screen", () => {
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
     const form = container.querySelector<HTMLElement>('form[data-form="create-project"]')!;
     const firstInForm = tabbable.find((el) => form.contains(el))!;
-    // 019/R8-T21 + ADR-0018: the BA menu has five links ("Agent access", "Without role", then "Profile")
-    const labels = tabbable.slice(0, 8);
-    expect(labels.slice(0, 5).map((el) => el.getAttribute("href"))).toEqual(BA_MENU);
+    // 019/R8-T21 + ADR-0018 + 008/FR-1 + 012/FR-5: семь ссылок меню БА («Сводка», «Уведомления»)
+    const labels = tabbable.slice(0, 10);
+    expect(labels.slice(0, 7).map((el) => el.getAttribute("href"))).toEqual(BA_MENU);
     // 004/AC-12: ссылки меню, «Задача», «Выйти», затем содержимое
-    expect(labels[5]?.getAttribute("data-action")).toBe("create-task");
-    expect(labels[6]?.getAttribute("data-action")).toBe("logout");
-    expect(labels[7]).toBe(firstInForm);
+    expect(labels[7]?.getAttribute("data-action")).toBe("create-task");
+    expect(labels[8]?.getAttribute("data-action")).toBe("logout");
+    expect(labels[9]).toBe(firstInForm);
   });
 });
 
@@ -233,12 +234,12 @@ describe("AC-30 tab order of the U /my-tasks screen (004/AC-12)", () => {
     const tabbable = Array.from(
       container.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
-    expect(tabbable.slice(0, 4).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks", AGENTS_PATH, "/profile"]);
-    expect(tabbable[4]?.getAttribute("data-action")).toBe("create-task");
-    expect(tabbable[5]?.getAttribute("data-action")).toBe("logout");
+    expect(tabbable.slice(0, 6).map((el) => el.getAttribute("href"))).toEqual(U_MENU);
+    expect(tabbable[6]?.getAttribute("data-action")).toBe("create-task");
+    expect(tabbable[7]?.getAttribute("data-action")).toBe("logout");
     // дальше - содержимое экрана, не меню
-    expect(tabbable[6]).toBe(taskLink);
-    expect(tabbable[6]?.closest(".ui-sidebar") ?? null).toBeNull();
+    expect(tabbable[8]).toBe(taskLink);
+    expect(tabbable[8]?.closest(".ui-sidebar") ?? null).toBeNull();
   });
 });
 

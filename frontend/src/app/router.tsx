@@ -17,6 +17,9 @@ import { RegisterConfirmPage } from "../features/auth/RegisterConfirmPage";
 import { RegisterPage } from "../features/auth/RegisterPage";
 import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
 import { MyTasksPage } from "../features/tasks/TaskList";
+import { SummaryPage } from "../features/overview/SummaryPage";
+import { NotificationsMenuItem } from "../features/notifications/Badge";
+import { NotificationsPage } from "../features/notifications/NotificationsPage";
 import { TaskPage } from "../features/tasks/TaskPage";
 import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
@@ -140,6 +143,17 @@ function MenuItems({ profile }: { profile: MeResponse }) {
               <Icon name="tasks" />
               {t("nav.my_tasks")}
             </NavLink>
+          </p>
+          {/* 008/FR-1: «Сводка» — пункт меню, стартовый экран не меняется (Q-10) */}
+          <p>
+            <NavLink to="/summary">
+              <Icon name="tasks" />
+              {t("nav.summary")}
+            </NavLink>
+          </p>
+          {/* 012/FR-5: уведомления со счётчиком непрочитанных */}
+          <p>
+            <NotificationsMenuItem />
           </p>
         </>
       ) : null}
@@ -483,6 +497,22 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/profile/agents"
         element={
           <RoleScreen insideMain={insideMain}>{() => <AgentAccessPage />}</RoleScreen>
+        }
+      />
+      <Route
+        path="/summary"
+        element={
+          <RoleScreen insideMain={insideMain} capability="business_access">
+            {() => <SummaryPage />}
+          </RoleScreen>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <RoleScreen insideMain={insideMain} capability="business_access">
+            {() => <NotificationsPage />}
+          </RoleScreen>
         }
       />
       <Route

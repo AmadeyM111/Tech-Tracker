@@ -12,7 +12,8 @@
 (``registration_request``, ``registration_attempt``) и колонка ``app_user.email``
 не выгружаются. Неподтверждённые заявки и токены в архив не попадают; имя, фамилия
 и ``self_registered`` учётных записей выгружаются (ADR-0019).
-Членов ``files/`` в этой версии нет: вложений в схеме пока нет.
+Файлы живых вложений (spec 011 FR-11) — члены ``files/<storage_key>``; при импорте их набор и sha256
+сверяются со строками ``attachment`` из ``data.json``.
 Всё, что не совпадает с ожидаемым форматом, отвергается как ``ImportRefused``.
 """
 
@@ -21,16 +22,18 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import tarfile
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Final
+from typing import IO, Any, Final
 from uuid import UUID
 
 import sqlalchemy as sa
 
 # Регистрация всех таблиц в Base.metadata до обхода (без импорта таблицы не попадут в архив).
+import app.domain.attachments.models  # noqa: F401
 import app.domain.auth.models  # noqa: F401
 import app.domain.comments.models  # noqa: F401
 import app.domain.events.models  # noqa: F401
@@ -62,6 +65,9 @@ EXCLUDED_TABLES: Final = frozenset(
 # Колонки, не попадающие в архив (персональные данные); после импорта они NULL.
 EXCLUDED_COLUMNS: Final[Mapping[str, frozenset[str]]] = {"app_user": frozenset({"email"})}
 MAX_DATA_BYTES: Final = 1024 * 1024 * 1024  # 1 GiB: защита от архива-бомбы
+FILES_PREFIX: Final = "files/"
+_FILE_MEMBER: Final = re.compile(r"files/([0-9a-f]{32})")
+MAX_FILE_BYTES: Final = 64 * 1024 * 1024  # больше лимита вложения с запасом
 
 
 class ImportRefused(Exception):
@@ -122,8 +128,8 @@ def payload_bytes(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
 
 
-def write_archive(data: bytes, out: Path) -> None:
-    """Пишет tar с ``data.json`` атомарно; файл создаётся с режимом 0600."""
+def write_archive(data: bytes, out: Path, files: Mapping[str, Path] | None = None) -> None:
+    """Пишет tar с ``data.json`` и ``files/<ключ>`` атомарно; файл создаётся с режимом 0600."""
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_name(out.name + ".partial")
     try:
@@ -134,6 +140,13 @@ def write_archive(data: bytes, out: Path) -> None:
             info.mode = 0o600
             info.mtime = 0
             tar.addfile(info, io.BytesIO(data))
+            for key, path in sorted((files or {}).items()):
+                member = tarfile.TarInfo(f"{FILES_PREFIX}{key}")
+                member.size = path.stat().st_size
+                member.mode = 0o600
+                member.mtime = 0
+                with path.open("rb") as handle:
+                    tar.addfile(member, handle)
         os.chmod(tmp, 0o600)
         os.replace(tmp, out)
     except BaseException:
@@ -141,23 +154,77 @@ def write_archive(data: bytes, out: Path) -> None:
         raise
 
 
-def read_data_member(path: Path) -> bytes:
-    """Читает ``data.json`` из архива; любые другие члены — отказ (безопасное чтение)."""
+def read_archive(path: Path) -> tuple[bytes, dict[str, int]]:
+    """``data.json`` и ``{ключ: размер}`` файлов вложений; прочие члены — отказ."""
     try:
         with tarfile.open(path, mode="r:") as tar:
-            return _single_member_bytes(tar)
+            return _scan(tar)
     except tarfile.ReadError as exc:
         raise ImportRefused("файл не является архивом экспорта") from exc
 
 
-def _single_member_bytes(tar: tarfile.TarFile) -> bytes:
-    members = tar.getmembers()
-    if len(members) != 1 or members[0].name != DATA_MEMBER or not members[0].isreg():
-        raise ImportRefused(f"архив должен содержать только {DATA_MEMBER}")
-    member = members[0]
+def read_data_member(path: Path) -> bytes:
+    """Читает ``data.json`` из архива (безопасное чтение, см. ``read_archive``)."""
+    return read_archive(path)[0]
+
+
+def iter_files(path: Path) -> Iterator[tuple[str, IO[bytes]]]:
+    """Члены ``files/<ключ>`` по одному (потоково); вызывать после ``read_archive``."""
+    with tarfile.open(path, mode="r:") as tar:
+        for member in tar:
+            match = _FILE_MEMBER.fullmatch(member.name)
+            if match is None:
+                continue
+            handle = tar.extractfile(member)
+            if handle is None:
+                raise ImportRefused(f"не удалось прочитать {member.name}")
+            yield match.group(1), handle
+
+
+def _scan(tar: tarfile.TarFile) -> tuple[bytes, dict[str, int]]:
+    data: bytes | None = None
+    files: dict[str, int] = {}
+    for member in tar.getmembers():
+        if not member.isreg():
+            raise ImportRefused(f"недопустимый член архива: {member.name}")
+        if member.name == DATA_MEMBER:
+            if data is not None:
+                raise ImportRefused(f"{DATA_MEMBER} встречается дважды")
+            data = _member_bytes(tar, member)
+            continue
+        match = _FILE_MEMBER.fullmatch(member.name)
+        if match is None or match.group(1) in files or member.size > MAX_FILE_BYTES:
+            raise ImportRefused(
+                f"архив должен содержать только {DATA_MEMBER} и {FILES_PREFIX}<ключ>"
+            )
+        files[match.group(1)] = member.size
+    if data is None:
+        raise ImportRefused(f"в архиве нет {DATA_MEMBER}")
+    return data, files
+
+
+def _member_bytes(tar: tarfile.TarFile, member: tarfile.TarInfo) -> bytes:
     if member.size > MAX_DATA_BYTES:
         raise ImportRefused("data.json больше допустимого размера")
     handle = tar.extractfile(member)
     if handle is None:
         raise ImportRefused(f"не удалось прочитать {DATA_MEMBER}")
     return handle.read()
+
+
+def expected_files(rows: Mapping[str, list[dict[str, Any]]]) -> dict[str, tuple[str, int]]:
+    """Файлы, которые должны быть в архиве: живые вложения ``{ключ: (sha256, размер)}``."""
+    return {
+        str(r["storage_key"]): (str(r["sha256"]), int(r["size_bytes"]))
+        for r in rows.get("attachment", [])
+        if r.get("deleted_at") is None
+    }
+
+
+def match_files(expected: Mapping[str, tuple[str, int]], present: Mapping[str, int]) -> None:
+    """Набор и размеры файлов архива совпадают с живыми вложениями ``data.json``."""
+    if set(expected) != set(present):
+        raise ImportRefused("файлы вложений в архиве не совпадают с data.json")
+    for key, (_sha, size) in expected.items():
+        if present[key] != size:
+            raise ImportRefused(f"размер файла вложения {key} не совпадает с data.json")

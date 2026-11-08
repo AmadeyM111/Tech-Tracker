@@ -9,6 +9,8 @@ export interface ConfirmDialogProps {
   pending: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Label of the confirm button; default «Подтвердить» (011: «Удалить» по макету). */
+  confirmLabel?: string;
 }
 
 /**
@@ -70,7 +72,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
           {t("admin.cancel")}
         </button>{" "}
         <button type="button" data-action="confirm" ref={confirmRef} disabled={pending} onClick={onConfirm}>
-          {t("admin.confirm")}
+          {props.confirmLabel ?? t("admin.confirm")}
         </button>
       </div>
     </div>

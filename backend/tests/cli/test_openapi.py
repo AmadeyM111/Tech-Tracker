@@ -420,6 +420,7 @@ BODY_ROUTES_400 = {
     ("POST", "/api/v1/me/tokens"),  # 020/M20-T06
     ("PUT", "/api/v1/me/name"),  # R8-T05
     ("PUT", "/api/v1/unassigned-accounts/{user_id}/role"),  # R8-T07
+    ("POST", "/api/v1/me/notifications/read"),  # 012/N12-T03
 }
 BAD_JSON_DESCRIPTION = "Некорректный JSON в теле запроса (code: bad_request)"
 
@@ -429,7 +430,8 @@ def test_t68_400_declared_exactly_on_routes_with_body(spec: dict[str, Any]) -> N
     declared: set[tuple[str, str]] = set()
     for method, path, op in _operations(spec):
         has_400 = "400" in op["responses"]
-        has_body = "requestBody" in op
+        # 011: загрузка вложения — сырое тело (application/octet-stream), JSON нет и 400 не бывает
+        has_body = "application/json" in op.get("requestBody", {}).get("content", {})
         assert has_400 == has_body, (method, path)
         if has_400:
             declared.add((method, path))

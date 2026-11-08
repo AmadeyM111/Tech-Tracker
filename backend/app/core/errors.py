@@ -87,6 +87,8 @@ class ErrorCode(StrEnum):
     # [019]
     first_name_invalid = "first_name_invalid"
     last_name_invalid = "last_name_invalid"
+    # [011]
+    attachment_empty = "attachment_empty"
 
 
 class AppError(Exception):
@@ -191,6 +193,22 @@ class PayloadTooLarge(AppError):
     status_code = 413
     code = "attachment_too_large"
     default_detail = "Файл слишком большой"
+
+
+class TooManyAttachments(AppError):
+    """409: у задачи уже ``ATTACHMENTS_PER_TASK`` живых вложений (spec 011 FR-3)."""
+
+    status_code = 409
+    code = "too_many_attachments"
+    default_detail = "У задачи слишком много вложений"
+
+
+class StorageFull(AppError):
+    """507: на диске данных меньше ``ATTACHMENTS_MIN_FREE_MB`` (spec 011 FR-10, R2-40)."""
+
+    status_code = 507
+    code = "storage_full"
+    default_detail = "Недостаточно места для файлов. Обратитесь к администратору"
 
 
 class ServiceBusy(AppError):

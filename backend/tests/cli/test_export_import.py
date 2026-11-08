@@ -162,11 +162,12 @@ def _tar_with(members: dict[str, bytes], path: Path) -> Path:
 @pytest.mark.parametrize(
     "members",
     [
-        {DATA_MEMBER: b"{}", "files/0123456789abcdef0123456789abcdef": b"x"},
+        {DATA_MEMBER: b"{}", "files/../0123456789abcdef0123456789abcdef": b"x"},
+        {DATA_MEMBER: b"{}", "files/NOT-A-KEY": b"x"},
         {"../evil.json": b"{}"},
         {"other.json": b"{}"},
     ],
-    ids=["extra-file", "path-traversal", "wrong-name"],
+    ids=["file-traversal", "file-bad-key", "path-traversal", "wrong-name"],
 )
 def test_unsafe_archive_is_refused(tmp_path: Path, members: dict[str, bytes]) -> None:
     from app.domain.ops.archive import read_data_member
@@ -493,3 +494,144 @@ async def test_007_archive_of_schema_0007_is_refused_by_version(
     payload["schema_version"] = "0007"
     with pytest.raises(ImportRefused, match="версия схемы"):
         parse_rows(payload_bytes(payload), schema_version=schema_head())
+
+
+# --- 011/AC-10: вложения в экспорте и импорте ------------------------------------------------
+
+
+def test_011_unreferenced_or_missing_files_are_refused() -> None:
+    """Файл без живого вложения или вложение без файла — отказ (``files/`` = ``data.json``)."""
+    from app.domain.ops.archive import match_files
+
+    key = "0123456789abcdef0123456789abcdef"
+    with pytest.raises(ImportRefused, match="не совпадают"):
+        match_files({}, {key: 1})  # бывший случай «extra-file»
+    with pytest.raises(ImportRefused, match="не совпадают"):
+        match_files({key: ("a" * 64, 1)}, {})
+    with pytest.raises(ImportRefused, match="размер"):
+        match_files({key: ("a" * 64, 1)}, {key: 2})
+
+
+async def _add_attachment(sm: Any, settings: Settings, body: bytes) -> str:
+    import hashlib
+    import uuid
+
+    from app.domain.attachments.models import Attachment
+    from app.domain.attachments.storage import final_path
+    from app.domain.projects.models import Project
+    from app.domain.tasks.models import Task
+
+    async with sm() as s:
+        task = (await s.execute(select(Task).limit(1))).scalar_one()
+        project = (
+            await s.execute(select(Project).where(Project.id == task.project_id))
+        ).scalar_one()
+        key = uuid.uuid4().hex
+        s.add(
+            Attachment(
+                workspace_id=task.workspace_id,
+                task_id=task.id,
+                project_id=project.id,
+                created_by=project.owner_id,
+                original_name="протокол.pdf",
+                kind="pdf",
+                content_type="application/pdf",
+                size_bytes=len(body),
+                sha256=hashlib.sha256(body).hexdigest(),
+                storage_key=key,
+                created_at=FIXED_NOW,
+                updated_at=FIXED_NOW,
+            )
+        )
+        await s.commit()
+    path = final_path(settings.attachments_dir, key)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(body)
+    return key
+
+
+async def test_011_ac10_roundtrip_keeps_attachment_files(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings],
+    test_database_url: str,
+    tmp_path: Path,
+) -> None:
+    import hashlib
+
+    from app.domain.attachments.storage import final_path
+    from app.domain.ops.export import export_archive
+
+    sm, engine, settings = filled
+    body = b"%PDF-1.4 synthetic attachment"
+    key = await _add_attachment(sm, settings, body)
+    archive = tmp_path / "export.tar"
+    await export_archive(settings, archive, schema_version=schema_head(), exported_at=FIXED_NOW)
+    with tarfile.open(archive) as tar:
+        assert f"files/{key}" in tar.getnames()
+    first = await _export_payload(engine)
+
+    await _reset_schema(engine, test_database_url)
+    fresh = settings.model_copy(update={"data_dir": tmp_path / "fresh-data"})
+    await _bootstrap(sm, fresh)
+    await import_archive(fresh, archive, schema_version=schema_head())
+    restored = final_path(fresh.attachments_dir, key)
+    assert hashlib.sha256(restored.read_bytes()).hexdigest() == hashlib.sha256(body).hexdigest()
+    second = await _export_payload(engine)
+    assert _strip_timestamp(second) == _strip_timestamp(first)
+
+
+async def test_011_ac10_tampered_file_is_refused_before_db(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings],
+    test_database_url: str,
+    tmp_path: Path,
+) -> None:
+    from app.domain.ops.export import export_archive
+
+    sm, engine, settings = filled
+    key = await _add_attachment(sm, settings, b"%PDF-original")
+    archive = tmp_path / "export.tar"
+    await export_archive(settings, archive, schema_version=schema_head(), exported_at=FIXED_NOW)
+    with tarfile.open(archive) as tar:
+        members = {m.name: tar.extractfile(m).read() for m in tar.getmembers()}  # type: ignore[union-attr]
+    members[f"files/{key}"] = b"%PDF-changed!"  # тот же размер, другое содержимое
+    bad = _tar_with(members, tmp_path / "bad.tar")
+
+    await _reset_schema(engine, test_database_url)
+    fresh = settings.model_copy(update={"data_dir": tmp_path / "fresh-data"})
+    await _bootstrap(sm, fresh)
+    users_before = await _count(engine, AppUser)
+    with pytest.raises(ImportRefused, match="контрольная сумма"):
+        await import_archive(fresh, bad, schema_version=schema_head())
+    assert await _count(engine, AppUser) == users_before
+    leftovers = list((fresh.attachments_dir / ".incoming").glob("*"))
+    assert leftovers == []
+
+
+async def test_011_export_fails_when_attachment_file_is_missing(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings], tmp_path: Path
+) -> None:
+    from app.domain.attachments.storage import final_path
+    from app.domain.ops.export import ExportError, export_archive
+
+    sm, _engine, settings = filled
+    key = await _add_attachment(sm, settings, b"%PDF-x")
+    final_path(settings.attachments_dir, key).unlink()
+    with pytest.raises(ExportError, match=key):
+        await export_archive(
+            settings, tmp_path / "e.tar", schema_version=schema_head(), exported_at=FIXED_NOW
+        )
+
+
+async def test_011_export_fails_when_attachment_file_is_corrupted(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings], tmp_path: Path
+) -> None:
+    """Повреждённый файл обнаруживается при экспорте, а не при восстановлении (ревью 011, п. 4)."""
+    from app.domain.attachments.storage import final_path
+    from app.domain.ops.export import ExportError, export_archive
+
+    sm, _engine, settings = filled
+    key = await _add_attachment(sm, settings, b"%PDF-good")
+    final_path(settings.attachments_dir, key).write_bytes(b"%PDF-bad!")
+    with pytest.raises(ExportError, match="повреждён"):
+        await export_archive(
+            settings, tmp_path / "e.tar", schema_version=schema_head(), exported_at=FIXED_NOW
+        )

@@ -775,3 +775,106 @@ h1 input[name="title"] {
   border-color: var(--danger);
   color: var(--danger);
 }
+
+/* 012 «Уведомления» (макеты Shared/Design/gtrack-r2-attachments-notifications, утверждены 2026-11-08) */
+.nav-badge {
+  display: inline-block;
+  margin-left: 8px;
+  min-width: 1.5rem;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 600;
+  text-align: center;
+}
+.notif-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.notif-toolbar p {
+  margin: 0;
+}
+.notif-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.notif {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.notif.is-unread {
+  border-left: 4px solid var(--accent);
+}
+.notif-title {
+  font-weight: 600;
+}
+.notif-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.notif-meta {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-muted);
+}
+.notif-actions {
+  display: flex;
+  align-items: flex-start;
+}
+.notif-actions button {
+  min-height: 44px;
+  padding: 8px 14px;
+}
+.notif-empty {
+  margin: 12px 0;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.notif-empty p {
+  margin: 0;
+}
+.notif-empty p + p {
+  margin-top: 6px;
+}
+.ui-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  text-decoration: underline;
+}
+.mention {
+  color: var(--accent);
+  font-weight: 600;
+}
+.mention-hint {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+}
+@media (max-width: 719px) {
+  .notif {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

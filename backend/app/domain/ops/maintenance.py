@@ -1,8 +1,9 @@
 """Регулярное обслуживание (plan §4.13, §4.3, §10.4; D-42, FR-25b, NFR-9).
 
 ``run_maintenance`` собирает отчёт о выполненных (или, при ``dry_run``, только подсчитанных)
-действиях. Заполняются ``sessions_expired`` (T31) и ``registration_requests_expired`` (R8-T12);
-счётчики корзины и файлов (T54) пока равны 0. События в журнал не пишутся.
+действиях: истёкшие сессии (T31), заявки регистрации (R8-T12) и вложения — корзина и
+файлы-сироты (spec 011). Корзина проектов, задач и комментариев — R3, их счётчики равны 0. События
+в журнал не пишутся.
 """
 
 from __future__ import annotations
@@ -10,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from app.domain.attachments.purge import purge_attachments
+from app.domain.notifications.due import purge_notifications
 from app.domain.system.maintenance import (
     purge_expired_registration_requests,
     purge_expired_sessions,
@@ -35,6 +38,7 @@ class MaintenanceReport:
     files_removed: int = 0
     orphan_files_removed: int = 0
     registration_requests_expired: int = 0
+    notifications_purged: int = 0  # spec 012 FR-9: старше 90 дней
 
 
 async def run_maintenance(
@@ -57,8 +61,14 @@ async def run_maintenance(
         now=now,
         dry_run=dry_run,
     )
+    files = await purge_attachments(sessionmaker, settings, now=clock.now(), dry_run=dry_run)
+    notes = await purge_notifications(sessionmaker, now=clock.now(), dry_run=dry_run)
     return MaintenanceReport(
         dry_run=dry_run,
         sessions_expired=sessions_expired,
         registration_requests_expired=registration_requests_expired,
+        attachments_purged=files.attachments_purged,
+        files_removed=files.files_removed,
+        orphan_files_removed=files.orphan_files_removed,
+        notifications_purged=notes,
     )

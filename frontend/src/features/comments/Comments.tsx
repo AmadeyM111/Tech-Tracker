@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { usePolledQuery } from "../../shared/api/polling";
+import { MentionSuggest, MentionText, insertMention, mentionAt, useMentionOptions } from "./MentionSuggest";
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
@@ -46,6 +47,8 @@ export interface CommentsProps {
   alert: AlertState;
   /** True while the card itself shows a load error: the list does not add a second alert. */
   suppressLoadError?: boolean;
+  /** 012/FR-2: project of the task — «@» suggests its members; null — no suggestions. */
+  projectId?: string | null;
 }
 
 interface ItemProps {
@@ -152,7 +155,7 @@ function CommentItem({ comment, pending, alert, onSave, onDelete }: ItemProps) {
       ) : (
         <>
           <p data-field="body" style={{ whiteSpace: "pre-wrap" }}>
-            {comment.body}
+            <MentionText text={comment.body ?? ""} />
           </p>
           {comment.permissions.edit ? (
             <button type="button" data-action="edit-comment" ref={editRef} onClick={open}>
@@ -173,7 +176,7 @@ function CommentItem({ comment, pending, alert, onSave, onDelete }: ItemProps) {
   );
 }
 
-export function Comments({ taskId, alert, suppressLoadError = false }: CommentsProps) {
+export function Comments({ taskId, alert, suppressLoadError = false, projectId = null }: CommentsProps) {
   const baseId = useId();
   const queryClient = useQueryClient();
   const busy = useRef(false);
@@ -183,6 +186,41 @@ export function Comments({ taskId, alert, suppressLoadError = false }: CommentsP
   const focusHeading = useRef(false);
   const [page, setPage] = useState(1);
   const [text, setText] = useState("");
+  const [caret, setCaret] = useState(0);
+  const [active, setActive] = useState(0);
+  const pendingCaret = useRef<number | null>(null);
+  const partial = mentionAt(text, caret);
+  const options = useMentionOptions(projectId, partial);
+
+  // После вставки логина курсор ставится сразу за ним (ревью 012, п. 8).
+  useEffect(() => {
+    if (pendingCaret.current !== null && areaRef.current !== null) {
+      areaRef.current.setSelectionRange(pendingCaret.current, pendingCaret.current);
+      pendingCaret.current = null;
+    }
+  }, [text]);
+
+  function pickMention(login: string) {
+    const next = insertMention(text, caret, login);
+    pendingCaret.current = next.caret;
+    setText(next.text);
+    setCaret(next.caret);
+    setActive(0);
+    areaRef.current?.focus();
+  }
+
+  function onMentionKey(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (options === undefined || options.length === 0) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      setActive((i) => (i + step + options.length) % options.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const login = options[Math.min(active, options.length - 1)];
+      if (login !== undefined) pickMention(login);
+    }
+  }
   const [pending, setPending] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // The page on screen: the previous one stays until the requested page arrives.
@@ -299,8 +337,15 @@ export function Comments({ taskId, alert, suppressLoadError = false }: CommentsP
             ref={areaRef}
             name="body"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              setCaret(e.target.selectionStart);
+              setActive(0);
+            }}
+            onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
+            onKeyDown={onMentionKey}
           />
+          <MentionSuggest partial={partial} options={options} active={active} onPick={pickMention} />
         </div>
         <button type="submit">{t("comments.add")}</button>
       </form>

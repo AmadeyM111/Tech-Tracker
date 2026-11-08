@@ -251,7 +251,14 @@ def test_t21_src_files_only_expected() -> None:
         # T24
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
         "features/admin/password.ts", "features/admin/EmailDialog.tsx",
+        # 008 «Сводка»
+        "features/overview/SummaryPage.tsx", "features/overview/api.ts",
+        "features/overview/filters.ts", "features/overview/summary.css",
         "features/admin/BackupBanner.tsx",  # 009/FR-7
+        "features/attachments/Attachments.tsx", "features/attachments/api.ts",  # 011
+        "features/notifications/api.ts", "features/notifications/Badge.tsx",  # 012
+        "features/notifications/NotificationsPage.tsx", "features/comments/MentionSuggest.tsx",
+        "features/attachments/attachments.css",
         "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
         # 019/R8-T20: dialog for changing first and last name
         "features/admin/NameDialog.tsx",
