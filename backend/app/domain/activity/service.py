@@ -20,6 +20,7 @@ from app.core.errors import Forbidden
 from app.core.pagination import PageParams, paginate
 from app.domain.access.policy import can_read_project_content
 from app.domain.access.roles import Actor
+from app.domain.attachments.models import Attachment
 from app.domain.comments.models import Comment
 from app.domain.events.models import DomainEvent
 from app.domain.projects.models import Project
@@ -86,6 +87,15 @@ async def _entity_states(
         )
         for row in rows:
             states[("comment", row.id)] = (row.deleted_at is not None, None)
+    if attachment_ids := ids.get("attachment"):
+        rows = await db.execute(
+            select(Attachment.id, Attachment.original_name, Attachment.deleted_at).where(
+                Attachment.workspace_id == workspace_id, Attachment.id.in_(attachment_ids)
+            )
+        )
+        for row in rows:
+            # имя файла в ленте — как названия задач (spec 011 FR-8, Q-4)
+            states[("attachment", row.id)] = (row.deleted_at is not None, row.original_name)
     if user_ids := ids.get("user"):
         for user_id, ref in (await user_refs(db, workspace_id, user_ids)).items():
             states[("user", user_id)] = (False, ref.login)

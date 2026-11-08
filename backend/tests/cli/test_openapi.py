@@ -422,7 +422,8 @@ def test_t68_400_declared_exactly_on_routes_with_body(spec: dict[str, Any]) -> N
     declared: set[tuple[str, str]] = set()
     for method, path, op in _operations(spec):
         has_400 = "400" in op["responses"]
-        has_body = "requestBody" in op
+        # 011: загрузка вложения — сырое тело (application/octet-stream), JSON нет и 400 не бывает
+        has_body = "application/json" in op.get("requestBody", {}).get("content", {})
         assert has_400 == has_body, (method, path)
         if has_400:
             declared.add((method, path))
