@@ -12,7 +12,7 @@
 ## B09-T01 — Настройки, модель и миграция `backup_run`
 - **Статус:** TODO
 - **AC:** AC-5 (схема)
-- **Файлы:** `backend/app/core/config.py`, `backend/app/domain/ops/models.py`, `backend/app/domain/registry.py`, `backend/migrations/versions/0011_backup_run.py`, `docs/data-model.md`, `backend/tests/db/test_009_backup_run_schema.py`
+- **Файлы:** `backend/app/core/config.py`, `backend/app/domain/ops/models.py`, `backend/app/domain/registry.py`, `backend/migrations/versions/0011_backup_run.py`, `docs/data-model.md`, `backend/tests/db/test_009_backup_run_schema.py`, `backend/tests/db/test_migrations.py`, `backend/tests/db/test_007_schema.py`, `backend/tests/upgrade002_support.py` (голова цепочки `0009` → `0011`)
 - **Зависит от:** —
 - **Описание:** поля настроек PB-9; таблица `backup_run` (id, started_at, finished_at, status CHECK ok|failed, size_bytes, schema_revision, file_name, error_code); индекс по `finished_at`.
 - **Готово, когда:** миграция вверх/вниз на `*_test`, тест схемы зелёный.
