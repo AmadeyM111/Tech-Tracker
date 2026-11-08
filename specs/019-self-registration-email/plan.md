@@ -523,3 +523,6 @@ npm: нет. `test_dependencies_allowlist.py` не меняется (NFR-6, AC-2
 - **Q-6 (§3.1) — закрыт.** У ТА нет `onboard_accounts`, ему хватает `/admin/users` (RG-11).
 - **Q-7 (FR-9) — закрыт.** Если пространств не ровно одно, регистрация отвечает 404 `feature_disabled` (RG-9).
 - **К-4** — решение ИБ по ПДн, предусловие запуска (шапка плана, R-1). Открыто.
+
+
+> Примечание (R8-T06, ревью): `FOR NO KEY UPDATE` в этом плане реализуется как `with_for_update(key_share=True)` в SQLAlchemy (так же, как в `users/service.py`).

@@ -160,9 +160,9 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 2. Поправки после ревью: (a) `SetNameRequest` без `max_length` (`schemas/admin.py`): длину 1…100 проверяет домен, поэтому 101+ даёт `first_name_invalid`; `openapi.json` перегенерирован; (c) добавлены тесты: повтор того же имени без события, 422 без эха значения в теле, NFR-1 (в логах нет значения имени) — `test_019_profile_api.py`, 33 теста в файле. **Долг (b), до T14/T22:** гонка двух одинаковых `PUT /me/name` — второе событие `user.name_changed` no-op; решение: `SELECT … FOR UPDATE` в `profile.set_own_name` перед сравнением. Предыдущая попытка: тесты: 518 passed (T05-набор + openapi + docs static), линт (ruff, mypy) чист. Ревью (reviewer): FAIL по процессу — `python scripts/task_scope.py R8-T05` сообщает файлы вне рамок (незакоммиченные T01–T04 в той же рабочей копии; коммиты делает оркестратор). Замечания по коду (minor): (a) `SetNameRequest.max_length=1024` (`schemas/admin.py`) против RG-3 (1…100): значения 101–1024 дают `first_name_invalid`, длиннее 1024 — `validation_error`; решить, поправить схему или зафиксировать в plan; (b) гонка двух одинаковых `PUT /me/name` (`profile.py`, чтение без `FOR UPDATE`): второе событие no-op, данные верны; (c) пробелы тестов: нет проверки отсутствия события при повторе тех же имён, нет проверки, что тело 422 не содержит введённое значение, нет проверки логов (NFR-1).
 
 ## R8-T06 — Домен: учётные записи без роли для БА
-- **Статус:** TODO
+- **Статус:** DONE (ревью: PASS, 2026-11-08)
 - **AC:** AC-30 (домен), AC-26 (БА, домен)
-- **Файлы:** `backend/app/domain/users/onboarding.py` (новый);
+- **Файлы:** `backend/app/domain/users/onboarding.py` (новый); `specs/019-self-registration-email/plan.md` (примечание о режиме блокировки, см. «Попытки»);
   тесты: `backend/tests/domain/test_019_onboarding.py` (новый)
 - **Зависит от:** R8-T02, R8-T03
 - **Описание:** `UnassignedAccount`, `list_unassigned`, `assign_user_role`, `_lock_for_onboarding` по plan §4.3 и
@@ -174,7 +174,7 @@ T17, T19, T20, T21), тоже последовательно.
   ТА), записей с ролью нет, чужого пространства нет; назначение «user» и событие с автором-БА; BA/TA-роль → 403;
   повтор для уже назначенной → 403; П и ТА → 403; заблокированный БА (состояние после `get_actor`) → 403.
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/domain/test_019_onboarding.py backend/tests/domain/test_user_admin_service.py` зелёный; «Линт бэкенда» чист
-- **Попытки:** 0
+- **Попытки:** 1. Тесты: test_019_onboarding.py 25 passed; с test_user_admin_service.py 149 passed; ruff, mypy чисты; task_scope exit 0. Отклонение: plan §4.3 просит FOR NO KEY UPDATE, в коде `with_for_update(key_share=True)` (SQLAlchemy даёт FOR NO KEY UPDATE этим вызовом; text() не используется). Сериализация обеспечивается advisory-ключом. Принято ревью. Долг: тест на вызов pg_advisory_xact_lock не добавлен (minor).
 
 ## R8-T07 — API: `/unassigned-accounts`
 - **Статус:** TODO
@@ -508,7 +508,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T03 | DONE |
 | R8-T04 | DONE |
 | R8-T05 | DONE |
-| R8-T06 | TODO |
+| R8-T06 | DONE |
 | R8-T07 | TODO |
 | R8-T08 | TODO |
 | R8-T09 | TODO |
