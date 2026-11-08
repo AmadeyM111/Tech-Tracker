@@ -1,8 +1,8 @@
 """Регулярное обслуживание (plan §4.13, §10.4; D-42, FR-25b).
 
 ``run_maintenance`` собирает отчёт о выполненных (или, при ``dry_run``, только подсчитанных)
-действиях. В T31 заполняется только ``sessions_expired``; счётчики корзины и файлов (T54)
-пока равны 0. События в журнал не пишутся.
+действиях: истёкшие сессии (T31) и вложения — корзина и файлы-сироты (spec 011). Корзина
+проектов, задач и комментариев — R3, их счётчики равны 0. События в журнал не пишутся.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from app.domain.attachments.purge import purge_attachments
 from app.domain.system.maintenance import purge_expired_sessions
 
 if TYPE_CHECKING:
@@ -47,4 +48,11 @@ async def run_maintenance(
         idle_timeout=settings.session_idle_timeout,
         dry_run=dry_run,
     )
-    return MaintenanceReport(dry_run=dry_run, sessions_expired=sessions_expired)
+    files = await purge_attachments(sessionmaker, settings, now=clock.now(), dry_run=dry_run)
+    return MaintenanceReport(
+        dry_run=dry_run,
+        sessions_expired=sessions_expired,
+        attachments_purged=files.attachments_purged,
+        files_removed=files.files_removed,
+        orphan_files_removed=files.orphan_files_removed,
+    )

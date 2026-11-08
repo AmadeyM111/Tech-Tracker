@@ -22,7 +22,7 @@
 
 ## A11-T04 — Очистка, экспорт и импорт файлов
 - **Статус:** TODO · **AC:** AC-7, AC-10 · **Оценка:** 0,75 дня · **Зависит от:** A11-T02
-- **Файлы:** `backend/app/domain/ops/maintenance.py`, `backend/app/domain/ops/export.py`, `backend/app/domain/ops/importer.py`, `backend/app/domain/ops/archive.py`, `backend/tests/cli/test_011_maintenance.py`, `backend/tests/cli/test_export_import.py`
+- **Файлы:** `backend/app/domain/attachments/purge.py`, `backend/app/domain/ops/maintenance.py`, `backend/app/domain/ops/export.py`, `backend/app/domain/ops/importer.py`, `backend/app/domain/ops/archive.py`, `backend/tests/cli/test_011_maintenance.py`, `backend/tests/cli/test_export_import.py`
 
 ## A11-T05 — Интерфейс карточки
 - **Статус:** TODO · **AC:** AC-11 · **Оценка:** 0,75 дня · **Зависит от:** A11-T03

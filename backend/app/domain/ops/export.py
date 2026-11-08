@@ -14,9 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.core.config import Settings
 from app.core.db import create_engine
+from app.domain.attachments.storage import final_path
 from app.domain.ops.archive import (
     FORMAT,
     encode_value,
+    expected_files,
     exported_columns,
     iso_utc,
     payload_bytes,
@@ -63,5 +65,20 @@ async def export_archive(
         )
     finally:
         await engine.dispose()
-    write_archive(payload_bytes(payload), out)
+    write_archive(payload_bytes(payload), out, files=_attachment_files(settings, payload))
     return {name: len(rows) for name, rows in payload["tables"].items()}
+
+
+class ExportError(RuntimeError):
+    """Экспорт невозможен: данные БД и файлы вложений не согласованы."""
+
+
+def _attachment_files(settings: Settings, payload: dict[str, Any]) -> dict[str, Path]:
+    """Файлы живых вложений (spec 011 FR-11); отсутствующий файл — ошибка, а не тихий пропуск."""
+    files: dict[str, Path] = {}
+    for key in expected_files(payload["tables"]):
+        path = final_path(settings.attachments_dir, key)
+        if not path.is_file():
+            raise ExportError(f"нет файла вложения {key}")
+        files[key] = path
+    return files
