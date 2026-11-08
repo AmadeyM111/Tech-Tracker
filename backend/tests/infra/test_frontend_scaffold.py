@@ -253,6 +253,7 @@ def test_t21_src_files_only_expected() -> None:
         "features/admin/password.ts", "features/admin/EmailDialog.tsx",
         "features/admin/BackupBanner.tsx",  # 009/FR-7
         "features/attachments/Attachments.tsx", "features/attachments/api.ts",  # 011
+        "features/attachments/attachments.css",
         "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
         # T81
         "shared/ui/UserPicker.tsx", "features/users/api.ts",
