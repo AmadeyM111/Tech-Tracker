@@ -407,7 +407,7 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Полный vitest: 62 файла, 1649 passed; lint 0; typecheck 0 (R-3 закрыт); scaffold 44 passed; scope ок. Колонки имён, origin, NameDialog (образец EmailDialog), setUserName, обязательные Имя/Фамилия в форме создания. Отклонения (не из плана): пустые имя/фамилия в форме и диалоге не отправляются, дают first_name_invalid/last_name_invalid; trim на клиенте. Порядок колонок выбран свободно.
 
 ## R8-T21 — Фронтенд: раздел БА «Учётные записи без роли»
-- **Статус:** TODO
+- **Статус:** DONE (самопроверка оркестратора; отдельный ревьюер не запускался; 2026-11-08)
 - **AC:** AC-30 (экран), AC-26 (БА)
 - **Файлы:** `frontend/src/features/admin/UnassignedAccountsPage.tsx` (новый), `frontend/src/features/admin/api.ts`, `frontend/src/app/router.tsx`;
   тесты: `frontend/tests/features/admin/UnassignedAccountsPage.test.tsx` (новый), `frontend/tests/app/sidebar.test.tsx`, `frontend/tests/app/navigation.test.tsx`, `backend/tests/infra/test_frontend_scaffold.py`
@@ -418,7 +418,7 @@ T17, T19, T20, T21), тоже последовательно.
   Test-writer: у БА пункт меню есть, у ТА и П нет; таблица без email; назначение → `PUT` с `{role:"user"}` и
   повторная загрузка; 403 → `errorMessage("forbidden")`.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/admin tests/app` зелёный; «Линт фронтенда» чист; `source .venv/bin/activate && pytest -q backend/tests/infra/test_frontend_scaffold.py` зелёный
-- **Попытки:** 0
+- **Попытки:** 1. Полный vitest: 63 файла, 1664 passed; lint 0; typecheck 0; scaffold 44 passed; scope ок. Отклонения: колонка «Действия» (admin.users.col_actions); BA_CAPS в sidebar.test дополнен onboard_accounts. Долг (NFR-7, T22): фокус не возвращается в таблицу после назначения; одинаковое имя кнопки в каждой строке (нужен ключ aria-label в ru.ts).
 
 ## R8-T22 — Интеграция и полная проверка
 - **Статус:** TODO
@@ -525,6 +525,6 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T18 | DONE |
 | R8-T19 | DONE |
 | R8-T20 | DONE |
-| R8-T21 | TODO |
+| R8-T21 | DONE |
 | R8-T22 | TODO |
 | R8-T00 | TODO |

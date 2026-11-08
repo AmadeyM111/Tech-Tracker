@@ -20,7 +20,10 @@ const MENU = "Меню";
 // 004: кнопка «Задача» между ссылками и «Выйти» (только при business_access).
 const CREATE_TASK = ru["nav.create_task"];
 const DICT = Object.values(ru) as string[];
-const BA_CAPS = ["business_access", "project_create", "task_assign_others"];
+// 019/R8-T21: the business admin holds onboard_accounts (RG-11), so the BA menu has the "Without role" item.
+const BA_CAPS = ["business_access", "project_create", "task_assign_others", "onboard_accounts"];
+const BA_MENU = ["/projects", "/my-tasks", "/unassigned-accounts", "/profile"];
+const U_MENU = ["/projects", "/my-tasks", "/profile"];
 const U_CAPS = ["business_access"];
 const capsFor = (role: string) => (role === "business_admin" ? BA_CAPS : U_CAPS);
 const TASK_ID = "44444444-4444-4444-8444-444444444444";
@@ -66,7 +69,7 @@ describe("AC-19 business sidebar", () => {
     const hrefs = within(nav)
       .getAllByRole("link")
       .map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["/projects", "/my-tasks", "/profile"]);
+    expect(hrefs).toEqual(role === "business_admin" ? BA_MENU : U_MENU);
     expect(within(nav).queryByRole("link", { name: ru["admin.home_users_link"] })).toBeNull();
     expect(within(nav).queryByRole("link", { name: ru["admin.home_audit_link"] })).toBeNull();
 
@@ -210,12 +213,13 @@ describe("AC-30 tab order of the BA /projects screen", () => {
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
     const form = container.querySelector<HTMLElement>('form[data-form="create-project"]')!;
     const firstInForm = tabbable.find((el) => form.contains(el))!;
-    const labels = tabbable.slice(0, 6);
-    expect(labels.slice(0, 3).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks", "/profile"]);
+    // 019/R8-T21: the BA menu has four links (the "Without role" item is added before "Profile")
+    const labels = tabbable.slice(0, 7);
+    expect(labels.slice(0, 4).map((el) => el.getAttribute("href"))).toEqual(BA_MENU);
     // 004/AC-12: ссылки меню, «Задача», «Выйти», затем содержимое
-    expect(labels[3]?.getAttribute("data-action")).toBe("create-task");
-    expect(labels[4]?.getAttribute("data-action")).toBe("logout");
-    expect(labels[5]).toBe(firstInForm);
+    expect(labels[4]?.getAttribute("data-action")).toBe("create-task");
+    expect(labels[5]?.getAttribute("data-action")).toBe("logout");
+    expect(labels[6]).toBe(firstInForm);
   });
 });
 
@@ -375,7 +379,7 @@ describe("AC-28 business roles on tech admin paths", () => {
     const alerts = screen.getAllByRole("alert");
     expect(alerts).toHaveLength(1);
     expect(alerts[0]?.textContent).toBe(ru["error.forbidden"]);
-    expect(hrefsOf(nav)).toEqual(["/projects", "/my-tasks", "/profile"]);
+    expect(hrefsOf(nav)).toEqual(role === "business_admin" ? BA_MENU : U_MENU);
     expect(container.querySelector<HTMLElement>(".ui-sidebar")!.parentElement?.classList.contains("ui-shell")).toBe(true);
     expect(within(nav).getByRole("link", { name: ru["nav.projects"] })).toBeTruthy();
     expect(within(nav).getByRole("link", { name: ru["nav.my_tasks"] })).toBeTruthy();
@@ -427,5 +431,30 @@ describe("019 AC-34 profile menu item", () => {
     const { nav } = await openMenu("/profile");
     expect(hrefsOf(nav)).toEqual([USERS, AUDIT_PATH, "/profile"]);
     expect(within(nav).getByRole("link", { name: ru["nav.profile"] }).getAttribute("aria-current")).toBe("page");
+  });
+});
+
+// ---------------------------------------------------------------- 019/R8-T21: "Without role" item only for BA (FR-13a)
+describe("019 AC-30 unassigned-accounts menu item", () => {
+  it("019_ac30_ba_menu_has_unassigned_item_before_profile", async () => {
+    setup("business_admin");
+    const { nav } = await openMenu("/projects");
+    const link = within(nav).getByRole("link", { name: ru["nav.unassigned"] });
+    expect(link.getAttribute("href")).toBe("/unassigned-accounts");
+    expect(hrefsOf(nav)).toEqual(BA_MENU);
+  });
+
+  it("019_ac30_user_menu_has_no_unassigned_item", async () => {
+    setup("user");
+    const { nav } = await openMenu("/my-tasks");
+    expect(within(nav).queryByRole("link", { name: ru["nav.unassigned"] })).toBeNull();
+    expect(hrefsOf(nav)).not.toContain("/unassigned-accounts");
+  });
+
+  it("019_ac30_ta_menu_has_no_unassigned_item", async () => {
+    setupTa();
+    const { nav } = await openMenu(USERS);
+    expect(within(nav).queryByRole("link", { name: ru["nav.unassigned"] })).toBeNull();
+    expect(hrefsOf(nav)).not.toContain("/unassigned-accounts");
   });
 });

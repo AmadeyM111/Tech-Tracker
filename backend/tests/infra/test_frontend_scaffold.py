@@ -254,6 +254,8 @@ def test_t21_src_files_only_expected() -> None:
         "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
         # 019/R8-T20: dialog for changing first and last name
         "features/admin/NameDialog.tsx",
+        # 019/R8-T21: accounts without a role, /unassigned-accounts (AC-30)
+        "features/admin/UnassignedAccountsPage.tsx",
         # T81
         "shared/ui/UserPicker.tsx", "features/users/api.ts",
         # T82

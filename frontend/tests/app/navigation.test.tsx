@@ -210,3 +210,27 @@ describe("T82 projects screens in the shell", () => {
     expect(link().getAttribute("aria-current")).toBeNull();
   });
 });
+
+// 019/R8-T21: the "Without role" item is shown only with onboard_accounts (AC-30, FR-13a).
+describe("019 AC-30 menu item unassigned accounts by capability", () => {
+  it("019_ac30_menu_unassigned_item_for_onboard_accounts", async () => {
+    installFetch({
+      [ME]: () => j(200, meWith([...BUSINESS, "onboard_accounts"], "business_admin")),
+      ...PROJECT_ROUTES,
+    });
+    renderApp("/");
+    await expectAt("/projects");
+    await screen.findByRole("navigation", { name: ru["app.menu_label"] });
+    expect(hrefs()).toContain("/unassigned-accounts");
+    expect(screen.getByRole("link", { name: ru["nav.unassigned"] }).getAttribute("href")).toBe("/unassigned-accounts");
+  });
+
+  it("019_ac30_menu_no_unassigned_item_without_onboard_accounts", async () => {
+    installFetch({ [ME]: () => j(200, meWith(BUSINESS, "business_admin")), ...PROJECT_ROUTES });
+    renderApp("/");
+    await expectAt("/projects");
+    await screen.findByRole("navigation", { name: ru["app.menu_label"] });
+    expect(hrefs()).not.toContain("/unassigned-accounts");
+    expect(screen.queryByRole("link", { name: ru["nav.unassigned"] })).toBeNull();
+  });
+});

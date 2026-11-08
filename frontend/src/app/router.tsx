@@ -4,6 +4,7 @@ import { Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } 
 
 import { AgentAccessPage } from "../features/tokens/AgentAccessPage";
 import { AuditPage } from "../features/admin/AuditPage";
+import { UnassignedAccountsPage } from "../features/admin/UnassignedAccountsPage";
 import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
@@ -154,6 +155,15 @@ function MenuItems({ profile }: { profile: MeResponse }) {
           <NavLink to="/admin/audit">
             <Icon name="audit" />
             {t("admin.home_audit_link")}
+          </NavLink>
+        </p>
+      ) : null}
+      {/* 019/RG-11: accounts without a role, only for the business admin (onboard_accounts). */}
+      {has("onboard_accounts") ? (
+        <p>
+          <NavLink to="/unassigned-accounts" end>
+            <Icon name="users" />
+            {t("nav.unassigned")}
           </NavLink>
         </p>
       ) : null}
@@ -410,6 +420,15 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         element={
           <RoleScreen insideMain={insideMain} capability="view_audit">
             {() => <AuditPage />}
+          </RoleScreen>
+        }
+      />
+      {/* 019/RG-11, AC-30: accounts without a role; the business admin assigns only "user". */}
+      <Route
+        path="/unassigned-accounts"
+        element={
+          <RoleScreen insideMain={insideMain} capability="onboard_accounts">
+            {() => <UnassignedAccountsPage />}
           </RoleScreen>
         }
       />
