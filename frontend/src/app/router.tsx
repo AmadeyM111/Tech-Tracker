@@ -10,6 +10,7 @@ import { LoginPage } from "../features/auth/LoginPage";
 import { PasswordResetConfirmPage } from "../features/auth/PasswordResetConfirmPage";
 import { PasswordResetRequestPage } from "../features/auth/PasswordResetRequestPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
+import { RegisterPage } from "../features/auth/RegisterPage";
 import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
 import { MyTasksPage } from "../features/tasks/TaskList";
 import { TaskPage } from "../features/tasks/TaskPage";
@@ -327,8 +328,8 @@ function useClientHandlers(): void {
     () =>
       setNavigationHandlers({
         onUnauthenticated: () => {
-          // On the login page there is no session data to drop and nothing to leave.
-          if (pathRef.current === "/login") return;
+          // On the login and register pages there is no session data to drop and nothing to leave (RG-14).
+          if (pathRef.current === "/login" || pathRef.current === "/register") return;
           queryClient.clear();
           navigate("/login", { replace: true, state: focusHeadingState(stateRef.current) });
         },
@@ -372,6 +373,14 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           <NeedsSession>
             <NoRolePage />
           </NeedsSession>
+        }
+      />
+      <Route
+        path="/register"
+        element={
+          <GuestOnly>
+            <RegisterPage />
+          </GuestOnly>
         }
       />
       <Route path="/password-reset" element={<PasswordResetRequestPage />} />

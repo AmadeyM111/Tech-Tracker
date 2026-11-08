@@ -1,7 +1,17 @@
 // T23: features/auth/api.ts поверх общего клиента: пути, тела, ApiError.
 import { describe, expect, it, vi } from "vitest";
 
-import { changePassword, confirmPasswordReset, login, logout, me, passwordResetStatus, requestPasswordReset } from "../../../src/features/auth/api";
+import {
+  changePassword,
+  confirmPasswordReset,
+  confirmRegistration,
+  login,
+  logout,
+  me,
+  passwordResetStatus,
+  requestPasswordReset,
+  requestRegistration,
+} from "../../../src/features/auth/api";
 import { ApiError } from "../../../src/shared/api/client";
 
 const j = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
@@ -83,5 +93,33 @@ describe("auth api (T23)", () => {
     stub(() => j(404, { detail: "x", code: "feature_disabled" }));
     await expect(requestPasswordReset({ email: "a@x.ru" })).rejects.toMatchObject({ code: "feature_disabled", status: 404 });
     await expect(passwordResetStatus()).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it("019_ac2_request_registration_posts_exactly_five_fields", async () => {
+    const calls = stub(() => j(200, { detail: "x" }));
+    const body = { email: "a@x.ru", first_name: "Ivan", last_name: "Petrov", login: "ivanov", password: "Correct-Horse-Battery-9" };
+    await requestRegistration(body);
+    expect(new URL(calls[0]!.url).pathname).toBe("/api/v1/auth/registration/request");
+    expect(calls[0]!.method).toBe("POST");
+    expect(await calls[0]!.json()).toEqual(body);
+    expect(calls[0]!.url).not.toContain("Correct-Horse");
+  });
+
+  it("019_ac2_confirm_registration_posts_token_only", async () => {
+    const calls = stub(() => new Response(null, { status: 204 }));
+    await confirmRegistration("tok-123");
+    expect(new URL(calls[0]!.url).pathname).toBe("/api/v1/auth/registration/confirm");
+    expect(calls[0]!.method).toBe("POST");
+    expect(await calls[0]!.json()).toEqual({ token: "tok-123" });
+    expect(calls[0]!.url).not.toContain("tok-123");
+  });
+
+  it("019_ac2_registration_calls_reject_with_api_error_code", async () => {
+    stub(() => j(404, { detail: "x", code: "feature_disabled" }));
+    await expect(
+      requestRegistration({ email: "a@x.ru", first_name: "Ivan", last_name: "Petrov", login: "ivanov", password: "Correct-Horse-Battery-9" }),
+    ).rejects.toMatchObject({ code: "feature_disabled", status: 404 });
+    stub(() => j(409, { detail: "x", code: "login_taken" }));
+    await expect(confirmRegistration("tok")).rejects.toMatchObject({ code: "login_taken", status: 409 });
   });
 });

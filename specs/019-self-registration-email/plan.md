@@ -526,3 +526,5 @@ npm: нет. `test_dependencies_allowlist.py` не меняется (NFR-6, AC-2
 
 
 > Примечание (R8-T06, ревью): `FOR NO KEY UPDATE` в этом плане реализуется как `with_for_update(key_share=True)` в SQLAlchemy (так же, как в `users/service.py`).
+
+> Примечание (R8-T16, ревью): поле Email на `/register` без `type="email"`, как на экране сброса 007: общий `TextField` поддерживает только `text|password`, его менять вне задачи нельзя. Формат проверяет сервер (FR-3), `noValidate` в форме. Если владелец настаивает на `type="email"`, нужна отдельная правка `shared/ui/TextField.tsx`.

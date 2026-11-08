@@ -333,9 +333,9 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Тесты: i18n + AuditPage 304 passed; полный vitest 1578 passed; lint чист; typecheck — 4 ожидаемые ошибки (UsersPage.tsx:244 до T20; tests/features/admin/api.test.ts:46,109,110 — T20 обязан их закрыть). Ревью PASS. Долг (minor): русские комментарии в ru.ts:393 и i18n.test.ts:54,274,331 — перевести на английский; самоссылочные ожидания в AuditPage.test.tsx:532–546; accounts.assign_title = «Назначить роль?» (взято по образцу, план не задал — подтвердить владельцем). admin.capability.onboard_accounts не добавлен: подписей возможностей в ru.ts нет.
 
 ## R8-T16 — Фронтенд: API регистрации и экран `/register`
-- **Статус:** TODO
+- **Статус:** DONE (ревью: FAIL по кириллице в тесте и незаписанному отклонению → исправлено; 2026-11-08)
 - **AC:** AC-1 (экран), AC-2, AC-3
-- **Файлы:** `frontend/src/features/auth/api.ts`, `frontend/src/features/auth/RegisterPage.tsx` (новый), `frontend/src/app/router.tsx`;
+- **Файлы:** `frontend/src/features/auth/api.ts`, `frontend/src/features/auth/RegisterPage.tsx` (новый), `frontend/src/app/router.tsx`, `specs/019-self-registration-email/plan.md` (примечание о типе поля Email, ревью);
   тесты: `frontend/tests/features/auth/RegisterPage.test.tsx` (новый), `frontend/tests/features/auth/api.test.ts`, `backend/tests/infra/test_frontend_scaffold.py`
 - **Зависит от:** R8-T15
 - **Описание:** В `api.ts` — `requestRegistration`, `confirmRegistration` (типы только из `components["schemas"]`).
@@ -345,7 +345,7 @@ T17, T19, T20, T21), тоже последовательно.
   форма скрыта; ошибки по коду (`login_taken`, `email_invalid`, `rate_limited`, `feature_disabled`); `enabled:false`
   → `auth.register_disabled`; через `AppRoutes`: `/me` 200 → стартовый экран, `/me` 401 → остаётся `/register`.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/auth tests/app` зелёный; «Линт фронтенда»: `npm run lint` чист, `npm run typecheck` чист или падает только на `src/features/admin/UsersPage.tsx` (до R8-T20); `source .venv/bin/activate && pytest -q backend/tests/infra/test_frontend_scaffold.py` зелёный
-- **Попытки:** 0
+- **Попытки:** 1. Тесты: vitest tests/features/auth + tests/app — 499 passed; RegisterPage.test — 17 passed; lint чист; pytest test_frontend_scaffold — 44 passed; scope ок. Typecheck: 4 ошибки (UsersPage.tsx:244 — до T20; tests/features/admin/api.test.ts:46,109,110 — из-за CreateUserRequest после T04; закрыть в T20). Отклонения (записаны в plan §4.7): поле Email без type="email" (TextField text|password); на форме кнопка reveal рядом с паролем. Решения: trim логина и имён; feature_disabled → auth.register_disabled (план §4.7). Долг (minor, T22): тесты на пробелы в пароле, имя из пробелов, состояние загрузки и ошибки статуса. Кириллица в новых файлах устранена. В frontend/src вне ru.ts есть кириллица в файлах более ранних задач (features/tasks/api.ts, shared/ui/TextField.tsx, shared/api/schema.d.ts) — проверить, кто внёс.
 
 ## R8-T17 — Фронтенд: экран `/register/confirm`
 - **Статус:** TODO
@@ -520,7 +520,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T13 | DONE |
 | R8-T14 | DONE |
 | R8-T15 | DONE |
-| R8-T16 | TODO |
+| R8-T16 | DONE |
 | R8-T17 | TODO |
 | R8-T18 | TODO |
 | R8-T19 | TODO |
