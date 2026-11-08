@@ -1,18 +1,18 @@
-# Стенд замера нормативов (spec 016, NFR-1, plan §2): Mac разработки в Docker, 3 vCPU / 6 ГБ на сервис.
+# Стенд замера нормативов (spec 016, NFR-1, plan §2): Mac разработки в Docker, суммарно 3 vCPU / 6 ГБ (Q-1).
 # Подключается явно; docker-compose.yml не меняется:
 #   docker compose -p gtperf -f docker-compose.yml -f deploy/compose.load.yml up -d --build --wait db api
 #   docker compose -p gtperf -f docker-compose.yml -f deploy/compose.load.yml down -v   # после замера
 # Не для прода и не для пилота: ENV=local (загрузка набора отказывает при production), COOKIE_SECURE=false
-# (вход по http), API опубликован только на 127.0.0.1. Ограничения cpus/mem_limit заданы на каждый сервис;
-# суммарная квота стенда — 6 vCPU / 12 ГБ (отмечено в отчёте docs/acceptance/load-2026-11-08.md).
+# (вход по http), API опубликован только на 127.0.0.1. Раскладка лимитов cpus/mem_limit:
+# api 2 vCPU / 3 ГБ, db 1 vCPU / 3 ГБ — сумма 3 vCPU / 6 ГБ (Q-1 владельца).
 services:
   db:
-    cpus: "3"
-    mem_limit: 6g
+    cpus: "1"
+    mem_limit: 3g
 
   api:
-    cpus: "3"
-    mem_limit: 6g
+    cpus: "2"
+    mem_limit: 3g
     environment:
       ENV: local
       COOKIE_SECURE: "false"

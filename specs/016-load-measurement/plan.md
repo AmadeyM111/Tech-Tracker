@@ -34,7 +34,7 @@
 | Авторизация харнесса | `POST /api/v1/auth/login` на каждого клиента; логин и пароль из параметров или `GT_LOAD_LOGIN` / `GT_LOAD_PASSWORD` | Пароль в аргументах по умолчанию | Не хранить секреты в репозитории и истории shell |
 | httpx | Перенос из dev в runtime, версия `>=0.28` | Новая зависимость | Уже транзитивная через `mcp`; вес нулевой. Правка `tests/arch/test_dependencies_allowlist.py` |
 | CI (FR-4) | Тест `backend/tests/load/test_load_smoke.py` в существующем job `backend` (`pytest backend/tests`) | Новый job в `ci.yml` | Не трогаем `.github` (задача: без лишней правки CI) |
-| Стенд | `deploy/compose.load.yml`: `COOKIE_SECURE=false`, `ENV=local`, `cpus: "3"`, `mem_limit: 6g` на api и db, порт API на `127.0.0.1` | Правка `docker-compose.yml` | Основной compose не меняется; `COOKIE_SECURE=true` не даёт httpx отправить cookie по http |
+| Стенд | `deploy/compose.load.yml`: `COOKIE_SECURE=false`, `ENV=local`, api 2 vCPU / 3 ГБ, db 1 vCPU / 3 ГБ (сумма 3 / 6, Q-1), порт API на `127.0.0.1` | Правка `docker-compose.yml` | Основной compose не меняется; `COOKIE_SECURE=true` не даёт httpx отправить cookie по http |
 
 ## 3. Затрагиваемые модули и файлы
 - `specs/016-load-measurement/plan.md`, `tasks.md` — новые.
@@ -110,7 +110,7 @@ async def measure(*, base_url, login, password, clients, samples, warmup_rounds,
 - **Вложения:** `GET /tasks/{id}/attachments` отсутствует во всех ветках (011 не реализована). Строка не замеряется, помечается «не реализовано».
 - **Счётчик уведомлений:** `GET /me/notifications` отсутствует (012/T-05). Строка не замеряется, в отчёте «отложено до 012».
 - **FR-4 в feat/r2-perf:** маршрутов «Сводки» здесь нет, поэтому смоук-тест пропускается с явной причиной (`skipif`, проверка маршрутов приложения), а не скрыто. После слияния 008 в main пропуск исчезает.
-- **Лимиты стенда:** `cpus` и `mem_limit` заданы на каждый сервис (api и db по 3 vCPU / 6 ГБ), как в брифе. Суммарная квота стенда при этом 6 vCPU / 12 ГБ, а не 3 / 6. Это отмечено в отчёте как ограничение методики.
+- **Лимиты стенда:** суммарно 3 vCPU / 6 ГБ (Q-1 владельца): `api` — `cpus: 2`, `mem_limit: 3g`; `db` — `cpus: 1`, `mem_limit: 3g`. Фактические значения и железо хоста пишутся в отчёт.
 - **Хост:** Docker Desktop VM в этом окружении: 18 vCPU, 8 ГБ памяти; клиент замера работает на хосте, чтобы не делить CPU с API.
 - **Пароли синтетики** общеизвестны по seed: `load-data` отказывает при `ENV=production`.
 - **Миграции:** в `fff9338` новых миграций нет (head = 0009), замер не требует миграции; если «Сводка» не уложится, см. шаг 6 брифа.
