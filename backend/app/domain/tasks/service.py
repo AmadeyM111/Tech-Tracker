@@ -36,6 +36,7 @@ from app.domain.access.roles import Actor, Role
 from app.domain.comments.models import Comment
 from app.domain.events.catalog import EventAction
 from app.domain.events.writer import FieldChange, JsonValue, record_event
+from app.domain.notifications import producer as notifications
 from app.domain.projects.models import ProjectMember
 from app.domain.projects.queries import load_project_facts
 from app.domain.tasks import positions
@@ -178,6 +179,9 @@ async def create_task(
     db.add(task)
     await db.flush()
     await _record_task_event(db, actor, EventAction.TASK_CREATED, task.id, project_id)
+    await notifications.on_assigned(
+        db, actor, task_id=task.id, project_id=project_id, assignee_id=assignee_id
+    )
     return task.id
 
 
@@ -228,6 +232,9 @@ async def create_subtask(
     db.add(task)
     await db.flush()
     await _record_task_event(db, actor, EventAction.TASK_CREATED, task.id, ctx.project.project_id)
+    await notifications.on_assigned(
+        db, actor, task_id=task.id, project_id=ctx.project.project_id, assignee_id=assignee_id
+    )
     return task.id
 
 
@@ -389,6 +396,34 @@ async def update_task(db: AsyncSession, actor: Actor, task_id: UUID, patch: Task
             setattr(task, name, TaskPriority(value).value if name == "priority" else value)
     await db.flush()
     await _record_update(db, actor, task, before, changed)
+    await _notify_update(db, actor, ctx.project, task, before, changed)
+
+
+async def _notify_update(
+    db: AsyncSession,
+    actor: Actor,
+    project: ProjectFacts,
+    task: Task,
+    before: Mapping[str, Any],
+    changed: Mapping[str, Any],
+) -> None:
+    """Уведомления 012/FR-3: смена исполнителя и переходы статуса «На проверке»."""
+    if "assignee_id" in changed:
+        await notifications.on_assigned(
+            db, actor, task_id=task.id, project_id=task.project_id, assignee_id=task.assignee_id
+        )
+    if "status" in changed:
+        await notifications.on_status_changed(
+            db,
+            actor,
+            task_id=task.id,
+            project_id=task.project_id,
+            owner_id=project.owner_id,
+            created_by=task.created_by,
+            assignee_id=task.assignee_id,
+            old=str(before["status"]),
+            new=task.status,
+        )
 
 
 async def _record_update(
@@ -515,7 +550,19 @@ async def move(
         raise _invalid(positions.SUBTASK_NOT_ON_BOARD)
     target = _status(status)
     task = await _load_task(db, task_id)
+    old_status = task.status
     await positions.move_task(
         db, task, status=target, before_task_id=before_task_id, after_task_id=after_task_id
     )
     await db.flush()
+    await notifications.on_status_changed(
+        db,
+        actor,
+        task_id=task.id,
+        project_id=task.project_id,
+        owner_id=ctx.project.owner_id,
+        created_by=task.created_by,
+        assignee_id=task.assignee_id,
+        old=old_status,
+        new=task.status,
+    )

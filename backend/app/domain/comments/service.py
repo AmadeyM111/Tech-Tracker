@@ -31,6 +31,7 @@ from app.domain.comments.models import Comment
 from app.domain.comments.sanitize import strip_html
 from app.domain.events.catalog import EventAction
 from app.domain.events.writer import record_event
+from app.domain.notifications import producer as notifications
 from app.domain.projects.models import Project
 from app.domain.projects.queries import load_project_facts
 from app.domain.tasks.context import load_task_context
@@ -219,6 +220,17 @@ async def create_comment(db: AsyncSession, actor: Actor, task_id: UUID, body: st
         entity_id=comment.id,
         project_id=ctx.project.project_id,
     )
+    await notifications.on_comment(
+        db,
+        actor,
+        comment_id=comment.id,
+        body=comment.body,
+        task_id=task_id,
+        project_id=ctx.project.project_id,
+        created_by=ctx.task.created_by,
+        assignee_id=ctx.task.assignee_id,
+        is_new=True,
+    )
     return await _view(db, actor, ctx.project, comment)
 
 
@@ -233,6 +245,22 @@ async def edit_comment(db: AsyncSession, actor: Actor, comment_id: UUID, body: s
     comment.body = _clean_body(body)
     comment.edited_at = utcnow()
     await db.flush()
+    task = (
+        await db.execute(
+            select(Task.created_by, Task.assignee_id).where(Task.id == comment.task_id)
+        )
+    ).one()
+    await notifications.on_comment(
+        db,
+        actor,
+        comment_id=comment.id,
+        body=comment.body,
+        task_id=comment.task_id,
+        project_id=project.project_id,
+        created_by=task.created_by,
+        assignee_id=task.assignee_id,
+        is_new=False,
+    )
     return await _view(db, actor, project, comment)
 
 

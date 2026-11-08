@@ -13,7 +13,7 @@
 
 ## N12-T02 — Правила создания уведомлений
 - **Статус:** TODO · **AC:** AC-1, AC-3, AC-4 · **Оценка:** 1 день · **Зависит от:** N12-T01
-- **Файлы:** `backend/app/domain/notifications/producer.py`, `backend/app/domain/tasks/service.py`, `backend/app/domain/comments/service.py`, `backend/tests/domain/test_012_producer.py`
+- **Файлы:** `backend/app/domain/notifications/producer.py`, `backend/app/domain/notifications/mentions.py` (общий `LOGIN_RE`), `backend/app/domain/tasks/service.py`, `backend/app/domain/comments/service.py`, `backend/tests/domain/test_012_producer.py`
 
 ## N12-T03 — Список, счётчик, прочтение (API)
 - **Статус:** TODO · **AC:** AC-6, AC-7 · **Оценка:** 0,75 дня · **Зависит от:** N12-T02
