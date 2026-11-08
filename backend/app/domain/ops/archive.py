@@ -43,8 +43,9 @@ LEGACY_FORMAT: Final = "gostracker-export"
 ACCEPTED_FORMATS: Final = frozenset({FORMAT, LEGACY_FORMAT})
 DATA_MEMBER: Final = "data.json"
 # Сессии входа не переносятся: их идентификаторы — секреты текущей установки.
+# ``backup_run`` (spec 009) — журнал эксплуатации установки, не данные пространства.
 EXCLUDED_TABLES: Final = frozenset(
-    {"user_session", "password_reset_token", "password_reset_attempt"}
+    {"user_session", "password_reset_token", "password_reset_attempt", "backup_run"}
 )
 # Колонки, не попадающие в архив (персональные данные); после импорта они NULL.
 EXCLUDED_COLUMNS: Final[Mapping[str, frozenset[str]]] = {"app_user": frozenset({"email"})}

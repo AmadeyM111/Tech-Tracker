@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     backup_dir: Path = Path("/backups")
     backup_keep: int = Field(14, ge=1)
     backup_stale_hours: int = Field(26, ge=1)
+    # каталог pg_dump/pg_restore; пусто — из PATH (в образе api — клиент PostgreSQL 16)
+    pg_bin_dir: Path | None = None
 
     @field_validator(
         "session_idle_timeout",

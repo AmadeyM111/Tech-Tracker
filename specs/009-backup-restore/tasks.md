@@ -22,7 +22,7 @@
 ## B09-T02 — Снятие, проверка, ротация
 - **Статус:** TODO
 - **AC:** AC-1…AC-6, AC-13
-- **Файлы:** `backend/app/domain/ops/backup.py`, `backend/tests/unit/test_009_backup_unit.py`, `backend/tests/domain/test_009_backup.py`
+- **Файлы:** `backend/app/domain/ops/backup.py`, `backend/app/core/config.py` (`pg_bin_dir`), `backend/app/domain/ops/archive.py` (`backup_run` не экспортируется), `backend/tests/backup_support.py`, `backend/tests/unit/test_009_backup_unit.py`, `backend/tests/domain/test_009_backup.py`
 - **Зависит от:** B09-T01
 - **Описание:** `create_backup`, `verify_backup`, `rotate`, `record_run` (PB-2…PB-4), `Runner` с `PGPASSWORD`.
 - **Готово, когда:** тесты зелёные (интеграционные — при наличии `pg_dump` 16).
@@ -32,7 +32,7 @@
 ## B09-T03 — Восстановление
 - **Статус:** TODO
 - **AC:** AC-9, AC-10
-- **Файлы:** `backend/app/domain/ops/backup.py`, `backend/tests/domain/test_009_restore.py`
+- **Файлы:** `backend/app/domain/ops/backup.py`, `backend/tests/domain/test_009_backup.py`, `backend/tests/unit/test_009_backup_unit.py`
 - **Зависит от:** B09-T02
 - **Описание:** `restore_backup` (PB-8): проверки пустоты, sha256, `pg_restore`, распаковка с защитой от обхода путей.
 - **Готово, когда:** круг «export → backup → restore в чистую БД → export» даёт одинаковый `data.json`.
