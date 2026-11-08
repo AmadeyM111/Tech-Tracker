@@ -412,6 +412,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Overview
+         * @description Плитки «Сводки» по всем моим проектам; фильтров нет (Q-2).
+         */
+        get: operations["get_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/overview/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Overview Tasks
+         * @description Задачи сводки с фильтрами: срок по возрастанию, без срока в конце (FR-5…FR-9).
+         */
+        get: operations["list_overview_tasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/tasks": {
         parameters: {
             query?: never;
@@ -1022,6 +1062,11 @@ export interface components {
             role: components["schemas"]["Role"];
         };
         /**
+         * DuePreset
+         * @enum {string}
+         */
+        DuePreset: "overdue" | "today" | "tomorrow" | "week" | "none";
+        /**
          * EntityType
          * @enum {string}
          */
@@ -1091,6 +1136,60 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
+        };
+        /**
+         * OverviewCountsOut
+         * @description Плитки: сумма статусов = ``total``; ``needs_review`` — подмножество ``review``.
+         */
+        OverviewCountsOut: {
+            /** Done */
+            done: number;
+            /** In Progress */
+            in_progress: number;
+            /** Needs Review */
+            needs_review: number;
+            /** Review */
+            review: number;
+            /** Todo */
+            todo: number;
+            /** Total */
+            total: number;
+        };
+        /** OverviewTaskItem */
+        OverviewTaskItem: {
+            assignee: components["schemas"]["UserRef"] | null;
+            /** Due Date */
+            due_date: string | null;
+            /** Hot */
+            hot: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parent Id */
+            parent_id: string | null;
+            priority: components["schemas"]["TaskPriority"];
+            project: components["schemas"]["ProjectRef"];
+            status: components["schemas"]["TaskStatus"];
+            /** Title */
+            title: string;
+        };
+        /**
+         * OverviewTaskPage
+         * @description Страница списка; ``total`` — число задач под фильтрами (FR-9, «Показано N из M»).
+         */
+        OverviewTaskPage: {
+            /** Has Next */
+            has_next: boolean;
+            /** Items */
+            items: components["schemas"]["OverviewTaskItem"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
         };
         /** OwnerChange */
         OwnerChange: {
@@ -2774,6 +2873,108 @@ export interface operations {
             };
             /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewCountsOut"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_overview_tasks: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                project_id?: string | null;
+                status?: components["schemas"]["TaskStatus"] | null;
+                priority?: components["schemas"]["TaskPriority"][];
+                due?: components["schemas"]["DuePreset"] | null;
+                needs_review?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewTaskPage"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

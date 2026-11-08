@@ -10,6 +10,7 @@ from app.api.v1 import (
     comments,
     health,
     me,
+    overview,
     password_reset,
     projects,
     tasks,
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/api/v1")
 router.include_router(health.router)
 router.include_router(auth.router)
 router.include_router(me.router)
+router.include_router(overview.router)
 router.include_router(tokens.router)
 router.include_router(password_reset.router)
 router.include_router(admin_users.router)
