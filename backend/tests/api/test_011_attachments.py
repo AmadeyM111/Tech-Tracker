@@ -194,7 +194,7 @@ async def test_011_ac7_delete_rules_and_soft_delete(api_env: ApiEnv) -> None:
     listed = await api_env.client.get(
         f"/api/v1/tasks/{w.task.id}/attachments", headers=api_env.auth(w.tokens["ba"])
     )
-    assert listed.json() == []
+    assert listed.json()["items"] == []
 
 
 async def test_011_ac8_feed_shows_file_name(api_env: ApiEnv) -> None:
@@ -237,7 +237,7 @@ async def test_011_list_shows_author_and_rights(api_env: ApiEnv) -> None:
         await api_env.client.get(
             f"/api/v1/tasks/{w.task.id}/attachments", headers=api_env.auth(w.tokens["member"])
         )
-    ).json()
+    ).json()["items"]
     assert [(i["name"], i["author"]["login"], i["kind"]) for i in mine] == [
         ("ba.pdf", w.ba.login, "pdf")
     ]

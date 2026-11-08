@@ -753,7 +753,7 @@ export interface paths {
         };
         /**
          * List Attachments
-         * @description Живые вложения задачи (FR-9).
+         * @description Живые вложения задачи, старые сверху (FR-9); формат списка — как у всех (ADR-0012).
          */
         get: operations["list_attachments"];
         put?: never;
@@ -1257,6 +1257,17 @@ export interface components {
             has_next: boolean;
             /** Items */
             items: components["schemas"]["AdminUser"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** Page[AttachmentOut] */
+        Page_AttachmentOut_: {
+            /** Has Next */
+            has_next: boolean;
+            /** Items */
+            items: components["schemas"]["AttachmentOut"][];
             /** Page */
             page: number;
             /** Page Size */
@@ -4281,7 +4292,10 @@ export interface operations {
     };
     list_attachments: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
             header?: never;
             path: {
                 task_id: string;
@@ -4296,7 +4310,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AttachmentOut"][];
+                    "application/json": components["schemas"]["Page_AttachmentOut_"];
                 };
             };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */

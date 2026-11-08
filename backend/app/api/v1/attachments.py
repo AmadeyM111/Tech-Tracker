@@ -20,6 +20,7 @@ from app.api.v1.schemas.attachments import AttachmentOut
 from app.core.config import Settings
 from app.core.db import DbSession
 from app.core.errors import PayloadTooLarge
+from app.core.pagination import Page, PageParams
 from app.domain.access.roles import Actor, Capability
 from app.domain.attachments import queries, service
 
@@ -42,13 +43,18 @@ def _settings(request: Request) -> Settings:
     return settings
 
 
-@router.get("/tasks/{task_id}/attachments", response_model=list[AttachmentOut])
+@router.get("/tasks/{task_id}/attachments", response_model=Page[AttachmentOut])
 async def list_attachments(
-    task_id: UUID, db: DbSession, actor: CurrentActor
-) -> list[AttachmentOut]:
-    """Живые вложения задачи (FR-9)."""
-    items = await queries.list_attachments(db, actor, task_id)
-    return [AttachmentOut.model_validate(i) for i in items]
+    task_id: UUID, db: DbSession, actor: CurrentActor, params: Annotated[PageParams, Query()]
+) -> Page[AttachmentOut]:
+    """Живые вложения задачи, старые сверху (FR-9); формат списка — как у всех (ADR-0012)."""
+    items, has_next = await queries.list_attachments(db, actor, task_id, params)
+    return Page[AttachmentOut](
+        items=[AttachmentOut.model_validate(i) for i in items],
+        page=params.page,
+        page_size=params.page_size,
+        has_next=has_next,
+    )
 
 
 @router.post(

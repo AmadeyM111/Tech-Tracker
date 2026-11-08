@@ -16,6 +16,7 @@ from sqlalchemy import select
 
 from app.core.config import Settings
 from app.core.errors import Forbidden, NotFound
+from app.core.pagination import PageParams, paginate
 from app.domain.access.policy import (
     ProjectFacts,
     TaskFacts,
@@ -77,28 +78,27 @@ async def view_of(
     return _view(row, author, actor, project, task)
 
 
-async def list_attachments(db: AsyncSession, actor: Actor, task_id: UUID) -> list[AttachmentView]:
+async def list_attachments(
+    db: AsyncSession, actor: Actor, task_id: UUID, params: PageParams
+) -> tuple[list[AttachmentView], bool]:
     """Живые вложения задачи, старые сверху (FR-9)."""
     ctx = await load_task_context(db, actor, task_id)
     if not can_read_project_content(actor, ctx.project):
         raise Forbidden()
-    rows = list(
-        (
-            await db.execute(
-                select(Attachment)
-                .where(
-                    Attachment.task_id == task_id,
-                    Attachment.workspace_id == actor.workspace_id,
-                    Attachment.deleted_at.is_(None),
-                )
-                .order_by(Attachment.created_at, Attachment.id)
-            )
-        ).scalars()
+    stmt = (
+        select(Attachment)
+        .where(
+            Attachment.task_id == task_id,
+            Attachment.workspace_id == actor.workspace_id,
+            Attachment.deleted_at.is_(None),
+        )
+        .order_by(Attachment.created_at, Attachment.id)
     )
+    rows, has_next = await paginate(db, stmt, params)
     refs = await user_refs(
         db, actor.workspace_id, [r.created_by for r in rows if r.created_by is not None]
     )
-    return [
+    views = [
         _view(
             r,
             None if r.created_by is None else refs.get(r.created_by),
@@ -108,6 +108,7 @@ async def list_attachments(db: AsyncSession, actor: Actor, task_id: UUID) -> lis
         )
         for r in rows
     ]
+    return views, has_next
 
 
 async def open_attachment(

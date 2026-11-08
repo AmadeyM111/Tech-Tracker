@@ -1072,6 +1072,37 @@
         "title": "Page[AdminUser]",
         "type": "object"
       },
+      "Page_AttachmentOut_": {
+        "properties": {
+          "has_next": {
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "has_next"
+        ],
+        "title": "Page[AttachmentOut]",
+        "type": "object"
+      },
       "Page_AuditEntry_": {
         "properties": {
           "has_next": {
@@ -5529,7 +5560,7 @@
     },
     "/api/v1/tasks/{task_id}/attachments": {
       "get": {
-        "description": "Живые вложения задачи (FR-9).",
+        "description": "Живые вложения задачи, старые сверху (FR-9); формат списка — как у всех (ADR-0012).",
         "operationId": "list_attachments",
         "parameters": [
           {
@@ -5541,6 +5572,30 @@
               "title": "Task Id",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 1000000000000000,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -5548,11 +5603,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/AttachmentOut"
-                  },
-                  "title": "Response List Attachments",
-                  "type": "array"
+                  "$ref": "#/components/schemas/Page_AttachmentOut_"
                 }
               }
             },
