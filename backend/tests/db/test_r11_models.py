@@ -374,7 +374,8 @@ async def test_t69_no_gin_or_trigram_indexes_and_no_pg_trgm(db: AsyncSession) ->
     assert [r.indexname for r in gin] == []
 
 
-@pytest.mark.parametrize("table", ["label", "task_label", "mention", "attachment"])
+# «attachment» снят с отложенных: вложения в R2 (spec 011, миграция 0012)
+@pytest.mark.parametrize("table", ["label", "task_label", "mention"])
 async def test_t69_deferred_tables_are_absent(db: AsyncSession, table: str) -> None:
     """D-58: отложенные таблицы не создаются."""
     found = await db.execute(

@@ -70,7 +70,8 @@ describe("Attachments", () => {
     fireEvent.change(input, { target: { files: [file] } });
     await waitFor(() => expect(f.count(UPLOAD)).toBe(1));
     const req = f.last(UPLOAD);
-    expect(f.query(req).get("name")).toBe("отчёт.pdf");
+    expect(decodeURIComponent(req.headers.get("x-file-name") ?? "")).toBe("отчёт.pdf");
+    expect(f.query(req).get("name")).toBeNull();
     expect(req.headers.get("content-type")).toBe("application/octet-stream");
     expect(await req.text()).toBe("%PDF-1.4");
   });

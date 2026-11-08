@@ -21,7 +21,7 @@ _MAIN = {
 }
 
 
-def ooxml(kind: str, *, macro: bool = False) -> bytes:
+def ooxml(kind: str, *, macro: bool = False, extra: tuple[str, str] | None = None) -> bytes:
     """Минимальный OOXML-zip: ``[Content_Types].xml`` и главная часть; ``macro`` — с VBA."""
     part, main = _MAIN[kind]
     ctype = f"application/vnd.openxmlformats-officedocument.{main}"
@@ -37,4 +37,23 @@ def ooxml(kind: str, *, macro: bool = False) -> bytes:
         zf.writestr(part, "<x/>")
         if macro:
             zf.writestr("word/vbaProject.bin", b"\x00vba")
+        if extra is not None:
+            zf.writestr(extra[0], extra[1])
+    return buf.getvalue()
+
+
+def ooxml_with_type(kind: str, part: str, content_type: str) -> bytes:
+    """OOXML, где опасная часть объявлена типом, а имя части безобидное."""
+    main_part, main = _MAIN[kind]
+    types = (
+        '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/'
+        f'package/2006/content-types"><Override PartName="/{main_part}" ContentType='
+        f'"application/vnd.openxmlformats-officedocument.{main}"/><Override PartName="/{part}" '
+        f'ContentType="{content_type}"/></Types>'
+    )
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("[Content_Types].xml", types)
+        zf.writestr(main_part, "<x/>")
+        zf.writestr(part, b"\x00")
     return buf.getvalue()

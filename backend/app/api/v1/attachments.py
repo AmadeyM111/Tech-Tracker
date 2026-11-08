@@ -1,17 +1,19 @@
 """Вложения: ``/api/v1/tasks/{task_id}/attachments`` и ``/api/v1/attachments/{id}`` (spec 011).
 
 Гейт — router-level ``require_capability(BUSINESS_ACCESS)``: ТА и «без роли» получают 403.
-Загрузка — сырое тело запроса (``Content-Type`` клиента не используется), имя — ``?name=``
-(plan PA-1). ``Content-Length`` больше лимита — 413 до чтения тела. Отдача — с ``nosniff``,
+Загрузка — сырое тело запроса (``Content-Type`` клиента не используется), имя — заголовок
+``X-File-Name`` (URL-encoded; plan PA-1). ``Content-Length`` больше лимита — 413 после проверки
+прав и до чтения тела. Отдача — с ``nosniff``,
 CSP ``sandbox``; ``inline`` только для картинок (FR-6).
 """
 
 from __future__ import annotations
 
 from typing import Annotated
+from urllib.parse import unquote
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import FileResponse
 
 from app.api.deps import get_active_actor, require_capability
@@ -19,7 +21,6 @@ from app.api.openapi import error_responses
 from app.api.v1.schemas.attachments import AttachmentOut
 from app.core.config import Settings
 from app.core.db import DbSession
-from app.core.errors import PayloadTooLarge
 from app.core.pagination import Page, PageParams
 from app.domain.access.roles import Actor, Capability
 from app.domain.attachments import queries, service
@@ -76,19 +77,24 @@ async def upload_attachment(
     request: Request,
     db: DbSession,
     actor: CurrentActor,
-    name: Annotated[str, Query(min_length=1, max_length=1024)],
+    file_name: Annotated[
+        str,
+        Header(alias="X-File-Name", min_length=1, max_length=2048, description="URL-encoded UTF-8"),
+    ],
 ) -> AttachmentOut:
-    """Прикрепляет файл: тело запроса — содержимое файла (FR-1…FR-5, FR-10)."""
-    settings = _settings(request)
+    """Прикрепляет файл: тело — содержимое, имя — заголовок ``X-File-Name`` (FR-1…FR-5, FR-10).
+
+    Имя не в адресе: так оно не попадает в журнал доступа веб-сервера (NFR-2).
+    """
     declared = request.headers.get("content-length")
-    if (
-        declared is not None
-        and declared.isdigit()
-        and int(declared) > settings.attachment_max_bytes
-    ):
-        raise PayloadTooLarge(f"Файл больше {settings.attachment_max_bytes} байт")
     view = await service.add_attachment(
-        db, actor, settings, task_id, name=name, chunks=request.stream()
+        db,
+        actor,
+        _settings(request),
+        task_id,
+        name=unquote(file_name),
+        chunks=request.stream(),
+        declared_size=int(declared) if declared is not None and declared.isdigit() else None,
     )
     return AttachmentOut.model_validate(view)
 

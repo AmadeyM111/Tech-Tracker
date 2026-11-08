@@ -53,12 +53,17 @@ async def _world(env: ApiEnv) -> World:
     return World(env, ba, member, stranger, project, task, tokens)
 
 
+def _headers(env: ApiEnv, token: str, name: str) -> dict[str, str]:
+    return env.auth(
+        token, **{"Content-Type": "application/octet-stream", "X-File-Name": quote(name)}
+    )
+
+
 async def _upload(w: World, who: str, name: str, data: bytes, task_id: Any = None) -> Any:
     return await w.env.client.post(
         f"/api/v1/tasks/{task_id or w.task.id}/attachments",
-        params={"name": name},
         content=data,
-        headers=w.env.auth(w.tokens[who], **{"Content-Type": "application/octet-stream"}),
+        headers=_headers(w.env, w.tokens[who], name),
     )
 
 
@@ -102,9 +107,8 @@ async def test_011_ac3_permissions(api_env: ApiEnv) -> None:
     ta_token = await api_env.login_ok(ta)
     r = await api_env.client.post(
         f"/api/v1/tasks/{w.task.id}/attachments",
-        params={"name": "a.pdf"},
         content=fx.PDF,
-        headers=api_env.auth(ta_token),
+        headers=_headers(api_env, ta_token, "a.pdf"),
     )
     assert r.status_code == 403
     assert (await _upload(w, "stranger", "a.pdf", fx.PDF)).status_code == 403
@@ -115,7 +119,7 @@ async def test_011_ac3_permissions(api_env: ApiEnv) -> None:
     )
     assert (await _upload(w, "member", "a.pdf", fx.PDF)).status_code == 404
     anon = await api_env.client.post(
-        f"/api/v1/tasks/{w.task.id}/attachments", params={"name": "a.pdf"}, content=fx.PDF
+        f"/api/v1/tasks/{w.task.id}/attachments", content=fx.PDF, headers={"X-File-Name": "a.pdf"}
     )
     assert anon.status_code == 401
 
@@ -241,3 +245,41 @@ async def test_011_list_shows_author_and_rights(api_env: ApiEnv) -> None:
     assert [(i["name"], i["author"]["login"], i["kind"]) for i in mine] == [
         ("ba.pdf", w.ba.login, "pdf")
     ]
+
+
+async def test_011_permissions_checked_before_size(api_env: ApiEnv) -> None:
+    """Не участник получает 403, а не 413, даже на слишком большой файл (ревью 011, п. 8)."""
+    w = await _world(api_env)
+    big = fx.PDF + b"0" * (MAX + 1)
+    assert (await _upload(w, "stranger", "big.pdf", big)).status_code == 403
+
+
+async def test_011_name_header_is_required_and_decoded(api_env: ApiEnv) -> None:
+    w = await _world(api_env)
+    missing = await api_env.client.post(
+        f"/api/v1/tasks/{w.task.id}/attachments",
+        content=fx.PDF,
+        headers=api_env.auth(w.tokens["member"]),
+    )
+    assert missing.status_code == 422
+    ok = await _upload(w, "member", "Отчёт № 5.pdf", fx.PDF)
+    assert ok.json()["name"] == "Отчёт № 5.pdf"
+
+
+async def test_011_cp1251_text_is_served_with_its_charset(api_env: ApiEnv) -> None:
+    w = await _world(api_env)
+    item = (await _upload(w, "member", "1251.txt", fx.TXT_1251)).json()
+    assert item["content_type"] == "text/plain; charset=windows-1251"
+    utf = (await _upload(w, "member", "utf.csv", fx.CSV)).json()
+    assert utf["content_type"] == "text/csv; charset=utf-8"
+
+
+async def test_011_ac4_parallel_uploads_respect_limit(committed_api_env: ApiEnv) -> None:
+    """Параллельные загрузки не обходят лимит (ревью 011, п. 1): блокировка задачи."""
+    import asyncio
+
+    w = await _world(committed_api_env)
+    committed_api_env.app.state.settings.attachments_per_task = 2
+    results = await asyncio.gather(*(_upload(w, "member", f"{i}.pdf", fx.PDF) for i in range(6)))
+    codes = sorted(r.status_code for r in results)
+    assert codes == [201, 201, 409, 409, 409, 409]
