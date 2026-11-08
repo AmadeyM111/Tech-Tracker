@@ -1,6 +1,6 @@
 # Plan: Упоминания и уведомления (012)
 
-- **Spec:** ./spec.md (DRAFT) · **Статус:** DRAFT
+- **Spec:** ./spec.md (APPROVED 2026-11-08) · **Статус:** APPROVED
 
 ## 1. Подход
 Таблицы `comment_mention` и `notification` (миграция `0013`, `down_revision="0012"`). Домен
