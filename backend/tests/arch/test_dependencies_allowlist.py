@@ -20,11 +20,11 @@ BACKEND_RUNTIME = {
     "tzdata",
     "greenlet",
     "mcp",  # 020/PN-9: официальный SDK MCP (ADR-0018)
+    "httpx",  # 016/plan §7: харнесс load-measure в CLI; уже транзитивно через mcp
 }
 BACKEND_DEV = {
     "pytest",
     "pytest-asyncio",
-    "httpx",
     "ruff",
     "mypy",
     "pyyaml",

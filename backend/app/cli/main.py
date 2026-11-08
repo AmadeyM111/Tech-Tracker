@@ -12,6 +12,8 @@ from app.cli.commands import (
     export,
     hash_bench,
     import_,
+    load_data,
+    load_measure,
     maintenance,
     mcp,
     openapi,
@@ -31,6 +33,8 @@ def build_parser() -> argparse.ArgumentParser:
     demo_data.add_parser(subparsers)
     export.add_parser(subparsers)
     import_.add_parser(subparsers)
+    load_data.add_parser(subparsers)
+    load_measure.add_parser(subparsers)
     mcp.add_parser(subparsers)
     return parser
 
