@@ -5,14 +5,19 @@ import { Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } 
 import { AgentAccessPage } from "../features/tokens/AgentAccessPage";
 import { AuditPage } from "../features/admin/AuditPage";
 import { BackupBanner } from "../features/admin/BackupBanner";
+import { UnassignedAccountsPage } from "../features/admin/UnassignedAccountsPage";
 import { UsersPage } from "../features/admin/UsersPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { PasswordResetConfirmPage } from "../features/auth/PasswordResetConfirmPage";
 import { PasswordResetRequestPage } from "../features/auth/PasswordResetRequestPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
+import { ProfilePage } from "../features/auth/ProfilePage";
+import { RegisterConfirmPage } from "../features/auth/RegisterConfirmPage";
+import { RegisterPage } from "../features/auth/RegisterPage";
 import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
 import { MyTasksPage } from "../features/tasks/TaskList";
+import { SummaryPage } from "../features/overview/SummaryPage";
 import { TaskPage } from "../features/tasks/TaskPage";
 import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
@@ -137,13 +142,20 @@ function MenuItems({ profile }: { profile: MeResponse }) {
               {t("nav.my_tasks")}
             </NavLink>
           </p>
+          {/* 008/FR-1: «Сводка» — пункт меню, стартовый экран не меняется (Q-10) */}
+          <p>
+            <NavLink to="/summary">
+              <Icon name="tasks" />
+              {t("nav.summary")}
+            </NavLink>
+          </p>
         </>
       ) : null}
       {has("manage_accounts") ? (
         <p>
           <NavLink to="/admin/users">
             <Icon name="users" />
-            {t("admin.home_users_link")}
+            {t("admin.users.title")}
           </NavLink>
         </p>
       ) : null}
@@ -160,6 +172,22 @@ function MenuItems({ profile }: { profile: MeResponse }) {
         <NavLink to="/profile/agents">
           <Icon name="password" />
           {t("agent_tokens.title")}
+        </NavLink>
+      </p>
+      {/* 019/RG-11: accounts without a role, only for the business admin (onboard_accounts). */}
+      {has("onboard_accounts") ? (
+        <p>
+          <NavLink to="/unassigned-accounts" end>
+            <Icon name="users" />
+            {t("nav.unassigned")}
+          </NavLink>
+        </p>
+      ) : null}
+      {/* 019/RG-16: the profile item is shown to every role. */}
+      <p>
+        <NavLink to="/profile" end>
+          <Icon name="password" />
+          {t("nav.profile")}
         </NavLink>
       </p>
     </>
@@ -235,10 +263,9 @@ function StartRedirect({ insideMain }: { insideMain: boolean }) {
   );
 }
 
-/** 009/FR-7: the backup warning goes on tech admin screens, to users who manage accounts. */
-function showsBackupBanner(capability: Capability | undefined, profile: MeResponse): boolean {
-  const adminScreen = capability === "manage_accounts" || capability === "view_audit";
-  return adminScreen && profile.capabilities.includes("manage_accounts");
+/** 009/FR-7: the backup warning goes on every screen of a user who manages accounts (TA). */
+function showsBackupBanner(profile: MeResponse): boolean {
+  return profile.capabilities.includes("manage_accounts");
 }
 
 /**
@@ -262,7 +289,7 @@ function RoleScreen({
           <Sidebar profile={profile} />
           {capability === undefined || profile.capabilities.includes(capability) ? (
             <>
-              {showsBackupBanner(capability, profile) ? <BackupBanner /> : null}
+              {showsBackupBanner(profile) ? <BackupBanner /> : null}
               {children(profile)}
             </>
           ) : (
@@ -344,8 +371,8 @@ function useClientHandlers(): void {
     () =>
       setNavigationHandlers({
         onUnauthenticated: () => {
-          // On the login page there is no session data to drop and nothing to leave.
-          if (pathRef.current === "/login") return;
+          // On the login and register pages there is no session data to drop and nothing to leave (RG-14).
+          if (pathRef.current === "/login" || pathRef.current === "/register") return;
           queryClient.clear();
           navigate("/login", { replace: true, state: focusHeadingState(stateRef.current) });
         },
@@ -391,6 +418,16 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           </NeedsSession>
         }
       />
+      <Route
+        path="/register"
+        element={
+          <GuestOnly>
+            <RegisterPage />
+          </GuestOnly>
+        }
+      />
+      {/* RG-14: no GuestOnly here, the link from the e-mail works for any session state. */}
+      <Route path="/register/confirm" element={<RegisterConfirmPage />} />
       <Route path="/password-reset" element={<PasswordResetRequestPage />} />
       <Route path="/password-reset/confirm" element={<PasswordResetConfirmPage />} />
       <Route path="/" element={<StartRedirect insideMain={insideMain} />} />
@@ -407,6 +444,15 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         element={
           <RoleScreen insideMain={insideMain} capability="view_audit">
             {() => <AuditPage />}
+          </RoleScreen>
+        }
+      />
+      {/* 019/RG-11, AC-30: accounts without a role; the business admin assigns only "user". */}
+      <Route
+        path="/unassigned-accounts"
+        element={
+          <RoleScreen insideMain={insideMain} capability="onboard_accounts">
+            {() => <UnassignedAccountsPage />}
           </RoleScreen>
         }
       />
@@ -434,10 +480,25 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           </RoleScreen>
         }
       />
+      {/* 019/RG-16: no capability, so every role with a profile may open its own screen. */}
+      <Route
+        path="/profile"
+        element={
+          <RoleScreen insideMain={insideMain}>{(profile) => <ProfilePage profile={profile} />}</RoleScreen>
+        }
+      />
       <Route
         path="/profile/agents"
         element={
           <RoleScreen insideMain={insideMain}>{() => <AgentAccessPage />}</RoleScreen>
+        }
+      />
+      <Route
+        path="/summary"
+        element={
+          <RoleScreen insideMain={insideMain} capability="business_access">
+            {() => <SummaryPage />}
+          </RoleScreen>
         }
       />
       <Route

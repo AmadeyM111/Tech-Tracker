@@ -163,11 +163,26 @@ describe("LoginPage (T23)", () => {
   });
 });
 
-// Spec 005-login-help. Dictionary keys fixed by this test: auth.help_title, auth.help_p1.
-const HELP_KEYS = ["auth.help_title", "auth.help_p1"] as const;
+// Spec 005-login-help v0.3: help block = h2, intro paragraph, ordered list of four items (ТЗ §3).
+// Dictionary keys fixed by this test: auth.help_title, auth.help_p1, auth.help_item_1…4.
+const HELP_KEYS = [
+  "auth.help_title",
+  "auth.help_p1",
+  "auth.help_item_1",
+  "auth.help_item_2",
+  "auth.help_item_3",
+  "auth.help_item_4",
+] as const;
 const HELP_TITLE = "О системе";
 const HELP_P1 =
-  "GTrack — интеллектуальный трекер задач для команд и компаний. Проекты, задачи с подзадачами со статусами с канбан-доской.";
+  "GTrack — интеллектуальный трекер задач для личных задач, ведения бизнеса, рабочих команд и компаний. Он умеет:";
+const HELP_ITEMS = [
+  "Вести личные и корпоративные проекты;",
+  "Заводить и отслеживать задачи, которые можно разделить для удобства на подзадачи;",
+  "Двигать задачи по статусам в канбан-доске;",
+  "Подключать ваш ИИ для синхронизации и автоматизации вашей деятельности.",
+];
+const HELP_ALL_TEXT = HELP_TITLE + HELP_P1 + HELP_ITEMS.join("");
 const LOGIN_TITLE = "Войти в GTrack";
 const dict = ru as Record<string, string>;
 
@@ -205,6 +220,7 @@ describe("LoginPage help block (spec 005)", () => {
   it("ac2_dictionary_values_equal_fr2_strings", () => {
     expect(dict["auth.help_title"]).toBe(HELP_TITLE);
     expect(dict["auth.help_p1"]).toBe(HELP_P1);
+    HELP_ITEMS.forEach((item, i) => expect(dict[`auth.help_item_${i + 1}`]).toBe(item));
     for (const k of HELP_KEYS) expect(t(k as never)).toBe(dict[k]);
   });
 
@@ -230,20 +246,36 @@ describe("LoginPage help block (spec 005)", () => {
     expect(h1[0]!.textContent).toBe(LOGIN_TITLE);
   });
 
-  it("ac2_block_has_exactly_one_h2_and_one_paragraph_with_exact_text", () => {
+  it("ac2_block_has_one_h2_one_paragraph_and_one_ordered_list_with_exact_text", () => {
     renderAt("/login", <LoginPage />);
     const block = helpBlock();
     expect(block.querySelectorAll("h2").length).toBe(1);
     const ps = Array.from(block.querySelectorAll("p"));
     expect(ps.map((p) => p.textContent)).toEqual([HELP_P1]);
     expect(within(block).getByRole("heading", { level: 2 }).textContent).toBe(HELP_TITLE);
+    const lists = block.querySelectorAll("ol");
+    expect(lists.length).toBe(1);
+    expect(lists[0]!.tagName).toBe("OL");
+    expect(Array.from(lists[0]!.querySelectorAll("li")).map((li) => li.textContent)).toEqual(HELP_ITEMS);
+    // Order in the document: h2, paragraph, list.
+    const [h2, p, ol] = [block.querySelector("h2")!, ps[0]!, lists[0]!];
+    expect(h2.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(p.compareDocumentPosition(ol) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("ac3_no_interactive_elements_and_text_is_exactly_the_three_strings", () => {
+  it("ac3_no_interactive_elements_and_text_is_title_paragraph_and_items", () => {
     renderAt("/login", <LoginPage />);
     const block = helpBlock();
     expect(block.querySelectorAll("a, button, input, select, textarea, [tabindex]").length).toBe(0);
-    expect(block.textContent).toBe(HELP_TITLE + HELP_P1);
+    expect(block.textContent).toBe(HELP_ALL_TEXT);
+  });
+
+  it("v03_no_subtitle_under_the_logo_and_brand_block_holds_only_logo_and_title", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    const brand = container.querySelector(".ui-brand")!;
+    expect(Array.from(brand.children).map((el) => el.tagName)).toEqual(["svg", "H1"]);
+    expect(container.querySelectorAll("h1, h2").length).toBe(2);
+    expect(container.querySelector(".ui-brand + p, .login-subtitle")).toBeNull();
   });
 
   it("ac4_standalone_login_page_makes_no_network_requests", () => {
@@ -315,6 +347,7 @@ describe("LoginPage help block (spec 005)", () => {
 // 006-bugreport-ch1, R6-T02: «глазок» на экране входа (AC-1, AC-3, AC-5, AC-6, AC-7, AC-8, AC-9, AC-10).
 const SECRET = "Secret-Pass-123";
 const SHOW = "Показать пароль";
+const HIDE = "Скрыть пароль";
 const pwd = (c: HTMLElement) => field(c, "current-password");
 const eye = (c: HTMLElement) => {
   const b = revealButtons(c)[0];
@@ -360,7 +393,8 @@ describe("LoginPage password reveal (006)", () => {
     expect(pwd(container).value).toBe(SECRET);
     expect(b.getAttribute("aria-pressed")).toBe("true");
     expect(document.activeElement).toBe(b);
-    expect(screen.getByRole("button", { name: SHOW })).toBe(b);
+    // Owner decision 2026-11-08 (plan §10, p. 5): while the password is shown, the button is named «Скрыть пароль».
+    expect(screen.getByRole("button", { name: HIDE })).toBe(b);
     fireEvent.click(b);
     expect(pwd(container).type).toBe("password");
     expect(b.getAttribute("aria-pressed")).toBe("false");
@@ -534,5 +568,180 @@ describe("LoginPage forgot-password link (spec 007)", () => {
     window.dispatchEvent(new Event("focus"));
     await new Promise((r) => setTimeout(r, 50));
     expect(api.passwordResetStatus).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Spec 019 (R8-T18, AC-1, AC-21, FR-12): ссылка «Зарегистрироваться» и абзац 2 справки зависят от того же статуса,
+// что и «Забыли пароль?» (RG-13, Q-1). Существующие случаи enabled:false выше не меняются.
+describe("LoginPage registration link and help (spec 019)", () => {
+  const forgot = () => screen.queryByRole("link", { name: t("auth.forgot_password") });
+  const register = () => screen.queryByRole("link", { name: t("auth.register_link") });
+  const HELP_P2_REGISTRATION =
+    "Учётную запись выдаёт технический администратор, или её можно создать самостоятельно через «Зарегистрироваться». Роль после регистрации назначает технический или бизнес-администратор.";
+  const helpTexts = () => Array.from(helpBlock().querySelectorAll("p")).map((p) => p.textContent);
+
+  it("019_ac21_help_registration_text_is_the_owner_approved_fr12_text", () => {
+    expect(dict["auth.help_p2_registration"]).toBe(HELP_P2_REGISTRATION);
+    expect(dict["auth.register_link"]).toBe("Зарегистрироваться");
+  });
+
+  it("019_ac21_enabled_true_register_link_to_register_is_after_forgot_link_and_before_help", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    const { container } = renderAt("/login", <LoginPage />);
+    const reg = await screen.findByRole("link", { name: t("auth.register_link") });
+    expect(reg.getAttribute("href")).toBe("/register");
+    expect(reg.textContent).toBe(t("auth.register_link"));
+    const forgotLink = screen.getByRole("link", { name: t("auth.forgot_password") });
+    const submit = submitButton(container);
+    const help = container.querySelector("section.ui-login-help")!;
+    expect(submit.compareDocumentPosition(forgotLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(forgotLink.compareDocumentPosition(reg) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(reg.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(help.contains(reg)).toBe(false);
+  });
+
+  it("019_ac21_enabled_true_help_second_paragraph_is_registration_text", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    renderAt("/login", <LoginPage />);
+    await screen.findByRole("link", { name: t("auth.register_link") });
+    const block = helpBlock();
+    expect(block.querySelectorAll("h2").length).toBe(1);
+    expect(helpTexts()).toEqual([HELP_P1, HELP_P2_REGISTRATION]);
+    expect(block.textContent).toBe(HELP_ALL_TEXT + HELP_P2_REGISTRATION);
+    expect(block.querySelectorAll("a").length).toBe(0);
+    // v0.3: the registration paragraph comes after the list (owner decision 2026-11-08).
+    const ol = block.querySelector("ol")!;
+    const regP = block.querySelectorAll("p")[1]!;
+    expect(ol.compareDocumentPosition(regP) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("019_ac21_enabled_true_tab_order_adds_links_after_submit_and_no_focus_change", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    const { container } = renderAt("/login", <LoginPage />);
+    await screen.findByRole("link", { name: t("auth.register_link") });
+    expect(document.activeElement).toBe(field(container, "username"));
+    const focusable = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((el) => !(el as HTMLButtonElement).disabled);
+    expect(focusable).toEqual([
+      field(container, "username"),
+      field(container, "current-password"),
+      revealButtons(container)[0],
+      submitButton(container),
+      screen.getByRole("link", { name: t("auth.forgot_password") }),
+      screen.getByRole("link", { name: t("auth.register_link") }),
+    ]);
+    expect(focusable.some((el) => helpBlock().contains(el))).toBe(false);
+  });
+
+  it("019_ac21_enabled_true_makes_no_new_requests", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      renderAt("/login", <LoginPage />);
+      await screen.findByRole("link", { name: t("auth.register_link") });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(api.passwordResetStatus).toHaveBeenCalledTimes(1);
+      expect(api.login).not.toHaveBeenCalled();
+      expect(api.requestPasswordReset).not.toHaveBeenCalled();
+      expect(api.confirmPasswordReset).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("019_ac21_enabled_false_has_no_register_link_and_help_is_unchanged", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: false });
+    const { container } = renderAt("/login", <LoginPage />);
+    await waitFor(() => expect(api.passwordResetStatus).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(register()).toBeNull();
+    expect(container.querySelector('a[href="/register"]')).toBeNull();
+    expect(forgot()).toBeNull();
+    // 005 v0.3: one help paragraph and the list; the registration paragraph appears only when enabled (R8-T00)
+    expect(helpTexts()).toEqual([HELP_P1]);
+    expect(helpBlock().textContent).toBe(HELP_ALL_TEXT);
+    expect(helpBlock().textContent).not.toContain(HELP_P2_REGISTRATION);
+  });
+
+  it("019_ac21_status_pending_shows_help_p2_then_registration_text_when_enabled", async () => {
+    const d = deferred<{ enabled: boolean }>();
+    vi.mocked(api.passwordResetStatus).mockReturnValue(d.promise);
+    renderAt("/login", <LoginPage />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(register()).toBeNull();
+    expect(helpTexts()).toEqual([HELP_P1]);
+    d.resolve({ enabled: true });
+    await screen.findByRole("link", { name: t("auth.register_link") });
+    expect(helpTexts()).toEqual([HELP_P1, HELP_P2_REGISTRATION]);
+  });
+
+  it("019_ac21_status_error_keeps_help_p2_and_has_no_register_link", async () => {
+    vi.mocked(api.passwordResetStatus).mockRejectedValue(new ApiError(500, "internal_error", "x"));
+    renderAt("/login", <LoginPage />);
+    await waitFor(() => expect(api.passwordResetStatus).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(register()).toBeNull();
+    expect(helpTexts()).toEqual([HELP_P1]);
+  });
+
+  // Owner decision 2026-11-08 (plan §10, p. 5): the reveal button names the action for the current state (login too).
+  it("019_ac2_reveal_button_name_switches_to_hide_while_password_is_shown", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    const { container } = renderAt("/login", <LoginPage />);
+    await screen.findByRole("link", { name: t("auth.register_link") });
+    const eye = revealButtons(container)[0]!;
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.show_password"));
+    fireEvent.click(eye);
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.hide_password"));
+    expect(field(container, "current-password").type).toBe("text");
+    fireEvent.click(eye);
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.show_password"));
+    expect(field(container, "current-password").type).toBe("password");
+  });
+});
+
+// Spec 005-login-help v0.3, design approval 2026-11-08: P-5 (error icon), error above the button,
+// submitting state (decorative spinner, text kept).
+describe("LoginPage design v0.3 (spec 005)", () => {
+  it("p5_error_alert_has_decorative_icon_and_message_text_only", async () => {
+    vi.mocked(api.login).mockRejectedValue(new ApiError(401, "invalid_credentials", "x"));
+    const { container } = renderAt("/login", <LoginPage />);
+    fill(container);
+    fireEvent.click(submitButton(container));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(errorMessage("invalid_credentials"));
+    const icon = alert.querySelector("svg.ui-icon");
+    expect(icon).not.toBeNull();
+    expect(icon!.getAttribute("aria-hidden")).toBe("true");
+    expect(icon!.querySelector("[tabindex], a, button")).toBeNull();
+  });
+
+  it("error_alert_sits_directly_above_the_submit_button", async () => {
+    vi.mocked(api.login).mockRejectedValue(new ApiError(401, "invalid_credentials", "x"));
+    const { container } = renderAt("/login", <LoginPage />);
+    fill(container);
+    fireEvent.click(submitButton(container));
+    const alert = await screen.findByRole("alert");
+    expect(alert.nextElementSibling).toBe(submitButton(container));
+  });
+
+  it("submitting_button_is_disabled_keeps_text_and_shows_decorative_spinner", async () => {
+    const d = deferred<never>();
+    vi.mocked(api.login).mockReturnValue(d.promise);
+    const { container } = renderAt("/login", <LoginPage />);
+    expect(submitButton(container).querySelector("svg")).toBeNull();
+    fill(container);
+    fireEvent.click(submitButton(container));
+    const btn = submitButton(container);
+    expect(btn.disabled).toBe(true);
+    expect(btn.textContent?.trim()).toBe(t("auth.login_submit"));
+    const spinner = btn.querySelector("svg.ui-icon");
+    expect(spinner).not.toBeNull();
+    expect(spinner!.getAttribute("aria-hidden")).toBe("true");
   });
 });

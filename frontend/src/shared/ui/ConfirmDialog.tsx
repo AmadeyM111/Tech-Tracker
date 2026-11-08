@@ -68,7 +68,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
       >
         <h2 id={`${id}-title`}>{title}</h2>
         <p id={`${id}-message`}>{message}</p>
-        <button type="button" data-action="cancel" ref={cancelRef} disabled={pending} onClick={onCancel}>
+        <button type="button" className="ui-btn-secondary" data-action="cancel" ref={cancelRef} disabled={pending} onClick={onCancel}>
           {t("admin.cancel")}
         </button>{" "}
         <button type="button" data-action="confirm" ref={confirmRef} disabled={pending} onClick={onConfirm}>

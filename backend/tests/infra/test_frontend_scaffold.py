@@ -251,10 +251,19 @@ def test_t21_src_files_only_expected() -> None:
         # T24
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
         "features/admin/password.ts", "features/admin/EmailDialog.tsx",
+        # 008 «Сводка»
+        "features/overview/SummaryPage.tsx", "features/overview/api.ts",
+        "features/overview/filters.ts", "features/overview/summary.css",
         "features/admin/BackupBanner.tsx",  # 009/FR-7
         "features/attachments/Attachments.tsx", "features/attachments/api.ts",  # 011
         "features/attachments/attachments.css",
         "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
+        # 019/R8-T20: dialog for changing first and last name
+        "features/admin/NameDialog.tsx",
+        # 019/R8-T21: accounts without a role, /unassigned-accounts (AC-30)
+        "features/admin/UnassignedAccountsPage.tsx",
+        # 019: layout of the auth screens by the mockups (2026-11-08, доводка по макетам)
+        "features/auth/auth-screens.css",
         # T81
         "shared/ui/UserPicker.tsx", "features/users/api.ts",
         # T82
@@ -277,6 +286,12 @@ def test_t21_src_files_only_expected() -> None:
         "features/auth/session.ts",
         # 007/R7-T17
         "features/auth/PasswordResetRequestPage.tsx",
+        # 019/R8-T16: экран регистрации /register
+        "features/auth/RegisterPage.tsx",
+        # 019/R8-T17: экран подтверждения регистрации /register/confirm
+        "features/auth/RegisterConfirmPage.tsx",
+        # 019/R8-T19: экран профиля /profile
+        "features/auth/ProfilePage.tsx",
         # PN-15 (MCP): «Доступ для агентов» (ADR-0018)
         "features/tokens/api.ts", "features/tokens/model.ts", "features/tokens/AgentAccessPage.tsx",
         "features/tokens/TokenList.tsx", "features/tokens/IssuedToken.tsx",

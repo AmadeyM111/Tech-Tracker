@@ -197,3 +197,25 @@ def test_002_ac1_committed_openapi_json_has_no_mixed() -> None:
 def test_002_ac1_generated_openapi_has_no_mixed(generated_text: str) -> None:
     """002/AC-1 (FR-1): в сгенерированном описании API нет `mixed`."""
     assert "mixed" not in generated_text.lower()
+
+
+def test_019_ac30_unassigned_role_route_uses_set_role_request(
+    spec_pair: tuple[str, dict[str, Any], str],
+) -> None:
+    """019/AC-30 (R8-T07): ``PUT /unassigned-accounts/{user_id}/role`` принимает ту же схему
+    ``SetRoleRequest``, что и ``/admin/users/{user_id}/role`` (три значения роли + null)."""
+    source, spec, _ = spec_pair
+    operation = spec["paths"]["/api/v1/unassigned-accounts/{user_id}/role"]["put"]
+    body_schema = operation["requestBody"]["content"]["application/json"]["schema"]
+    assert body_schema == {"$ref": "#/components/schemas/SetRoleRequest"}, source
+    assert _role_enum(spec, "SetRoleRequest", "role") == THREE_ROLES, source
+
+
+def test_019_ac30_unassigned_account_out_has_no_email(
+    spec_pair: tuple[str, dict[str, Any], str],
+) -> None:
+    """019/AC-30 (NFR-1, R8-T07): элемент списка для БА - без ``email`` и без ролей."""
+    source, spec, _ = spec_pair
+    props = _schemas(spec)["UnassignedAccountOut"]["properties"]
+    assert set(props) == {"id", "login", "first_name", "last_name", "created_at"}, source
+    assert "email" not in json.dumps(spec["components"]["schemas"]["UnassignedAccountOut"]), source

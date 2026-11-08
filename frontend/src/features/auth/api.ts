@@ -10,6 +10,9 @@ export type PasswordResetRequest = components["schemas"]["PasswordResetRequest"]
 export type PasswordResetConfirm = components["schemas"]["PasswordResetConfirm"];
 export type PasswordResetStatus = components["schemas"]["PasswordResetStatus"];
 export type MeResponse = components["schemas"]["MeResponse"];
+export type RegistrationRequest = components["schemas"]["RegistrationRequest"];
+export type RegistrationConfirm = components["schemas"]["RegistrationConfirm"];
+export type SetNameRequest = components["schemas"]["SetNameRequest"];
 
 function invalidBody(status: number): ApiError {
   return new ApiError(status, INVALID_RESPONSE, "invalid response body");
@@ -42,6 +45,24 @@ export async function requestPasswordReset(body: PasswordResetRequest): Promise<
 // The token travels only in the request body.
 export async function confirmPasswordReset(body: PasswordResetConfirm): Promise<void> {
   await getAppClient().POST("/api/v1/auth/password-reset/confirm", { body });
+}
+
+// The answer is the same for a free and a taken address (FR-4), so the form shows one text in both cases.
+export async function requestRegistration(body: RegistrationRequest): Promise<void> {
+  await getAppClient().POST("/api/v1/auth/registration/request", { body });
+}
+
+// The token travels only in the request body; it is sent on the confirm button press only.
+export async function confirmRegistration(token: string): Promise<void> {
+  const body: RegistrationConfirm = { token };
+  await getAppClient().POST("/api/v1/auth/registration/confirm", { body });
+}
+
+// AC-34: the user changes own first and last name; the answer is the refreshed profile (MeResponse).
+export async function updateMyName(body: SetNameRequest): Promise<MeResponse> {
+  const { data } = await getAppClient().PUT("/api/v1/me/name", { body });
+  if (data === undefined) throw invalidBody(200);
+  return data;
 }
 
 // The profile request lives in session.ts (the router reads it independently of the form calls above).

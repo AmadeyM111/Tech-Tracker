@@ -84,6 +84,9 @@ class ErrorCode(StrEnum):
     due_date_in_past = "due_date_in_past"
     # [007]
     email_invalid = "email_invalid"
+    # [019]
+    first_name_invalid = "first_name_invalid"
+    last_name_invalid = "last_name_invalid"
     # [011]
     attachment_empty = "attachment_empty"
 
@@ -166,6 +169,24 @@ class EmailTaken(AppError):
     status_code = 409
     code = "email_taken"
     default_detail = "Email уже используется"
+
+
+class RateLimited(AppError):
+    status_code = 429
+    code = "rate_limited"
+    default_detail = "Слишком много запросов. Попробуйте позже"
+
+
+class RegistrationTokenInvalid(AppError):
+    status_code = 400
+    code = "registration_token_invalid"
+    default_detail = "Ссылка подтверждения недействительна"
+
+
+class LoginTakenConflict(AppError):
+    status_code = 409
+    code = "login_taken"
+    default_detail = "Логин уже занят"
 
 
 class PayloadTooLarge(AppError):

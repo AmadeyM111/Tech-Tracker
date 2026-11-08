@@ -1,8 +1,9 @@
-"""Регулярное обслуживание (plan §4.13, §10.4; D-42, FR-25b).
+"""Регулярное обслуживание (plan §4.13, §4.3, §10.4; D-42, FR-25b, NFR-9).
 
 ``run_maintenance`` собирает отчёт о выполненных (или, при ``dry_run``, только подсчитанных)
-действиях: истёкшие сессии (T31) и вложения — корзина и файлы-сироты (spec 011). Корзина
-проектов, задач и комментариев — R3, их счётчики равны 0. События в журнал не пишутся.
+действиях: истёкшие сессии (T31), заявки регистрации (R8-T12) и вложения — корзина и
+файлы-сироты (spec 011). Корзина проектов, задач и комментариев — R3, их счётчики равны 0. События
+в журнал не пишутся.
 """
 
 from __future__ import annotations
@@ -11,7 +12,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.domain.attachments.purge import purge_attachments
-from app.domain.system.maintenance import purge_expired_sessions
+from app.domain.system.maintenance import (
+    purge_expired_registration_requests,
+    purge_expired_sessions,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -32,6 +36,7 @@ class MaintenanceReport:
     attachments_purged: int = 0
     files_removed: int = 0
     orphan_files_removed: int = 0
+    registration_requests_expired: int = 0
 
 
 async def run_maintenance(
@@ -42,16 +47,23 @@ async def run_maintenance(
     dry_run: bool,
 ) -> MaintenanceReport:
     """Выполняет обслуживание на момент ``clock.now()``; при ``dry_run`` только считает."""
+    now = clock.now()
     sessions_expired = await purge_expired_sessions(
         sessionmaker,
-        now=clock.now(),
+        now=now,
         idle_timeout=settings.session_idle_timeout,
+        dry_run=dry_run,
+    )
+    registration_requests_expired = await purge_expired_registration_requests(
+        sessionmaker,
+        now=now,
         dry_run=dry_run,
     )
     files = await purge_attachments(sessionmaker, settings, now=clock.now(), dry_run=dry_run)
     return MaintenanceReport(
         dry_run=dry_run,
         sessions_expired=sessions_expired,
+        registration_requests_expired=registration_requests_expired,
         attachments_purged=files.attachments_purged,
         files_removed=files.files_removed,
         orphan_files_removed=files.orphan_files_removed,

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, Text, false
 from sqlalchemy.engine.default import DefaultExecutionContext
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,6 +46,13 @@ class AppUser(UUIDPkMixin, TimestampMixin, AuthoredMixin, Base):
         String(64), nullable=False, default=_login_display_default
     )
     email: Mapped[str | None] = mapped_column(String(254), unique=True, nullable=True)
+    # 019: имя и фамилия (NULL у учётных записей, созданных до 019, и у первого ТА).
+    first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # 019: учётная запись создана самостоятельной регистрацией.
+    self_registered: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False)
     is_blocked: Mapped[bool] = mapped_column(Boolean, nullable=False)

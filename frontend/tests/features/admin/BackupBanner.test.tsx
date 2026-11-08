@@ -74,3 +74,16 @@ describe("BackupBanner on tech admin screens", () => {
     expect(f.count(BACKUP)).toBe(0);
   });
 });
+
+describe("BackupBanner on every TA screen", () => {
+  it.each(["/profile/agents", "/profile"])("shows on %s", async (path) => {
+    installFetch({
+      [ME]: () => j(200, meWith(CAPS_ALL)),
+      [BACKUP]: () => j(200, { ...OK, stale: true, last_success_at: null, last_run_status: null, last_run_at: null }),
+      "GET /api/v1/me/tokens": () => j(200, []),
+    });
+    const { container } = renderApp(path);
+    await waitFor(() => expect(container.querySelector('[data-banner="backup"]')).not.toBeNull());
+    expect(container.querySelector('[data-banner="backup"] svg')).not.toBeNull();
+  });
+});
