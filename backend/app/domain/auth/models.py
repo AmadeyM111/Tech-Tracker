@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, LargeBinary, Text, Uuid
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, LargeBinary, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.clock import utcnow
@@ -68,6 +68,49 @@ class PasswordResetAttempt(Base):
         CheckConstraint("octet_length(key_hash) = 32", name="key_hash_length"),
         Index(
             "ix_password_reset_attempt_scope_key_hash_created_at", "scope", "key_hash", "created_at"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    scope: Mapped[str] = mapped_column(Text, nullable=False)
+    key_hash: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
+    )
+
+
+class RegistrationRequest(Base):
+    """Заявка на самостоятельную регистрацию (019, plan §4.1). Только хеши; без FK."""
+
+    __tablename__ = "registration_request"
+    __table_args__ = (
+        CheckConstraint('lower(email COLLATE "C") = email', name="email_lower"),
+        CheckConstraint("octet_length(token_hash) = 32", name="token_hash_length"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    email: Mapped[str] = mapped_column(String(254), unique=True, nullable=False)
+    login: Mapped[str] = mapped_column(String(64), nullable=False)
+    login_display: Mapped[str] = mapped_column(String(64), nullable=False)
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+
+
+class RegistrationAttempt(Base):
+    __tablename__ = "registration_attempt"
+    __table_args__ = (
+        CheckConstraint("scope IN ('request_ip','confirm_ip','confirm_token')", name="scope_valid"),
+        CheckConstraint("octet_length(key_hash) = 32", name="key_hash_length"),
+        Index(
+            "ix_registration_attempt_scope_key_hash_created_at", "scope", "key_hash", "created_at"
         ),
     )
 
