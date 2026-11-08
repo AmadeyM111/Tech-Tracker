@@ -274,9 +274,9 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 2. Попытка 1 — реализация (без записи в журнал). Попытка 2 — исправления ревью R8-T11. Тесты: test_019_registration_api.py 43 passed; набор из задачи (с test_route_guards, test_openapi, test_openapi_roles, test_frontend_api_types) 168 passed; test_007_password_reset_api.py в составе 147 passed; ruff check и format, mypy чисты; task_scope exit 0; `scripts/gen-api.sh` не меняет артефакты. Исправления: (1) MAJOR, AC-7: `test_019_ac7_hash_runs_once_for_taken_and_free_address` считает вызовы `hash_in_thread` (monkeypatch в `app.domain.auth.registration`, где он вызывается): занятый и свободный адрес дают ровно 1 вызов. Мутация «хеш после проверки занятости» — тест падает. `test_019_ac7_mail_leaves_after_response_and_commit_only_for_free`: журнал порядка (`commit` через слушатель `after_commit` класса `Session`, `response` через ASGI-обёртку, `deliver` через подмену в `app.api.v1.registration`); факт: `commit, commit, response, deliver`; для занятого адреса `deliver` не вызывается. Мутация «`await deliver` вместо `background.add_task`» — тест падает. (2) `test_019_smtp_failure_same_answer_and_no_address_in_log`: отказ SMTP → 200, тело и заголовки как у обычного ответа, в логе только `mail delivery failed: OSError`, адреса нет. (3) Границы: `test_019_ac4_email_length_254_accepted_255_invalid` (254 → 200 и письмо; 255 → `email_invalid`); `test_019_ac29_first_name_100_accepted_101_invalid`; `test_019_schema_limit_1024_reaches_domain_1025_is_validation_error` (email, first_name, last_name, login: 1024 → код поля домена, 1025 → `validation_error`). `schemas/registration.py` не менялась. (4) НЕ ВЫПОЛНЕНО, нужно решение владельца: код `registration_token_invalid` в описании 400 у confirm. Описание 400 с кодом (проверено) ломает `test_openapi.py::test_t68_400_declared_exactly_on_routes_with_body` (D-65: у всех маршрутов с телом описание 400 равно «Некорректный JSON в теле запроса (code: bad_request)»). Код уже есть в описании операции (docstring, `description` в openapi.json). Снять можно только ослаблением D-65 в `test_openapi.py`, а этот файл вне списка этой правки. (5) Процесс, фиксация: тесты написаны исполнителем без отдельного test-writer, хотя описание задачи его требует. Отклонение: при выключенной функции и при 0 пространствах (проверено зондом) невалидное тело даёт 422 `validation_error`, а не 404 `feature_disabled`: FastAPI валидирует тело до обработчика. Тот же паттерн, что в 007. Решить на уровне проекта; долг до T22.
 
 ## R8-T12 — Очистка истёкших заявок в `gostracker maintenance`
-- **Статус:** TODO
+- **Статус:** DONE (ревью: PASS; 2026-11-08)
 - **AC:** NFR-9
-- **Файлы:** `backend/app/domain/system/maintenance.py`, `backend/app/domain/ops/maintenance.py`, `README.md` (разделы «Регулярное обслуживание» и «Regular maintenance»: команда удаляет также истёкшие заявки на регистрацию);
+- **Файлы:** `backend/app/domain/system/maintenance.py`, `backend/app/domain/ops/maintenance.py`, `backend/app/cli/commands/maintenance.py` (текст справки и шага, ревью), `docs/data-model.md` (фраза о команде, ревью), `README.md` (разделы «Регулярное обслуживание» и «Regular maintenance»: команда удаляет также истёкшие заявки на регистрацию);
   тесты: `backend/tests/db/test_019_purge_registration.py` (новый), `backend/tests/cli/test_maintenance.py`
 - **Зависит от:** R8-T01
 - **Описание:** `purge_expired_registration_requests(sessionmaker, *, now, dry_run=False) -> int` (RG-18):
@@ -287,7 +287,7 @@ T17, T19, T20, T21), тоже последовательно.
   Test-writer: истёкшие удаляются, действующие остаются, `dry_run` только считает; список ключей отчёта в
   `test_maintenance.py` расширен.
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/db/test_019_purge_registration.py backend/tests/cli/test_maintenance.py backend/tests/infra/test_docs_static.py` зелёный; «Линт бэкенда» чист
-- **Попытки:** 0
+- **Попытки:** 1. Тесты: 262 passed; ruff, mypy, scope чисты. Ревью PASS. Правки по ревью: фразы README (RU/EN) и справка CLI уточнены, data-model.md фраза про команду. Долг (minor, T22): тест сохранности сессий при очистке заявок; имя теста test_t88_readme_maintenance_is_sessions_only_no_trash в test_docs_static.py устарело; сигнатура принимает sessionmaker (соответствует plan §4.3).
 
 ## R8-T13 — Экспорт и импорт: имена есть, заявок и попыток нет
 - **Статус:** TODO
@@ -516,7 +516,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T09 | DONE |
 | R8-T10 | DONE |
 | R8-T11 | DONE |
-| R8-T12 | TODO |
+| R8-T12 | DONE |
 | R8-T13 | TODO |
 | R8-T14 | TODO |
 | R8-T15 | TODO |

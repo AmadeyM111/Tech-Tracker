@@ -28,9 +28,10 @@ from app.domain.ops.maintenance import MaintenanceReport, run_maintenance
 def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser(
         "maintenance",
-        help="регулярное обслуживание: удалить истёкшие сессии пользователей",
+        help="регулярное обслуживание: удалить истёкшие сессии и заявки на регистрацию",
         description=(
             "Ждёт БД (до 60 с) и выполняет обслуживание: удаляет истёкшие сессии "
+            "и заявки на регистрацию "
             "(простой или абсолютный срок). В stdout печатаются строки ключ=значение. "
             "Безопасна при работающем API."
         ),
@@ -76,7 +77,7 @@ def run(args: argparse.Namespace) -> int:
         step = "ожидание БД"
         with _quiet_asyncio_logger():
             asyncio.run(wait_for_database(settings.database_url))
-            step = "удаление истёкших сессий"
+            step = "удаление истёкших сессий и заявок на регистрацию"
             report = asyncio.run(_maintain(settings, dry_run=bool(args.dry_run)))
     except BootstrapError as exc:
         print(f"Ошибка ({step}): {exc}", file=sys.stderr, flush=True)

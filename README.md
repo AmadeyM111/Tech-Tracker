@@ -301,8 +301,10 @@ Compose). Веб-часть (frontend внутри образа `web`) при э
 ### Регулярное обслуживание
 
 В MVP команда `gostracker maintenance` удаляет только истёкшие сессии пользователей (простой
-или абсолютный срок). Корзины в MVP нет (она отложена), поэтому чистить больше нечего. Без
-регулярного запуска истёкшие сессии остаются в БД: на работу это не влияет, но таблица растёт.
+или абсолютный срок) и истёкшие заявки на самостоятельную регистрацию (срок подтверждения по
+ссылке). Корзины в MVP нет (она отложена), поэтому чистить больше нечего. Без регулярного запуска
+истёкшие сессии и заявки остаются в БД: на работу это не влияет, но таблица растёт. Неподтверждённая
+заявка удаляется при ежедневном запуске не позднее чем через сутки после истечения срока.
 Запускайте команду раз в сутки, например из `crontab` пользователя, у которого есть доступ к
 Docker:
 
@@ -318,11 +320,12 @@ Docker:
 
 - Для проверки перед первым запуском: `docker compose exec -T api gostracker maintenance --dry-run`
   только считает, что было бы очищено, и ничего не меняет.
-- Вывод - ровно восемь строк `ключ=значение` (`dry_run`, `sessions_expired`, `projects_purged`,
+- Вывод - ровно девять строк `ключ=значение` (`dry_run`, `sessions_expired`, `projects_purged`,
   `tasks_purged`, `comments_purged`, `attachments_purged`, `files_removed`,
-  `orphan_files_removed`); в MVP значимо только `sessions_expired`, остальные счётчики равны 0.
+  `orphan_files_removed`, `registration_requests_expired`); в MVP значимы только
+  `sessions_expired` и `registration_requests_expired`, остальные счётчики равны 0.
   При ошибке команда пишет сообщение в stderr и завершается с кодом 1.
-- Команда безопасна при работающем API: обработка идёт короткими пакетами, строки, занятые
+- Команда безопасна при работающем API: очистка сессий идёт короткими пакетами, строки, занятые
   запросами пользователей, пропускаются; повторный запуск ничего не ломает.
 - Фонового планировщика в R1 нет: сервиса compose для обслуживания нет, `api` его сам не
   запускает. Запуск по расписанию остаётся за оператором.
@@ -719,10 +722,12 @@ before a downgrade.
 ### Regular maintenance
 
 In the MVP the `gostracker maintenance` command deletes only expired user sessions (idle or
-absolute timeout). There is no trash in the MVP (it is deferred), so there is nothing else to
-clean up. Without regular runs expired sessions stay in the database: work is not affected,
-but the table grows. Run the command once a day, for example from the `crontab` of a user
-who has access to Docker:
+absolute timeout) and expired self-registration requests (the confirmation link has expired).
+There is no trash in the MVP (it is deferred), so there is nothing else to clean up. Without
+regular runs expired sessions and requests stay in the database: work is not affected, but the
+table grows. An unconfirmed request is deleted by a daily run no later than a day after it
+expires. Run the command once a day, for example from the `crontab` of a user who has access
+to Docker:
 
 ```
 17 3 * * * cd /path/to/gostracker && { date -u; docker compose exec -T api gostracker maintenance; } >> /var/log/gostracker-maintenance.log 2>&1
@@ -736,11 +741,12 @@ who has access to Docker:
 
 - To check before the first run: `docker compose exec -T api gostracker maintenance --dry-run`
   only counts what would be cleaned up and changes nothing.
-- The output is exactly eight `key=value` lines (`dry_run`, `sessions_expired`,
+- The output is exactly nine `key=value` lines (`dry_run`, `sessions_expired`,
   `projects_purged`, `tasks_purged`, `comments_purged`, `attachments_purged`, `files_removed`,
-  `orphan_files_removed`); in the MVP only `sessions_expired` is meaningful, the other counters
-  are 0. On failure the command writes a message to stderr and exits with code 1.
-- The command is safe while the API is running: it works in short batches, rows held by user
+  `orphan_files_removed`, `registration_requests_expired`); in the MVP only `sessions_expired`
+  and `registration_requests_expired` are meaningful, the other counters are 0. On failure the
+  command writes a message to stderr and exits with code 1.
+- The command is safe while the API is running: session cleanup works in short batches, rows held by user
   requests are skipped, and a repeated run breaks nothing.
 - There is no background scheduler in R1 and no compose service for maintenance; `api` does
   not start it by itself. Scheduled runs are up to the operator.
