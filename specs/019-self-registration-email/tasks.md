@@ -231,7 +231,7 @@ T17, T19, T20, T21), тоже последовательно.
   заявка → `RateLimited`, в том числе когда предыдущие 10 получили 422 (`login_taken`, `email_invalid`, пароль) —
   решение владельца, RG-5; два пространства и ноль пространств → `FeatureDisabled` (RG-9).
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/domain/test_019_request_registration.py backend/tests/db/test_migrations.py::test_commit_durably_used_only_by_auth_service backend/tests/unit/test_config.py backend/tests/api/test_007_password_reset_api.py` зелёный; «Линт бэкенда» чист
-- **Попытки:** 2. Тесты: 101 passed (T09 + T08 + миграции-список + unit); ruff, mypy, task_scope чисты. Исправления ревью: (1) client_ip=None → общая корзина «no-ip» (тест test_019_ac18_unknown_ip_shares_one_bucket), требует подтверждения владельца; (2) repr=False у полей _Checked; (3) шаблон письма зафиксирован явными строками; (4) контрольная проверка caplog. Открыто: вопрос владельцу о client_ip=None (вариант A — общая корзина, принят по умолчанию).
+- **Попытки:** 2. Тесты: 101 passed (T09 + T08 + миграции-список + unit); ruff, mypy, task_scope чисты. Исправления ревью: (1) client_ip=None → общая корзина «no-ip» (тест test_019_ac18_unknown_ip_shares_one_bucket), требует подтверждения владельца; (2) repr=False у полей _Checked; (3) шаблон письма зафиксирован явными строками; (4) контрольная проверка caplog. Решение владельца 2026-11-08: вариант «Общий лимит» (общая корзина «no-ip», 10 заявок в час на все запросы без IP) — подтверждено, см. spec 019, «Журнал решений владельца».
 
 ## R8-T10 — Домен: подтверждение регистрации
 - **Статус:** DONE (ревью: FAIL по порядку пространства → исправлено; 2026-11-08)
