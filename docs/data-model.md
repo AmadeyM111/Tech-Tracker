@@ -382,12 +382,33 @@ TRUNCATE` — в бэклоге (plan D-8).
 Индексы: `ix_attachment_task_id_created_at` (живые), `ix_attachment_deleted_at` (удалённые).
 
 
-### comment_mention, notification
-Упоминания и уведомления (spec 012). `comment_mention` — PK `(comment_id, user_id)`, удаляется вместе с
-комментарием. `notification`: получатель, вид (`assigned`, `review_requested`, `review_returned`,
-`mentioned`, `commented`, `due_tomorrow`, `overdue`), задача, проект, автор действия (NULL — «система»,
-напоминание о сроке), комментарий (без текста), `dedup_key`, `created_at`, `read_at`.
-`UNIQUE (recipient_id, kind, task_id, dedup_key)` — от повторов (напоминания о сроке: ключ — дата срока).
+### comment_mention
+Упоминания в комментариях (spec 012). PK `(comment_id, user_id)`; удаляется вместе с комментарием.
+
+| Столбец | Тип | NULL | Примечание |
+|---|---|---|---|
+| `comment_id` | uuid | нет | часть PK; FK → `comment.id`, `CASCADE` |
+| `user_id` | uuid | нет | часть PK; упомянутый, FK → `app_user.id`, `CASCADE` |
+| `workspace_id` | uuid | нет | FK → `workspace.id`; индекс `ix_comment_mention_workspace_id` |
+| `created_at` | timestamptz | нет | |
+
+### notification
+Уведомление в системе (spec 012); текст комментария не хранится.
+
+| Столбец | Тип | NULL | Примечание |
+|---|---|---|---|
+| `id` | uuid | нет | PK `pk_notification` |
+| `workspace_id` | uuid | нет | FK → `workspace.id`; индекс |
+| `recipient_id` | uuid | нет | получатель, FK → `app_user.id`, `CASCADE` |
+| `kind` | text | нет | `assigned`, `review_requested`, `review_returned`, `mentioned`, `commented`, `due_tomorrow`, `overdue` (`ck_notification_kind_valid`) |
+| `task_id` | uuid | нет | FK → `task.id`, `CASCADE` |
+| `project_id` | uuid | нет | FK → `project.id`, `CASCADE` |
+| `actor_id` | uuid | да | автор действия; `NULL` — «система» (напоминание о сроке); FK → `app_user.id`, `SET NULL` |
+| `comment_id` | uuid | да | комментарий-источник; FK → `comment.id`, `CASCADE` |
+| `dedup_key` | text | нет | 1..64 символа; `UNIQUE (recipient_id, kind, task_id, dedup_key)` — от повторов |
+| `created_at` | timestamptz | нет | |
+| `read_at` | timestamptz | да | момент прочтения |
+
 Индексы: `(recipient_id, read_at, created_at DESC)` — список и счётчик; `created_at` — очистка старше 90 дней.
 
 ## Эксплуатация

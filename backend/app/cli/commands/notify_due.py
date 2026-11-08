@@ -41,7 +41,7 @@ async def _run(settings: Settings) -> DueReport:
         await engine.dispose()
 
 
-def run(args: argparse.Namespace) -> int:  # noqa: ARG001  # сигнатура задана фреймворком
+def run(_args: argparse.Namespace) -> int:
     """Выполняет ``gtrack notify-due``; возвращает код выхода (0 — успех)."""
     step = "настройки"
     settings: Settings | None = None

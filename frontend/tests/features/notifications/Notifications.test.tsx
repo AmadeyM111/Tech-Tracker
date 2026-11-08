@@ -62,7 +62,7 @@ describe("notifications", () => {
       [`GET /api/v1/tasks/${TASK}`]: () => j(404, { detail: "x", code: "not_found" }),
     });
     const { container } = renderApp("/notifications");
-    expect(await screen.findByText("За последние 30 дней · новые сверху")).toBeTruthy();
+    expect(await screen.findByText("За последние 90 дней · новые сверху")).toBeTruthy();
     const unread = container.querySelector<HTMLElement>('li[data-notification-id="n1"]')!;
     expect(unread.className).toContain("is-unread");
     expect(within(unread).getByText("Новое")).toBeTruthy();
@@ -100,7 +100,7 @@ describe("notifications", () => {
     });
     renderApp("/notifications");
     expect(await screen.findByText("Уведомлений пока нет")).toBeTruthy();
-    expect(screen.getByText("Здесь появятся назначения, проверки, упоминания и сроки за последние 30 дней.")).toBeTruthy();
+    expect(screen.getByText("Здесь появятся назначения, проверки, упоминания и сроки за последние 90 дней.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Прочитать все" })).toBeNull();
   });
 });

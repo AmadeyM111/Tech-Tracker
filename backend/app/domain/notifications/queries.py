@@ -1,6 +1,6 @@
 """Список, счётчик и прочтение уведомлений (spec 012 FR-5…FR-7; plan PN-3, PN-4).
 
-Видимость (PN-3): получатель — актор; за 30 дней; задача и проект не удалены; комментарий (если
+Видимость (PN-3): получатель — актор; за 90 дней; задача и проект не удалены; комментарий (если
 есть) не удалён; получатель сейчас участник проекта. Убрали из проекта — уведомления скрыты, вернули
 — снова видны. Чужие и скрытые уведомления отметить прочитанными нельзя (тихо игнорируются).
 """
@@ -27,7 +27,7 @@ from app.domain.users.directory import UserRef, user_refs
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-WINDOW: Final = timedelta(days=30)
+WINDOW: Final = timedelta(days=90)  # окно показа = срок хранения (FR-5, FR-9; решение 2026-11-08)
 
 
 @dataclass(frozen=True)
@@ -93,7 +93,7 @@ async def unread_count(db: AsyncSession, actor: Actor, *, now: datetime) -> int:
 async def list_notifications(
     db: AsyncSession, actor: Actor, params: PageParams, *, now: datetime
 ) -> tuple[list[NotificationView], bool]:
-    """Видимые уведомления за 30 дней, новые сверху."""
+    """Видимые уведомления за 90 дней, новые сверху."""
     _require(actor)
     stmt = (
         _joined(select(Notification))

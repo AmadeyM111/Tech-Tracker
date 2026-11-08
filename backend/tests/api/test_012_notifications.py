@@ -90,11 +90,11 @@ async def test_012_ac3_deleted_comment_hides_its_notifications(api_env: ApiEnv) 
     assert "mentioned" not in kinds
 
 
-async def test_012_only_last_30_days_are_listed(api_env: ApiEnv) -> None:
+async def test_012_only_last_90_days_are_listed(api_env: ApiEnv) -> None:
     w = await _users(api_env)
     await _create_task(w, w.u2)
     await api_env.execute(
-        update(Notification).values(created_at=api_env.clock.now() - timedelta(days=31))
+        update(Notification).values(created_at=api_env.clock.now() - timedelta(days=91))
     )
     assert (await _get(api_env, w.tok["u2"]))["unread"] == 0
 
