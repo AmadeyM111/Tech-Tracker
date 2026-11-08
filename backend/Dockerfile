@@ -8,6 +8,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Клиент PostgreSQL 16 для `gtrack backup`/`gtrack restore` (spec 009, plan PB-1, NFR-4): major-версия
+# совпадает с сервером (клиент 15 из bookworm не дампит сервер 16). Репозиторий PGDG — только на этапе
+# сборки; в рантайме внешних обращений нет.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && install -d -m 0755 /usr/share/postgresql-common/pgdg \
+    && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+        https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-16 \
+    && apt-get purge -y --auto-remove curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Слой зависимостей: меняется только вместе с pyproject.toml (правка исходников его не сбрасывает).
 COPY pyproject.toml /app/pyproject.toml
 RUN python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml', 'rb'))['project']['dependencies']))" \

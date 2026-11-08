@@ -254,6 +254,7 @@ def test_t21_src_files_only_expected() -> None:
         # 008 «Сводка»
         "features/overview/SummaryPage.tsx", "features/overview/api.ts",
         "features/overview/filters.ts", "features/overview/summary.css",
+        "features/admin/BackupBanner.tsx",  # 009/FR-7
         "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
         # 019/R8-T20: dialog for changing first and last name
         "features/admin/NameDialog.tsx",

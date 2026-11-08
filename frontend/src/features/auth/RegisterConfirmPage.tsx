@@ -1,5 +1,6 @@
 // 019/R8-T17: confirmation screen /register/confirm (RG-15, FR-8). The token is read once from the
 // `#token=` fragment, the fragment is removed from the address bar, and the request is sent by the button only.
+import { GTrackLogo } from "../../shared/ui/GTrackLogo";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
@@ -65,7 +66,10 @@ export function RegisterConfirmPage() {
   if (token === null) {
     return (
       <section className="ui-form login-card">
-        <h1>{t("auth.register_confirm_title")}</h1>
+        <div className="ui-brand">
+          <GTrackLogo />
+          <h1>{t("auth.register_confirm_title")}</h1>
+        </div>
         <p>{t("auth.register_link_invalid")}</p>
         {registerAgain}
       </section>
@@ -76,7 +80,10 @@ export function RegisterConfirmPage() {
   if (done) {
     return (
       <section className="ui-form login-card">
-        <h1>{t("auth.register_confirm_title")}</h1>
+        <div className="ui-brand">
+          <GTrackLogo />
+          <h1>{t("auth.register_confirm_title")}</h1>
+        </div>
         <p role="status" className="reg-status">
           {t("auth.register_confirmed")}
         </p>
@@ -91,7 +98,10 @@ export function RegisterConfirmPage() {
 
   return (
     <section className="ui-form login-card">
-      <h1>{t("auth.register_confirm_title")}</h1>
+      <div className="ui-brand">
+        <GTrackLogo />
+        <h1>{t("auth.register_confirm_title")}</h1>
+      </div>
       <form onSubmit={(e) => void onSubmit(e)} noValidate>
         <ErrorAlert message={alert.message} seq={alert.seq} />
         <button type="submit" className="login-submit" disabled={pending}>

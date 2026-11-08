@@ -12,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BASE_URL_RE = re.compile(r"https?://[^/\s]+")
@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     smtp_starttls: bool = True
     public_base_url: str | None = None
+    # [010] рабочая роль БД процесса API; пусто — API под DATABASE_URL (только не production)
+    db_app_role: str | None = None
+    # [009] резервные копии: каталог (том /backups), сколько хранить, порог «устарела», ч
+    backup_dir: Path = Path("/backups")
+    backup_keep: int = Field(14, ge=1)
+    backup_stale_hours: int = Field(26, ge=1)
+    # каталог pg_dump/pg_restore; пусто — из PATH (в образе api — клиент PostgreSQL 16)
+    pg_bin_dir: Path | None = None
 
     @field_validator(
         "session_idle_timeout",
@@ -81,6 +89,7 @@ class Settings(BaseSettings):
         "smtp_password",
         "smtp_from",
         "public_base_url",
+        "db_app_role",
         mode="before",
     )
     @classmethod

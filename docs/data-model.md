@@ -388,6 +388,26 @@ TRUNCATE` — в бэклоге (plan D-8).
 Запись события выполняется в той же транзакции, что и изменение; откат изменения откатывает и
 событие. Первый запуск (создание первого администратора) событий аудита не пишет.
 
+
+## Эксплуатация
+
+### backup_run
+Журнал запусков `gtrack backup` (spec 009, FR-4). Глобальная таблица без `workspace_id`: копия
+снимается со всей БД (как `app_user`, plan PB-5). Содержимого копии, путей и секретов нет.
+
+| Столбец | Тип | NULL | Примечание |
+|---|---|---|---|
+| `id` | uuid | нет | PK `pk_backup_run` |
+| `started_at`, `finished_at` | timestamptz | нет | `ck_backup_run_finished_after_started` |
+| `status` | text | нет | `ok` / `failed`, `ck_backup_run_status_valid` |
+| `size_bytes` | bigint | да | размер архива; `ck_backup_run_size_non_negative` |
+| `schema_revision` | text | да | ревизия alembic на момент копии |
+| `file_name` | text | да | имя файла без пути |
+| `error_code` | text | да | задан тогда и только тогда, когда `failed` (`ck_backup_run_error_code_iff_failed`) |
+
+Индексы: `ix_backup_run_finished_at` (`finished_at DESC`), `ix_backup_run_ok_finished_at`
+(`finished_at DESC WHERE status = 'ok'`).
+
 ## Миграции
 
 | Ревизия | Содержание |
@@ -400,6 +420,9 @@ TRUNCATE` — в бэклоге (plan D-8).
 | `0006` | три роли (ADR-0013): у всех пользователей с ролью `mixed` роль снимается (`NULL`), а если в пространстве нет активного ТА, активные бывшие СМ получают `tech_admin` (FR-16); на каждого бывшего СМ одна запись `domain_event` от «системы» (`actor_id = NULL`); `CHECK` `ck_workspace_member_role_valid` пересоздаётся с тремя значениями; всё в одной транзакции (откат `downgrade 0005` возвращает прежний `CHECK`, но роли `mixed` не возвращает и журнал не меняет) |
 | `0007` | приоритет задачи: значение `base` заменяется на `medium`, `high` без изменений; `CHECK` `ck_task_priority_valid` |
 | `0008` | сброс пароля по email: `app_user.email` с `uq_app_user_email` и `ck_app_user_email_lower`, таблицы `password_reset_token` и `password_reset_attempt` с индексами (откат удаляет всё созданное) |
+| `0009` | MCP-доступ агентов: `api_token`, `domain_event.client_name` (ADR-0018) |
+| `0010` | самостоятельная регистрация (spec 019): `app_user.first_name`, `last_name`, `self_registered`, таблицы `registration_request`, `registration_attempt` |
+| `0011` | журнал резервного копирования `backup_run` (spec 009; `down_revision` `0010`); откат удаляет таблицу |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия
 моделей миграциям — `alembic -c backend/alembic.ini check` (входит в `scripts/check.sh` и CI).

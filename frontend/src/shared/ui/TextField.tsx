@@ -51,7 +51,7 @@ export function TextField(props: TextFieldProps) {
           {input}
           <button
             type="button"
-            className="ui-reveal"
+            className="ui-reveal ui-btn-secondary"
             aria-pressed={reveal.shown ? "true" : "false"}
             aria-label={reveal.label}
             disabled={disabled}

@@ -2,7 +2,18 @@
 // name always comes from the text next to the icon. Colour, stroke width and caps come from ui.css
 // (`.ui-icon`, `currentColor`). Shapes are path data only (24x24 grid) so no Latin attribute literals
 // sit in the JSX (the i18n scan of tests/shared/i18n.test.ts).
-export type IconName = "projects" | "tasks" | "users" | "audit" | "password" | "logout" | "plus" | "eye" | "eye-off";
+export type IconName =
+  | "projects"
+  | "tasks"
+  | "users"
+  | "audit"
+  | "password"
+  | "logout"
+  | "plus"
+  | "eye"
+  | "eye-off"
+  | "alert"
+  | "spinner";
 
 const PATHS: Record<IconName, string[]> = {
   // Folder.
@@ -32,11 +43,15 @@ const PATHS: Record<IconName, string[]> = {
     "M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0",
     "M3 3l18 18",
   ],
+  // Circle with an exclamation mark.
+  alert: ["M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0", "M12 7v6M12 17h.01"],
+  // Open circle with a gap: loading indicator.
+  spinner: ["M21 12a9 9 0 1 1-6.2-8.55"],
 };
 
-export function Icon({ name }: { name: IconName }) {
+export function Icon({ name, className }: { name: IconName; className?: string }) {
   return (
-    <svg className="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable={false}>
+    <svg className={className === undefined ? "ui-icon" : `ui-icon ${className}`} viewBox="0 0 24 24" aria-hidden="true" focusable={false}>
       {PATHS[name].map((d) => (
         <path key={d} d={d} />
       ))}

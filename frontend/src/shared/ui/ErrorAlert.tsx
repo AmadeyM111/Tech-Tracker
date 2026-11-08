@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Icon } from "./Icon";
 
 export interface AlertState {
   message: string | null;
@@ -27,7 +28,8 @@ export function ErrorAlert({ message, seq = 0 }: { message: string | null; seq?:
   }, [message, seq]);
   if (message === null) return null;
   return (
-    <p ref={ref} role="alert" tabIndex={-1} className="ui-error">
+    <p ref={ref} role="alert" tabIndex={-1} className="ui-error-alert">
+      <Icon name="alert" />
       {message}
     </p>
   );

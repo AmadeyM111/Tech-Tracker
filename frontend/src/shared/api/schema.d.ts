@@ -44,6 +44,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/system/backup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Backup Status
+         * @description Состояние резервных копий: ``stale`` — нет копий, старше порога или последний сбой.
+         */
+        get: operations["get_backup_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -1067,6 +1087,24 @@ export interface components {
              */
             occurred_at: string;
         };
+        /**
+         * BackupStatusOut
+         * @description Последняя успешная копия, последний запуск и признак «устарела» (plan PB-6).
+         */
+        BackupStatusOut: {
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Last Run Status */
+            last_run_status: ("ok" | "failed") | null;
+            /** Last Success At */
+            last_success_at: string | null;
+            /** Last Success Size Bytes */
+            last_success_size_bytes: number | null;
+            /** Stale */
+            stale: boolean;
+            /** Stale After Hours */
+            stale_after_hours: number;
+        };
         /** Board */
         Board: {
             /** Columns */
@@ -2054,6 +2092,44 @@ export interface operations {
             };
             /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_backup_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupStatusOut"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
