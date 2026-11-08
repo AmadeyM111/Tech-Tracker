@@ -41,7 +41,7 @@
 
 ### app_user
 
-Учётная запись (миграция 0001; `login_display` — миграция 0005; `email` — миграция 0008).
+Учётная запись (миграция 0001; `login_display` — миграция 0005; `email` — миграция 0008; `first_name`, `last_name`, `self_registered` — миграция 0010, spec 019).
 
 | Столбец | Тип | NULL | Описание |
 |---|---|---|---|
@@ -49,6 +49,9 @@
 | `login` | varchar(64) | нет | **ключ** логина (нормализованный вид, строчные): вход, уникальность, поиск, сортировка; наружу не отдаётся; `UNIQUE` (`uq_app_user_login`); `CHECK` `ck_app_user_login_format`: `^[a-z0-9][a-z0-9._-]{2,63}$` — заодно гарантирует нижний регистр, поэтому уникальность регистронезависима |
 | `login_display` | varchar(64) | нет | логин в написании при создании (FR-73a, D-66): так он показывается во всех ответах API; `CHECK` `ck_app_user_login_display_lower`: `lower(login_display COLLATE "C") = login` (показ совпадает с ключом с точностью до регистра латинских букв); у существующих строк при миграции 0005 равен `login`; если не передан, приложение подставляет `login` |
 | `email` | varchar(254) | да | адрес для сброса пароля (007, PR-1), в нижнем регистре (нормализует сервис); `NULL` — адрес не задан; `UNIQUE` `uq_app_user_email` (уникальность без учёта регистра, т. к. значение всегда в нижнем регистре; `NULL` не конфликтует с `NULL`); `CHECK` `ck_app_user_email_lower`: `lower(email COLLATE "C") = email` |
+| `first_name` | varchar(100) | да | имя (019, миграция 0010); `NULL` у учётных записей, созданных до 019, и у первого ТА; правится через `PUT /me/name` (сам пользователь) и `PUT /admin/users/{id}/name` (ТА) |
+| `last_name` | varchar(100) | да | фамилия (019, миграция 0010); то же, что `first_name` |
+| `self_registered` | boolean | нет | учётная запись создана самостоятельной регистрацией (019, миграция 0010); по умолчанию `false` |
 | `password_hash` | text | нет | хеш Argon2id (пароль в открытом виде не хранится) |
 | `must_change_password` | boolean | нет | требуется смена пароля при входе |
 | `is_blocked` | boolean | нет | учётная запись заблокирована |
@@ -59,6 +62,34 @@
 | `created_at` | timestamptz | нет | момент создания |
 | `updated_at` | timestamptz | нет | момент последнего изменения |
 | `created_by` | uuid | да | автор; FK `fk_app_user_created_by_app_user` → `app_user.id`, `RESTRICT`; `NULL` — система |
+
+### registration_request
+
+Заявка на самостоятельную регистрацию (миграция 0010, spec 019). Хранится только до подтверждения адреса; в таблице нет внешних ключей. Открытого токена и пароля нет: только хеши. Удаление истёкших заявок — `gostracker maintenance` (R8-T12).
+
+| Столбец | Тип | NULL | Описание |
+|---|---|---|---|
+| `id` | uuid | нет | первичный ключ `pk_registration_request` |
+| `email` | varchar(254) | нет | адрес из заявки, в нижнем регистре (`CHECK` `ck_registration_request_email_lower`); `UNIQUE` `uq_registration_request_email` |
+| `login` | varchar(64) | нет | ключ логина, как в `app_user.login` |
+| `login_display` | varchar(64) | нет | логин в написании пользователя (показ, как в `app_user.login_display`) |
+| `first_name` | varchar(100) | нет | имя из заявки |
+| `last_name` | varchar(100) | нет | фамилия из заявки |
+| `password_hash` | text | нет | хеш Argon2id пароля из заявки (пароль в открытом виде не хранится) |
+| `token_hash` | bytea | нет | хеш одноразового токена подтверждения, 32 байта (`CHECK` `ck_registration_request_token_hash_length`); `UNIQUE` `uq_registration_request_token_hash` |
+| `created_at` | timestamptz | нет | момент подачи заявки |
+| `expires_at` | timestamptz | нет | срок токена (30 минут); индекс `ix_registration_request_expires_at` |
+
+### registration_attempt
+
+Счётчики попыток регистрации для лимитов (миграция 0010, spec 019). Хранятся только хеши ключей: IP-адрес и токен открыто не записываются.
+
+| Столбец | Тип | NULL | Описание |
+|---|---|---|---|
+| `id` | uuid | нет | первичный ключ `pk_registration_attempt` |
+| `scope` | text | нет | область лимита: `request_ip`, `confirm_ip` или `confirm_token` (`CHECK` `ck_registration_attempt_scope_valid`) |
+| `key_hash` | bytea | нет | хеш ключа (IP или токена), 32 байта (`CHECK` `ck_registration_attempt_key_hash_length`) |
+| `created_at` | timestamptz | нет | момент попытки; индексы `ix_registration_attempt_created_at` и `ix_registration_attempt_scope_key_hash_created_at` |
 
 ### workspace_member
 

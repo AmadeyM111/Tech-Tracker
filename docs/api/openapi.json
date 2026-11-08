@@ -1537,12 +1537,10 @@
         "description": "``PUT /admin/users/{user_id}/name``: имя и фамилия, оба обязательны (FR-3c).",
         "properties": {
           "first_name": {
-            "maxLength": 1024,
             "title": "First Name",
             "type": "string"
           },
           "last_name": {
-            "maxLength": 1024,
             "title": "Last Name",
             "type": "string"
           }

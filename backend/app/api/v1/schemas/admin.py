@@ -78,5 +78,7 @@ class SetNameRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    first_name: Annotated[str, Field(max_length=MAX_CREDENTIAL_LENGTH)]
-    last_name: Annotated[str, Field(max_length=MAX_CREDENTIAL_LENGTH)]
+    # Длину 1…100 проверяет домен (RG-3): ошибка — first_name_invalid / last_name_invalid,
+    # а не validation_error схемы.
+    first_name: str
+    last_name: str

@@ -145,10 +145,10 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 2
 
 ## R8-T05 — Свой профиль: имена в `GET /me`, `PUT /me/name`
-- **Статус:** IN_PROGRESS (тесты T05 зелёные, 518 passed; ревью вынесло FAIL по рамкам файлов и мелким замечаниям, см. «Попытки»)
+- **Статус:** DONE (ревью повторно: PASS, 2026-11-08; тесты T05-набора 575 passed; scope и линт — см. «Попытки»)
 - **AC:** AC-34 (API)
-- **Файлы:** `backend/app/domain/users/profile.py` (новый), `backend/app/api/v1/me.py`, `backend/app/api/v1/schemas/auth.py`, `docs/api/openapi.json`, `frontend/src/shared/api/schema.d.ts` (перегенерация), `docs/data-model.md` (добавлено по решению владельца 2026-11-08: имена и `self_registered` в описании `app_user`, секции `registration_request` и `registration_attempt`);
-  тесты: `backend/tests/api/test_019_profile_api.py` (новый), `backend/tests/cli/test_openapi.py`, `frontend/tests/app/startPath.test.ts`, `backend/tests/api/test_sessions.py` и `backend/tests/api/test_route_guards.py` (правки 4 устаревших ассертов по решению владельца, test-writer)
+- **Файлы:** `backend/app/domain/users/profile.py` (новый), `backend/app/api/v1/me.py`, `backend/app/api/v1/schemas/auth.py`, `backend/app/api/v1/schemas/admin.py` (поправка по ревью: у `SetNameRequest` снят `max_length`, длину проверяет домен, см. «Попытки»), `specs/019-self-registration-email/plan.md` (синхронизация §4.4 с принятым решением по длине имени), `docs/api/openapi.json`, `frontend/src/shared/api/schema.d.ts` (перегенерация), `docs/data-model.md` (добавлено по решению владельца 2026-11-08: имена и `self_registered` в описании `app_user`, секции `registration_request` и `registration_attempt`);
+  тесты: `backend/tests/api/test_019_profile_api.py` (новый), `backend/tests/cli/test_openapi.py`, `frontend/tests/app/startPath.test.ts`, `backend/tests/api/test_route_guards.py` (правка вызова `me`, по решению владельца, test-writer); `test_sessions.py` правился в T02-коммите `b43842e`; `startPath.test.ts` не менялся (нужен только если меняется тип фронтенда)
 - **Зависит от:** R8-T04
 - **Описание:** По plan §4.3–4.4: `get_own_profile`, `set_own_name` (событие `user.name_changed`, актор и объект —
   сам пользователь). `MeResponse` += `first_name: str | None`, `last_name: str | None`. `GET /me` получает
@@ -157,7 +157,7 @@ T17, T19, T20, T21), тоже последовательно.
   Test-writer: П и БА меняют свои имена → 200 и `GET /me`; 422; без роли → 403 `no_role`; с обязательной сменой
   пароля → 403 `password_change_required`; событие без значений; `PUT /admin/users/{other}/name` от П и БА → 403.
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/api/test_019_profile_api.py backend/tests/api/test_deps_gates.py backend/tests/api/test_sessions.py backend/tests/api/test_route_guards.py` зелёный; «Перегенерация API» выполнена; «Линт бэкенда» чист
-- **Попытки:** 1. Тесты: 518 passed (T05-набор + openapi + docs static), линт (ruff, mypy) чист. Ревью (reviewer): FAIL по процессу — `python scripts/task_scope.py R8-T05` сообщает файлы вне рамок (незакоммиченные T01–T04 в той же рабочей копии; коммиты делает оркестратор). Замечания по коду (minor): (a) `SetNameRequest.max_length=1024` (`schemas/admin.py`) против RG-3 (1…100): значения 101–1024 дают `first_name_invalid`, длиннее 1024 — `validation_error`; решить, поправить схему или зафиксировать в plan; (b) гонка двух одинаковых `PUT /me/name` (`profile.py`, чтение без `FOR UPDATE`): второе событие no-op, данные верны; (c) пробелы тестов: нет проверки отсутствия события при повторе тех же имён, нет проверки, что тело 422 не содержит введённое значение, нет проверки логов (NFR-1).
+- **Попытки:** 2. Поправки после ревью: (a) `SetNameRequest` без `max_length` (`schemas/admin.py`): длину 1…100 проверяет домен, поэтому 101+ даёт `first_name_invalid`; `openapi.json` перегенерирован; (c) добавлены тесты: повтор того же имени без события, 422 без эха значения в теле, NFR-1 (в логах нет значения имени) — `test_019_profile_api.py`, 33 теста в файле. **Долг (b), до T14/T22:** гонка двух одинаковых `PUT /me/name` — второе событие `user.name_changed` no-op; решение: `SELECT … FOR UPDATE` в `profile.set_own_name` перед сравнением. Предыдущая попытка: тесты: 518 passed (T05-набор + openapi + docs static), линт (ruff, mypy) чист. Ревью (reviewer): FAIL по процессу — `python scripts/task_scope.py R8-T05` сообщает файлы вне рамок (незакоммиченные T01–T04 в той же рабочей копии; коммиты делает оркестратор). Замечания по коду (minor): (a) `SetNameRequest.max_length=1024` (`schemas/admin.py`) против RG-3 (1…100): значения 101–1024 дают `first_name_invalid`, длиннее 1024 — `validation_error`; решить, поправить схему или зафиксировать в plan; (b) гонка двух одинаковых `PUT /me/name` (`profile.py`, чтение без `FOR UPDATE`): второе событие no-op, данные верны; (c) пробелы тестов: нет проверки отсутствия события при повторе тех же имён, нет проверки, что тело 422 не содержит введённое значение, нет проверки логов (NFR-1).
 
 ## R8-T06 — Домен: учётные записи без роли для БА
 - **Статус:** TODO
@@ -507,7 +507,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T02 | DONE |
 | R8-T03 | DONE |
 | R8-T04 | DONE |
-| R8-T05 | IN_PROGRESS |
+| R8-T05 | DONE |
 | R8-T06 | TODO |
 | R8-T07 | TODO |
 | R8-T08 | TODO |
