@@ -1,13 +1,13 @@
 """T27: переносы из ревью T26 в образ web (plan §4.12, «Решения после ревью T26» (в)).
 
-- (7) ``10-gostracker-tls.sh`` под flock удаляет остатки ``.tls.key.XXXXXX`` / ``.tls.crt.XXXXXX``
+- (7) ``10-gtrack-tls.sh`` под flock удаляет остатки ``.tls.key.XXXXXX`` / ``.tls.crt.XXXXXX``
   (шесть символов, как у ``mktemp``) в томе сгенерированной пары; файлы оператора, посторонние
   имена и ``tls.crt``/``tls.key`` не трогаются;
 - (8) HEALTHCHECK web не пишется в access-лог nginx: интерфейс - ``location = /healthz`` с
   ``access_log off`` и ответом 200 без проксирования и без SPA; HEALTHCHECK Dockerfile
   обращается к ``/healthz``.
 
-Docker-часть собирает образ ``gostracker-web:t27`` и запускает контейнеры ``gt-t27-*``; без
+Docker-часть собирает образ ``gtrack-web:t27`` и запускает контейнеры ``gt-t27-*``; без
 Docker пропускается. Стек пользователя не затрагивается.
 """
 
@@ -28,7 +28,7 @@ pytestmark = pytest.mark.infra_static
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WEB_DIR = REPO_ROOT / "deploy" / "web"
-IMAGE = "gostracker-web:t27"
+IMAGE = "gtrack-web:t27"
 VOL = "gt-t27-tls"
 CONTAINER = "gt-t27-web"
 
@@ -135,12 +135,12 @@ def image() -> Iterator[str]:
 def _run_script(image: str, volume: str, shell_prefix: str) -> str:
     """Выполняет ``shell_prefix``, затем скрипт выбора сертификата, затем листинг тома."""
     script = (
-        f"{shell_prefix}; /docker-entrypoint.d/10-gostracker-tls.sh >/dev/null 2>&1; "
-        "rc=$?; echo rc=$rc; ls -A /var/lib/gostracker/tls"
+        f"{shell_prefix}; /docker-entrypoint.d/10-gtrack-tls.sh >/dev/null 2>&1; "
+        "rc=$?; echo rc=$rc; ls -A /var/lib/gtrack/tls"
     )
     res = docker(
         "run", "--rm", "-e", "HTTPS_PORT=443", "-e", "TLS_SERVER_NAME=tracker.test",
-        "-v", f"{volume}:/var/lib/gostracker/tls", "--entrypoint", "sh", image, "-c", script,
+        "-v", f"{volume}:/var/lib/gtrack/tls", "--entrypoint", "sh", image, "-c", script,
     )  # fmt: skip
     return res.stdout
 
@@ -158,9 +158,7 @@ def _files(listing: str) -> set[str]:
 @needs_docker
 def test_t27_tls_script_removes_leftover_temp_files_when_generating(image: str) -> None:
     docker("volume", "create", VOL)
-    prep = (
-        f"cd /var/lib/gostracker/tls && touch {LEFTOVERS} {KEEP} && echo secret > .tls.key.QqQqQq"
-    )
+    prep = f"cd /var/lib/gtrack/tls && touch {LEFTOVERS} {KEEP} && echo secret > .tls.key.QqQqQq"
     names = _files(_run_script(image, VOL, prep))
     for stale in LEFTOVERS.split() + [".tls.key.QqQqQq"]:
         assert stale not in names, f"остаток {stale} не удалён"
@@ -176,16 +174,16 @@ def test_t27_tls_script_removes_leftovers_and_keeps_valid_pair_untouched(image: 
     docker("volume", "create", VOL)
     first = _run_script(image, VOL, "true")
     assert {"tls.crt", "tls.key"} <= _files(first)
-    sums = "cd /var/lib/gostracker/tls && sha256sum tls.crt tls.key && stat -c '%a' tls.key"
+    sums = "cd /var/lib/gtrack/tls && sha256sum tls.crt tls.key && stat -c '%a' tls.key"
 
     def snapshot() -> str:
         return docker(
-            "run", "--rm", "-v", f"{VOL}:/var/lib/gostracker/tls", "--entrypoint", "sh",
+            "run", "--rm", "-v", f"{VOL}:/var/lib/gtrack/tls", "--entrypoint", "sh",
             image, "-c", sums,
         ).stdout  # fmt: skip
 
     before = snapshot()
-    prep = f"cd /var/lib/gostracker/tls && touch {LEFTOVERS} {KEEP}"
+    prep = f"cd /var/lib/gtrack/tls && touch {LEFTOVERS} {KEEP}"
     names = _files(_run_script(image, VOL, prep))
     for stale in LEFTOVERS.split():
         assert stale not in names, f"остаток {stale} не удалён (пара цела, генерации нет)"
@@ -199,11 +197,11 @@ def test_t27_tls_script_directory_named_like_temp_file_does_not_break_start(imag
     """Каталоги ``.tls.key.*``/``.tls.crt.*`` в томе: rc=0, каталоги целы, пара валидна."""
     docker("volume", "rm", "-f", VOL, check=False)
     docker("volume", "create", VOL)
-    d = "/var/lib/gostracker/tls"
+    d = "/var/lib/gtrack/tls"
     script = (
         f"cd {d} && mkdir .tls.key.DirAb1 .tls.crt.DirCd2 && echo keep > .tls.key.DirAb1/inner "
         f"&& echo secret > .tls.key.FilEf3 && touch .tls.crt.FilGh4; "
-        "/docker-entrypoint.d/10-gostracker-tls.sh >/tmp/out 2>&1; echo rc=$?; "
+        "/docker-entrypoint.d/10-gtrack-tls.sh >/tmp/out 2>&1; echo rc=$?; "
         f"cd {d}; ls -A; "
         "[ -f .tls.key.DirAb1/inner ] && echo inner_ok; [ -d .tls.crt.DirCd2 ] && echo dir_ok; "
         '[ -n "$(openssl x509 -in tls.crt -noout -pubkey)" ] && '
@@ -233,14 +231,14 @@ def test_t27_tls_script_operator_cert_branch_keeps_operator_files(
     docker("volume", "rm", "-f", VOL, check=False)
     docker("volume", "create", VOL)
     script = (
-        "mkdir -p /etc/gostracker/tls && cd /etc/gostracker/tls && "
+        "mkdir -p /etc/gtrack/tls && cd /etc/gtrack/tls && "
         "openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 2 "
         "-subj /CN=op -keyout tls.key -out tls.crt 2>/dev/null && "
         "touch .tls.key.AbC123 operator-note.txt && "
-        "/docker-entrypoint.d/10-gostracker-tls.sh >/dev/null && ls -A /etc/gostracker/tls"
+        "/docker-entrypoint.d/10-gtrack-tls.sh >/dev/null && ls -A /etc/gtrack/tls"
     )
     res = docker(
-        "run", "--rm", "-e", "HTTPS_PORT=443", "-v", f"{VOL}:/var/lib/gostracker/tls",
+        "run", "--rm", "-e", "HTTPS_PORT=443", "-v", f"{VOL}:/var/lib/gtrack/tls",
         "--entrypoint", "sh", image, "-c", script,
     )  # fmt: skip
     assert set(res.stdout.split()) == {"tls.crt", "tls.key", ".tls.key.AbC123", "operator-note.txt"}

@@ -1,6 +1,6 @@
-"""Подкоманда ``gostracker mcp``: stdio-мост к ``/mcp`` для локальных агентов (ADR-0018, PN-8).
+"""Подкоманда ``gtrack mcp``: stdio-мост к ``/mcp`` для локальных агентов (ADR-0018, PN-8).
 
-Агент (например Claude Code) запускает процесс ``gostracker mcp`` и говорит с ним по stdin/stdout.
+Агент (например Claude Code) запускает процесс ``gtrack mcp`` и говорит с ним по stdin/stdout.
 Мост пересылает протокол на HTTP-эндпоинт трекера с токеном из окружения; бизнес-логики нет.
 Переменные: ``GTRACK_TOKEN`` (обязательна), ``GTRACK_URL`` (по умолчанию
 ``https://localhost:<HTTPS_PORT>``), ``GTRACK_CA_FILE`` (для самоподписанного сертификата).
@@ -90,7 +90,7 @@ async def _bridge(endpoint: str, token: str, ca_file: str | None) -> int:
             async with stdio_server() as (stdin, stdout):
                 await server.run(stdin, stdout, server.create_initialization_options())
     except Exception as exc:  # без текста ответа и заголовков: только тип и адрес
-        print(f"gostracker mcp: сбой моста к {endpoint} ({type(exc).__name__})", file=sys.stderr)
+        print(f"gtrack mcp: сбой моста к {endpoint} ({type(exc).__name__})", file=sys.stderr)
         return 1
     return 0
 

@@ -10,7 +10,7 @@
   Если задача противоречит spec или plan — вернуть `PLAN_ISSUE`, ничего не додумывать.
 - Окружение: Python 3.12, команды из корня репозитория после `source .venv/bin/activate`.
   Тестовая БД:
-  `docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db`,
+  `docker compose -p gtrack-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db`,
   `export TEST_DATABASE_URL=postgresql+asyncpg://tracker:tracker@localhost:5432/tracker_test`.
   Деструктивные операции с БД разрешены только в `*_test`. Тома Docker не удалять.
 - Фронтенд: Node `^22.12 || ^24 || >=26`, команды `cd frontend && npm run lint && npm run typecheck && npm test`.
@@ -557,7 +557,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
   `("demo.ba4", "business_admin")` → `("demo.mixed", "mixed")`, `_ALL_PROJECTS_BA` →
   `"demo.mixed"`; `load_demo_data(seed=1)`. Снимок: N записей журнала, md5 строк `project`,
   `task`, `comment` (как `_snapshot` в `db/test_login_display_upgrade.py`), пароли из
-  `demo-passwords.txt`. Обновление — командой оператора `gostracker bootstrap`
+  `demo-passwords.txt`. Обновление — командой оператора `gtrack bootstrap`
   (`app.cli.main.main(["bootstrap"])` в отдельном потоке с окружением тестовой БД, по образцу
   `cli/test_bootstrap.py`). Проверки AC-30: `demo.mixed` без роли и участник обоих проектов;
   роли первого ТА и 11 демо-пользователей прежние; журнал N + 1 (`user.role_removed`, автор
@@ -587,9 +587,9 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
   В ADR-0013 (и кратко в `docs/data-model.md` рядом со строкой миграции 0006) — раздел
   «Порядок обновления» (ревью R3-T11-1, «Окно до миграции»; plan §8): код 002 требует схему
   0006 и не должен работать на схеме ≤ 0005 с ролью `mixed` (такой пользователь даёт 500);
-  порядок обеспечивает `backend/docker-entrypoint.sh`: `gostracker bootstrap` (advisory-блокировка,
+  порядок обеспечивает `backend/docker-entrypoint.sh`: `gtrack bootstrap` (advisory-блокировка,
   `alembic upgrade head`, `run_bootstrap`) → `exec uvicorn`, при ошибке миграции API не стартует;
-  при ручном запуске сначала `gostracker bootstrap`, потом API; после восстановления БД из
+  при ручном запуске сначала `gtrack bootstrap`, потом API; после восстановления БД из
   резервной копии 001 перезапустить сервис `api` (миграция 0006 выполнится при старте). Тесты
   `test_002_nfr5_*`: файл ADR-0013 есть, в нём «ADR-0003», «ТЗ §4», три отличия, «Q-5» или
   «аудит» состава участников, «0006»; в ADR-0003 статус «заменено ADR-0013»; в модели данных у
@@ -638,7 +638,7 @@ R3-T12, R3-T14, R3-T15, когда закрыты их зависимости.
 |---|---|---|---|
 | AC-27 | *ручной* | `docs/acceptance/mvp-demo.md`, пункт `002/AC-27`, в браузере при приёмке; автоматические части — vitest | R3-T09, R3-T10, R3-T17 |
 | AC-28 | *инфра* | `backend/tests/cli/test_demo_data.py::test_002_ac28_*` (команда оператора `demo-data` против тестовой БД, обычный прогон pytest) | R3-T08 |
-| AC-30 | *инфра* | `backend/tests/db/test_three_roles_demo_upgrade.py::test_002_ac30_*` (предыдущее демо по plan D-13, обновление командой `gostracker bootstrap`; Docker не нужен) | R3-T15 |
+| AC-30 | *инфра* | `backend/tests/db/test_three_roles_demo_upgrade.py::test_002_ac30_*` (предыдущее демо по plan D-13, обновление командой `gtrack bootstrap`; Docker не нужен) | R3-T15 |
 
 ## Документы, требующие разрешения владельца (не задачи)
 

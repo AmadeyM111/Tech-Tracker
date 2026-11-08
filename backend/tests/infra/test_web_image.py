@@ -5,15 +5,15 @@
 1. Статические проверки файлов ``deploy/web/*``, ``deploy/tls/README.md``, ``.gitignore``
    (Docker не нужен).
 2. Проверки через Docker (пропуск без Docker): ``docker build -f deploy/web/Dockerfile
-   -t gostracker-web:test .`` и запуск контейнеров ``gt-t25-*`` на портах 127.0.0.1. В качестве
+   -t gtrack-web:test .`` и запуск контейнеров ``gt-t25-*`` на портах 127.0.0.1. В качестве
    заглушки ``api`` используется сам собранный образ с nginx-конфигом, который отдаёт заголовки
    запроса. Всё созданное удаляется в finalizer'ах. Стек пользователя и dev-БД не затрагиваются.
 
 Контракт образа (то, что тесты считают интерфейсом):
 - переменные окружения: ``HTTPS_PORT`` (внешний порт в Location редиректа), ``TLS_SERVER_NAME``
   (CN и SAN самоподписанного сертификата);
-- сертификат оператора: ``/etc/gostracker/tls/tls.crt`` + ``tls.key``;
-- сгенерированный: каталог ``/var/lib/gostracker/tls/`` (файл ключа ``*.key``, режим 0600);
+- сертификат оператора: ``/etc/gtrack/tls/tls.crt`` + ``tls.key``;
+- сгенерированный: каталог ``/var/lib/gtrack/tls/`` (файл ключа ``*.key``, режим 0600);
 - слушает 80 (только 308) и 443 (TLS), статика в ``/usr/share/nginx/html``.
 """
 
@@ -34,7 +34,7 @@ import pytest
 
 pytestmark = pytest.mark.infra_static
 
-IMAGE = "gostracker-web:test"
+IMAGE = "gtrack-web:test"
 NETWORK = "gt-t25-net"
 STUB = "gt-t25-api-stub"
 WEB = "gt-t25-web"
@@ -102,7 +102,7 @@ def template() -> str:
 
 @pytest.fixture(scope="module")
 def tls_script() -> str:
-    return _read(WEB_DIR / "10-gostracker-tls.sh")
+    return _read(WEB_DIR / "10-gtrack-tls.sh")
 
 
 @pytest.fixture(scope="module")
@@ -146,17 +146,17 @@ def test_fr63_dockerfile_copies_static_template_and_script(
         re.M,
     )
     assert re.search(
-        r"deploy/web/10-gostracker-tls\.sh\s+/docker-entrypoint\.d/(10-gostracker-tls\.sh)?\s*$",
+        r"deploy/web/10-gtrack-tls\.sh\s+/docker-entrypoint\.d/(10-gtrack-tls\.sh)?\s*$",
         joined,
         re.M,
     )
 
 
 def test_fr63_dockerfile_script_is_executable(dockerfile: list[tuple[str, str]]) -> None:
-    mode_ok = os.access(WEB_DIR / "10-gostracker-tls.sh", os.X_OK)
+    mode_ok = os.access(WEB_DIR / "10-gtrack-tls.sh", os.X_OK)
     text = "\n".join(a for h, a in dockerfile)
-    chmod_ok = bool(re.search(r"chmod\s+\S*\+x\S*\s+\S*10-gostracker-tls\.sh", text)) or bool(
-        re.search(r"COPY\s+--chmod=[0-7]*[1357]{1}\S*\s+deploy/web/10-gostracker-tls\.sh", text)
+    chmod_ok = bool(re.search(r"chmod\s+\S*\+x\S*\s+\S*10-gtrack-tls\.sh", text)) or bool(
+        re.search(r"COPY\s+--chmod=[0-7]*[1357]{1}\S*\s+deploy/web/10-gtrack-tls\.sh", text)
     )
     assert mode_ok or chmod_ok, "скрипт не исполняемый: nginx entrypoint его пропустит"
 
@@ -245,9 +245,9 @@ def test_fr63_script_shape(tls_script: str) -> None:
 
 
 def test_fr63_script_selection_and_generation(tls_script: str) -> None:
-    assert "/etc/gostracker/tls/tls.crt" in tls_script
-    assert "/etc/gostracker/tls/tls.key" in tls_script
-    assert "/var/lib/gostracker/tls" in tls_script
+    assert "/etc/gtrack/tls/tls.crt" in tls_script
+    assert "/etc/gtrack/tls/tls.key" in tls_script
+    assert "/var/lib/gtrack/tls" in tls_script
     assert re.search(r"openssl\s+req\s+.*-x509", tls_script, re.S)
     for token in ("ec_paramgen_curve:prime256v1", "-nodes", "-days 825", "TLS_SERVER_NAME"):
         assert token in tls_script, token
@@ -446,7 +446,7 @@ def _cleanup() -> None:
 def image() -> Iterator[str]:
     if not _docker_available():
         pytest.skip("Docker недоступен")
-    for required in ("Dockerfile", "default.conf.template", "10-gostracker-tls.sh"):
+    for required in ("Dockerfile", "default.conf.template", "10-gtrack-tls.sh"):
         assert (WEB_DIR / required).is_file(), f"нет deploy/web/{required}"
     _cleanup()
     res = docker(
@@ -469,7 +469,7 @@ def web(image: str) -> Iterator[Web]:
         "-e", f"CONF={STUB_CONF}", "--entrypoint", "sh", image,
         "-c", 'printf "%s" "$CONF" > /tmp/s.conf && exec nginx -c /tmp/s.conf -g "daemon off;"',
     )  # fmt: skip
-    yield run_web(WEB, volumes=[f"{VOL}:/var/lib/gostracker/tls"])
+    yield run_web(WEB, volumes=[f"{VOL}:/var/lib/gtrack/tls"])
 
 
 # --- Docker: сборка и образ --------------------------------------------------------------
@@ -485,9 +485,9 @@ def test_fr63_image_builds(image: str) -> None:
 def test_fr63_image_has_no_private_keys(image: str) -> None:
     out = docker(
         "run", "--rm", "--entrypoint", "sh", image, "-c",
-        "grep -rl 'PRIVATE KEY' /etc/nginx /etc/gostracker /var/lib/gostracker "
+        "grep -rl 'PRIVATE KEY' /etc/nginx /etc/gtrack /var/lib/gtrack "
         "/usr/share/nginx /docker-entrypoint.d 2>/dev/null; "
-        "ls /etc/gostracker/tls /var/lib/gostracker/tls 2>/dev/null; true",
+        "ls /etc/gtrack/tls /var/lib/gtrack/tls 2>/dev/null; true",
     ).stdout  # fmt: skip
     assert out.strip() == "", f"в образе есть ключи/сертификаты:\n{out}"
 
@@ -525,7 +525,7 @@ def test_ac40_selfsigned_validity_and_key_mode(web: Web) -> None:
     assert ok.returncode == 0, "сертификат должен действовать >= 800 дней"
     over = docker("exec", web.name, "sh", "-c", f"{cert} -checkend 77760000", check=False)
     assert over.returncode == 1, "срок сертификата должен быть ~825 дней (не >= 900)"
-    modes = web.exec("sh", "-c", "stat -c '%a' /var/lib/gostracker/tls/*.key").split()
+    modes = web.exec("sh", "-c", "stat -c '%a' /var/lib/gtrack/tls/*.key").split()
     assert modes and all(m == "600" for m in modes), modes
 
 
@@ -535,7 +535,7 @@ def test_ac40_cert_stable_across_restart_and_new_container(web: Web) -> None:
     docker("restart", web.name)
     wait_ready(web)
     assert web.fingerprint() == before, "сертификат перегенерирован при перезапуске"
-    other = run_web(WEB2, volumes=[f"{VOL}:/var/lib/gostracker/tls"])
+    other = run_web(WEB2, volumes=[f"{VOL}:/var/lib/gtrack/tls"])
     try:
         assert other.fingerprint() == before, "новый контейнер с тем же томом сменил сертификат"
     finally:
@@ -558,7 +558,7 @@ def test_ac40_operator_certificate_is_used(image: str, tmp_path: Path) -> None:
     (d / "tls.key").chmod(0o600)
     d.chmod(0o755)
     (d / "tls.crt").chmod(0o644)
-    op = run_web(WEB_OP, network=None, volumes=[f"{d}:/etc/gostracker/tls:ro"])
+    op = run_web(WEB_OP, network=None, volumes=[f"{d}:/etc/gtrack/tls:ro"])
     try:
         assert "operator-cert.test" in op.cert_info()
         assert op.request("/")[0] == 200

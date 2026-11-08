@@ -1,4 +1,4 @@
-"""``gostracker export`` / ``gostracker import`` (plan §4.10, FR-40, AC-17, AC-93, ADR-0010).
+"""``gtrack export`` / ``gtrack import`` (plan §4.10, FR-40, AC-17, AC-93, ADR-0010).
 
 Покрытие: цикл экспорт → импорт → экспорт даёт идентичный ``data.json`` (метка ``exported_at``
 не сравнивается); файл архива с режимом 0600; сброс файла с паролем первого ТА; синхронизация
@@ -78,7 +78,7 @@ async def test_roundtrip_export_import_export_is_identical(
 ) -> None:
     sm, engine, settings = filled
     first = await _export_payload(engine)
-    assert first["format"] == "gostracker-export"
+    assert first["format"] == "gtrack-export"
     assert len(first["tables"]["task"]) > 0
     assert len(first["tables"]["domain_event"]) > 0
     assert "user_session" not in first["tables"]
@@ -189,6 +189,18 @@ def test_parse_rows_rejects_wrong_format(tmp_path: Path) -> None:
     raw = json.dumps({"format": "other", "schema_version": "x", "tables": {}}).encode()
     with pytest.raises(ImportRefused, match="формат"):
         parse_rows(raw, schema_version="x")
+
+
+def test_parse_rows_accepts_legacy_gostracker_format_id() -> None:
+    # Архив, созданный до переименования, проходит проверку формата (дальше падает на таблицах).
+    from app.domain.ops.archive import ACCEPTED_FORMATS, LEGACY_FORMAT
+
+    assert LEGACY_FORMAT == "gostracker-export"
+    assert LEGACY_FORMAT in ACCEPTED_FORMATS
+    raw = json.dumps({"format": LEGACY_FORMAT, "schema_version": "x", "tables": {}}).encode()
+    with pytest.raises(ImportRefused) as exc:
+        parse_rows(raw, schema_version="x")
+    assert "неизвестный формат" not in str(exc.value)
 
 
 # --- CLI --------------------------------------------------------------------------------

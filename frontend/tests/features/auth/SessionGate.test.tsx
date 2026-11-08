@@ -76,8 +76,8 @@ describe("session gate on / (T23)", () => {
     const main = await screen.findByRole("main");
     await expectAt("/admin/users");
     expect((await screen.findByRole("alert")).textContent).toBe(ru["error.forbidden"]);
-    // 019/RG-16: единственная ссылка в main - пункт меню «Профиль»; других ссылок нет.
-    expect(Array.from(main.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/profile"]);
+    // 019/RG-16 + ADR-0018: в main только пункты «Профиль» и «Доступ для агентов»
+    expect(Array.from(main.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/profile/agents", "/profile"]);
     expect(screen.getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
     expect(screen.queryByRole("heading", { name: "Главная" })).toBeNull();
     await new Promise((r) => setTimeout(r, 40));

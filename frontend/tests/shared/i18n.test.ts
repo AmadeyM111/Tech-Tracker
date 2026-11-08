@@ -382,7 +382,7 @@ const TECHNICAL_ATTRS = new Set([
 ]); // fmt: skip
 // Whitelist of Latin literals allowed outside the dictionary (exact match after trim).
 const LATIN_ALLOWED = new Set<string>([
-  "GOSTracker", // product name: a proper noun, not translated (NFR-6)
+  "GTrack", // product name: a proper noun, not translated (NFR-6)
 ]);
 const LATIN = /[A-Za-z]/;
 
@@ -580,9 +580,9 @@ describe("scanLatinUi (self-check of the compiler-API scanner)", () => {
   });
 
   it("allows only the explicit whitelist", () => {
-    expect(caught("<h1>GOSTracker</h1>")).toEqual([]);
-    expect(caught('<h1>{"GOSTracker"}</h1>')).toEqual([]);
-    expect(caught("<h1>GOSTracker CRM</h1>").length).toBe(1);
+    expect(caught("<h1>GTrack</h1>")).toEqual([]);
+    expect(caught('<h1>{"GTrack"}</h1>')).toEqual([]);
+    expect(caught("<h1>GTrack CRM</h1>").length).toBe(1);
   });
 });
 

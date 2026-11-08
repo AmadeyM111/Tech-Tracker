@@ -1,4 +1,4 @@
-"""T19: ``gostracker hash-bench [--iterations N]`` (plan §4.13; AC-38 инструмент замера, FR-52).
+"""T19: ``gtrack hash-bench [--iterations N]`` (plan §4.13; AC-38 инструмент замера, FR-52).
 
 Формат вывода plan не фиксирует; тесты закрепляют JSON-объект в stdout с ключами
 ``p50_ms``, ``p95_ms``, ``iterations``, ``time_cost``, ``memory_cost_kib``, ``parallelism``.

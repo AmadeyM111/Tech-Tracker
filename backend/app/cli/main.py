@@ -1,4 +1,4 @@
-"""Точка входа CLI ``gostracker`` (plan §4.13, D-29): ``argparse``, тонкие подкоманды."""
+"""Точка входа CLI ``gtrack`` (plan §4.13, D-29): ``argparse``, тонкие подкоманды."""
 
 from __future__ import annotations
 
@@ -20,8 +20,8 @@ from app.cli.commands import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="gostracker",
-        description="Команды оператора GOSTracker.",
+        prog="gtrack",
+        description="Команды оператора GTrack.",
     )
     subparsers = parser.add_subparsers(dest="command", metavar="КОМАНДА", required=True)
     bootstrap.add_parser(subparsers)

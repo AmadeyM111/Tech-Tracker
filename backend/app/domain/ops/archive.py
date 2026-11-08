@@ -2,7 +2,7 @@
 
 Архив — tar без сжатия с одним членом ``data.json``::
 
-    {"format": "gostracker-export", "schema_version": "<alembic head>",
+    {"format": "gtrack-export", "schema_version": "<alembic head>",
      "exported_at": "<UTC>", "tables": {"<table>": [rows...]}}
 
 Строки отсортированы по первичному ключу; ключи JSON отсортированы; ``uuid`` — строки,
@@ -40,7 +40,10 @@ import app.domain.users.models  # noqa: F401
 import app.domain.workspaces.models  # noqa: F401
 from app.core.models import Base
 
-FORMAT: Final = "gostracker-export"
+FORMAT: Final = "gtrack-export"
+# Архивы, созданные до переименования (GOSTracker): импорт принимает и этот формат.
+LEGACY_FORMAT: Final = "gostracker-export"
+ACCEPTED_FORMATS: Final = frozenset({FORMAT, LEGACY_FORMAT})
 DATA_MEMBER: Final = "data.json"
 # Сессии входа не переносятся: их идентификаторы — секреты текущей установки. Заявки регистрации
 # содержат email и токены до подтверждения (NFR-7, ADR-0019). Попытки хранят только хеши ключей

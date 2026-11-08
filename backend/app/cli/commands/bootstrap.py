@@ -1,4 +1,4 @@
-"""Подкоманда ``gostracker bootstrap`` (plan §4.7, §4.13, D-21, D-29, FR-6).
+"""Подкоманда ``gtrack bootstrap`` (plan §4.7, §4.13, D-21, D-29, FR-6).
 
 Последовательность: ожидание БД (до 60 с) → ``ensure_secret_key`` → под одной
 advisory-блокировкой ``alembic upgrade head`` (``ALEMBIC_CONFIG``) → ``run_bootstrap``.
@@ -177,7 +177,7 @@ def _warn(message: str) -> None:
 
 
 def run(args: argparse.Namespace) -> int:  # noqa: ARG001  # сигнатура задана фреймворком
-    """Выполняет ``gostracker bootstrap``; возвращает код выхода (0 — успех)."""
+    """Выполняет ``gtrack bootstrap``; возвращает код выхода (0 — успех)."""
     step = "настройки"
     loaded: Settings | None = None  # для маскирования секретов, если сбой случится позже
     try:

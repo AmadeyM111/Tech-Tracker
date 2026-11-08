@@ -1,6 +1,6 @@
-# GOSTracker - единый трекер для ведения воронки клиентов, проектов и задач сотрудников
+# GTrack - единый трекер для ведения воронки клиентов, проектов и задач сотрудников
 
-GOSTracker is a self-hosted tracker for client pipelines, projects and employee tasks.
+GTrack is a self-hosted tracker for client pipelines, projects and employee tasks.
 
 Документация на двух языках / Documentation in two languages:
 [Русский](#быстрый-старт) | [English](#quick-start)
@@ -16,7 +16,7 @@ GOSTracker is a self-hosted tracker for client pipelines, projects and employee 
 Нужны Docker с плагином Compose v2 и свободные порты 80 и 443 (как их сменить - ниже).
 
 ```bash
-git clone <URL репозитория> gostracker && cd gostracker
+git clone <URL репозитория> gtrack && cd gtrack
 # все следующие команды выполняйте в каталоге клона
 cp .env.example .env
 docker compose up -d --build --wait
@@ -48,12 +48,12 @@ R1 - прототип таск-трекера (MVP): приёмка R1 прох�
 - комментарии: простой текст, HTML вырезается, без упоминаний;
 - лента активности проекта: события по задачам, участникам и комментариям, без текста комментариев
   (`docs/adr/0015-activity-feed-returned.md`);
-- экспорт и импорт данных (оператор, CLI: `gostracker export` / `gostracker import`);
+- экспорт и импорт данных (оператор, CLI: `gtrack export` / `gtrack import`);
 - личный список «Мои задачи» и список задач проекта с фильтрами по исполнителю и статусу;
 - канбан-доска с перетаскиванием, ручным порядком карточек и клавиатурной заменой
   перетаскивания;
 - опрос сервера (не реже раза в 15 с) на доске, в списках задач и в карточке задачи;
-- экспорт и импорт данных оператором (CLI `gostracker export` и `gostracker import`, ADR-0015);
+- экспорт и импорт данных оператором (CLI `gtrack export` и `gtrack import`, ADR-0015);
 - демо-данные одной командой (см. ниже).
 
 Отложено (не входит в MVP, вернётся в следующей версии):
@@ -75,7 +75,7 @@ R1 - прототип таск-трекера (MVP): приёмка R1 прох�
 командой и прочитайте пароли:
 
 ```bash
-docker compose exec api gostracker demo-data
+docker compose exec api gtrack demo-data
 docker compose exec api cat /data/secrets/demo-passwords.txt
 ```
 
@@ -219,11 +219,11 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
 Обновляйтесь только командой `docker compose up -d --build --wait` (стек под другим именем
 Compose - `docker compose -p <имя> up -d --build --wait`; правило имени - в «Быстром старте»).
 Entrypoint контейнера `api` выполняет миграции до старта API; если миграция падает, API не
-запускается. При ручном запуске (без Docker) сначала `gostracker bootstrap`, потом API. Не
+запускается. При ручном запуске (без Docker) сначала `gtrack bootstrap`, потом API. Не
 запускайте `uvicorn` вручную на немигрированной БД: код 002 на схеме ≤ 0005 с пользователем, у
 которого упразднённая роль `mixed`, отвечает 500.
 
-Если порт 80 занят другим стеком (например, `gostracker` при работающем `gostracker-web`),
+Если порт 80 занят другим стеком (например, `gtrack` при работающем `gtrack-web`),
 контейнер `web` нового стека не стартует из-за конфликта порта, и команда
 `docker compose up -d --build --wait` вернёт ненулевой код. Такой стек обновляйте только API:
 `docker compose up -d --build --wait api` (с `-p <имя>`, если стек запущен под другим именем
@@ -260,7 +260,7 @@ Compose). Веб-часть (frontend внутри образа `web`) при э
   `min(32, CPU + 4)`, поэтому при одновременных входах и сменах паролей пиковое потребление
   памяти `api` на стенде 3 vCPU составляет около 900 МиБ. Планируйте память с запасом;
   уменьшение `ARGON2_MEMORY_COST_KIB` ослабляет защиту паролей.
-- **Запуск API.** Команда `gostracker` (bootstrap, openapi, hash-bench, maintenance, demo-data) API не
+- **Запуск API.** Команда `gtrack` (bootstrap, openapi, hash-bench, maintenance, demo-data) API не
   запускает. Запускайте `api` командой `uvicorn app.main:app` (как в образе), не
   программным `uvicorn.run(app)`: при таком запуске `dictConfig` uvicorn
   вернёт обработчики без фильтра секретов, и значения паролей и токенов могут попасть в лог.
@@ -300,7 +300,7 @@ Compose). Веб-часть (frontend внутри образа `web`) при э
 
 ### Регулярное обслуживание
 
-В MVP команда `gostracker maintenance` удаляет только истёкшие сессии пользователей (простой
+В MVP команда `gtrack maintenance` удаляет только истёкшие сессии пользователей (простой
 или абсолютный срок) и истёкшие заявки на самостоятельную регистрацию (срок подтверждения по
 ссылке). Корзины в MVP нет (она отложена), поэтому чистить больше нечего. Без регулярного запуска
 истёкшие сессии и заявки остаются в БД: на работу это не влияет, но таблица растёт. Неподтверждённая
@@ -309,16 +309,16 @@ Compose). Веб-часть (frontend внутри образа `web`) при э
 Docker:
 
 ```
-17 3 * * * cd /path/to/gostracker && { date -u; docker compose exec -T api gostracker maintenance; } >> /var/log/gostracker-maintenance.log 2>&1
+17 3 * * * cd /path/to/gtrack && { date -u; docker compose exec -T api gtrack maintenance; } >> /var/log/gtrack-maintenance.log 2>&1
 ```
 
-- `/path/to/gostracker` - замените на каталог клона репозитория (из него Compose берёт
+- `/path/to/gtrack` - замените на каталог клона репозитория (из него Compose берёт
   `docker-compose.yml`, `.env` и имя проекта). Если стек запущен под другим именем
   (`COMPOSE_PROJECT_NAME` или `-p`), укажите его: `docker compose -p <имя> exec -T api ...`.
 - `date -u` пишет в журнал время запуска в UTC перед результатом команды.
 - Ключ `-T` отключает TTY, без него `cron` не сможет выполнить `docker compose exec`.
 
-- Для проверки перед первым запуском: `docker compose exec -T api gostracker maintenance --dry-run`
+- Для проверки перед первым запуском: `docker compose exec -T api gtrack maintenance --dry-run`
   только считает, что было бы очищено, и ничего не меняет.
 - Вывод - ровно девять строк `ключ=значение` (`dry_run`, `sessions_expired`, `projects_purged`,
   `tasks_purged`, `comments_purged`, `attachments_purged`, `files_removed`,
@@ -345,7 +345,7 @@ Dev-конфигурация `deploy/compose.dev.yml` подключается �
 
 ```bash
 # БД для разработки и тестов
-docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db
+docker compose -p gtrack-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db
 
 # окружение Python 3.12
 python3.12 -m venv .venv && source .venv/bin/activate
@@ -354,7 +354,7 @@ pip install -e "backend[dev]"
 # настройки разработки из deploy/dev.env.example (приложение файл .env не читает)
 set -a; . deploy/dev.env.example; set +a
 
-gostracker bootstrap                                  # миграции, ключ, первый администратор
+gtrack bootstrap                                  # миграции, ключ, первый администратор
 uvicorn app.main:app --reload --app-dir backend       # API на :8000, /docs - Swagger
 cd frontend && npm ci && npm run dev                  # фронтенд на :5173, прокси /api -> :8000
 ```
@@ -365,8 +365,8 @@ cd frontend && npm ci && npm run dev                  # фронтенд на :5
 Экспорт и импорт данных (оператор, CLI):
 
 ```bash
-gostracker export --out /backup/gostracker-export.tar   # tar с data.json, режим 0600
-gostracker import /backup/gostracker-export.tar         # только в пустую систему
+gtrack export --out /backup/gtrack-export.tar   # tar с data.json, режим 0600
+gtrack import /backup/gtrack-export.tar         # только в пустую систему
 ```
 
 `import` заменяет автоданные первого администратора данными архива и отказывает (код 2),
@@ -398,13 +398,13 @@ bash scripts/check.sh            # линтер, типы, alembic check, pytest
 стек; порядок строго такой:
 
 ```bash
-HTTP_PORT=18080 HTTPS_PORT=18443 docker compose -p gostracker-infratest up -d --build --wait
-GT_INFRA_STACK=1 GT_INFRA_PROJECT=gostracker-infratest HTTP_PORT=18080 HTTPS_PORT=18443 \
+HTTP_PORT=18080 HTTPS_PORT=18443 docker compose -p gtrack-infratest up -d --build --wait
+GT_INFRA_STACK=1 GT_INFRA_PROJECT=gtrack-infratest HTTP_PORT=18080 HTTPS_PORT=18443 \
   pytest -q -m infra_stack backend/tests/infra
-docker compose -p gostracker-infratest down -v
+docker compose -p gtrack-infratest down -v
 ```
 
-Перед повторным прогоном обязательно выполните `down -v` для проекта `gostracker-infratest`:
+Перед повторным прогоном обязательно выполните `down -v` для проекта `gtrack-infratest`:
 на «использованном» стеке тесты первого запуска падают с сообщением «нужен свежий стек».
 
 ### Прочее
@@ -425,7 +425,7 @@ You need Docker with the Compose v2 plugin and free ports 80 and 443 (see below 
 them).
 
 ```bash
-git clone <repository URL> gostracker && cd gostracker
+git clone <repository URL> gtrack && cd gtrack
 # run all the following commands in the clone directory
 cp .env.example .env
 docker compose up -d --build --wait
@@ -458,11 +458,11 @@ Included in the MVP demo:
 - comments: plain text, HTML is stripped, no mentions;
 - project activity feed: events for tasks, members and comments, without comment text
   (`docs/adr/0015-activity-feed-returned.md`);
-- data export and import (operator, CLI: `gostracker export` / `gostracker import`);
+- data export and import (operator, CLI: `gtrack export` / `gtrack import`);
 - the personal "My tasks" list and the project task list with assignee and status filters;
 - a kanban board with drag and drop, manual card order and a keyboard replacement for dragging;
 - server polling (at least every 15 s) on the board, task lists and the task card;
-- data export and import by the operator (CLI `gostracker export` and `gostracker import`, ADR-0015);
+- data export and import by the operator (CLI `gtrack export` and `gtrack import`, ADR-0015);
 - demo data with one command (see below).
 
 Deferred (not part of the MVP, planned for the next version):
@@ -484,7 +484,7 @@ On a fresh installation (after `docker compose up -d --build --wait`) load the d
 one command and read the passwords:
 
 ```bash
-docker compose exec api gostracker demo-data
+docker compose exec api gtrack demo-data
 docker compose exec api cat /data/secrets/demo-passwords.txt
 ```
 
@@ -633,11 +633,11 @@ is taken: creating it is rejected with a 422 response and the `login_taken` code
 Upgrade only with `docker compose up -d --build --wait` (a stack under another Compose name:
 `docker compose -p <name> up -d --build --wait`; the name rule is in "Quick start"). The `api`
 container entrypoint runs the migrations before the API starts; if a migration fails, the API
-does not start. When starting by hand (without Docker), run `gostracker bootstrap` first, then
+does not start. When starting by hand (without Docker), run `gtrack bootstrap` first, then
 the API. Do not run `uvicorn` by hand on an unmigrated database: on a schema ≤ 0005 with a
 user who has the retired `mixed` role, the 002 code answers 500.
 
-If port 80 is taken by another stack (for example `gostracker` while `gostracker-web` is
+If port 80 is taken by another stack (for example `gtrack` while `gtrack-web` is
 running), the `web` container of the new stack does not start because of the port conflict, and
 `docker compose up -d --build --wait` returns a non-zero exit code. Upgrade such a stack with the
 API only: `docker compose up -d --build --wait api` (with `-p <name>` if the stack runs under
@@ -677,7 +677,7 @@ before a downgrade.
   `min(32, CPU + 4)`, so with simultaneous logins and password changes the peak memory of `api`
   on a 3 vCPU host is about 900 MiB. Plan memory with a margin; lowering
   `ARGON2_MEMORY_COST_KIB` weakens password protection.
-- **Starting the API.** The `gostracker` command (bootstrap, openapi, hash-bench, maintenance, demo-data) does
+- **Starting the API.** The `gtrack` command (bootstrap, openapi, hash-bench, maintenance, demo-data) does
   not start the API. Run `api` with `uvicorn app.main:app` (as the image does), not
   programmatically with `uvicorn.run(app)`: that way uvicorn's
   `dictConfig` restores handlers without the secrets filter, and passwords or tokens may leak
@@ -721,7 +721,7 @@ before a downgrade.
 
 ### Regular maintenance
 
-In the MVP the `gostracker maintenance` command deletes only expired user sessions (idle or
+In the MVP the `gtrack maintenance` command deletes only expired user sessions (idle or
 absolute timeout) and expired self-registration requests (the confirmation link has expired).
 There is no trash in the MVP (it is deferred), so there is nothing else to clean up. Without
 regular runs expired sessions and requests stay in the database: work is not affected, but the
@@ -730,16 +730,16 @@ expires. Run the command once a day, for example from the `crontab` of a user wh
 to Docker:
 
 ```
-17 3 * * * cd /path/to/gostracker && { date -u; docker compose exec -T api gostracker maintenance; } >> /var/log/gostracker-maintenance.log 2>&1
+17 3 * * * cd /path/to/gtrack && { date -u; docker compose exec -T api gtrack maintenance; } >> /var/log/gtrack-maintenance.log 2>&1
 ```
 
-- `/path/to/gostracker` - replace it with the clone directory of the repository (Compose takes
+- `/path/to/gtrack` - replace it with the clone directory of the repository (Compose takes
   `docker-compose.yml`, `.env` and the project name from it). If the stack runs under another
   name (`COMPOSE_PROJECT_NAME` or `-p`), give it: `docker compose -p <name> exec -T api ...`.
 - `date -u` writes the start time in UTC to the log before the command output.
 - The `-T` flag disables the TTY; without it `cron` cannot run `docker compose exec`.
 
-- To check before the first run: `docker compose exec -T api gostracker maintenance --dry-run`
+- To check before the first run: `docker compose exec -T api gtrack maintenance --dry-run`
   only counts what would be cleaned up and changes nothing.
 - The output is exactly nine `key=value` lines (`dry_run`, `sessions_expired`,
   `projects_purged`, `tasks_purged`, `comments_purged`, `attachments_purged`, `files_removed`,
@@ -766,7 +766,7 @@ database port `127.0.0.1:5432`; the repository intentionally has no `docker-comp
 
 ```bash
 # database for development and tests
-docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db
+docker compose -p gtrack-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db
 
 # Python 3.12 environment
 python3.12 -m venv .venv && source .venv/bin/activate
@@ -775,7 +775,7 @@ pip install -e "backend[dev]"
 # development settings from deploy/dev.env.example (the app does not read .env)
 set -a; . deploy/dev.env.example; set +a
 
-gostracker bootstrap                                  # migrations, key, first administrator
+gtrack bootstrap                                  # migrations, key, first administrator
 uvicorn app.main:app --reload --app-dir backend       # API on :8000, /docs - Swagger
 cd frontend && npm ci && npm run dev                  # frontend on :5173, /api -> :8000 proxy
 ```
@@ -786,8 +786,8 @@ In dev mode the first administrator password is in `.data/secrets/initial-admin-
 Export and import of data (operator, CLI):
 
 ```bash
-gostracker export --out /backup/gostracker-export.tar   # tar with data.json, mode 0600
-gostracker import /backup/gostracker-export.tar         # into an empty system only
+gtrack export --out /backup/gtrack-export.tar   # tar with data.json, mode 0600
+gtrack import /backup/gtrack-export.tar         # into an empty system only
 ```
 
 `import` replaces the first administrator's automatic data with the archive's data and refuses
@@ -821,13 +821,13 @@ Running-stack tests (`infra_stack`) need a **fresh**, separate project so that y
 stays untouched; the order is strict:
 
 ```bash
-HTTP_PORT=18080 HTTPS_PORT=18443 docker compose -p gostracker-infratest up -d --build --wait
-GT_INFRA_STACK=1 GT_INFRA_PROJECT=gostracker-infratest HTTP_PORT=18080 HTTPS_PORT=18443 \
+HTTP_PORT=18080 HTTPS_PORT=18443 docker compose -p gtrack-infratest up -d --build --wait
+GT_INFRA_STACK=1 GT_INFRA_PROJECT=gtrack-infratest HTTP_PORT=18080 HTTPS_PORT=18443 \
   pytest -q -m infra_stack backend/tests/infra
-docker compose -p gostracker-infratest down -v
+docker compose -p gtrack-infratest down -v
 ```
 
-Always run `down -v` for the `gostracker-infratest` project before a rerun: on a "used" stack
+Always run `down -v` for the `gtrack-infratest` project before a rerun: on a "used" stack
 the first-run tests fail with the "fresh stack needed" message.
 
 ### More

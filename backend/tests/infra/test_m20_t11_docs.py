@@ -24,7 +24,7 @@ def test_m20_t11_guide_has_claude_code_and_codex_commands() -> None:
     text = _guide()
     assert "claude mcp add" in text
     assert "codex mcp add" in text
-    assert "gostracker mcp" in text
+    assert "gtrack mcp" in text
     assert "GTRACK_TOKEN" in text
 
 

@@ -1,4 +1,4 @@
-# Поставляемая конфигурация GOSTracker (plan §4.12, D-17..D-20).
+# Поставляемая конфигурация GTrack (plan §4.12, D-17..D-20).
 # Порты публикует только web; db и api доступны лишь внутри сети проекта.
 # Режим разработки: deploy/compose.dev.yml подключается только явно (см. README).
 x-logging: &logging
@@ -85,8 +85,8 @@ services:
       HTTPS_PORT: ${HTTPS_PORT:-443}
       TLS_SERVER_NAME: ${TLS_SERVER_NAME:-localhost}
     volumes:
-      - ./deploy/tls:/etc/gostracker/tls:ro
-      - tls-generated:/var/lib/gostracker/tls
+      - ./deploy/tls:/etc/gtrack/tls:ro
+      - tls-generated:/var/lib/gtrack/tls
     depends_on:
       api:
         condition: service_healthy

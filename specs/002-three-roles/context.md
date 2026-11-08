@@ -14,7 +14,7 @@
 
 ## Frontend
 - `shared/i18n/ru.ts:66` (`admin.role.mixed`); `features/admin/UsersPage.tsx:24,45,118`; `AuditPage.tsx:61`; `tasks/TaskList.tsx:112,137` (`canPickAssignee`); `projects/ProjectPage.tsx:52` (`OWNER_ROLES`); `shared/api/schema.d.ts:1085` (генерируется).
-- Генерация: `gostracker openapi --out docs/api/openapi.json` → `cd frontend && npm run gen:api`.
+- Генерация: `gtrack openapi --out docs/api/openapi.json` → `cd frontend && npm run gen:api`.
 
 ## Тесты
 - backend/tests: 48 файлов (api 21, domain 9, db 4, infra 4, unit 4, cli 1, корень 5: `factories.py:29`, `admin_support.py`, `projects_*_support.py`, `tasks_api_support.py`). Ключевые: `unit/test_role_matrix.py`, `unit/test_policy.py`, `unit/test_recipients.py`, `api/test_admin_roles.py`, `api/test_role_change_effect.py`, `api/test_deps_gates.py`, `db/test_migrations.py`, `db/test_identity_models.py`, `db/test_login_display_upgrade.py`, `cli/test_demo_data.py`, `domain/test_user_admin_service.py`; `infra/test_stack_first_run.py` (чужая незакоммиченная правка!), `test_compose_static.py`.

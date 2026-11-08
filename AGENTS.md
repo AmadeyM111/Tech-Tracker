@@ -10,7 +10,7 @@ python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e "backend[dev]"
 # БД для разработки (127.0.0.1:5432): dev-конфигурация подключается только явно (-f);
 # поставляемый `docker compose up` порт 5432 не публикует — см. plan.md, D-18, N-7
-docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db
+docker compose -p gtrack-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db
 # настройки разработки (DATABASE_URL, COOKIE_SECURE=false, ENV=local, DATA_DIR=./.data):
 # приложение .env не читает, значения берутся из окружения процесса
 set -a; . deploy/dev.env.example; set +a
@@ -18,7 +18,7 @@ set -a; . deploy/dev.env.example; set +a
 export TEST_DATABASE_URL=postgresql+asyncpg://tracker:tracker@localhost:5432/tracker_test
 
 # разработка
-gostracker bootstrap                                   # миграции БД, ключ, первый администратор
+gtrack bootstrap                                   # миграции БД, ключ, первый администратор
 uvicorn app.main:app --reload --app-dir backend     # API на :8000, /docs — Swagger
 cd frontend && npm run dev                          # фронт на :5173
 

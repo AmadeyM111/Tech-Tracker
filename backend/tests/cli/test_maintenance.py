@@ -1,4 +1,4 @@
-"""T19 (заметка ревью T16a): ``gostracker maintenance`` удаляет истёкшие сессии пользователей.
+"""T19 (заметка ревью T16a): ``gtrack maintenance`` удаляет истёкшие сессии пользователей.
 
 Истёкшая: ``now - last_activity_at >= 8 ч`` или ``now >= absolute_expires_at`` (D-13, FR-58).
 Времена сидов отсчитываются от реальных часов с запасом в минуты: команда читает текущее
@@ -176,7 +176,7 @@ async def test_019_nfr9_maintenance_reports_expired_registration_requests(
     cli_env: Path,
     capfd: pytest.CaptureFixture[str],
 ) -> None:
-    """NFR-9: ``gostracker maintenance`` удаляет истёкшие заявки и печатает их число."""
+    """NFR-9: ``gtrack maintenance`` удаляет истёкшие заявки и печатает их число."""
     from app.domain.auth.models import RegistrationRequest
 
     now = datetime.now(UTC)

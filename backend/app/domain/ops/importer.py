@@ -20,7 +20,7 @@ from app.core.config import Settings
 from app.core.db import create_engine
 from app.core.models import Base
 from app.domain.ops.archive import (
-    FORMAT,
+    ACCEPTED_FORMATS,
     ImportRefused,
     decode_value,
     exported_columns,
@@ -51,7 +51,7 @@ def parse_rows(raw: bytes, *, schema_version: str) -> dict[str, list[dict[str, A
         payload = json.loads(raw)
     except ValueError as exc:
         raise ImportRefused("data.json не разобран как JSON") from exc
-    if not isinstance(payload, dict) or payload.get("format") != FORMAT:
+    if not isinstance(payload, dict) or payload.get("format") not in ACCEPTED_FORMATS:
         raise ImportRefused("неизвестный формат архива")
     if payload.get("schema_version") != schema_version:
         raise ImportRefused(

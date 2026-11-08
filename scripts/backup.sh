@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Резервная копия стека GOSTracker: дамп БД (pg_dump -Fc) и архив тома appdata
+# Резервная копия стека GTrack: дамп БД (pg_dump -Fc) и архив тома appdata
 # (/data: secret_key и файлы секретов). Тома не удаляются и не пересоздаются.
 #
 #   scripts/backup.sh -p <проект-compose> [-d <каталог>]
 #
 #   -p  проект Compose стека (как в `docker compose ls`); обязателен, чтобы не
 #       снять копию с чужого стека.
-#   -d  каталог назначения; по умолчанию ~/gostracker-backups/<проект>-<UTC-метка>.
+#   -d  каталог назначения; по умолчанию ~/gtrack-backups/<проект>-<UTC-метка>.
 #       Каталог вне клона: в дампе хеши паролей, в репозиторий они попадать не должны.
 #
 # Результат: db.dump, appdata.tar (если том есть), SHA256SUMS. Права 600, каталог 700.
@@ -59,7 +59,7 @@ appdata_volume() {
 }
 
 if [ -z "$DEST" ]; then
-  DEST="$HOME/gostracker-backups/$PROJECT-$(date -u +%Y%m%dT%H%M%SZ)"
+  DEST="$HOME/gtrack-backups/$PROJECT-$(date -u +%Y%m%dT%H%M%SZ)"
 fi
 mkdir -p -m 700 "$DEST"
 if [ -n "$(ls -A "$DEST")" ]; then

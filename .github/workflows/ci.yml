@@ -1,4 +1,4 @@
-# CI GOSTracker (T27, NFR-10, N-6): backend, frontend, contract, infra.
+# CI GTrack (T27, NFR-10, N-6): backend, frontend, contract, infra.
 # Секретов нет; права токена - только чтение; публикаций в репозиторий нет.
 name: CI
 
@@ -118,7 +118,7 @@ jobs:
     timeout-minutes: 40
     env:
       GT_INFRA_STACK: "1"
-      GT_INFRA_PROJECT: gostracker-infratest
+      GT_INFRA_PROJECT: gtrack-infratest
       HTTP_PORT: "18080"
       HTTPS_PORT: "18443"
     steps:
@@ -131,12 +131,12 @@ jobs:
       - name: Установка зависимостей тестов
         run: pip install -e "backend[dev]"
       - name: Подъём стека (отдельный проект, порты 18080/18443)
-        run: docker compose -p gostracker-infratest up -d --build --wait
+        run: docker compose -p gtrack-infratest up -d --build --wait
       - name: Тесты работающего стека
         run: pytest -q -m infra_stack backend/tests/infra
       - name: Логи стека при ошибке
         if: failure()
-        run: docker compose -p gostracker-infratest logs
+        run: docker compose -p gtrack-infratest logs
       - name: Остановка стека и удаление томов
         if: always()
-        run: docker compose -p gostracker-infratest down -v
+        run: docker compose -p gtrack-infratest down -v

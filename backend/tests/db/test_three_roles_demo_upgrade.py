@@ -4,7 +4,7 @@
 ``app.domain.ops.demo`` подменяются ``("demo.ba4", "business_admin")`` на
 ``("demo.mixed", "mixed")`` и ``_ALL_PROJECTS_BA`` на ``"demo.mixed"`` ->
 ``load_demo_data(seed=1)``.
-Обновление - командой оператора ``gostracker bootstrap`` (``app.cli.main.main(["bootstrap"])``
+Обновление - командой оператора ``gtrack bootstrap`` (``app.cli.main.main(["bootstrap"])``
 в отдельном потоке, окружение тестовой БД), как в контейнере. В демо первый ТА ``admin`` активен,
 поэтому бывший СМ только теряет роль и ТА не получает (FR-16 не срабатывает).
 """
@@ -223,7 +223,7 @@ async def test_002_ac30_demo_installation_upgrade_by_operator_bootstrap(
     t0 = await db_now(env)
     code = await _run_operator_bootstrap(env)
     t1 = await db_now(env)
-    assert code == 0, "gostracker bootstrap завершился с ошибкой"
+    assert code == 0, "gtrack bootstrap завершился с ошибкой"
 
     # --- версия схемы и роли ---
     assert await alembic_versions(env) == [HEAD_REVISION]
