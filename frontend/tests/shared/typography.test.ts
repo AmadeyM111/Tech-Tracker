@@ -38,6 +38,8 @@ const OLD: Record<string, number> = {
   ".ui-table th": 13,
   ".ui-secret code": 20,
   "[data-column] h3": 14,
+  // UI-kit 2026-11-08: badge 15 px = 11 px + 4 px (T100 rule); 11 px is the assumed prior size, no prior badge existed.
+  ".ui-badge": 11,
   'li[data-task-id] [data-field]:not([data-field="title"])': 13,
 };
 
