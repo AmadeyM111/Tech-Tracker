@@ -67,7 +67,7 @@ describe("AC-19 business sidebar", () => {
     const hrefs = within(nav)
       .getAllByRole("link")
       .map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["/projects", "/my-tasks", AGENTS_PATH]);
+    expect(hrefs).toEqual(["/projects", "/my-tasks", "/summary", AGENTS_PATH]); // 008/FR-1
     expect(within(nav).queryByRole("link", { name: ru["admin.home_users_link"] })).toBeNull();
     expect(within(nav).queryByRole("link", { name: ru["admin.home_audit_link"] })).toBeNull();
 
@@ -211,13 +211,14 @@ describe("AC-30 tab order of the BA /projects screen", () => {
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
     const form = container.querySelector<HTMLElement>('form[data-form="create-project"]')!;
     const firstInForm = tabbable.find((el) => form.contains(el))!;
-    const labels = tabbable.slice(0, 5);
-    expect(labels.slice(0, 2).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks"]);
+    const labels = tabbable.slice(0, 6);
+    // 008/FR-1: «Сводка» — третья ссылка меню
+    expect(labels.slice(0, 3).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks", "/summary"]);
     // 004/AC-12: ссылки меню (включая «Доступ для агентов»), «Задача», «Выйти», затем содержимое
-    expect(labels[2]?.getAttribute("href")).toBe(AGENTS_PATH);
-    expect(labels[3]?.getAttribute("data-action")).toBe("create-task");
-    expect(labels[4]?.getAttribute("data-action")).toBe("logout");
-    expect(tabbable[5]).toBe(firstInForm);
+    expect(labels[3]?.getAttribute("href")).toBe(AGENTS_PATH);
+    expect(labels[4]?.getAttribute("data-action")).toBe("create-task");
+    expect(labels[5]?.getAttribute("data-action")).toBe("logout");
+    expect(tabbable[6]).toBe(firstInForm);
   });
 });
 
@@ -230,13 +231,14 @@ describe("AC-30 tab order of the U /my-tasks screen (004/AC-12)", () => {
     const tabbable = Array.from(
       container.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
-    expect(tabbable.slice(0, 2).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks"]);
-    expect(tabbable[2]?.getAttribute("href")).toBe(AGENTS_PATH);
-    expect(tabbable[3]?.getAttribute("data-action")).toBe("create-task");
-    expect(tabbable[4]?.getAttribute("data-action")).toBe("logout");
+    // 008/FR-1: «Сводка» — третья ссылка меню
+    expect(tabbable.slice(0, 3).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks", "/summary"]);
+    expect(tabbable[3]?.getAttribute("href")).toBe(AGENTS_PATH);
+    expect(tabbable[4]?.getAttribute("data-action")).toBe("create-task");
+    expect(tabbable[5]?.getAttribute("data-action")).toBe("logout");
     // дальше - содержимое экрана, не меню
-    expect(tabbable[5]).toBe(taskLink);
-    expect(tabbable[5]?.closest(".ui-sidebar") ?? null).toBeNull();
+    expect(tabbable[6]).toBe(taskLink);
+    expect(tabbable[6]?.closest(".ui-sidebar") ?? null).toBeNull();
   });
 });
 
@@ -378,7 +380,7 @@ describe("AC-28 business roles on tech admin paths", () => {
     const alerts = screen.getAllByRole("alert");
     expect(alerts).toHaveLength(1);
     expect(alerts[0]?.textContent).toBe(ru["error.forbidden"]);
-    expect(hrefsOf(nav)).toEqual(["/projects", "/my-tasks", AGENTS_PATH]);
+    expect(hrefsOf(nav)).toEqual(["/projects", "/my-tasks", "/summary", AGENTS_PATH]); // 008/FR-1
     expect(container.querySelector<HTMLElement>(".ui-sidebar")!.parentElement?.classList.contains("ui-shell")).toBe(true);
     expect(within(nav).getByRole("link", { name: ru["nav.projects"] })).toBeTruthy();
     expect(within(nav).getByRole("link", { name: ru["nav.my_tasks"] })).toBeTruthy();

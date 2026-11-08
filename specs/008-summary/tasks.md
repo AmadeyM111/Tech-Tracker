@@ -42,7 +42,7 @@
 ## S08-T04 — Экран «Сводка»
 - **Статус:** TODO
 - **AC:** AC-12, AC-13, FR-1, FR-10, FR-12, NFR-3
-- **Файлы:** `frontend/src/features/overview/SummaryPage.tsx`, `frontend/src/features/overview/api.ts`, `frontend/src/features/overview/filters.ts`, `frontend/src/features/overview/SummaryPage.test.tsx`, `frontend/src/app/router.tsx`, `frontend/src/shared/i18n/ru.ts`, `frontend/src/shared/ui/ui.css`, `backend/tests/infra/test_frontend_scaffold.py`
+- **Файлы:** `frontend/src/features/overview/SummaryPage.tsx`, `frontend/src/features/overview/api.ts`, `frontend/src/features/overview/filters.ts`, `frontend/tests/features/overview/SummaryPage.test.tsx`, `frontend/src/app/router.tsx`, `frontend/src/shared/i18n/ru.ts`, `frontend/src/shared/ui/ui.css`, `backend/tests/infra/test_frontend_scaffold.py`, `frontend/tests/app/sidebar.test.tsx`, `frontend/tests/app/create-task-button.test.tsx` (новый пункт меню — третьей ссылкой), `frontend/tests/shared/typography.test.ts` (размер `.sum-count` в таблице)
 - **Зависит от:** S08-T03
 - **Описание:** плитки, фильтры (чекбоксы приоритета, пресеты `aria-pressed`), список/карточки на 360 px, «Показано N из M», пустое состояние, опрос 15 с, пункт меню. Макет — `Shared/Design/gtrack-summary/`.
 - **Готово, когда:** `cd frontend && npm run lint && npm run typecheck && npm test` зелёный.

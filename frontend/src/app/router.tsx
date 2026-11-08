@@ -12,6 +12,7 @@ import { PasswordResetRequestPage } from "../features/auth/PasswordResetRequestP
 import { NoRolePage } from "../features/auth/NoRolePage";
 import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
 import { MyTasksPage } from "../features/tasks/TaskList";
+import { SummaryPage } from "../features/overview/SummaryPage";
 import { TaskPage } from "../features/tasks/TaskPage";
 import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
@@ -134,6 +135,13 @@ function MenuItems({ profile }: { profile: MeResponse }) {
             <NavLink to="/my-tasks">
               <Icon name="tasks" />
               {t("nav.my_tasks")}
+            </NavLink>
+          </p>
+          {/* 008/FR-1: «Сводка» — пункт меню, стартовый экран не меняется (Q-10) */}
+          <p>
+            <NavLink to="/summary">
+              <Icon name="tasks" />
+              {t("nav.summary")}
             </NavLink>
           </p>
         </>
@@ -428,6 +436,14 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/profile/agents"
         element={
           <RoleScreen insideMain={insideMain}>{() => <AgentAccessPage />}</RoleScreen>
+        }
+      />
+      <Route
+        path="/summary"
+        element={
+          <RoleScreen insideMain={insideMain} capability="business_access">
+            {() => <SummaryPage />}
+          </RoleScreen>
         }
       />
       <Route
