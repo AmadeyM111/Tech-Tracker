@@ -49,3 +49,8 @@ docker compose -p <новый> up -d --wait            # bootstrap примен�
 `/var/backups/gtrack/<UTC>/`, 14 копий). С 2026-11-08 работает на сервере пилота до выкатки
 spec 009; после выкатки заменяется таймером выше (spec 009, Q-4). Протокол учения —
 `docs/acceptance/backup-restore-drill.md`.
+
+## Напоминания о сроках (spec 012)
+
+`gtrack-notify-due.service` и `.timer` ставятся так же, как `gtrack-backup` (тот же
+`/etc/gtrack/backup.env`); запуск — ежедневно в 09:00 МСК. Cron: `0 6 * * * docker exec <проект>-api-1 gtrack notify-due`.

@@ -8,7 +8,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any, Final
 
@@ -19,18 +21,29 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from app.core.config import Settings
 from app.core.db import create_engine
 from app.core.models import Base
+from app.domain.attachments.storage import INCOMING, final_path
 from app.domain.ops.archive import (
     ACCEPTED_FORMATS,
     ImportRefused,
     decode_value,
+    expected_files,
     exported_columns,
-    read_data_member,
+    iter_files,
+    match_files,
+    read_archive,
     tables_in_order,
 )
 from app.domain.system.bootstrap import INITIAL_ADMIN_FILE
 
 # Таблицы, которые должны быть пустыми (кроме автоданных первого ТА и воронки по умолчанию).
-BUSINESS_TABLES: Final = ("project", "project_member", "task", "comment", "domain_event")
+BUSINESS_TABLES: Final = (
+    "project",
+    "project_member",
+    "task",
+    "comment",
+    "attachment",
+    "domain_event",
+)
 # Автоданные установки, которые импорт заменяет; domain_event не трогается (триггер запрещает).
 # Заявки и попытки регистрации в архив не входят, поэтому очищаются первыми (у них нет FK).
 AUTO_TABLES: Final = (
@@ -146,11 +159,50 @@ async def import_archive(
     settings: Settings, archive: Path, *, schema_version: str
 ) -> dict[str, int]:
     """Импортирует архив в пустую систему; возвращает число строк по таблицам."""
-    rows = parse_rows(read_data_member(archive), schema_version=schema_version)
+    data, present = read_archive(archive)
+    rows = parse_rows(data, schema_version=schema_version)
+    expected = expected_files(rows)
+    match_files(expected, present)
+    staged = _stage_files(settings, archive, expected)
     engine = create_engine(settings)
     try:
         counts = await restore_rows(engine, rows)
+    except BaseException:
+        for path in staged.values():
+            path.unlink(missing_ok=True)
+        raise
     finally:
         await engine.dispose()
+    for key, path in staged.items():
+        target = final_path(settings.attachments_dir, key)
+        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.replace(path, target)
+        os.utime(target)  # свежее время: обслуживание не примет файл за старую сироту
     remove_initial_admin_file(settings)
     return counts
+
+
+def _stage_files(
+    settings: Settings, archive: Path, expected: dict[str, tuple[str, int]]
+) -> dict[str, Path]:
+    """Файлы вложений во временный каталог с проверкой sha256 до записи в БД (FR-11)."""
+    incoming = settings.attachments_dir / INCOMING
+    incoming.mkdir(mode=0o700, parents=True, exist_ok=True)
+    staged: dict[str, Path] = {}
+    try:
+        for key, handle in iter_files(archive):
+            path = incoming / f"{key}.import"
+            digest = hashlib.sha256()
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            staged[key] = path
+            with os.fdopen(fd, "wb") as out:
+                while chunk := handle.read(1024 * 1024):
+                    digest.update(chunk)
+                    out.write(chunk)
+            if digest.hexdigest() != expected[key][0]:
+                raise ImportRefused(f"контрольная сумма файла вложения {key} не совпадает")
+    except BaseException:
+        for path in staged.values():
+            path.unlink(missing_ok=True)
+        raise
+    return staged

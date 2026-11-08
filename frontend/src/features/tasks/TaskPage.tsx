@@ -10,6 +10,7 @@ import { errorMessage, t } from "../../shared/i18n";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import { ErrorAlert, FieldError, useAlertState } from "../../shared/ui/ErrorAlert";
 import { UserPicker } from "../../shared/ui/UserPicker";
+import { Attachments } from "../attachments/Attachments";
 import { Comments } from "../comments/Comments";
 import { listAllMembers } from "../projects/api";
 import { deleteTask, getTask, updateTask, type TaskDetail, type TaskPriority, type TaskStatus, type TaskUpdate } from "./api";
@@ -415,8 +416,15 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
         onCreated={() => queryClient.invalidateQueries({ queryKey: cardKey })}
       />
 
+      <Attachments taskId={task.id} alert={alert} />
+
       <div data-slot="comments">
-        <Comments taskId={task.id} alert={alert} suppressLoadError={pollError !== null} />
+        <Comments
+          taskId={task.id}
+          projectId={task.project.id}
+          alert={alert}
+          suppressLoadError={pollError !== null}
+        />
       </div>
 
       {permissions.delete ? (

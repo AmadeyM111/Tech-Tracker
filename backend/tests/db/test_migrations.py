@@ -959,7 +959,7 @@ def test_002_migration_0006_file_chain_and_single_head() -> None:
         if isinstance(node, ast.ImportFrom):
             assert not (node.module or "").startswith("app"), "миграция импортирует app.*"
     script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
-    assert script.get_heads() == ["0011"]  # 009: голова теперь 0011 (цепочка 0010 -> 0011)
+    assert script.get_heads() == ["0013"]  # 012: голова теперь 0013 (цепочка 0012 -> 0013)
     revision = script.get_revision("0006")
     assert revision is not None and revision.down_revision == "0005"
 
@@ -993,7 +993,7 @@ async def _version(maker: Any) -> list[str]:
 async def test_002_alembic_check_clean_at_head(committed: Any, test_database_url: str) -> None:
     """002/AC-2, plan §4.5 («alembic check чист»): на head=0006 модель (CHECK из трёх значений)
     и миграция не расходятся; CHECK в БД - без `mixed`."""
-    assert await _version(committed) == ["0011"], "голова БД должна быть 0011"
+    assert await _version(committed) == ["0013"], "голова БД должна быть 0013"
     assert "mixed" not in await _role_check_def(committed)
     await _alembic_ok(test_database_url, "check")
 
@@ -1007,7 +1007,7 @@ async def test_002_downgrade_0005_restores_four_value_check_and_keeps_data_then_
     ставит CHECK из трёх значений, версия 0006, ``alembic check`` чист."""
     from tests.factories import make_domain_event, make_user
 
-    assert await _version(committed) == ["0011"]
+    assert await _version(committed) == ["0013"]
     async with committed() as s, s.begin():
         ta = await make_user(s, role="tech_admin")
         ba = await make_user(s, role="business_admin", workspace=None)
@@ -1067,7 +1067,7 @@ async def test_002_downgrade_0005_restores_four_value_check_and_keeps_data_then_
 
     await _alembic_ok(test_database_url, "upgrade", "head")
     await db_engine.dispose()
-    assert await _version(committed) == ["0011"]
+    assert await _version(committed) == ["0013"]
     assert "mixed" not in await _role_check_def(committed)
     assert await snapshot() == before
     await _alembic_ok(test_database_url, "check")

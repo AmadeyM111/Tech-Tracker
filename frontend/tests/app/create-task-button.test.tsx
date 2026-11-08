@@ -332,16 +332,19 @@ describe("AC-12 order in the document and Tab sequence", () => {
       document.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
     const form = document.querySelector<HTMLElement>('form[data-form="create-project"]')!;
-    expect(tabbable.slice(0, 4).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks", "/profile/agents", "/profile"]);
-    expect(tabbable[4]?.getAttribute("data-action")).toBe("create-task");
-    expect(tabbable[5]?.getAttribute("data-action")).toBe("logout");
-    expect(tabbable[6]).toBe(tabbable.find((el) => form.contains(el)));
+    // 008/FR-1, 012/FR-5: «Сводка» и «Уведомления» — третья и четвёртая ссылки меню
+    expect(tabbable.slice(0, 6).map((el) => el.getAttribute("href"))).toEqual(["/projects", "/my-tasks", "/summary", "/notifications", "/profile/agents", "/profile"]);
+    expect(tabbable[6]?.getAttribute("data-action")).toBe("create-task");
+    expect(tabbable[7]?.getAttribute("data-action")).toBe("logout");
+    expect(tabbable[8]).toBe(tabbable.find((el) => form.contains(el)));
   });
 });
 
 describe("AC-13 no extra requests while the dialog is closed", () => {
+  // 012/FR-5: счётчик уведомлений в меню — собственный запрос каждого экрана бизнес-ролей
+  const UNREAD = "GET /api/v1/me/notifications/unread";
   const CASES: [string, string[]][] = [
-    ["/projects", [ME, "GET /api/v1/projects?page=1"]],
+    ["/projects", [ME, "GET /api/v1/projects?page=1", UNREAD]],
     [
       `/projects/${P1}`,
       [
@@ -349,9 +352,10 @@ describe("AC-13 no extra requests while the dialog is closed", () => {
         `GET /api/v1/projects/${P1}`,
         `GET /api/v1/projects/${P1}/board`,
         `GET /api/v1/projects/${P1}/members?page=1&page_size=100`,
+        UNREAD,
       ],
     ],
-    ["/my-tasks", [ME, "GET /api/v1/me/tasks?page=1"]],
+    ["/my-tasks", [ME, "GET /api/v1/me/tasks?page=1", UNREAD]],
   ];
   it.each(CASES)("004_ac13_BA_%s_requests_are_only_the_screens_own", async (path, expected) => {
     const f = boot(dialogFor(ROLES[0]), path).f;

@@ -17,13 +17,14 @@ from sqlalchemy.ext.asyncio import (
 from app.core.config import Settings
 
 
-def create_engine(settings: Settings) -> AsyncEngine:
+def create_engine(settings: Settings, *, url: str | None = None) -> AsyncEngine:
     """Создаёт асинхронный движок (asyncpg). Соединение не открывается до первого запроса.
 
     ``hide_parameters=True`` — значения параметров не попадают в текст исключений и логи.
+    ``url`` — другой DSN (процесс API под рабочей ролью, spec 010); по умолчанию ``DATABASE_URL``.
     """
     return create_async_engine(
-        settings.database_url,
+        settings.database_url if url is None else url,
         hide_parameters=True,
         pool_pre_ping=True,
     )

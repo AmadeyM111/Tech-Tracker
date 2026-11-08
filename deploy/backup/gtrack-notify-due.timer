@@ -1,0 +1,10 @@
+# Ежедневно в 09:00 по Москве (spec 012, Q-1).
+[Unit]
+Description=GTrack due-date reminders at 09:00 Europe/Moscow
+
+[Timer]
+OnCalendar=*-*-* 09:00:00 Europe/Moscow
+Persistent=true
+
+[Install]
+WantedBy=timers.target

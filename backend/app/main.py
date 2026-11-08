@@ -18,6 +18,7 @@ from app.api.v1 import router as api_v1_router
 from app.core.clock import Clock, SystemClock, use_clock
 from app.core.config import Settings, get_settings
 from app.core.db import create_engine
+from app.core.db_roles import app_database_url
 from app.core.errors import install_error_handlers
 from app.core.logging import AccessLogMiddleware, configure_logging
 from app.core.mail import SmtpMailer
@@ -87,7 +88,8 @@ async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
         state.mailer = None
         state.password_reset_policy = None
         state.registration_policy = None
-    engine = create_engine(settings)
+    # spec 010: процесс API — под рабочей ролью БД (DB_APP_ROLE), не под владельцем схемы
+    engine = create_engine(settings, url=app_database_url(settings))
     application.state.engine = engine
     application.state.sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
     try:

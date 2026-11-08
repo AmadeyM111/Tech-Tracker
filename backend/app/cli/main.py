@@ -15,6 +15,7 @@ from app.cli.commands import (
     import_,
     maintenance,
     mcp,
+    notify_due,
     openapi,
     restore,
 )
@@ -36,6 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     mcp.add_parser(subparsers)
     backup.add_parser(subparsers)
     restore.add_parser(subparsers)
+    notify_due.add_parser(subparsers)
     return parser
 
 

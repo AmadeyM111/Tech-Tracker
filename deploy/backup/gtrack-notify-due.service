@@ -1,0 +1,12 @@
+# GTrack: напоминания о сроках задач (spec 012 FR-4, Q-1). Установка — как gtrack-backup (README).
+[Unit]
+Description=GTrack due-date reminders (gtrack notify-due in the api container)
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=GTRACK_API_CONTAINER=gtrack-api-1
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/run/current-system/sw/bin
+EnvironmentFile=-/etc/gtrack/backup.env
+ExecStart=/usr/bin/env docker exec ${GTRACK_API_CONTAINER} gtrack notify-due
