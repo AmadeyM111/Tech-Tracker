@@ -7,7 +7,7 @@
 //     запросы пользователя идут БЕЗ X-GT-Background)
 //     listUsers(p: { page: number; pageSize?: number }): Promise<Page<AdminUser>>
 //         GET /api/v1/admin/users?page=&page_size=   (page_size только если передан)
-//     createUser(b: { login: string; one_time_password: string }): Promise<AdminUser>   POST /admin/users
+//     createUser(b: { login: string; first_name: string; last_name: string; one_time_password: string }): Promise<AdminUser>   POST /admin/users
 //     blockUser(id) / unblockUser(id) / revokeSessions(id): Promise<void>
 //         POST /admin/users/{id}/block | unblock | revoke-sessions
 //     resetPassword(id, b: { one_time_password: string }): Promise<void>  POST .../reset-password
@@ -89,6 +89,9 @@ export function meWith(capabilities: string[], role = "tech_admin") {
 export interface UserFx {
   id: string;
   login: string;
+  first_name: string | null;
+  last_name: string | null;
+  self_registered: boolean;
   role: string | null;
   is_blocked: boolean;
   must_change_password: boolean;
@@ -97,6 +100,9 @@ export interface UserFx {
 
 export function mkUser(over: Partial<UserFx> & Pick<UserFx, "id" | "login">): UserFx {
   return {
+    first_name: null,
+    last_name: null,
+    self_registered: false,
     role: null,
     is_blocked: false,
     must_change_password: true,

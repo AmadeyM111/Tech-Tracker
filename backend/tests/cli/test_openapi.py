@@ -400,6 +400,7 @@ BODY_ROUTES_400 = {
     ("POST", "/api/v1/admin/users/{user_id}/reset-password"),
     ("PUT", "/api/v1/admin/users/{user_id}/role"),
     ("PUT", "/api/v1/admin/users/{user_id}/email"),  # R7-T10
+    ("PUT", "/api/v1/admin/users/{user_id}/name"),  # R8-T04
     ("POST", "/api/v1/auth/password-reset/request"),  # R7-T11
     ("POST", "/api/v1/auth/password-reset/confirm"),  # R7-T12
     ("POST", "/api/v1/projects"),
@@ -413,6 +414,7 @@ BODY_ROUTES_400 = {
     ("POST", "/api/v1/tasks/{user_id}/comments"),  # T80
     ("PATCH", "/api/v1/comments/{user_id}"),  # T80
     ("POST", "/api/v1/me/tokens"),  # 020/M20-T06
+    ("PUT", "/api/v1/me/name"),  # R8-T05
 }
 BAD_JSON_DESCRIPTION = "Некорректный JSON в теле запроса (code: bad_request)"
 

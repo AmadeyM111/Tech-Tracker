@@ -27,11 +27,14 @@ OTP_FIELD = "one_time_password"  # plan §4.6: {login, one_time_password}
 ADMIN_VIEW_FIELDS = {
     "id",
     "login",
+    "first_name",
+    "last_name",
     "email",
     "role",
     "is_blocked",
     "must_change_password",
     "created_at",
+    "self_registered",
 }
 
 
@@ -109,8 +112,11 @@ async def admin_in_new_workspace(
 async def events(
     env: ApiEnv, *, entity_id: uuid.UUID | None = None, workspace_id: uuid.UUID | None = None
 ) -> list[Any]:
-    """Строки ``domain_event`` (id, actor_id, entity_id, action, details) по порядку id."""
-    sql = "SELECT id, actor_id, entity_id, action, details FROM domain_event WHERE true"
+    """Строки ``domain_event`` (id, actor_id, entity_id, action, details, changed_fields)."""
+    sql = (
+        "SELECT id, actor_id, entity_id, action, details, changed_fields "
+        "FROM domain_event WHERE true"
+    )
     params: dict[str, Any] = {}
     if entity_id is not None:
         sql += " AND entity_id = :e"
@@ -191,7 +197,12 @@ def admin_call(
     if action == "create":
         return env.client.post(
             ADMIN_USERS,
-            json={"login": f"new.{uuid.uuid4().hex[:12]}", OTP_FIELD: OTP},
+            json={
+                "login": f"new.{uuid.uuid4().hex[:12]}",
+                "first_name": "Иван",
+                "last_name": "Петров",
+                OTP_FIELD: OTP,
+            },
             headers=headers,
         )
     raise AssertionError(action)
