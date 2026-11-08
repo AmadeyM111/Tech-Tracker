@@ -370,6 +370,79 @@
         "title": "AuditEntry",
         "type": "object"
       },
+      "BackupStatusOut": {
+        "description": "Последняя успешная копия, последний запуск и признак «устарела» (plan PB-6).",
+        "properties": {
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_run_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ok",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Status"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "last_success_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success Size Bytes"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "stale_after_hours": {
+            "title": "Stale After Hours",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "last_success_at",
+          "last_success_size_bytes",
+          "last_run_at",
+          "last_run_status",
+          "stale",
+          "stale_after_hours"
+        ],
+        "title": "BackupStatusOut",
+        "type": "object"
+      },
       "Board": {
         "properties": {
           "columns": {
@@ -2525,6 +2598,48 @@
         "summary": "Get Audit Entry",
         "tags": [
           "admin-audit"
+        ]
+      }
+    },
+    "/api/v1/admin/system/backup": {
+      "get": {
+        "description": "Состояние резервных копий: ``stale`` — нет копий, старше порога или последний сбой.",
+        "operationId": "get_backup_status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          }
+        },
+        "summary": "Get Backup Status",
+        "tags": [
+          "admin-system"
         ]
       }
     },

@@ -18,18 +18,20 @@ from typing import Final
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 import app as app_package
-from app.core.clock import SystemClock
+from app.core.clock import SystemClock, utcnow
 from app.core.config import Settings, get_settings
 from app.core.db import create_engine
 from app.core.logging import redact_text
 from app.core.secrets import ensure_secret_key
+from app.domain.ops.backup_status import bootstrap_warning, last_success_at
 from app.domain.system.bootstrap import (
     INITIAL_ADMIN_FILE,
     BootstrapResult,
@@ -130,12 +132,43 @@ async def _migrate_and_first_start(settings: Settings, stage: list[str]) -> Boot
         sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
         stage[0] = "блокировка первого запуска"
         async with bootstrap_lock(sessionmaker) as lock:
+            stage[0] = "проверка резервной копии"
+            await _warn_if_backup_stale(sessionmaker)
             stage[0] = "миграции"
             await asyncio.to_thread(_alembic_upgrade_head)
             stage[0] = "первый запуск"
             return await run_bootstrap(sessionmaker, settings, clock=SystemClock(), locked=lock)
     finally:
         await engine.dispose()
+
+
+def _alembic_head() -> str:
+    head = ScriptDirectory.from_config(Config(str(_alembic_config_path()))).get_current_head()
+    if head is None:
+        raise BootstrapError("в миграциях Alembic не найдена версия схемы")
+    return head
+
+
+async def _warn_if_backup_stale(sessionmaker: async_sessionmaker[AsyncSession]) -> None:
+    """Предупреждение перед миграцией, если копии нет или она старше 24 ч (spec 009 FR-9)."""
+    async with sessionmaker() as session:
+        has_schema = (
+            await session.execute(text("SELECT to_regclass('public.alembic_version')"))
+        ).scalar() is not None
+        current = (
+            (await session.execute(text("SELECT version_num FROM alembic_version"))).scalar()
+            if has_schema
+            else None
+        )
+        last_ok = await last_success_at(session) if current is not None else None
+    message = bootstrap_warning(
+        current=None if current is None else str(current),
+        head=_alembic_head(),
+        last_ok=last_ok,
+        now=utcnow(),
+    )
+    if message:
+        _warn(message)
 
 
 def _known_secrets(settings: Settings | None = None) -> list[str]:

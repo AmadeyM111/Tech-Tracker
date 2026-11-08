@@ -70,6 +70,10 @@ export const ru = {
   "auth.logout": "Выйти",
   "admin.home_users_link": "Учётные записи",
   "admin.home_audit_link": "Журнал аудита",
+  // 009/FR-7: тексты плашки утверждены владельцем 2026-11-08 (spec 009, Q-2)
+  "admin.backup.none": "Резервных копий нет.",
+  "admin.backup.old": "Последняя резервная копия старше {hours} часов: {when}.",
+  "admin.backup.failed": "Последняя резервная копия не удалась: {when}.",
   "admin.loading": "Загрузка…",
   "admin.page_label": "Страница {page}",
   "admin.pagination_label": "Постраничная навигация",

@@ -48,6 +48,7 @@ DATA_MEMBER: Final = "data.json"
 # Сессии входа не переносятся: их идентификаторы — секреты текущей установки. Заявки регистрации
 # содержат email и токены до подтверждения (NFR-7, ADR-0019). Попытки хранят только хеши ключей
 # лимитов: IP и токены в них не записываются, но таблица служебная и в архив не входит.
+# ``backup_run`` (spec 009) — журнал эксплуатации установки, не данные пространства.
 EXCLUDED_TABLES: Final = frozenset(
     {
         "user_session",
@@ -55,6 +56,7 @@ EXCLUDED_TABLES: Final = frozenset(
         "password_reset_attempt",
         "registration_request",
         "registration_attempt",
+        "backup_run",
     }
 )
 # Колонки, не попадающие в архив (персональные данные); после импорта они NULL.

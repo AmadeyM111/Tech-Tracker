@@ -63,6 +63,21 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://tracker:tracker@localhost:5432/tracker_test
           ENV: test
         run: alembic -c backend/alembic.ini check
+      - name: Клиент PostgreSQL 16 из образа postgres:16 (spec 009, тесты gtrack backup/restore)
+        run: |
+          # В пакетах runner нет postgresql-client-16: pg_dump/pg_restore запускаются из контейнера
+          # (docker run -i, сеть хоста; PG* передаются как есть).
+          mkdir -p "$RUNNER_TEMP/pg16"
+          for tool in pg_dump pg_restore; do
+            printf '%s\n' '#!/usr/bin/env bash' \
+              'envs=(); for v in $(compgen -e | grep "^PG"); do envs+=(-e "$v"); done' \
+              "exec docker run --rm -i --network host \"\${envs[@]}\" postgres:16 $tool \"\$@\"" \
+              > "$RUNNER_TEMP/pg16/$tool"
+            chmod +x "$RUNNER_TEMP/pg16/$tool"
+          done
+          docker pull -q postgres:16
+          "$RUNNER_TEMP/pg16/pg_dump" --version
+          echo "PG_BIN_DIR=$RUNNER_TEMP/pg16" >> "$GITHUB_ENV"
       - name: pytest (без infra_stack)
         run: pytest -q backend/tests -m "not infra_stack"
 

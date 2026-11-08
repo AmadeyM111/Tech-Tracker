@@ -372,6 +372,15 @@ gtrack import /backup/gtrack-export.tar         # только в пустую �
 `import` заменяет автоданные первого администратора данными архива и отказывает (код 2),
 если в системе уже есть данные или версия схемы архива другая. Сессии входа не переносятся.
 
+Резервная копия (оператор, CLI; расписание, хранение и восстановление — `deploy/backup/README.md`):
+
+```bash
+docker exec <проект>-api-1 gtrack backup      # копия БД и данных, проверка, 14 последних
+gtrack restore /backups/gtrack-backup-<UTC>.tar --yes   # только чистый стенд
+```
+
+Перед обновлением стека снимите копию: `docker exec <проект>-api-1 gtrack backup`.
+
 ### Node.js
 
 Фронтенду нужен Node.js `^22.12 || ^24 || >=26` (поле `engines` в `frontend/package.json`;
@@ -793,6 +802,15 @@ gtrack import /backup/gtrack-export.tar         # into an empty system only
 `import` replaces the first administrator's automatic data with the archive's data and refuses
 (exit code 2) if the system already has data or the archive's schema version differs. Login
 sessions are not transferred.
+
+Backup (operator, CLI; schedule, retention and restore — `deploy/backup/README.md`):
+
+```bash
+docker exec <project>-api-1 gtrack backup     # DB and data copy, verified, last 14 kept
+gtrack restore /backups/gtrack-backup-<UTC>.tar --yes   # clean stand only
+```
+
+Before upgrading the stack take a copy: `docker exec <project>-api-1 gtrack backup`.
 
 ### Node.js
 

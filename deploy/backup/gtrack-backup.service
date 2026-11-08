@@ -1,0 +1,15 @@
+# GTrack: ежедневная резервная копия через CLI приложения (spec 009, D-1).
+# Установка — deploy/backup/README.md. Имя контейнера api — в /etc/gtrack/backup.env.
+[Unit]
+Description=GTrack daily backup (gtrack backup in the api container)
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=GTRACK_API_CONTAINER=gtrack-api-1
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/run/current-system/sw/bin
+EnvironmentFile=-/etc/gtrack/backup.env
+ExecStart=/usr/bin/env docker exec ${GTRACK_API_CONTAINER} gtrack backup
+Nice=10
+IOSchedulingClass=idle
