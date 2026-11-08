@@ -1,4 +1,4 @@
-// Menu item «Уведомления» with the unread counter (012/FR-5), polled every 15 s.
+// Menu item «Уведомления» with the unread counter (012/FR-5), polled every 15 s; > 99 — «99+».
 import { NavLink } from "react-router-dom";
 
 import { usePolledQuery } from "../../shared/api/polling";
@@ -6,6 +6,10 @@ import { t } from "../../shared/i18n";
 import { Icon } from "../../shared/ui/Icon";
 import { getUnread } from "./api";
 import { UNREAD_KEY } from "./NotificationsPage";
+
+export function badgeText(unread: number): string {
+  return unread > 99 ? "99+" : String(unread);
+}
 
 export function NotificationsMenuItem() {
   const query = usePolledQuery({
@@ -18,8 +22,8 @@ export function NotificationsMenuItem() {
       <Icon name="tasks" />
       {t("notifications.title")}
       {unread > 0 ? (
-        <span className="ui-badge" data-unread={unread} aria-hidden="true">
-          {unread}
+        <span className="nav-badge" data-unread={unread} aria-hidden="true">
+          {badgeText(unread)}
         </span>
       ) : null}
     </NavLink>
