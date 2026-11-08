@@ -92,3 +92,23 @@ describe("spec 005 v0.3 NFR-2: login screen styles use theme tokens only", () =>
     expect(authCss).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 });
+
+// UI-kit §1–2 (2026-11-08): shared classes for secondary buttons and badges.
+describe("UI-kit 2026-11-08: secondary button and badge classes in ui.css", () => {
+  it(".ui-btn-secondary: 44 px min height, 1 px --border, pill radius", () => {
+    const d = declsFor(parseRules(uiCss), ".ui-btn-secondary");
+    expect(d["min-height"]).toBe("44px");
+    expect(d.border).toBe("1px solid var(--border)");
+    expect(d["border-radius"]).toBe("999px");
+    expect(d.background).toBe("var(--surface-2)");
+    expect(d.color).toBe("var(--text)");
+  });
+
+  it(".ui-badge: 1 px border, 6 px radius; --accent and --danger modifiers", () => {
+    const base = declsFor(parseRules(uiCss), ".ui-badge");
+    expect(base.border).toBe("1px solid var(--border)");
+    expect(base["border-radius"]).toBe("6px");
+      expect(declsFor(parseRules(uiCss), ".ui-badge--accent")["border-color"]).toBe("var(--accent)");
+    expect(declsFor(parseRules(uiCss), ".ui-badge--danger")["border-color"]).toBe("var(--danger)");
+  });
+});

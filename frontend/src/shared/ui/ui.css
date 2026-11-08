@@ -744,3 +744,34 @@ h1 input[name="title"] {
   width: 100%;
   max-width: 48rem;
 }
+
+/* UI-kit §1–2 (2026-11-08): secondary button — "Отмена", "Назад", "Показать/Скрыть пароль". */
+.ui-btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  min-height: 44px;
+  /* Font size inherits the body 19px (UI-kit §1–2); base button rule has font: inherit. */
+}
+
+/* UI-kit §1–2: badge — 1 px border, 6 px radius, 15 px font. Modifiers: --accent, --danger. */
+.ui-badge {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 15px;
+  padding: 2px 6px;
+  color: var(--text);
+  background: transparent;
+}
+
+.ui-badge--accent {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ui-badge--danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
