@@ -69,6 +69,23 @@ server {
         proxy_read_timeout 60s;
     }
 
+    # MCP для AI-агентов (ADR-0018, спека 020): api сам проверяет Origin и Bearer-токен, nginx только
+    # проксирует. Без этого блока /mcp попадал в SPA (location /) и POST отдавал 405 от nginx.
+    # Регулярное выражение: точное совпадение с /mcp и /mcp/, а не префикс (например, /mcpx).
+    location ~ ^/mcp/?$ {
+        set $api_upstream http://api:8000;
+        proxy_pass $api_upstream;
+        proxy_http_version 1.1;
+        # $http_host: с портом клиента, иначе проверка Origin в api даёт ложный origin_mismatch.
+        proxy_set_header Host $http_host;
+        # Перезаписываются, клиентские значения не пропускаются.
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        # Streamable HTTP отдаёт потоковые ответы (SSE): буфер и короткий таймаут рвут сессию.
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+    }
+
     # /api никогда не отдаёт index.html.
     location = /api {
         return 404;
