@@ -111,7 +111,7 @@ describe("T81 routes under the session gate", () => {
     expect(f.calls.length).toBe(1);
     // 003/AC-27: меню ТА, «Выйти», нет «На главную»
     const nav = await screen.findByRole("navigation", { name: ru["app.menu_label"] });
-    expect(Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/admin/users", "/admin/audit"]);
+    expect(Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/admin/users", "/admin/audit", "/profile/agents"]);
     expect(screen.getAllByRole("button", { name: ru["auth.logout"] })).toHaveLength(1);
     expect(screen.queryByRole("button", { name: CREATE_TASK })).toBeNull(); // 004/AC-10
     expect(screen.queryByRole("link", { name: REMOVED_HOME_LINK })).toBeNull();

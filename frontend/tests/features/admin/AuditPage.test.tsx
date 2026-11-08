@@ -421,7 +421,7 @@ describe("sidebar on admin screens (003/AC-20, AC-16)", () => {
     await waitFor(() => expect(container.querySelector("form")).toBeTruthy());
     const nav = screen.getByRole("navigation", { name: ru["app.menu_label"] });
     const hrefs = Array.from(nav.querySelectorAll("a")).map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["/admin/users", "/admin/audit"]);
+    expect(hrefs).toEqual(["/admin/users", "/admin/audit", "/profile/agents"]);
     for (const a of Array.from(nav.querySelectorAll("a"))) expect(DICT).toContain(a.textContent);
     const logout = screen.getAllByRole("button", { name: ru["auth.logout"] });
     expect(logout).toHaveLength(1);

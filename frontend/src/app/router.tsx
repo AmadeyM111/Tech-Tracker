@@ -154,6 +154,13 @@ function MenuItems({ profile }: { profile: MeResponse }) {
           </NavLink>
         </p>
       ) : null}
+      {/* Personal agent tokens (ADR-0018): any signed-in user with a role */}
+      <p>
+        <NavLink to="/profile/agents">
+          <Icon name="password" />
+          {t("agent_tokens.title")}
+        </NavLink>
+      </p>
     </>
   );
 }
