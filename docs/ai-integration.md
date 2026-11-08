@@ -40,11 +40,11 @@ claude mcp add --transport http gtrack https://localhost/mcp \
   --header "Authorization: Bearer $GTRACK_TOKEN"
 ```
 
-Вариант B — stdio (агент запускает мост `gostracker mcp`; нужен установленный пакет трекера):
+Вариант B — stdio (агент запускает мост `gtrack mcp`; нужен установленный пакет трекера):
 
 ```bash
 claude mcp add gtrack -e GTRACK_TOKEN=$GTRACK_TOKEN -e GTRACK_URL=https://localhost \
-  -- gostracker mcp
+  -- gtrack mcp
 ```
 
 Команда `claude mcp add` сохраняет значение переменной в конфигурации Claude Code. Используйте
@@ -63,10 +63,10 @@ codex mcp add gtrack --url https://localhost/mcp --bearer-token-env-var GTRACK_T
 
 ```bash
 codex mcp add gtrack --env GTRACK_TOKEN=$GTRACK_TOKEN --env GTRACK_URL=https://localhost \
-  -- gostracker mcp
+  -- gtrack mcp
 ```
 
-### Мост `gostracker mcp`
+### Мост `gtrack mcp`
 
 Подкоманда читает настройки из окружения и не принимает токен аргументом командной строки:
 
@@ -100,7 +100,7 @@ codex mcp add gtrack --env GTRACK_TOKEN=$GTRACK_TOKEN --env GTRACK_URL=https://l
 
 Поставляемая конфигурация принимает подключения только по HTTPS. Если сертификат самоподписанный:
 
-- для моста `gostracker mcp` укажите `GTRACK_CA_FILE=/путь/к/сертификату.pem`;
+- для моста `gtrack mcp` укажите `GTRACK_CA_FILE=/путь/к/сертификату.pem`;
 - для Claude Code по HTTP (Node.js) укажите `NODE_EXTRA_CA_CERTS=/путь/к/сертификату.pem` в окружении
   запуска агента.
 

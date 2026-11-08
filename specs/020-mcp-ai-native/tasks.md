@@ -64,7 +64,7 @@ M20-T10 → M20-T11 → M20-T12. Задачи последовательные (
 - **Файлы:** `backend/app/domain/events/client_context.py` (новый), `backend/app/domain/events/writer.py`,
   `backend/app/domain/activity/service.py`, `backend/app/api/v1/schemas/activity.py`,
   `backend/app/api/v1/projects.py` (только `_activity_item`), `docs/api/openapi.json` (через `gen-api.sh`,
-  регенерирован `gostracker openapi`), `backend/tests/domain/test_m20_t04_client_name.py` (новый),
+  регенерирован `gtrack openapi`), `backend/tests/domain/test_m20_t04_client_name.py` (новый),
   `backend/tests/api/test_activity.py` (только `ITEM_FIELDS`: добавлено `via_client`).
 - **Решение по PN-6 (уточнение 2026-11-08):** имя клиента передаётся контекстной переменной
   (`client_name_scope`), а не полем `Actor`: иначе пришлось бы менять 23 вызова `record_event`
@@ -85,7 +85,7 @@ M20-T10 → M20-T11 → M20-T12. Задачи последовательные (
 ## M20-T06 — REST управления токенами
 - **Файлы:** `backend/app/api/v1/tokens.py` (новый), `backend/app/api/v1/schemas/tokens.py` (новый),
   `backend/app/api/v1/__init__.py`, `backend/app/api/openapi.py` (описание кода 409 для схемы; перенесено
-  сюда, потому что без него `error_responses(409)` падает), `docs/api/openapi.json` (через `gostracker openapi`),
+  сюда, потому что без него `error_responses(409)` падает), `docs/api/openapi.json` (через `gtrack openapi`),
   `backend/tests/api/test_m20_t06_tokens_api.py` (новый).
   `frontend/src/shared/api/schema.d.ts` — в M20-T10 (нужен `npm`-модуль фронтенда).
 - **AC:** AC-1, AC-3 (API). Маршруты cookie-only (PN-2): запрос с `Authorization: Bearer` → 401.
@@ -122,7 +122,7 @@ M20-T10 → M20-T11 → M20-T12. Задачи последовательные (
 ## M20-T09 — Команда `gtrack mcp` (stdio-мост)
 - **Файлы:** `backend/app/cli/commands/mcp.py` (новый), `backend/app/cli/main.py` (регистрация подкоманды),
   `backend/tests/cli/test_m20_t09_mcp_bridge.py` (новый).
-  Уточнения (2026-11-08): команда называется `gostracker mcp` (как остальные подкоманды; в ADR и ТЗ
+  Уточнения (2026-11-08): команда называется `gtrack mcp` (как остальные подкоманды; в ADR и ТЗ
   написано `gtrack`). SDK 1.30 берёт готовый `httpx.AsyncClient`, поэтому Bearer-заголовок и CA задаются
   клиентом, а не фабрикой.
 - **AC:** AC-9 (ручная проверка с Claude Code), PN-8 (токен только из окружения; `GTRACK_CA_FILE`;
