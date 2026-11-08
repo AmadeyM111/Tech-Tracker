@@ -22,6 +22,9 @@ chmod 700 "$ROOT"
 exec 9>"$ROOT/.lock"
 flock -n 9 || die "копия уже выполняется"
 
+# Остатки прерванных запусков (SIGKILL/OOM: trap EXIT не сработал) — под блокировкой.
+find "$ROOT" -mindepth 1 -maxdepth 1 -type d -name '.tmp-*' -exec rm -rf -- {} +
+
 free_mb="$(df -Pm "$ROOT" | awk 'NR==2 {print $4}')"
 [ "$free_mb" -ge "$MIN_FREE_MB" ] || die "мало места: ${free_mb} МБ < ${MIN_FREE_MB} МБ"
 
@@ -32,6 +35,7 @@ IMAGE="$(docker inspect -f '{{.Config.Image}}' "$DB_CONTAINER")"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 TMP="$ROOT/.tmp-$STAMP"
 DEST="$ROOT/$STAMP"
+[ ! -e "$DEST" ] || die "копия $STAMP уже существует"
 trap 'rm -rf -- "$TMP"' EXIT
 mkdir -m 700 "$TMP"
 started="$(date +%s)"

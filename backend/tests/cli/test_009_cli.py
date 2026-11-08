@@ -71,7 +71,15 @@ async def test_009_cli_backup_ok_prints_report_and_records_run(
     out, err = capsys.readouterr()
     assert code == 0, err
     report = _kv(out)
-    assert set(report) == {"path", "size_bytes", "schema_revision", "same_device", "removed"}
+    assert set(report) == {
+        "path",
+        "size_bytes",
+        "schema_revision",
+        "same_device",
+        "removed",
+        "rotate_error",
+    }
+    assert report["rotate_error"] == "0"
     assert Path(report["path"]).parent == cli_env / "backups"
     assert report["same_device"] == "1" and "том же устройстве" in err
     runs = await _runs(committed)
