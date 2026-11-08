@@ -1,4 +1,5 @@
 // 019/R8-T16: self-registration request screen /register (FR-2, FR-3, FR-4, AC-1, AC-2).
+import { GTrackLogo } from "../../shared/ui/GTrackLogo";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -83,7 +84,10 @@ export function RegisterPage() {
 
   return (
     <section className="ui-form login-card">
-      <h1>{t("auth.register_title")}</h1>
+      <div className="ui-brand">
+        <GTrackLogo />
+        <h1>{t("auth.register_title")}</h1>
+      </div>
       {registrationOff ? (
         <p>{t("auth.register_disabled")}</p>
       ) : sent ? (
