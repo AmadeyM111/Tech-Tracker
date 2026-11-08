@@ -255,10 +255,9 @@ function StartRedirect({ insideMain }: { insideMain: boolean }) {
   );
 }
 
-/** 009/FR-7: the backup warning goes on tech admin screens, to users who manage accounts. */
-function showsBackupBanner(capability: Capability | undefined, profile: MeResponse): boolean {
-  const adminScreen = capability === "manage_accounts" || capability === "view_audit";
-  return adminScreen && profile.capabilities.includes("manage_accounts");
+/** 009/FR-7: the backup warning goes on every screen of a user who manages accounts (TA). */
+function showsBackupBanner(profile: MeResponse): boolean {
+  return profile.capabilities.includes("manage_accounts");
 }
 
 /**
@@ -282,7 +281,7 @@ function RoleScreen({
           <Sidebar profile={profile} />
           {capability === undefined || profile.capabilities.includes(capability) ? (
             <>
-              {showsBackupBanner(capability, profile) ? <BackupBanner /> : null}
+              {showsBackupBanner(profile) ? <BackupBanner /> : null}
               {children(profile)}
             </>
           ) : (

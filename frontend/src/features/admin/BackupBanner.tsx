@@ -1,9 +1,10 @@
-// Tech admin warning about stale backups (009/FR-7, plan PB-6). One plain request per
+// Tech admin warning about stale backups (009/FR-7, plan PB-6); block with a border and an icon (UI kit, mockup gtrack-r2-backup-banner). One plain request per
 // screen visit (status changes once a day: no polling). A failed request shows nothing:
 // the banner is advisory and must not block the admin screens.
 import { useQuery } from "@tanstack/react-query";
 
 import { t } from "../../shared/i18n";
+import { Icon } from "../../shared/ui/Icon";
 import { getBackupStatus, type BackupStatus } from "./api";
 
 // Display time is Europe/Moscow (NFR-5); the API speaks UTC.
@@ -42,7 +43,8 @@ export function BackupBanner() {
   const message = query.data === undefined ? null : backupWarning(query.data);
   if (message === null) return null;
   return (
-    <p role="status" className="ui-error" data-banner="backup">
+    <p role="status" className="ui-error-alert" data-banner="backup">
+      <Icon name="alert" />
       {message}
     </p>
   );
