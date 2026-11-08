@@ -421,7 +421,7 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Полный vitest: 63 файла, 1664 passed; lint 0; typecheck 0; scaffold 44 passed; scope ок. Отклонения: колонка «Действия» (admin.users.col_actions); BA_CAPS в sidebar.test дополнен onboard_accounts. Долг (NFR-7, T22): фокус не возвращается в таблицу после назначения; одинаковое имя кнопки в каждой строке (нужен ключ aria-label в ru.ts).
 
 ## R8-T22 — Интеграция и полная проверка
-- **Статус:** TODO
+- **Статус:** DONE (2026-11-08): bash scripts/check.sh — EXIT=0 (ruff, format, mypy, alembic check, pytest 4616 passed / 81 skipped, vitest 1669 passed). Трассировка AC по plan §6 — все AC покрыты тестами, кроме AC-20 (логи nginx — ручная проверка на стенде).
 - **AC:** все (AC-1…AC-38, кроме удалённых AC-17 и AC-31); AC-23, AC-24, NFR-8
 - **Файлы:** тесты: `frontend/tests/features/auth/019_no_register_link.test.tsx` (новый); код — только исправления, найденные прогоном, в файлах задач R8-T01…R8-T21 (перечислить в отчёте с причиной)
 - **Зависит от:** R8-T01…R8-T21
@@ -434,7 +434,7 @@ T17, T19, T20, T21), тоже последовательно.
   SMTP, логи nginx) — по желанию владельца, только на стенде без реальных пользователей. В отчёте напомнить: до
   решения ИБ по К-4 (ADR-0019) регистрацию на стенде с реальным доступом не включать.
 - **Готово, когда:** `bash scripts/check.sh` завершается с кодом 0; `git status --porcelain docs/api frontend/src/shared/api` пуст после `bash scripts/gen-api.sh`
-- **Попытки:** 0
+- **Попытки:** 1. Создан frontend/tests/features/auth/019_no_register_link.test.tsx (AC-23); git diff 401a63e по ChangePasswordPage, PasswordResetRequestPage, PasswordResetConfirmPage, NoRolePage и по pyproject/package*.json пусто (AC-23, AC-24); gen-api идемпотентен. Открыто: ручная проверка AC-20 (nginx) и логов на стенде — по решению владельца; T00 (слияние с main) не выполнялась — по решению владельца, отдельно.
 
 ## R8-T00 — Проверка слияния с `main` перед выпуском
 - **Статус:** TODO
@@ -526,5 +526,5 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T19 | DONE |
 | R8-T20 | DONE |
 | R8-T21 | DONE |
-| R8-T22 | TODO |
+| R8-T22 | DONE |
 | R8-T00 | TODO |
