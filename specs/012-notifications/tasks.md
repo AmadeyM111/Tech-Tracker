@@ -25,4 +25,4 @@
 
 ## N12-T05 — Интерфейс: значок, список, подсказка `@`
 - **Статус:** TODO · **AC:** AC-8, FR-2 · **Оценка:** 1,25 дня · **Зависит от:** N12-T03
-- **Файлы:** `frontend/src/features/notifications/{NotificationsPage.tsx,Badge.tsx,api.ts}`, `frontend/src/app/router.tsx`, `frontend/src/features/comments/Comments.tsx`, `frontend/src/shared/i18n/ru.ts`, `frontend/tests/features/notifications/*.test.tsx`, `backend/tests/infra/test_frontend_scaffold.py`
+- **Файлы:** `frontend/src/features/notifications/NotificationsPage.tsx`, `frontend/src/features/notifications/Badge.tsx`, `frontend/src/features/notifications/api.ts`, `frontend/src/features/comments/MentionSuggest.tsx`, `frontend/src/features/comments/Comments.tsx`, `frontend/src/features/tasks/TaskPage.tsx`, `frontend/src/app/router.tsx`, `frontend/src/shared/i18n/ru.ts`, `frontend/src/shared/ui/ui.css`, `frontend/tests/features/notifications/Notifications.test.tsx`, `frontend/tests/app/sidebar.test.tsx`, `frontend/tests/app/create-task-button.test.tsx` (пункт меню и запрос счётчика), `backend/tests/infra/test_frontend_scaffold.py`

@@ -13,6 +13,8 @@ import { PasswordResetRequestPage } from "../features/auth/PasswordResetRequestP
 import { NoRolePage } from "../features/auth/NoRolePage";
 import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
 import { MyTasksPage } from "../features/tasks/TaskList";
+import { NotificationsMenuItem } from "../features/notifications/Badge";
+import { NotificationsPage } from "../features/notifications/NotificationsPage";
 import { TaskPage } from "../features/tasks/TaskPage";
 import { ProjectPage } from "../features/projects/ProjectPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
@@ -136,6 +138,10 @@ function MenuItems({ profile }: { profile: MeResponse }) {
               <Icon name="tasks" />
               {t("nav.my_tasks")}
             </NavLink>
+          </p>
+          {/* 012/FR-5: уведомления со счётчиком непрочитанных */}
+          <p>
+            <NotificationsMenuItem />
           </p>
         </>
       ) : null}
@@ -438,6 +444,14 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/profile/agents"
         element={
           <RoleScreen insideMain={insideMain}>{() => <AgentAccessPage />}</RoleScreen>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <RoleScreen insideMain={insideMain} capability="business_access">
+            {() => <NotificationsPage />}
+          </RoleScreen>
         }
       />
       <Route

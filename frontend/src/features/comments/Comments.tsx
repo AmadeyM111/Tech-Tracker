@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { usePolledQuery } from "../../shared/api/polling";
+import { MentionSuggest, insertMention, mentionAt } from "./MentionSuggest";
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
@@ -46,6 +47,8 @@ export interface CommentsProps {
   alert: AlertState;
   /** True while the card itself shows a load error: the list does not add a second alert. */
   suppressLoadError?: boolean;
+  /** 012/FR-2: project of the task — «@» suggests its members; null — no suggestions. */
+  projectId?: string | null;
 }
 
 interface ItemProps {
@@ -173,7 +176,7 @@ function CommentItem({ comment, pending, alert, onSave, onDelete }: ItemProps) {
   );
 }
 
-export function Comments({ taskId, alert, suppressLoadError = false }: CommentsProps) {
+export function Comments({ taskId, alert, suppressLoadError = false, projectId = null }: CommentsProps) {
   const baseId = useId();
   const queryClient = useQueryClient();
   const busy = useRef(false);
@@ -183,6 +186,7 @@ export function Comments({ taskId, alert, suppressLoadError = false }: CommentsP
   const focusHeading = useRef(false);
   const [page, setPage] = useState(1);
   const [text, setText] = useState("");
+  const [caret, setCaret] = useState(0);
   const [pending, setPending] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // The page on screen: the previous one stays until the requested page arrives.
@@ -299,7 +303,21 @@ export function Comments({ taskId, alert, suppressLoadError = false }: CommentsP
             ref={areaRef}
             name="body"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              setCaret(e.target.selectionStart);
+            }}
+            onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
+          />
+          <MentionSuggest
+            projectId={projectId}
+            partial={mentionAt(text, caret)}
+            onPick={(login) => {
+              const next = insertMention(text, caret, login);
+              setText(next.text);
+              setCaret(next.caret);
+              areaRef.current?.focus();
+            }}
           />
         </div>
         <button type="submit">{t("comments.add")}</button>

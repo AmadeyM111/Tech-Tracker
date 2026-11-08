@@ -714,3 +714,44 @@ h1 input[name="title"] {
   width: 100%;
   max-width: 48rem;
 }
+
+/* 012 «Уведомления»: счётчик в меню, список, подсказка «@» */
+.ui-badge {
+  display: inline-block;
+  min-width: 1.5em;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 600;
+  text-align: center;
+}
+.ui-notifications {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ui-notifications li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ui-notifications li[data-read="true"] .ui-link {
+  color: var(--text-muted);
+}
+.ui-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  text-align: left;
+  text-decoration: underline;
+}
+.ui-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}

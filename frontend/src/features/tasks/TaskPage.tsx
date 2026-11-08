@@ -419,7 +419,12 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
       <Attachments taskId={task.id} alert={alert} />
 
       <div data-slot="comments">
-        <Comments taskId={task.id} alert={alert} suppressLoadError={pollError !== null} />
+        <Comments
+          taskId={task.id}
+          projectId={task.project.id}
+          alert={alert}
+          suppressLoadError={pollError !== null}
+        />
       </div>
 
       {permissions.delete ? (
