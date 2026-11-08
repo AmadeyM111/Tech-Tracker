@@ -28,6 +28,7 @@ import app as app_package
 from app.core.clock import SystemClock
 from app.core.config import Settings, get_settings
 from app.core.db import create_engine
+from app.core.db_roles import check_role_name, ensure_app_password, ensure_app_role, scram_verifier
 from app.core.logging import redact_text
 from app.core.secrets import ensure_secret_key
 from app.domain.system.bootstrap import (
@@ -133,7 +134,13 @@ async def _migrate_and_first_start(settings: Settings, stage: list[str]) -> Boot
             stage[0] = "миграции"
             await asyncio.to_thread(_alembic_upgrade_head)
             stage[0] = "первый запуск"
-            return await run_bootstrap(sessionmaker, settings, clock=SystemClock(), locked=lock)
+            result = await run_bootstrap(sessionmaker, settings, clock=SystemClock(), locked=lock)
+            if settings.db_app_role is not None:
+                stage[0] = "рабочая роль БД"
+                verifier = scram_verifier(ensure_app_password(settings))
+                async with engine.begin() as conn:
+                    await ensure_app_role(conn, check_role_name(settings.db_app_role), verifier)
+            return result
     finally:
         await engine.dispose()
 

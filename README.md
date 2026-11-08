@@ -369,6 +369,14 @@ gtrack import /backup/gtrack-export.tar         # только в пустую �
 `import` заменяет автоданные первого администратора данными архива и отказывает (код 2),
 если в системе уже есть данные или версия схемы архива другая. Сессии входа не переносятся.
 
+Рабочая роль БД (spec 010). API подключается к PostgreSQL не владельцем схемы, а ролью
+`DB_APP_ROLE` (по умолчанию `gtrack_app`): без SUPERUSER, CREATEDB, CREATEROLE, без владения
+таблицами; журнал `domain_event` — только чтение и добавление. Роль и её пароль
+(`/data/secrets/db_app_password`, 0600) создаёт `gtrack bootstrap` при старте api; права выдаются
+заново при каждом старте. Переход действующей установки — обычное обновление: снимите копию,
+затем `docker compose up -d --build --wait`; ручных SQL-шагов нет. Миграции и команды оператора
+(`backup`, `restore`, `import`) по-прежнему работают под `POSTGRES_USER`.
+
 ### Node.js
 
 Фронтенду нужен Node.js `^22.12 || ^24 || >=26` (поле `engines` в `frontend/package.json`;
@@ -787,6 +795,14 @@ gtrack import /backup/gtrack-export.tar         # into an empty system only
 `import` replaces the first administrator's automatic data with the archive's data and refuses
 (exit code 2) if the system already has data or the archive's schema version differs. Login
 sessions are not transferred.
+
+Application database role (spec 010). The API connects to PostgreSQL not as the schema owner but
+as `DB_APP_ROLE` (default `gtrack_app`): no SUPERUSER, CREATEDB, CREATEROLE, owns no tables; the
+`domain_event` journal is read and append only. `gtrack bootstrap` creates the role and its password
+(`/data/secrets/db_app_password`, 0600) when api starts and re-grants privileges on every start.
+Existing installs migrate with a normal upgrade: take a backup, then
+`docker compose up -d --build --wait`; no manual SQL. Migrations and operator commands
+(`backup`, `restore`, `import`) still run as `POSTGRES_USER`.
 
 ### Node.js
 
