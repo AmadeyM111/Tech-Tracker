@@ -62,9 +62,9 @@
 ## B09-T06 — Плашка ТА
 - **Статус:** TODO
 - **AC:** AC-12
-- **Файлы:** `frontend/src/features/admin/BackupBanner.tsx`, `frontend/src/features/admin/BackupBanner.test.tsx`, `frontend/src/features/admin/api.ts`, `frontend/src/app/router.tsx`, `frontend/src/shared/i18n/ru.ts`, `backend/tests/infra/test_frontend_scaffold.py`
+- **Файлы:** `frontend/src/features/admin/BackupBanner.tsx`, `frontend/tests/features/admin/BackupBanner.test.tsx`, `frontend/src/features/admin/api.ts`, `frontend/src/app/router.tsx`, `frontend/src/shared/i18n/ru.ts`, `backend/tests/infra/test_frontend_scaffold.py`
 - **Зависит от:** B09-T05
-- **Описание:** плашка в оболочке экранов ТА, опрос статуса; тексты Q-2.
+- **Описание:** плашка в оболочке экранов ТА (один запрос при открытии экрана, без опроса: статус меняется раз в сутки; ошибка запроса — плашки нет); тексты Q-2.
 - **Готово, когда:** `npm run lint && npm run typecheck && npm test` зелёный.
 - **Оценка:** 0,25 дня
 - **Попытки:** 0
