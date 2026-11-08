@@ -77,7 +77,7 @@ def test_plan5_guard_rejects_non_test_database_names(url: str) -> None:
     "url",
     [
         DEFAULT_TEST_DATABASE_URL,
-        "postgresql+asyncpg://u:p@db.internal:5432/gostracker_ci_test",
+        "postgresql+asyncpg://u:p@db.internal:5432/gtrack_ci_test",
     ],
 )
 def test_plan5_guard_accepts_test_database_names(url: str) -> None:

@@ -1,4 +1,4 @@
-"""Подкоманда ``gostracker demo-data`` (plan §11.8, D-63; ожидание БД как у ``maintenance``).
+"""Подкоманда ``gtrack demo-data`` (plan §11.8, D-63; ожидание БД как у ``maintenance``).
 
 Загружает демо-данные (12 пользователей, 2 проекта, задачи, комментарии) и записывает пароли
 в ``secrets/demo-passwords.txt``. В stdout — строки ``ключ=значение``: путь к файлу и счётчики;
@@ -55,11 +55,11 @@ async def _load(settings: Settings, *, seed: int) -> DemoReport:
         await engine.dispose()
 
 
-_BOOTSTRAP_HINT = "Выполните `gostracker bootstrap` и повторите команду."
+_BOOTSTRAP_HINT = "Выполните `gtrack bootstrap` и повторите команду."
 
 
 def run(args: argparse.Namespace) -> int:
-    """Выполняет ``gostracker demo-data``; возвращает код выхода."""
+    """Выполняет ``gtrack demo-data``; возвращает код выхода."""
     step = "настройки"
     try:
         settings = get_settings()

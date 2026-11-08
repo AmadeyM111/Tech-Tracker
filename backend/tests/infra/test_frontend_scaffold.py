@@ -268,6 +268,8 @@ def test_t21_src_files_only_expected() -> None:
         "features/comments/api.ts", "features/comments/Comments.tsx",
         # T100
         "shared/ui/Icon.tsx",
+        # 008: логотип GTrack на экране входа
+        "shared/ui/GTrackLogo.tsx",
         # T103
         "features/auth/session.ts",
         # 007/R7-T17

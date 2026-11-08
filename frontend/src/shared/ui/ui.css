@@ -197,6 +197,41 @@ select:disabled {
   border-radius: var(--radius);
 }
 
+/* GTrack logo (GTrackLogo.tsx): decorative, colours come from theme tokens only. */
+.ui-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ui-logo {
+  flex-shrink: 0;
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.ui-logo-orbit {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+}
+
+.ui-logo-planet {
+  fill: var(--accent);
+}
+
+.ui-logo-satellite {
+  fill: var(--focus);
+}
+
+.ui-logo-spark {
+  fill: var(--text);
+}
+
+.ui-logo-star {
+  fill: var(--text-muted);
+}
+
 .ui-login-help {
   margin-top: 1.5rem;
   padding-top: 1rem;

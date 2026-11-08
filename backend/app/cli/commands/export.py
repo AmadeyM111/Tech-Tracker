@@ -1,7 +1,7 @@
-"""Подкоманда ``gostracker export`` (plan §4.10, FR-40, AC-17).
+"""Подкоманда ``gtrack export`` (plan §4.10, FR-40, AC-17).
 
 Пишет tar-архив с ``data.json`` (режим 0600). Без ``--out`` архив кладётся в
-``data_dir/exports/gostracker-export-<UTC>.tar``. Существующий файл не перезаписывается.
+``data_dir/exports/gtrack-export-<UTC>.tar``. Существующий файл не перезаписывается.
 Коды: 0 — успех; 2 — отказ (файл уже существует); 1 — ошибка БД, конфигурации или миграций.
 В stdout — строки ``ключ=значение``: путь к архиву и счётчики.
 """
@@ -29,7 +29,7 @@ from app.core.config import Settings, get_settings
 from app.core.secrets import ensure_private_dir
 from app.domain.ops.export import export_archive
 
-_BOOTSTRAP_HINT = "Выполните `gostracker bootstrap` и повторите команду."
+_BOOTSTRAP_HINT = "Выполните `gtrack bootstrap` и повторите команду."
 
 
 def schema_head() -> str:
@@ -56,7 +56,7 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
 
 def _default_out(settings: Settings) -> Path:
     stamp = utcnow().strftime("%Y%m%dT%H%M%SZ")
-    return settings.exports_dir / f"gostracker-export-{stamp}.tar"
+    return settings.exports_dir / f"gtrack-export-{stamp}.tar"
 
 
 async def _export(settings: Settings, out: Path, *, schema_version: str) -> dict[str, int]:
@@ -64,7 +64,7 @@ async def _export(settings: Settings, out: Path, *, schema_version: str) -> dict
 
 
 def run(args: argparse.Namespace) -> int:
-    """Выполняет ``gostracker export``; возвращает код выхода."""
+    """Выполняет ``gtrack export``; возвращает код выхода."""
     step = "настройки"
     try:
         settings = get_settings()

@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-gostracker = "app.cli.main:main"
+gtrack = "app.cli.main:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.24", "httpx>=0.28", "ruff==0.17.0", "mypy>=1.13",

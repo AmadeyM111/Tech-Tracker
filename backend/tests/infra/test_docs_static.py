@@ -241,7 +241,7 @@ def test_nfr11_data_model_documents_append_only_and_indexes() -> None:
 # --- 4. AGENTS.md ----------------------------------------------------------------------
 
 DEV_DB_COMMAND = (
-    "docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db"
+    "docker compose -p gtrack-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db"
 )
 
 
@@ -389,11 +389,11 @@ def test_t28_readme_dev_db_and_test_url_match_code() -> None:
 
 INFRA_TOKENS = [
     "GT_INFRA_STACK=1",
-    "GT_INFRA_PROJECT=gostracker-infratest",
+    "GT_INFRA_PROJECT=gtrack-infratest",
     "HTTP_PORT=18080",
     "HTTPS_PORT=18443",
     "-m infra_stack",
-    "-p gostracker-infratest",
+    "-p gtrack-infratest",
 ]
 
 
@@ -409,8 +409,8 @@ def test_t28_infra_stack_command_matches_stack_support() -> None:
 
 def test_t28_agents_bootstrap_before_uvicorn() -> None:
     block = _commands_block(_text(AGENTS))
-    assert "gostracker bootstrap" in block, "в блоке «Команды» нет gostracker bootstrap"
-    assert block.index("gostracker bootstrap") < block.index("uvicorn app.main:app")
+    assert "gtrack bootstrap" in block, "в блоке «Команды» нет gtrack bootstrap"
+    assert block.index("gtrack bootstrap") < block.index("uvicorn app.main:app")
 
 
 def test_t28_data_model_append_only_names_app_role() -> None:
@@ -456,7 +456,7 @@ def test_t28_readme_operator_cert_and_volumes() -> None:
 
 # --- T31: регулярное обслуживание (FR-25b, D-42) -------------------------------------------
 
-_CRON_CMD = "docker compose exec -T api gostracker maintenance"
+_CRON_CMD = "docker compose exec -T api gtrack maintenance"
 
 
 def _maintenance_section(part: str, heading_re: str) -> str:
@@ -477,7 +477,7 @@ def _maintenance_section(part: str, heading_re: str) -> str:
 def test_t31_readme_regular_maintenance_section(which: int, heading_re: str) -> None:
     """FR-25b: раздел регулярного обслуживания в обеих частях README."""
     section = _maintenance_section(_parts()[which], heading_re)
-    for term in ("gostracker maintenance", "--dry-run", "crontab", _CRON_CMD):
+    for term in ("gtrack maintenance", "--dry-run", "crontab", _CRON_CMD):
         assert term in section, f"в разделе нет «{term}»"
 
 
@@ -563,8 +563,8 @@ MVP_README_TERMS: list[tuple[str, str, str]] = [
     (r"экспорт", r"export", "экспорт и импорт в составе MVP"),
     (r"резервн\w*\s+копи|бэкап|backup", r"backup", "резервная копия отложена"),
     (
-        r"docker compose exec api gostracker demo-data",
-        r"docker compose exec api gostracker demo-data",
+        r"docker compose exec api gtrack demo-data",
+        r"docker compose exec api gtrack demo-data",
         "команда demo-data",
     ),
     (r"demo-passwords\.txt", r"demo-passwords\.txt", "файл паролей демо"),
@@ -674,13 +674,13 @@ def test_t88_readme_cli_commands_exist_in_parser() -> None:
     maint_opts = {o for a in sub.choices["maintenance"]._actions for o in a.option_strings}
     assert "--dry-run" in maint_opts
     for part in _parts():
-        assert "gostracker demo-data" in part
-        assert re.search(r"gostracker maintenance\s+--dry-run", part)
-        # в README нет несуществующих подкоманд gostracker
-        for name in re.findall(r"gostracker\s+([a-z][a-z-]+)", part):
+        assert "gtrack demo-data" in part
+        assert re.search(r"gtrack maintenance\s+--dry-run", part)
+        # в README нет несуществующих подкоманд gtrack
+        for name in re.findall(r"gtrack\s+([a-z][a-z-]+)", part):
             if name in {"is", "and", "the", "to", "command", "cli"}:
                 continue
-            assert name in sub.choices, f"README ссылается на неизвестную команду gostracker {name}"
+            assert name in sub.choices, f"README ссылается на неизвестную команду gtrack {name}"
 
 
 def test_t88_readme_demo_passwords_file_matches_code() -> None:
@@ -882,7 +882,7 @@ def test_002_nfr5_adr_0013_mentions_refined_adrs() -> None:
 
 
 _ADR_0013_UPGRADE_ORDER = {
-    "gostracker bootstrap": r"gostracker\s+bootstrap",
+    "gtrack bootstrap": r"gtrack\s+bootstrap",
     "docker-entrypoint": r"docker-entrypoint",
     "перед запуском API": r"(перед|до|сначала).{0,80}(запуск\w*|старт\w*)?.{0,40}API|API.{0,60}не\s+стартует",
     "схема 0006": r"схем\w*\s+`?0006`?",
@@ -1059,8 +1059,8 @@ def test_002_nfr5_data_model_documents_migration_0006_and_upgrade_order() -> Non
     assert _has(text, r"Порядок\s+обновления"), (
         "в модели данных нет упоминания «Порядок обновления»"
     )
-    assert _has(text, r"gostracker\s+bootstrap"), (
-        "в модели данных нет `gostracker bootstrap` в порядке обновления"
+    assert _has(text, r"gtrack\s+bootstrap"), (
+        "в модели данных нет `gtrack bootstrap` в порядке обновления"
     )
 
 
@@ -1439,10 +1439,10 @@ def test_002_fr22_readme_upgrade_section(which: int) -> None:
 
 def _assert_manual_start_order(flat: str, which: int) -> None:
     if which == 0:
-        ok = re.search(r"сначала\s+`?gostracker\s+bootstrap`?,?\s+потом\s+API", flat, re.I)
+        ok = re.search(r"сначала\s+`?gtrack\s+bootstrap`?,?\s+потом\s+API", flat, re.I)
     else:
-        ok = re.search(r"`?gostracker\s+bootstrap`?\s+first,?\s+then\s+the\s+API", flat, re.I)
-    assert ok, "нет правила ручного запуска: сначала `gostracker bootstrap`, потом API (ADR-0013)"
+        ok = re.search(r"`?gtrack\s+bootstrap`?\s+first,?\s+then\s+the\s+API", flat, re.I)
+    assert ok, "нет правила ручного запуска: сначала `gtrack bootstrap`, потом API (ADR-0013)"
 
 
 def _assert_no_operator_action_only_for_0005(section: str, which: int) -> None:

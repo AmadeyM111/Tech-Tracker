@@ -13,7 +13,7 @@ plan §11.7). Состав MVP и отложенное описаны в [README
   два профиля браузера (или обычное окно и окно инкогнито).
 - Чистая машина с Docker (Compose v2), порты 80 и 443 свободны, стек запущен по README
   («Быстрый старт»).
-- Демо-данные загружены командой `docker compose exec api gostracker demo-data`; пароли -
+- Демо-данные загружены командой `docker compose exec api gtrack demo-data`; пароли -
   в `/data/secrets/demo-passwords.txt` (см. README).
 - Результат фиксируйте в отметках `- [x]`; найденные дефекты записывайте отдельным списком в
   конце прогона (дата, версия `git rev-parse --short HEAD`, проверяющий).
@@ -21,7 +21,7 @@ plan §11.7). Состав MVP и отложенное описаны в [README
 ## 1. Развёртывание и демо-данные (AC-1)
 
 - [ ] AC-1: на чистой машине выполнены `git clone`, `cp .env.example .env`,
-  `docker compose up -d --build --wait`, `docker compose exec api gostracker demo-data`; вход с
+  `docker compose up -d --build --wait`, `docker compose exec api gtrack demo-data`; вход с
   демо-данными выполнен не позднее 10 минут от начала (время засечено, `date -u` в начале и в
   конце), код не правился.
 - [ ] Команда `demo-data` напечатала путь к файлу паролей и счётчики (12 пользователей, 2 проекта,

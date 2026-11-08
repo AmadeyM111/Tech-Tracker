@@ -1,7 +1,7 @@
 """T20: сборка и запуск образа API в изолированных контейнерах (маркер infra_stack).
 
 Выполняется только при ``GT_INFRA_STACK=1`` и доступном Docker. Не использует compose-проект
-``gostracker-dev``: образ ``gostracker-api:test``, контейнеры ``gt-t20-*``, своя сеть и тома.
+``gtrack-dev``: образ ``gtrack-api:test``, контейнеры ``gt-t20-*``, своя сеть и тома.
 Всё созданное удаляется в finally (``docker rm -f``, ``docker network rm``, ``docker volume rm``,
 ``docker rmi``). Покрывает FR-6, FR-48, NFR-4, D-19, D-21, AC-23 (контейнерная часть).
 
@@ -24,7 +24,7 @@ pytestmark = [
     pytest.mark.skipif(os.environ.get("GT_INFRA_STACK") != "1", reason="нужен GT_INFRA_STACK=1"),
 ]
 
-IMAGE = "gostracker-api:test"
+IMAGE = "gtrack-api:test"
 NETWORK = "gt-t20-net"
 DB = "gt-t20-db"
 API = "gt-t20-api"
@@ -191,7 +191,7 @@ def api(stack: None) -> Iterator[str]:
 
 
 def test_build_succeeds(stack: None) -> None:
-    """D-21: ``docker build -t gostracker-api:test backend`` успешен (проверяется в фикстуре)."""
+    """D-21: ``docker build -t gtrack-api:test backend`` успешен (проверяется в фикстуре)."""
     out = docker("image", "inspect", "-f", "{{.Id}}", IMAGE).stdout.strip()
     assert out.startswith("sha256:")
 
@@ -207,9 +207,9 @@ def test_image_runs_as_uid_10001(stack: None) -> None:
     assert in_image("id", "-u").strip() == "10001"
 
 
-def test_image_gostracker_help_exit_0(stack: None) -> None:
+def test_image_gtrack_help_exit_0(stack: None) -> None:
     """D-21: CLI установлен и запускается (подпакеты попали в установку)."""
-    res = docker("run", "--rm", "--entrypoint", "gostracker", IMAGE, "--help")
+    res = docker("run", "--rm", "--entrypoint", "gtrack", IMAGE, "--help")
     assert "bootstrap" in res.stdout
 
 

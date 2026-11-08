@@ -1,4 +1,4 @@
-# Образ API GOSTracker (plan §4.12, D-19, D-21): без секретов, непривилегированный пользователь.
+# Образ API GTrack (plan §4.12, D-19, D-21): без секретов, непривилегированный пользователь.
 FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -21,9 +21,9 @@ COPY . /app
 RUN pip install --no-cache-dir --no-deps /app \
     && rm -rf /app/build /app/*.egg-info \
     && chmod 0755 /app/docker-entrypoint.sh \
-    && groupadd --gid 10001 gostracker \
+    && groupadd --gid 10001 gtrack \
     && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /nonexistent \
-        --shell /usr/sbin/nologin gostracker \
+        --shell /usr/sbin/nologin gtrack \
     && install -d -o 10001 -g 10001 -m 0750 /data
 
 USER 10001

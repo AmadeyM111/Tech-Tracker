@@ -1,4 +1,4 @@
-"""T19: ``gostracker openapi [--out PATH]`` (plan §4.13, §4.14; FR-43, FR-44, FR-45, D-32, D-33).
+"""T19: ``gtrack openapi [--out PATH]`` (plan §4.13, §4.14; FR-43, FR-44, FR-45, D-32, D-33).
 
 Генерация идёт без БД и без секретов; вывод детерминирован (``sort_keys``, ``indent=2``,
 ``ensure_ascii=False``, завершающий ``\\n``); файл ``docs/api/openapi.json`` в репозитории
@@ -384,10 +384,10 @@ def test_fr57_no_password_or_hash_in_response_schemas(spec: dict[str, Any]) -> N
 def test_fr44_committed_openapi_json_matches_generation(spec_text: str) -> None:
     """``docs/api/openapi.json`` существует и совпадает с генерацией (побайтно).
 
-    Падает, если файла нет или он устарел: обновить ``gostracker openapi --out
+    Падает, если файла нет или он устарел: обновить ``gtrack openapi --out
     docs/api/openapi.json`` (``scripts/gen-api.sh``).
     """
-    assert COMMITTED_SPEC.is_file(), f"нет {COMMITTED_SPEC}: выполните gostracker openapi --out"
+    assert COMMITTED_SPEC.is_file(), f"нет {COMMITTED_SPEC}: выполните gtrack openapi --out"
     assert COMMITTED_SPEC.read_bytes() == spec_text.encode("utf-8"), (
         "docs/api/openapi.json устарел: перегенерируйте scripts/gen-api.sh"
     )

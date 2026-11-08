@@ -1,4 +1,4 @@
-# Tasks: Пилот GOSTracker R1
+# Tasks: Пилот GTrack R1
 
 Статусы: TODO | IN_PROGRESS | DONE | BLOCKED | SUPERSEDED (заменена MVP-задачей, номер указан) |
 SKIPPED (следующая версия). Статусы ведёт оркестратор.
@@ -28,7 +28,7 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
 - Окружение: Python 3.12 (`.venv`, см. T01), команды из корня репозитория после
   `source .venv/bin/activate`.
 - Тестовая БД для задач с БД (начиная с T05):
-  `docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db`
+  `docker compose -p gtrack-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db`
   (публикует `127.0.0.1:5432`); тесты используют `TEST_DATABASE_URL`
   (по умолчанию `postgresql+asyncpg://tracker:tracker@localhost:5432/tracker_test`, plan §5).
 - Тесты и фикстуры (`backend/tests/**`, `frontend/tests/**`, в т.ч. `conftest.py`,
@@ -51,7 +51,7 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
   на этой машине `python3` — 3.14) и установить `pip install -e "backend[dev]"`. В
   `pyproject.toml`: `[build-system]` setuptools; `[tool.setuptools.packages.find] include = ["app*"]`;
   `package-data` для `app/core/security/data/*`; зависимости `argon2-cffi>=25.1,<26` и
-  `tzdata>=2025.2` (plan §7.1); `[project.scripts] gostracker = "app.cli.main:main"`;
+  `tzdata>=2025.2` (plan §7.1); `[project.scripts] gtrack = "app.cli.main:main"`;
   mypy `python_version = "3.12"`, плагин `pydantic.mypy`; pytest `pythonpath = ["."]`,
   маркеры `committed`, `infra_static`, `infra_stack`, `asyncio_default_fixture_loop_scope = "session"`.
   `scripts/check.sh` вызывает инструменты из активного окружения, как сейчас.
@@ -73,7 +73,7 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
   `.env.example` — `POSTGRES_USER/PASSWORD/DB`, без `SECRET_KEY` и `COOKIE_SECURE`.
   Файлы `docker-compose.override.y*ml` и `compose.override.y*ml` не создавать.
 - **Готово, когда:** `pytest -q -m infra_static backend/tests/infra/test_compose_static.py` зелёный;
-  `docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db`
+  `docker compose -p gtrack-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db`
   поднимает БД, `pg_isready -h 127.0.0.1 -p 5432` (или `docker compose … exec db pg_isready`) — ок.
 - **Попытки:** 1
 
@@ -268,7 +268,7 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
   `forbidden`), `check_origin` (D-16, 403 `origin_mismatch`). Порядок проверок — plan §4.5.
 - **Готово, когда:** `pytest -q backend/tests/unit/test_role_matrix.py backend/tests/api/test_deps_gates.py` зелёный, линтер чистый.
 - **Заметка ревью T05:** зависимость с `yield` поверх `DbSession` должна объявляться со `scope="function"` (иначе `DependencyScopeError`); AST-тест «нет get_db вне core/db.py» усилить — запретить любое упоминание имени (Name/Attribute/alias, Security).
-- **Заметки ревью T11:** `SessionStore` — ключ только из `ensure_secret_key`; истёкшие сессии остаются после отката при 401 — очищать в `gostracker maintenance` (T19) или при входе пользователя.
+- **Заметки ревью T11:** `SessionStore` — ключ только из `ensure_secret_key`; истёкшие сессии остаются после отката при 401 — очищать в `gtrack maintenance` (T19) или при входе пользователя.
 - **Уточнения (оркестратор, по отчёту test-writer):** `check_origin` проверяет только `Origin` (D-16; `Referer` не проверяется);
   `app.state.session_store`, `app.state.password_hasher`, `app.state.auth_provider`; значения `Capability` — имя члена в нижнем регистре
   (`manage_accounts`); короткий `SECRET_KEY` (< 32 байт) роняет запуск; lifespan не обращается к БД.
@@ -423,15 +423,15 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
   `scripts/gen-api.sh`, `docs/api/openapi.json` (генерируется); тесты: `backend/tests/cli/test_openapi.py`,
   `backend/tests/unit/test_no_telemetry.py`
 - **Зависит от:** T18
-- **Описание:** `gostracker openapi [--out PATH]` — `app.openapi()` без подключения к БД,
+- **Описание:** `gtrack openapi [--out PATH]` — `app.openapi()` без подключения к БД,
   JSON с `sort_keys=True`, `indent=2`, `ensure_ascii=False`, завершающий `\n`.
-  `gostracker hash-bench [--iterations N]` — p50/p95 времени `PasswordHasher.hash` с текущими
+  `gtrack hash-bench [--iterations N]` — p50/p95 времени `PasswordHasher.hash` с текущими
   параметрами `Settings`, пароль генерируется и не печатается. `scripts/gen-api.sh` — генерирует
   `docs/api/openapi.json`; фронтенд-часть добавляется в T22 (если `frontend/package.json` нет — пропуск).
   Тест «нет телеметрии»: пакет `opentelemetry.sdk` не установлен, приложение не обращается к сети при старте.
 - **Готово, когда:** `pytest -q backend/tests/cli/test_openapi.py backend/tests/unit/test_no_telemetry.py` зелёный
   (включая проверку, что `docs/api/openapi.json` совпадает с генерацией), линтер чистый.
-- **Заметка ревью T16a:** `gostracker maintenance` удаляет истёкшие сессии (фоновый GET с истёкшей сессией не фиксирует удаление при 401).
+- **Заметка ревью T16a:** `gtrack maintenance` удаляет истёкшие сессии (фоновый GET с истёкшей сессией не фиксирует удаление при 401).
 - **Заметки ревью T17:** (1) битый JSON даёт 422 `json_invalid` раньше 401/403 на всех эндпоинтах — сквозное решение (обработчик ошибок/middleware) либо принять; (2) OpenAPI: описать ответы 401/403/404 и реальное тело ошибки `{detail, code}` (D-33, генерация типов).
 - **Заметки ревью T18:** OpenAPI — описать 401/403/404 для /admin/audit* (D-33); `list_accounts` читает `password_hash` (`users/service.py`) — сузить проекцией (`load_only`); при появлении deal/stage-событий — белый список имён `changed_fields` по действию; пропуск (с логированием) строк журнала с неизвестным `entity_type`, вместо 500 всей страницы.
 - **Заметка ревью T18:** строка журнала с неизвестным `entity_type` (откат кода после R1.1+) даёт 500 всей страницы аудита — CHECK-ограничение на `entity_type` в миграции либо отдача «неизвестный тип» без `details`; решить при первой задаче, расширяющей `EntityType`.
@@ -445,11 +445,11 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
 - **Зависит от:** T10, T19
 - **Описание:** По plan §4.12: `python:3.12-slim-bookworm`, исходники в `/app`,
   `pip install --no-cache-dir /app`, `ALEMBIC_CONFIG=/app/alembic.ini`, пользователь uid 10001,
-  `/data` принадлежит ему, `VOLUME /data`; entrypoint `umask 077` → `gostracker bootstrap` →
+  `/data` принадлежит ему, `VOLUME /data`; entrypoint `umask 077` → `gtrack bootstrap` →
   `exec uvicorn … --proxy-headers --forwarded-allow-ips='*' --no-access-log`; `HEALTHCHECK` на
   `/api/v1/health` средствами Python (без curl).
-- **Готово, когда:** `docker build -t gostracker-api:test backend` успешен;
-  `pytest -q -m infra_static backend/tests/infra/test_api_image_static.py` и `GT_INFRA_STACK=1 pytest -q -m infra_stack backend/tests/infra/test_api_image_build.py` зелёные (Python 3.12, uid 10001, `gostracker --help`).
+- **Готово, когда:** `docker build -t gtrack-api:test backend` успешен;
+  `pytest -q -m infra_static backend/tests/infra/test_api_image_static.py` и `GT_INFRA_STACK=1 pytest -q -m infra_stack backend/tests/infra/test_api_image_build.py` зелёные (Python 3.12, uid 10001, `gtrack --help`).
 - **Заметка ревью T02:** при `depends_on: db: condition: service_healthy` добавить `start_period` к healthcheck db.
 - **Заметки ревью T10 (желательные, не блокировали):** (1) `alembic upgrade head` выполнять под тем же advisory lock (параллельный запуск на чистой БД падает на `alembic_version`); (2) при ошибке COMMIT перед удалением файла пароля проверить отдельной сессией, не зафиксировано ли пространство (обрыв после фиксации оставляет ТА с неизвестным паролем); (3) минимальная длина `SECRET_KEY` из env (≥ 32 байт) и сравнение заглушки `strip().lower()` — требование в FR-6/D-20 через plan; (4) удалять остатки `.<name>.*.tmp` под блокировкой; `ensure_private_dir` — `lstat`/`S_ISDIR`, чинить права 0755 → 0700; (5) advisory lock на AUTOCOMMIT-соединении; `_known_secrets` из `settings`; `path_separator = os` в `alembic.ini`; plan §4.7 — stdout только путь, текст в stderr.
 - **Попытки:** 2
@@ -527,7 +527,7 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
 ## T25 — Образ web: TLS-прокси nginx и статика
 - **Статус:** DONE
 - **AC:** FR-63 (конфигурация; проверка в стеке — T26), AC-40 (проверка образа отдельно), NFR-4, D-17
-- **Файлы:** `deploy/web/Dockerfile`, `deploy/web/default.conf.template`, `deploy/web/10-gostracker-tls.sh`,
+- **Файлы:** `deploy/web/Dockerfile`, `deploy/web/default.conf.template`, `deploy/web/10-gtrack-tls.sh`,
   `deploy/tls/README.md`, `.gitignore` (`deploy/tls/*.crt`, `deploy/tls/*.key`, `backups/`, `frontend/dist`);
   тесты: `backend/tests/infra/test_web_image.py` (`infra_static`)
 - **Зависит от:** T24
@@ -536,7 +536,7 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
   (не перегенерируется при перезапуске); 80 → 308 на `https://$host:${HTTPS_PORT}`;
   `ssl_protocols TLSv1.2 TLSv1.3`; `client_max_body_size 12m` и JSON для 413;
   ленивое разрешение `api` через `resolver 127.0.0.11`; заголовки безопасности.
-- **Готово, когда:** `docker build -f deploy/web/Dockerfile -t gostracker-web:test .` успешен;
+- **Готово, когда:** `docker build -f deploy/web/Dockerfile -t gtrack-web:test .` успешен;
   `pytest -q -m infra_static backend/tests/infra/test_web_image.py` зелёный (самоподписанный
   сертификат создан и стабилен, TLS 1.2 принимается, TLS 1.1 отклоняется, `nginx -T` содержит
   `ssl_protocols TLSv1.2 TLSv1.3`, http → 308).
@@ -559,14 +559,14 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
   `.env.example` — plan §4.12. Инфраструктурные тесты стека поднимают отдельный проект,
   чтобы не трогать стек пользователя.
 - **Готово, когда:** `pytest -q -m infra_static backend/tests/infra/test_compose_static.py` зелёный;
-  `HTTP_PORT=18080 HTTPS_PORT=18443 docker compose -p gostracker-infratest up -d --build --wait`,
-  затем `GT_INFRA_STACK=1 GT_INFRA_PROJECT=gostracker-infratest HTTP_PORT=18080 HTTPS_PORT=18443 pytest -q -m infra_stack backend/tests/infra`
-  зелёный, затем `docker compose -p gostracker-infratest down -v` (удаляются только тома тестового проекта).
+  `HTTP_PORT=18080 HTTPS_PORT=18443 docker compose -p gtrack-infratest up -d --build --wait`,
+  затем `GT_INFRA_STACK=1 GT_INFRA_PROJECT=gtrack-infratest HTTP_PORT=18080 HTTPS_PORT=18443 pytest -q -m infra_stack backend/tests/infra`
+  зелёный, затем `docker compose -p gtrack-infratest down -v` (удаляются только тома тестового проекта).
 - **Заметка ревью T12:** infra_stack-тест входа и POST при `HTTPS_PORT=8443` (Origin с портом) — без ложного `origin_mismatch`.
 - **Заметка ревью T16:** документация оператора — `INITIAL_ADMIN_LOGIN` читается без `.strip()`: значение с пробелами/переводом строки по краям даёт ошибку запуска (без значения в тексте).
 - **Заметка ревью T16:** `idle_in_transaction_session_timeout` на уровне БД и `lock_timeout` для админ-действий (зависшая транзакция админа блокирует остальные админ-действия пространства).
 - **Перенесено из ревью T10/T20 (не терять):** (2) при ошибке COMMIT перед удалением файла пароля проверять отдельной сессией, не зафиксировано ли пространство; (4) удалять остатки `.<name>.*.tmp` под блокировкой, `ensure_private_dir` — `lstat`/`S_ISDIR` и 0755 → 0700; (5) advisory lock на AUTOCOMMIT-соединении, `_known_secrets` из `settings`, `path_separator = os` в `alembic.ini` (предупреждение alembic в логах); `run_bootstrap(locked: bool)` → токен-маркер от `bootstrap_lock`; не логировать `/api/v1/health` в INFO (≈8,6 тыс. строк/сутки от HEALTHCHECK) — правка теста T09; Dockerfile: слой зависимостей до исходников и очистка `/app/build`, `*.egg-info`.
-- **Перенесено из ревью T25:** (1) `deploy/web/10-gostracker-tls.sh`: временные файлы через `mktemp` в каталоге генерации (PID одинаков в контейнерах — гонка двух контейнеров на одном томе); перед использованием сгенерированной пары сверять открытые ключи и `-checkend 0`, при несовпадении/просрочке перегенерировать с сообщением в лог (не для сертификата оператора); предупреждение, если оператор положил только один из файлов; не глушить stderr openssl, проверка длины `TLS_SERVER_NAME` (≤ 64); (2) проверять `HTTPS_PORT` — число 1…65535, иначе понятная ошибка; (3) `.gitignore`: `deploy/tls/*` + `!deploy/tls/README.md`; (4) в compose у web: `HTTPS_PORT: ${HTTPS_PORT:-443}`, `TLS_SERVER_NAME: ${TLS_SERVER_NAME:-localhost}`, контекст сборки `.`, `dockerfile: deploy/web/Dockerfile`; api собирать строго с контекстом `./backend` (корневой `.dockerignore` — белый список: только `frontend` и `deploy/web`); одна реплика web на том `tls-generated`; healthcheck api только GET (HEAD `/api/v1/health` → 405); HEALTHCHECK у web; (5) infra_stack: вход и POST при `HTTPS_PORT=8443` с Origin с портом, подставной `X-Forwarded-Proto` ни на что не влияет; (6) тесты: 404 для отсутствующего `/assets/*`, `/api` не отдаёт index, `Cache-Control: no-cache` у index.html, `server_tokens off`, отказ при `TLS_SERVER_NAME` с `;`, `$(...)`; (7) ответы 502/400/405 от nginx на `/api` приходят HTML, не ErrorResponse — клиент T22 переносит (`invalid_response`), принять как известное; 413 с кодом `attachment_too_large` для любого пути.
+- **Перенесено из ревью T25:** (1) `deploy/web/10-gtrack-tls.sh`: временные файлы через `mktemp` в каталоге генерации (PID одинаков в контейнерах — гонка двух контейнеров на одном томе); перед использованием сгенерированной пары сверять открытые ключи и `-checkend 0`, при несовпадении/просрочке перегенерировать с сообщением в лог (не для сертификата оператора); предупреждение, если оператор положил только один из файлов; не глушить stderr openssl, проверка длины `TLS_SERVER_NAME` (≤ 64); (2) проверять `HTTPS_PORT` — число 1…65535, иначе понятная ошибка; (3) `.gitignore`: `deploy/tls/*` + `!deploy/tls/README.md`; (4) в compose у web: `HTTPS_PORT: ${HTTPS_PORT:-443}`, `TLS_SERVER_NAME: ${TLS_SERVER_NAME:-localhost}`, контекст сборки `.`, `dockerfile: deploy/web/Dockerfile`; api собирать строго с контекстом `./backend` (корневой `.dockerignore` — белый список: только `frontend` и `deploy/web`); одна реплика web на том `tls-generated`; healthcheck api только GET (HEAD `/api/v1/health` → 405); HEALTHCHECK у web; (5) infra_stack: вход и POST при `HTTPS_PORT=8443` с Origin с портом, подставной `X-Forwarded-Proto` ни на что не влияет; (6) тесты: 404 для отсутствующего `/assets/*`, `/api` не отдаёт index, `Cache-Control: no-cache` у index.html, `server_tokens off`, отказ при `TLS_SERVER_NAME` с `;`, `$(...)`; (7) ответы 502/400/405 от nginx на `/api` приходят HTML, не ErrorResponse — клиент T22 переносит (`invalid_response`), принять как известное; 413 с кодом `attachment_too_large` для любого пути.
 - **Заметки ревью T26:** перенесены в T27/T28 (блоки «Перенесено из ревью T26»).
 - **Попытки:** 1
 
@@ -587,10 +587,10 @@ SKIPPED (следующая версия). Статусы ведёт оркес�
 - **Заметка ревью T16a:** AST-тест `commit_durably` — требовать равенство `{auth/service.py, api/deps.py}`; тест числа COMMIT на запрос — `== 2`; mypy на `backend/tests` (≈13 ошибок типов в conftest и др.) — решить, проверять ли тесты.
 - **Заметка ревью T17:** `test_admin_roles.py::note_b` — ужесточить до `== 401` для параллельно заблокированного в смене пароля.
 - **Наблюдение (оркестратор, T18):** фильтр журнала по `actor_id` без совпадений уходит в `Seq Scan` (1,6 мс на 30 000 строк); при росте журнала (R1.1+, десятки тысяч событий на проект) рассмотреть частичный индекс `(workspace_id, actor_id, id DESC) WHERE in_audit`; замер объёма — в нагрузочном прогоне NFR-2 (R1.4).
-- **Заметки ревью T19:** вынести `_safe_description`/`wait_for_database`/`BootstrapError` из `bootstrap` в общий модуль CLI; в OpenAPI уточнить 403 у login/logout/password до `origin_mismatch` и объявить 500/default с `ErrorResponse`; `hash-bench` при неверных `ARGON2_*` печатать причину; R1.1 — единый `gostracker maintenance` с `--dry-run` и unit-тест `purge_expired_sessions` на точных границах (8 ч, ±1 мкс, `absolute == now`).
+- **Заметки ревью T19:** вынести `_safe_description`/`wait_for_database`/`BootstrapError` из `bootstrap` в общий модуль CLI; в OpenAPI уточнить 403 у login/logout/password до `origin_mismatch` и объявить 500/default с `ErrorResponse`; `hash-bench` при неверных `ARGON2_*` печатать причину; R1.1 — единый `gtrack maintenance` с `--dry-run` и unit-тест `purge_expired_sessions` на точных границах (8 ч, ±1 мкс, `absolute == now`).
 - **Открытый вопрос (оркестратор, T20):** `ruff check backend` обнаружил I001 в `backend/tests/cli/test_bootstrap.py` (:430, :532) и `backend/tests/api/test_deps_gates.py` (:147), существовавшие с T10/T12, хотя `bash scripts/check.sh` на тех задачах был зелёным; воспроизводится и с `--no-cache`, причина молчания прежних запусков не установлена. В CI запускать линтер на чистой выгрузке без кэша (`--no-cache`), версию ruff закрепить в `pyproject.toml`.
-- **Перенесено из ревью T26:** (1) CI infra-задание строго в порядке `up` → `pytest -m infra_stack` → `down -v` на свежем проекте (тесты first_run зависят от порядка/состояния), при ошибке — `docker compose logs`; только infra_stack ловит удаление `lock_timeout`; (2) `test_stack_first_run.py`: проверка свежести стека в начале модуля (`pytest.fail("нужен свежий стек: down -v")` вместо 9 каскадных KeyError) и статическая проверка `lock_timeout`/`idle_in_transaction_session_timeout` в `test_compose_static.py`; (3) `lock_timeout=30s` задан на весь сервер: в соединении блокировки bootstrap и в alembic — `SET lock_timeout = 0` (второй bootstrap по plan §4.7 ждёт); ответ на `LockNotAvailableError` сейчас 500 `internal_error` — код ошибки нужен в spec/plan (R1.1); (4) `deploy/web/10-gostracker-tls.sh`: удалять остатки `.tls.*.??????` (с закрытым ключом) под flock; `ensure_secret_key`: чистить `.secret_key.*.tmp`; (5) HEALTHCHECK web пишет `GET /` в access-лог nginx каждые 10 с — отдельный location с `access_log off`; (6) `restart: unless-stopped` — решить через plan (сейчас нет restart policy; иначе описать в T28); (7) `.gitignore`: строки `deploy/tls/*.crt|*.key` лишние (покрыты `deploy/tls/*`); bootstrap печатает путь к файлу пароля дважды.
-- **Заметки ревью T27 (R1.1+/T28):** (1) код ошибки для `LockNotAvailableError` (сейчас 500 `internal_error`, нужен пункт в spec/plan); (2) mypy на `backend/tests` (с `--explicit-package-bases` ≈64 ошибки в 15 файлах; без флага не стартует — конфликт имён `conftest`); (3) заметки T19, не сделанные в T27: вынос `_safe_description`/`wait_for_database`/`BootstrapError`, уточнение 403/500 в OpenAPI, причина в `hash-bench`, `gostracker maintenance --dry-run`, unit-тест границ `purge_expired_sessions`; (4) частичный индекс журнала по `actor_id` — по замеру NFR-2 (R1.4); (5) пины `actions/*` (v4/v5/v4) работают на рантайме Node 20 — поднять мажоры при первом прогоне CI; (6) `.gitignore`: лишние строки `deploy/tls/*.crt|*.key` (тест T25 их требует — убрать вместе с тестом); (7) T28 (документация): семантика `restart: unless-stopped` (после `docker stop`/`kill` не поднимается; unhealthy не перезапускается); bootstrap и миграции ждут блокировки бессрочно (`lock_timeout=0`), зависшая блокировка → api не healthy и `up --wait` висит; `/healthz` доступен снаружи (200 «ok»); infra_stack требует свежий стек (`down -v`); требования к Node; Content-Type `/healthz` — косметика.
+- **Перенесено из ревью T26:** (1) CI infra-задание строго в порядке `up` → `pytest -m infra_stack` → `down -v` на свежем проекте (тесты first_run зависят от порядка/состояния), при ошибке — `docker compose logs`; только infra_stack ловит удаление `lock_timeout`; (2) `test_stack_first_run.py`: проверка свежести стека в начале модуля (`pytest.fail("нужен свежий стек: down -v")` вместо 9 каскадных KeyError) и статическая проверка `lock_timeout`/`idle_in_transaction_session_timeout` в `test_compose_static.py`; (3) `lock_timeout=30s` задан на весь сервер: в соединении блокировки bootstrap и в alembic — `SET lock_timeout = 0` (второй bootstrap по plan §4.7 ждёт); ответ на `LockNotAvailableError` сейчас 500 `internal_error` — код ошибки нужен в spec/plan (R1.1); (4) `deploy/web/10-gtrack-tls.sh`: удалять остатки `.tls.*.??????` (с закрытым ключом) под flock; `ensure_secret_key`: чистить `.secret_key.*.tmp`; (5) HEALTHCHECK web пишет `GET /` в access-лог nginx каждые 10 с — отдельный location с `access_log off`; (6) `restart: unless-stopped` — решить через plan (сейчас нет restart policy; иначе описать в T28); (7) `.gitignore`: строки `deploy/tls/*.crt|*.key` лишние (покрыты `deploy/tls/*`); bootstrap печатает путь к файлу пароля дважды.
+- **Заметки ревью T27 (R1.1+/T28):** (1) код ошибки для `LockNotAvailableError` (сейчас 500 `internal_error`, нужен пункт в spec/plan); (2) mypy на `backend/tests` (с `--explicit-package-bases` ≈64 ошибки в 15 файлах; без флага не стартует — конфликт имён `conftest`); (3) заметки T19, не сделанные в T27: вынос `_safe_description`/`wait_for_database`/`BootstrapError`, уточнение 403/500 в OpenAPI, причина в `hash-bench`, `gtrack maintenance --dry-run`, unit-тест границ `purge_expired_sessions`; (4) частичный индекс журнала по `actor_id` — по замеру NFR-2 (R1.4); (5) пины `actions/*` (v4/v5/v4) работают на рантайме Node 20 — поднять мажоры при первом прогоне CI; (6) `.gitignore`: лишние строки `deploy/tls/*.crt|*.key` (тест T25 их требует — убрать вместе с тестом); (7) T28 (документация): семантика `restart: unless-stopped` (после `docker stop`/`kill` не поднимается; unhealthy не перезапускается); bootstrap и миграции ждут блокировки бессрочно (`lock_timeout=0`), зависшая блокировка → api не healthy и `up --wait` висит; `/healthz` доступен снаружи (200 «ok»); infra_stack требует свежий стек (`down -v`); требования к Node; Content-Type `/healthz` — косметика.
 - **Попытки:** 2
 
 ## T28 — Документация R1.0
@@ -659,9 +659,9 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
   `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` и
   `pytest -q -m infra_static backend/tests/infra/test_frontend_scaffold.py`.
 - Задачи с `infra_stack`: стек поднимается заново из текущего дерева —
-  `HTTP_PORT=18080 HTTPS_PORT=18443 docker compose -p gostracker-infratest up -d --build --wait`,
-  затем `GT_INFRA_STACK=1 GT_INFRA_PROJECT=gostracker-infratest HTTP_PORT=18080 HTTPS_PORT=18443 pytest -q -m infra_stack <файлы>`,
-  затем `docker compose -p gostracker-infratest down -v` (только тестовый проект).
+  `HTTP_PORT=18080 HTTPS_PORT=18443 docker compose -p gtrack-infratest up -d --build --wait`,
+  затем `GT_INFRA_STACK=1 GT_INFRA_PROJECT=gtrack-infratest HTTP_PORT=18080 HTTPS_PORT=18443 pytest -q -m infra_stack <файлы>`,
+  затем `docker compose -p gtrack-infratest down -v` (только тестовый проект).
 - Конкурентные сценарии (параллельные запросы через HTTP, ≥ 100 итераций, без 500), где они
   указаны в задаче, — по образцу `tests/api/test_session_row_lock.py` (T16a).
 
@@ -724,19 +724,19 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
   (поля — plan §10.4; в этой задаче заполняется `sessions_expired`, остальные счётчики — 0, их
   заполнит T54). `purge_expired_sessions(..., dry_run: bool = False)`: при `dry_run` — только
   `count(*)` тем же предикатом (`last_activity_at <= now − idle` или `absolute_expires_at <= now`),
-  ничего не удаляется. CLI: `gostracker maintenance [--dry-run]`; ожидание БД — как сейчас; stdout
+  ничего не удаляется. CLI: `gtrack maintenance [--dry-run]`; ожидание БД — как сейчас; stdout
   — строки `ключ=значение` в порядке полей отчёта (`dry_run=0|1`, `sessions_expired=N`,
   `projects_purged=N`, `tasks_purged=N`, `comments_purged=N`, `attachments_purged=N`,
   `files_removed=N`, `orphan_files_removed=N`), ошибки — в stderr без DSN; код 0/1. Границы
   (тест с явным `now`): `last_activity_at = now − 8 ч` — удаляется, `now − 8 ч + 1 мкс` — нет;
   `absolute_expires_at = now` — удаляется, `now + 1 мкс` — нет. README (ru и en): зачем
   запускать (корзина 30 дней и истёкшие сессии без запуска не очищаются, FR-25b), пример
-  `crontab` — `17 3 * * * cd /opt/gostracker && docker compose exec -T api gostracker maintenance >> /var/log/gostracker-maintenance.log 2>&1`,
+  `crontab` — `17 3 * * * cd /opt/gtrack && docker compose exec -T api gtrack maintenance >> /var/log/gtrack-maintenance.log 2>&1`,
   `--dry-run`, безопасность при работающем API. Сервис compose и запуск из api не добавлять
   (D-42: «фонового планировщика в R1 нет»).
 - **Готово, когда:** `pytest -q backend/tests/db/test_purge_sessions_boundaries.py backend/tests/cli/test_maintenance.py` и
   `pytest -q -m infra_static backend/tests/infra/test_docs_static.py` зелёные, линтер чистый.
-- **Заметки ревью T31 (в T54/T57):** (1) README: `/opt/gostracker` заменить на «каталог клона», запуск под пользователем с доступом к Docker, при `COMPOSE_PROJECT_NAME`/`-p` указать его в cron-строке; добавить `date -u` перед командой в примере; (2) предикат истечения сессий продублирован в dry-run и удалении — вынести в одно выражение (T54); (3) T54: срок корзины — момент UTC (`deleted_at <= now − 30 дней`, plan §4.10), пакеты короткие, занятые строки пропускаются — сохранить верным в README; снимок `FixedClock` на запуск корректен.
+- **Заметки ревью T31 (в T54/T57):** (1) README: `/opt/gtrack` заменить на «каталог клона», запуск под пользователем с доступом к Docker, при `COMPOSE_PROJECT_NAME`/`-p` указать его в cron-строке; добавить `date -u` перед командой в примере; (2) предикат истечения сессий продублирован в dry-run и удалении — вынести в одно выражение (T54); (3) T54: срок корзины — момент UTC (`deleted_at <= now − 30 дней`, plan §4.10), пакеты короткие, занятые строки пропускаются — сохранить верным в README; снимок `FixedClock` на запуск корректен.
 - **Попытки:** 1
 
 ## T32 — Мелочи приёмки R1.0: сквозные AC-2/AC-64, сканер строк, `--wait`, имя тестовой БД
@@ -1235,7 +1235,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
   (`@pytest.mark.committed`: AC-63 — задача с вложением, проект, комментарий и вложение в
   корзине 31 день удалены вместе с файлами, объекты 29 дней не тронуты; AC-66; `--dry-run` ничего
   не меняет и печатает те же счётчики), `backend/tests/infra/test_stack_maintenance.py`
-  (`infra_stack`: `docker compose exec -T api gostracker maintenance --dry-run` — код 0, строки `ключ=число`)
+  (`infra_stack`: `docker compose exec -T api gtrack maintenance --dry-run` — код 0, строки `ключ=число`)
 - **Зависит от:** T31, T52
 - **Описание:** Шаг «корзина»: по каждому пространству — идентификаторы проектов, задач,
   комментариев, вложений с `deleted_at <= now − trash_retention`, пачками ≤ 500 на транзакцию →
@@ -1412,7 +1412,7 @@ Q-1…Q-9), приёмке R1.0 (`reviews/R1.0-acceptance.md`, раздел «R1
 - **Зависит от:** T29–T65
 - **Описание:** Сверить трассировку plan §10.7 (каждый AC R1.1 — тест существует и зелёный;
   части других этапов помечены); `bash scripts/check.sh`; свежий стек `up -d --build --wait` и
-  `infra_stack` целиком; на стеке — `gostracker maintenance --dry-run`; `alembic downgrade 0003` →
+  `infra_stack` целиком; на стеке — `gtrack maintenance --dry-run`; `alembic downgrade 0003` →
   `upgrade head` на тестовой БД; ручной прогон UF-3, UF-4, UF-6, UF-9, UF-10 в Chromium с
   клавиатуры (предварительная AC-97); статус вопросов Q-1…Q-9 и Д-1…Д-8.
 - **Готово, когда:** `bash scripts/check.sh` и `infra_stack` зелёные; ревьюер подтверждает трассировку.
@@ -2046,7 +2046,7 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Статус:** DONE
 - **AC:** NFR-3, NFR-11, AC-1 (подготовка), D-64; заметки ревью T31 п.1 (README: каталог клона, `-p`, `date -u`)
 - **Файлы:** `README.md` (ru и en: состав MVP-демо и что отложено; загрузка демо-данных
-  `docker compose exec api gostracker demo-data` и чтение паролей; сценарий демо; обслуживание — только
+  `docker compose exec api gtrack demo-data` и чтение паролей; сценарий демо; обслуживание — только
   истёкшие сессии, корзины в MVP нет), `docs/data-model.md` (раздел MVP: мягкое удаление без корзины,
   `deleted_batch_id`, какие события пишутся), `docs/acceptance/mvp-demo.md` (новый чек-лист: AC-1,
   AC-5, AC-97 в объёме MVP, AC-98, сценарий UF-2…UF-6, проверка опроса ≤ 15 с вместо AC-107);
@@ -2067,8 +2067,8 @@ B1.1-C → T46–T48; B1.1-D → T49–T51; B1.1-E → T31, T52–T54; B1.1-F �
 - **Зависит от:** T29, T35, T67–T88
 - **Описание:** Сверить трассировку plan §11.7 (каждый AC — тест существует и зелёный; частичные
   AC — отложенная часть в реестре); `bash scripts/check.sh`; свежий стек `up -d --build --wait` и
-  `infra_stack` целиком; на стеке — `gostracker demo-data`, вход демо-пользователем, смена пароля;
-  `gostracker maintenance --dry-run`; `alembic downgrade 0003` → `upgrade head` на тестовой БД; ручной
+  `infra_stack` целиком; на стеке — `gtrack demo-data`, вход демо-пользователем, смена пароля;
+  `gtrack maintenance --dry-run`; `alembic downgrade 0003` → `upgrade head` на тестовой БД; ручной
   прогон `docs/acceptance/mvp-demo.md` в Chromium (в т.ч. с клавиатуры и двумя пользователями на
   доске).
 - **Готово, когда:** `bash scripts/check.sh` и `infra_stack` зелёные; чек-лист пройден; ревьюер подтверждает трассировку.

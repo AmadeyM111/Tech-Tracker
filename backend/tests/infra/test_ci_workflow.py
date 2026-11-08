@@ -215,7 +215,7 @@ def test_nfr10_contract_job_regenerates_and_diffs(jobs: dict[str, dict[str, Any]
     diff = re.search(r"git diff --exit-code", runs)
     assert gen and diff and gen.start() < diff.start()
     assert "docs/api" in runs and "schema.d.ts" in runs, "diff должен охватывать оба артефакта"
-    assert re.search(r"pip install -e [\"']?backend", runs), "gostracker openapi нужен пакет"
+    assert re.search(r"pip install -e [\"']?backend", runs), "gtrack openapi нужен пакет"
     assert re.search(r"npm (--prefix frontend |ci)", runs), "gen:api нужны зависимости фронтенда"
 
 
@@ -231,7 +231,7 @@ def test_nfr10_infra_job_needs_backend_and_frontend(jobs: dict[str, dict[str, An
 def test_nfr10_infra_job_project_ports_and_order(jobs: dict[str, dict[str, Any]]) -> None:
     job = _job(jobs, "infra")
     text = _job_text(job)
-    for token in ("gostracker-infratest", "18080", "18443"):
+    for token in ("gtrack-infratest", "18080", "18443"):
         assert token in text, token
     assert re.search(r"GT_INFRA_STACK['\"]?:\s*['\"]?1|GT_INFRA_STACK=1", text)
     steps = _steps(job)
@@ -248,7 +248,7 @@ def test_nfr10_infra_job_project_ports_and_order(jobs: dict[str, dict[str, Any]]
     tests = index(r"pytest\b[^\n]*-m\s+[\"']?infra_stack")
     down = index(r"compose\b[^\n]*\bdown\b[^\n]*-v")
     assert up < tests < down
-    assert "-p gostracker-infratest" in str(steps[up]["run"]) or "COMPOSE_PROJECT_NAME" in text
+    assert "-p gtrack-infratest" in str(steps[up]["run"]) or "COMPOSE_PROJECT_NAME" in text
 
 
 def test_nfr10_infra_job_logs_on_failure_and_always_down(jobs: dict[str, dict[str, Any]]) -> None:

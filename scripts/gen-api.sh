@@ -6,8 +6,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-# Схема не требует БД и секретов: `gostracker openapi` их не читает.
-gostracker openapi --out docs/api/openapi.json
+# Схема не требует БД и секретов: `gtrack openapi` их не читает.
+gtrack openapi --out docs/api/openapi.json
 echo "docs/api/openapi.json обновлён"
 
 if [ -f frontend/package.json ]; then

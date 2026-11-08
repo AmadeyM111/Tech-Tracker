@@ -26,7 +26,7 @@
   (`tests/shared/theme.test.ts`, `tests/shared/typography.test.ts`).
 - **БД.** Деструктивные операции — только в тестовой БД `*_test`. Тома Docker (`pgdata`,
   `appdata`) не удалять. Окружение — AGENTS.md, «Команды»: БД разработки
-  `docker compose -p gostracker-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db`,
+  `docker compose -p gtrack-dev -f docker-compose.yml -f deploy/compose.dev.yml up -d db`,
   `export TEST_DATABASE_URL=postgresql+asyncpg://tracker:tracker@localhost:5432/tracker_test`.
 - **Время в тестах** (NFR-6, plan §5): бэкенд — фикстура `fixed_clock` и `fixed_clock.set(...)`;
   фронтенд — `vi.setSystemTime(...)` и `vi.stubEnv("TZ", "UTC")`. Реальная дата и пояс машины
