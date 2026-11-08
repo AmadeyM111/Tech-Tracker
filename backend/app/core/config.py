@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     smtp_starttls: bool = True
     public_base_url: str | None = None
+    # [010] рабочая роль БД процесса API; пусто — API под DATABASE_URL (только не production)
+    db_app_role: str | None = None
 
     @field_validator(
         "session_idle_timeout",
@@ -81,6 +83,7 @@ class Settings(BaseSettings):
         "smtp_password",
         "smtp_from",
         "public_base_url",
+        "db_app_role",
         mode="before",
     )
     @classmethod

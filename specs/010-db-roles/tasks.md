@@ -12,7 +12,7 @@
 ## D10-T01 — Пароль, SCRAM и роль
 - **Статус:** TODO
 - **AC:** AC-1, AC-2, AC-3, AC-5, AC-6 (часть)
-- **Файлы:** `backend/app/core/config.py`, `backend/app/core/db_roles.py`, `backend/tests/unit/test_010_scram.py`, `backend/tests/db/test_010_app_role.py`
+- **Файлы:** `backend/app/core/config.py`, `backend/app/core/db.py` (`create_engine(url=)`), `backend/app/core/db_roles.py`, `backend/tests/unit/test_010_scram.py`, `backend/tests/db/test_010_app_role.py`
 - **Зависит от:** —
 - **Описание:** PR-3, PR-4; `ensure_app_password`, `scram_verifier`, `ensure_app_role`, `app_database_url`.
 - **Готово, когда:** тесты зелёные.
