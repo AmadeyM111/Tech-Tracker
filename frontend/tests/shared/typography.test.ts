@@ -39,7 +39,6 @@ const OLD: Record<string, number> = {
   ".ui-secret code": 20,
   "[data-column] h3": 14,
   'li[data-task-id] [data-field]:not([data-field="title"])': 13,
-  ".sum-count": 28, // 008 «Сводка»: число в плитке 2rem (макет Shared/Design/gtrack-summary)
 };
 
 describe("T100 font sizes +4px", () => {

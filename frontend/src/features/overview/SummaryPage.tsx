@@ -21,6 +21,7 @@ import {
   type SummaryFilters,
   type Tile,
 } from "./filters";
+import "./summary.css";
 
 const TILES: readonly Tile[] = ["needs_review", "total", ...STATUSES];
 const YMD = /^(\d{4})-(\d{2})-(\d{2})/;
