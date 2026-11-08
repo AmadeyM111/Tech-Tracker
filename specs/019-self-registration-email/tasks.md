@@ -234,12 +234,13 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 2. Тесты: 101 passed (T09 + T08 + миграции-список + unit); ruff, mypy, task_scope чисты. Исправления ревью: (1) client_ip=None → общая корзина «no-ip» (тест test_019_ac18_unknown_ip_shares_one_bucket), требует подтверждения владельца; (2) repr=False у полей _Checked; (3) шаблон письма зафиксирован явными строками; (4) контрольная проверка caplog. Открыто: вопрос владельцу о client_ip=None (вариант A — общая корзина, принят по умолчанию).
 
 ## R8-T10 — Домен: подтверждение регистрации
-- **Статус:** TODO
+- **Статус:** DONE (ревью: FAIL по порядку пространства → исправлено; 2026-11-08)
 - **AC:** AC-9, AC-10, AC-13, AC-14, AC-16 (домен), AC-19, AC-28, AC-38
 - **Файлы:** `backend/app/domain/auth/registration.py`;
-  тесты: `backend/tests/domain/test_019_confirm_registration.py` (новый)
+  тесты: `backend/tests/domain/test_019_confirm_registration.py` (новый);
+  `specs/019-self-registration-email/plan.md` (примечание к RG-8 и RG-9 по ревью: пространство первым; см. «Попытки»)
 - **Зависит от:** R8-T09
-- **Описание:** `confirm_registration` строго в порядке RG-8. `commit_durably` вызывается после `register_attempt`
+- **Описание:** `confirm_registration` в порядке RG-8 с пространством первым (ревью). `commit_durably` вызывается после `register_attempt`
   и в ветках «адрес занят» / «логин занят» после удаления заявки и перед `raise` (RG-6). Новая учётная запись
   создаётся по plan §4.3 (`self_registered=True`, `must_change_password=False`, `created_by=NULL`,
   `workspace_member.role=NULL`). Гонки ловятся savepoint'ом (`db.begin_nested()`, `ON CONFLICT (login) DO NOTHING`,
@@ -250,7 +251,7 @@ T17, T19, T20, T21), тоже последовательно.
   заявки нет, повтор → 400 (AC-28); шестая попытка по токену и 21-я с IP → `RateLimited` (AC-38); одно событие с
   `actor_id = entity_id`, неудачи событий не пишут (AC-19); `user_session` пуст (AC-16).
 - **Готово, когда:** `source .venv/bin/activate && pytest -q backend/tests/domain/test_019_confirm_registration.py backend/tests/domain/test_019_request_registration.py` зелёный; «Линт бэкенда» чист
-- **Попытки:** 0
+- **Попытки:** 2. Тесты: 99 passed (test_019_confirm_registration, test_019_request_registration, `test_commit_durably_used_only_by_auth_service`); ruff check и format, mypy чисты; task_scope exit 0 (plan.md добавлен в «Файлы»). Исправления ревью: (1) MAJOR: при подтверждении пространство проверяется первым, сразу после политики и до лимитов и токена, как в RG-7 (`confirm_registration`, docstring модуля и функции, RG-8 в plan §2); неверный токен при 0 или 2 пространствах даёт 404 и не пишет попыток. Тесты `…_wrong_token_with_zero_workspaces_…`, `…_wrong_token_with_two_workspaces_…`, `…_valid_token_with_zero_workspaces_works_after_one_is_back` падали на прежнем порядке; (2) граница 30:00 добавлена в AC-10 (ловит `>` → `>=`, проверено мутацией). Открыто, ждёт подтверждения владельца: `client_ip=None` → общая корзина «no-ip» и для confirm, как в T09 (вариант A по умолчанию). Долг (minor, до T22): число коммитов на успешном пути и `FOR UPDATE` тестами не покрыты.
 
 ## R8-T11 — Публичный API регистрации
 - **Статус:** TODO
@@ -513,7 +514,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T07 | DONE |
 | R8-T08 | DONE |
 | R8-T09 | DONE |
-| R8-T10 | TODO |
+| R8-T10 | DONE |
 | R8-T11 | TODO |
 | R8-T12 | TODO |
 | R8-T13 | TODO |
