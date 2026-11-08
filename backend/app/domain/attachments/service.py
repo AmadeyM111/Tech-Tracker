@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -16,13 +17,13 @@ from sqlalchemy import func, select
 
 from app.core.clock import utcnow
 from app.core.config import Settings
-from app.core.errors import Forbidden, NotFound, TooManyAttachments
+from app.core.errors import Forbidden, NotFound, PayloadTooLarge, TooManyAttachments
 from app.domain.access.policy import can_edit_task_fully, can_read_project_content
 from app.domain.access.roles import Actor
 from app.domain.attachments import storage
 from app.domain.attachments.models import Attachment
 from app.domain.attachments.queries import AttachmentView, view_of
-from app.domain.attachments.types import CONTENT_TYPES, clean_name, detect_kind
+from app.domain.attachments.types import FileKind, clean_name, content_type_for, detect_kind
 from app.domain.events.catalog import EventAction
 from app.domain.events.writer import record_event
 from app.domain.tasks.context import load_task_context
@@ -33,12 +34,13 @@ if TYPE_CHECKING:
 
 
 async def _lock_task(db: AsyncSession, task_id: UUID) -> None:
-    """``FOR SHARE`` на живой задаче: удаление задачи ждёт окончания загрузки (лимит FR-3)."""
+    """``FOR NO KEY UPDATE`` на живой задаче: загрузки в одну задачу идут по очереди, иначе
+    параллельные запросы обходят лимит FR-3 (ревью 011, п. 1); удаление задачи ждёт загрузку."""
     locked = (
         await db.execute(
             select(Task.id)
             .where(Task.id == task_id, Task.deleted_at.is_(None))
-            .with_for_update(read=True)
+            .with_for_update(key_share=True)
         )
     ).first()
     if locked is None:
@@ -59,6 +61,11 @@ async def _live_count(db: AsyncSession, actor: Actor, task_id: UUID) -> int:
     )
 
 
+def _detect(name: str, staged: storage.StagedFile) -> tuple[FileKind, str]:
+    kind = detect_kind(name, staged.head, staged.path)
+    return kind, content_type_for(kind, staged.path)
+
+
 async def add_attachment(
     db: AsyncSession,
     actor: Actor,
@@ -67,20 +74,30 @@ async def add_attachment(
     *,
     name: str,
     chunks: AsyncIterator[bytes],
+    declared_size: int | None = None,
 ) -> AttachmentView:
-    """Прикрепляет файл к задаче (FR-1…FR-5, FR-8, FR-10)."""
-    ctx = await load_task_context(db, actor, task_id, lock_project="share")
+    """Прикрепляет файл к задаче (FR-1…FR-5, FR-8, FR-10).
+
+    Тело читается до блокировок (медленный клиент не держит блокировку задачи); тип проверяется
+    в потоке (не блокирует цикл событий); лимит и запись — под блокировкой задачи.
+    """
+    ctx = await load_task_context(db, actor, task_id)
     if not can_read_project_content(actor, ctx.project):
         raise Forbidden()
+    if declared_size is not None and declared_size > settings.attachment_max_bytes:
+        raise PayloadTooLarge(f"Файл больше {settings.attachment_max_bytes} байт")
     original = clean_name(name)
     root = settings.attachments_dir
     storage.check_free_space(root, settings.attachments_min_free_mb)
-    await _lock_task(db, task_id)
-    if await _live_count(db, actor, task_id) >= settings.attachments_per_task:
-        raise TooManyAttachments()
     staged = await storage.stage(root, chunks, max_bytes=settings.attachment_max_bytes)
     try:
-        kind = detect_kind(original, staged.head, staged.path)
+        kind, content_type = await asyncio.to_thread(_detect, original, staged)
+        ctx = await load_task_context(db, actor, task_id, lock_project="share")
+        if not can_read_project_content(actor, ctx.project):
+            raise Forbidden()
+        await _lock_task(db, task_id)
+        if await _live_count(db, actor, task_id) >= settings.attachments_per_task:
+            raise TooManyAttachments()
         stored = storage.publish(root, staged)
     except BaseException:
         storage.discard(staged.path)
@@ -93,7 +110,7 @@ async def add_attachment(
             created_by=actor.user_id,
             original_name=original,
             kind=kind,
-            content_type=CONTENT_TYPES[kind],
+            content_type=content_type,
             size_bytes=staged.size,
             sha256=staged.sha256,
             storage_key=staged.key,
@@ -108,10 +125,10 @@ async def add_attachment(
             entity_id=row.id,
             project_id=ctx.project.project_id,
         )
+        return await view_of(db, actor, row, ctx.project, ctx.task)
     except BaseException:
         storage.discard(stored)
         raise
-    return await view_of(db, actor, row, ctx.project, ctx.task)
 
 
 async def delete_attachment(db: AsyncSession, actor: Actor, attachment_id: UUID) -> None:

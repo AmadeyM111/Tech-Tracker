@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -76,9 +77,15 @@ class ExportError(RuntimeError):
 def _attachment_files(settings: Settings, payload: dict[str, Any]) -> dict[str, Path]:
     """Файлы живых вложений (spec 011 FR-11); отсутствующий файл — ошибка, а не тихий пропуск."""
     files: dict[str, Path] = {}
-    for key in expected_files(payload["tables"]):
+    for key, (sha, size) in expected_files(payload["tables"]).items():
         path = final_path(settings.attachments_dir, key)
         if not path.is_file():
             raise ExportError(f"нет файла вложения {key}")
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            while chunk := handle.read(1024 * 1024):
+                digest.update(chunk)
+        if path.stat().st_size != size or digest.hexdigest() != sha:
+            raise ExportError(f"файл вложения {key} повреждён: размер или sha256 не совпадает")
         files[key] = path
     return files

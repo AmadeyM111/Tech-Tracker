@@ -69,7 +69,9 @@ async def test_011_ac7_purge_after_retention_and_orphans(
     live = await _attachment(committed, settings, deleted_days=None)
     old_orphan = _orphan(settings, "ab/" + "ab" * 16, hours_old=2)
     young_orphan = _orphan(settings, "cd/" + "cd" * 16, hours_old=0.1)
-    stale_upload = _orphan(settings, f"{INCOMING}/" + "ef" * 16, hours_old=3)
+    stale_upload = _orphan(settings, f"{INCOMING}/" + "ef" * 16, hours_old=25)
+    # идущий импорт или загрузка: в .incoming запас 24 ч (ревью 011, п. 5)
+    running_import = _orphan(settings, f"{INCOMING}/" + "12" * 16 + ".import", hours_old=3)
 
     dry = await purge_attachments(committed, settings, now=utcnow(), dry_run=True)
     assert (dry.attachments_purged, dry.files_removed, dry.orphan_files_removed) == (1, 1, 2)
@@ -82,7 +84,7 @@ async def test_011_ac7_purge_after_retention_and_orphans(
         2,
     )
     assert not expired.exists() and not old_orphan.exists() and not stale_upload.exists()
-    assert recent.exists() and live.exists() and young_orphan.exists()
+    assert recent.exists() and live.exists() and young_orphan.exists() and running_import.exists()
     async with committed() as s:
         assert (await s.execute(select(func.count()).select_from(Attachment))).scalar_one() == 2
 

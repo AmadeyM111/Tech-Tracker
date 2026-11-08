@@ -25,6 +25,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 ORPHAN_GRACE: Final = timedelta(hours=1)
+# незавершённые загрузки и файлы идущего импорта в ``.incoming``: запас на долгий импорт
+INCOMING_GRACE: Final = timedelta(hours=24)
 _KEY: Final = re.compile(r"[0-9a-f]{32}")
 
 
@@ -35,8 +37,8 @@ class PurgeReport:
     orphan_files_removed: int
 
 
-def _old(path: Path, now: datetime) -> bool:
-    return datetime.fromtimestamp(path.stat().st_mtime, UTC) < now - ORPHAN_GRACE
+def _old(path: Path, now: datetime, grace: timedelta = ORPHAN_GRACE) -> bool:
+    return datetime.fromtimestamp(path.stat().st_mtime, UTC) < now - grace
 
 
 def _orphans(root: Path, known: set[str], now: datetime) -> list[Path]:
@@ -47,7 +49,7 @@ def _orphans(root: Path, known: set[str], now: datetime) -> list[Path]:
         if not path.is_file() or path.is_symlink():
             continue
         if path.parent.name == INCOMING:
-            if _old(path, now):
+            if _old(path, now, INCOMING_GRACE):
                 found.append(path)
         elif _KEY.fullmatch(path.name) and path.name not in known and _old(path, now):
             found.append(path)

@@ -618,3 +618,19 @@ async def test_011_export_fails_when_attachment_file_is_missing(
         await export_archive(
             settings, tmp_path / "e.tar", schema_version=schema_head(), exported_at=FIXED_NOW
         )
+
+
+async def test_011_export_fails_when_attachment_file_is_corrupted(
+    filled: tuple[async_sessionmaker[Any], AsyncEngine, Settings], tmp_path: Path
+) -> None:
+    """Повреждённый файл обнаруживается при экспорте, а не при восстановлении (ревью 011, п. 4)."""
+    from app.domain.attachments.storage import final_path
+    from app.domain.ops.export import ExportError, export_archive
+
+    sm, _engine, settings = filled
+    key = await _add_attachment(sm, settings, b"%PDF-good")
+    final_path(settings.attachments_dir, key).write_bytes(b"%PDF-bad!")
+    with pytest.raises(ExportError, match="повреждён"):
+        await export_archive(
+            settings, tmp_path / "e.tar", schema_version=schema_head(), exported_at=FIXED_NOW
+        )

@@ -6009,7 +6009,7 @@
         ]
       },
       "post": {
-        "description": "Прикрепляет файл: тело запроса — содержимое файла (FR-1…FR-5, FR-10).",
+        "description": "Прикрепляет файл: тело — содержимое, имя — заголовок ``X-File-Name`` (FR-1…FR-5, FR-10).\n\nИмя не в адресе: так оно не попадает в журнал доступа веб-сервера (NFR-2).",
         "operationId": "upload_attachment",
         "parameters": [
           {
@@ -6023,13 +6023,15 @@
             }
           },
           {
-            "in": "query",
-            "name": "name",
+            "description": "URL-encoded UTF-8",
+            "in": "header",
+            "name": "X-File-Name",
             "required": true,
             "schema": {
-              "maxLength": 1024,
+              "description": "URL-encoded UTF-8",
+              "maxLength": 2048,
               "minLength": 1,
-              "title": "Name",
+              "title": "X-File-Name",
               "type": "string"
             }
           }

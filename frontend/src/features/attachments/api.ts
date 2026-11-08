@@ -22,7 +22,7 @@ export async function listAttachments(taskId: string, options: ReadOptions = {})
 
 export async function uploadAttachment(taskId: string, file: File): Promise<Attachment> {
   const { data } = await getAppClient().POST("/api/v1/tasks/{task_id}/attachments", {
-    params: { path: { task_id: taskId }, query: { name: file.name } },
+    params: { path: { task_id: taskId }, header: { "X-File-Name": encodeURIComponent(file.name) } },
     body: file as unknown as string,
     bodySerializer: (body: unknown) => body as BodyInit,
     headers: { "Content-Type": "application/octet-stream" },

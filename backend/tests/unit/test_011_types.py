@@ -48,6 +48,12 @@ def test_011_ac2_allowed_types(tmp_path: Path, name: str, data: bytes, kind: Fil
         ("logo.svg", b"<svg xmlns='http://www.w3.org/2000/svg'/>"),
         ("macro.docm", fx.ooxml("docx")),
         ("macro.docx", fx.ooxml("docx", macro=True)),
+        (
+            "hidden.docx",
+            fx.ooxml_with_type("docx", "word/data.bin", "application/vnd.ms-office.vbaProject"),
+        ),
+        ("activex.docx", fx.ooxml("docx", extra=("word/activeX/activeX1.xml", "<ax/>"))),
+        ("ole.xlsx", fx.ooxml("xlsx", extra=("xl/embeddings/oleObject1.bin", "x"))),
         ("fake.pdf", fx.PNG),
         ("fake.docx", fx.ooxml("xlsx")),
         ("broken.docx", b"PK\x03\x04garbage"),

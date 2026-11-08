@@ -819,7 +819,9 @@ export interface paths {
         put?: never;
         /**
          * Upload Attachment
-         * @description Прикрепляет файл: тело запроса — содержимое файла (FR-1…FR-5, FR-10).
+         * @description Прикрепляет файл: тело — содержимое, имя — заголовок ``X-File-Name`` (FR-1…FR-5, FR-10).
+         *
+         *     Имя не в адресе: так оно не попадает в журнал доступа веб-сервера (NFR-2).
          */
         post: operations["upload_attachment"];
         delete?: never;
@@ -4633,10 +4635,11 @@ export interface operations {
     };
     upload_attachment: {
         parameters: {
-            query: {
-                name: string;
+            query?: never;
+            header: {
+                /** @description URL-encoded UTF-8 */
+                "X-File-Name": string;
             };
-            header?: never;
             path: {
                 task_id: string;
             };

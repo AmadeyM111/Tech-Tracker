@@ -174,6 +174,7 @@ async def import_archive(
         target = final_path(settings.attachments_dir, key)
         target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.replace(path, target)
+        os.utime(target)  # свежее время: обслуживание не примет файл за старую сироту
     remove_initial_admin_file(settings)
     return counts
 
