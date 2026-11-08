@@ -17,7 +17,7 @@
 
 ## N12-T03 — Список, счётчик, прочтение (API)
 - **Статус:** TODO · **AC:** AC-6, AC-7 · **Оценка:** 0,75 дня · **Зависит от:** N12-T02
-- **Файлы:** `backend/app/domain/notifications/queries.py`, `backend/app/api/v1/notifications.py`, `backend/app/api/v1/schemas/notifications.py`, `backend/app/api/v1/__init__.py`, `backend/tests/api/test_012_notifications.py`, `docs/api/openapi.json`, `frontend/src/shared/api/schema.d.ts`
+- **Файлы:** `backend/app/domain/notifications/queries.py`, `backend/app/api/v1/notifications.py`, `backend/app/api/v1/schemas/notifications.py`, `backend/app/api/v1/__init__.py`, `backend/tests/api/test_012_notifications.py`, `backend/tests/cli/test_openapi.py` (POST …/read — JSON-тело, 400), `docs/api/openapi.json`, `frontend/src/shared/api/schema.d.ts`
 
 ## N12-T04 — `gtrack notify-due` и таймер
 - **Статус:** TODO · **AC:** AC-5 · **Оценка:** 0,5 дня · **Зависит от:** N12-T02
