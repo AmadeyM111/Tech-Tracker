@@ -3,7 +3,7 @@
 Статусы: TODO | IN_PROGRESS | DONE | BLOCKED. Статусы ведёт оркестратор.
 
 ## Общие условия
-- Старт кода — после ответов на §8 spec. ID — `A11-Tnn`; рамки: `python scripts/task_scope.py A11-Tnn`.
+- Spec APPROVED 2026-11-08. ID — `A11-Tnn`; рамки: `python scripts/task_scope.py A11-Tnn`.
 - Не трогать: `CLAUDE.md`, `AGENTS.md`, `docs/adr/**`, `spec.md`, применённые миграции.
 - Тестовые файлы — синтетические (сигнатуры), без реальных документов. БД — `*_test`.
 - Оценка пакета: ~4 дня.

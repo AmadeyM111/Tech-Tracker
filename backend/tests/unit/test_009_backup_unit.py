@@ -52,6 +52,11 @@ def env(tmp_path: Path) -> Settings:
     )
 
 
+def _visible(out: Path) -> list[str]:
+    """Файлы каталога копий, кроме файла блокировки ``.gtrack-backup.lock``."""
+    return sorted(p.name for p in out.iterdir() if p.name != ".gtrack-backup.lock")
+
+
 def _backup(settings: Settings, out: Path, runner: FakeRunner, *, now: datetime = NOW) -> Path:
     return create_backup(
         settings, out, schema_revision="0011", app_version="0.0.1", now=now, keep=14, runner=runner
@@ -65,7 +70,9 @@ def test_009_ac1_archive_has_three_members_mode_0600_and_valid_manifest(
     path = _backup(env, out, FakeRunner())
     assert path.name == "gtrack-backup-20261109T233000Z.tar"
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
-    assert sorted(p.name for p in out.iterdir()) == [path.name], "временных файлов не осталось"
+    assert sorted(p.name for p in out.iterdir()) == [".gtrack-backup.lock", path.name], (
+        "временных файлов не осталось"
+    )
     with tarfile.open(path) as tar:
         assert tar.getnames() == ["manifest.json", "db.dump", "appdata.tar"]
         manifest = json.loads(tar.extractfile("manifest.json").read())  # type: ignore[union-attr]
@@ -99,7 +106,7 @@ def test_009_ac3_tool_failure_leaves_no_files(
     with pytest.raises(BackupError) as err:
         _backup(env, out, FakeRunner(fail=fail))
     assert err.value.code == code
-    assert list(out.iterdir()) == []
+    assert _visible(out) == []
 
 
 def test_009_ac3_empty_dump_fails(env: Settings, tmp_path: Path) -> None:
@@ -107,7 +114,7 @@ def test_009_ac3_empty_dump_fails(env: Settings, tmp_path: Path) -> None:
     with pytest.raises(BackupError) as err:
         _backup(env, out, FakeRunner(dump=b""))
     assert err.value.code == "pg_dump_failed"
-    assert list(out.iterdir()) == []
+    assert _visible(out) == []
 
 
 def _seed_copies(out: Path, count: int) -> list[str]:
@@ -135,10 +142,10 @@ def test_009_ac4_rotation_keeps_newest_and_foreign_files(env: Settings, tmp_path
 def test_009_ac4_failed_backup_removes_nothing(env: Settings, tmp_path: Path) -> None:
     out = tmp_path / "b"
     _seed_copies(out, 15)
-    before = sorted(p.name for p in out.iterdir())
+    before = _visible(out)
     with pytest.raises(BackupError):
         _backup(env, out, FakeRunner(fail="pg_dump"))
-    assert sorted(p.name for p in out.iterdir()) == before
+    assert _visible(out) == before
 
 
 def test_009_rotate_rejects_zero(tmp_path: Path) -> None:
@@ -254,3 +261,104 @@ def test_009_restore_into_empty_data_dir_extracts_files(env: Settings, tmp_path:
     assert not (tmp_path / "fresh" / "exports").exists()
     restore_argv = [a for a, _ in runner.calls if "--dbname" in a]
     assert restore_argv and restore_argv[0][-1] == "tracker_test"
+
+
+# --- ревью 009: прерванные запуски, блокировка, публикация, ротация -----------------------
+
+
+def test_009_leftovers_of_killed_runs_are_swept(env: Settings, tmp_path: Path) -> None:
+    out = tmp_path / "b"
+    (out / ".gtrack-backup-dead" / "verify").mkdir(parents=True)
+    (out / ".gtrack-backup-dead" / "db.dump").write_bytes(b"x")
+    (out / ".keep-me").mkdir()
+    path = _backup(env, out, FakeRunner())
+    assert _visible(out) == [".keep-me", path.name]
+
+
+def test_009_concurrent_run_is_busy(env: Settings, tmp_path: Path) -> None:
+    import fcntl
+
+    out = tmp_path / "b"
+    out.mkdir()
+    fd = os.open(out / ".gtrack-backup.lock", os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        with pytest.raises(BackupError) as err:
+            _backup(env, out, FakeRunner())
+        assert err.value.code == "busy"
+    finally:
+        os.close(fd)
+
+
+def test_009_new_copy_survives_future_dated_copies(env: Settings, tmp_path: Path) -> None:
+    out = tmp_path / "b"
+    out.mkdir()
+    for d in range(1, 15):
+        (out / backup_name(NOW + timedelta(days=d))).write_bytes(b"future")
+    path = _backup(env, out, FakeRunner())
+    assert path.exists(), "только что снятая копия не удаляется ротацией"
+
+
+def test_009_rotation_failure_does_not_fail_published_copy(
+    env: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.domain.ops.backup as backup
+
+    def broken(*_a: object, **_k: object) -> tuple[str, ...]:
+        raise PermissionError("rotate")
+
+    monkeypatch.setattr(backup, "rotate", broken)
+    result = create_backup(
+        env,
+        tmp_path / "b",
+        schema_revision="0011",
+        app_version="x",
+        now=NOW,
+        keep=14,
+        runner=FakeRunner(),
+    )
+    assert result.rotate_error is True and result.path.exists()
+
+
+def test_009_disk_error_is_io_error(
+    env: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.domain.ops.backup as backup
+
+    def full(*_a: object, **_k: object) -> None:
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(backup, "_write_outer", full)
+    out = tmp_path / "b"
+    with pytest.raises(BackupError) as err:
+        _backup(env, out, FakeRunner())
+    assert err.value.code == "io_error"
+    assert _visible(out) == []
+
+
+def test_009_missing_pg_restore_is_tool_missing(env: Settings, tmp_path: Path) -> None:
+    assert env.pg_bin_dir is not None
+    (env.pg_bin_dir / "pg_restore").unlink()
+    with pytest.raises(BackupError) as err:
+        _backup(env, tmp_path / "b", FakeRunner())
+    assert err.value.code == "tool_missing"
+
+
+def test_009_libpq_env_passes_ssl_and_socket() -> None:
+    env = libpq_env("postgresql+asyncpg://u:p@h/d_test?ssl=require")
+    assert env["PGSSLMODE"] == "require"
+    env = libpq_env("postgresql+asyncpg://u:p@/d_test?host=/run/postgresql")
+    assert env["PGHOST"] == "/run/postgresql"
+
+
+def test_009_restore_uses_single_transaction_and_ignores_stale_stage(
+    env: Settings, tmp_path: Path
+) -> None:
+    path = _backup(env, tmp_path / "b", FakeRunner())
+    fresh = tmp_path / "fresh"
+    (fresh / ".gtrack-restore-dead").mkdir(parents=True)
+    runner = FakeRunner()
+    restore_backup(env.model_copy(update={"data_dir": fresh}), path, db_tables=[], runner=runner)
+    restore_argv = next(a for a, _ in runner.calls if "--dbname" in a)
+    assert "--single-transaction" in restore_argv
+    assert sorted(p.name for p in fresh.iterdir()) == ["secrets"]
