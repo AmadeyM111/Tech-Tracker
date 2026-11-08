@@ -1,0 +1,62 @@
+/*
+ * 019 (self-registration): layout of the auth screens by the approved mockups (2026-11-08).
+ * Only screens of this feature use these classes. The field border (P-1) is deliberately not changed here:
+ * it is deferred to spec 005 and belongs to the shared ui.css.
+ */
+
+/* P-2: show/hide button keeps its place next to the field, 44 px touch target. */
+.login-card .ui-input-row {
+  align-items: stretch;
+}
+
+.login-card .ui-reveal {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* P-3: full-width primary action, the only solid control in the card. */
+.login-card .login-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  margin: 8px 0 0;
+  font-size: 1.1875rem;
+}
+
+/* Links under the form: a 10 px gap between them, as in the mockup. */
+.login-card .login-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0 0;
+  font-size: 1.0625rem;
+}
+
+/* Registration: the field that caused the error is marked with the danger colour (design section 4.1). */
+.reg-form .ui-field input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+/* Registration: the status plate after a successful request. */
+.reg-status {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 1.0625rem;
+}
+
+/* Confirmation: the «Войти» link is the primary action, styled like the button (design section 6, item 5). */
+.login-card a.login-submit {
+  text-decoration: none;
+}

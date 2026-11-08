@@ -240,7 +240,13 @@ async def test_ac121_create_user_has_no_role_and_one_time_password_flag(
 ) -> None:
     w = await world(db)
     created = await svc.create_user(
-        db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     row = await user_by_login(db, "ivan.petrov")
     assert row is not None
@@ -256,7 +262,13 @@ async def test_ac113_one_time_password_stored_only_as_argon2id_hash(
 ) -> None:
     w = await world(db)
     await svc.create_user(
-        db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     row = await user_by_login(db, "ivan.petrov")
     assert row.password_hash.startswith("$argon2id$")
@@ -270,7 +282,13 @@ async def test_ac113_created_user_can_log_in_with_one_time_password_and_has_no_r
 ) -> None:
     w = await world(db)
     await svc.create_user(
-        db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     result = await login_as(db, env, mods, "ivan.petrov", ONE_TIME)
     assert result.must_change_password is True
@@ -282,7 +300,13 @@ async def test_ac121_ac64_create_writes_exactly_one_user_created_event(
 ) -> None:
     w = await world(db)
     created = await svc.create_user(
-        db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     rows = await events(db, w.ws.id)
     assert len(rows) == 1
@@ -302,7 +326,13 @@ async def test_ac116_login_keeps_case_on_create_key_is_lowercase(
     """FR-73a: написание сохраняется, ключ в БД строчный, вход — в любом регистре."""
     w = await world(db)
     created = await svc.create_user(
-        db, w.actor, env.hasher, login="Ivan.Petrov", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="Ivan.Petrov",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     assert created.login == "Ivan.Petrov"
     assert await user_by_login(db, "ivan.petrov") is not None
@@ -338,7 +368,15 @@ async def test_ac116_invalid_login_is_rejected_without_side_effects(
     count_before = (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one()
     await fails(
         db,
-        svc.create_user(db, w.actor, env.hasher, login=bad, one_time_password=SecretStr(ONE_TIME)),
+        svc.create_user(
+            db,
+            w.actor,
+            env.hasher,
+            login=bad,
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(ONE_TIME),
+        ),
         "login_invalid",
     )
     assert (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one() == count_before
@@ -351,7 +389,13 @@ async def test_ac116_boundary_valid_logins_are_accepted(
 ) -> None:
     w = await world(db)
     created = await svc.create_user(
-        db, w.actor, env.hasher, login=good, one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login=good,
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     assert created.login == good
     assert await user_by_login(db, good.lower()) is not None
@@ -375,7 +419,13 @@ async def test_ac125_create_stores_and_returns_login_as_typed(
 ) -> None:
     w = await world(db)
     created = await svc.create_user(
-        db, w.actor, env.hasher, login=login, one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login=login,
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     assert created.login == login
     assert await _stored_logins(db, created.id) == (login.lower(), login)
@@ -394,7 +444,13 @@ async def test_ac125_login_unchanged_by_block_reset_and_role_operations(
 
     w = await world(db)
     created = await svc.create_user(
-        db, w.actor, env.hasher, login="Ivanov.Petr", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="Ivanov.Petr",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     uid = created.id
 
@@ -423,7 +479,13 @@ async def test_ac128_case_variant_of_taken_login_is_login_taken_and_changes_noth
 ) -> None:
     w = await world(db)
     existing = await svc.create_user(
-        db, w.actor, env.hasher, login="Ivanov.Petr", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="Ivanov.Petr",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     await db.commit()
     users_before = (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one()
@@ -432,7 +494,13 @@ async def test_ac128_case_variant_of_taken_login_is_login_taken_and_changes_noth
     await fails(
         db,
         svc.create_user(
-            db, w.actor, env.hasher, login=attempt, one_time_password=SecretStr(ONE_TIME_2)
+            db,
+            w.actor,
+            env.hasher,
+            login=attempt,
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(ONE_TIME_2),
         ),
         "login_taken",
     )
@@ -456,7 +524,15 @@ async def test_ac128_invalid_mixed_case_login_is_login_invalid_and_changes_nothi
     events_before = await events(db)
     await fails(
         db,
-        svc.create_user(db, w.actor, env.hasher, login=bad, one_time_password=SecretStr(ONE_TIME)),
+        svc.create_user(
+            db,
+            w.actor,
+            env.hasher,
+            login=bad,
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(ONE_TIME),
+        ),
         "login_invalid",
     )
     assert (await db.execute(text("SELECT count(*) FROM app_user"))).scalar_one() == users_before
@@ -469,13 +545,25 @@ async def test_ac128_login_check_order_invalid_then_taken_then_password(
     """Порядок проверок прежний: ``login_invalid`` -> ``login_taken`` -> политика пароля."""
     w = await world(db)
     await svc.create_user(
-        db, w.actor, env.hasher, login="Ivanov.Petr", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="Ivanov.Petr",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     await db.commit()
     await fails(
         db,
         svc.create_user(
-            db, w.actor, env.hasher, login="ivanov.PETR", one_time_password=SecretStr(SHORT_11)
+            db,
+            w.actor,
+            env.hasher,
+            login="ivanov.PETR",
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(SHORT_11),
         ),
         "login_taken",
     )
@@ -504,7 +592,13 @@ async def test_ac128_parallel_create_of_case_variants_has_exactly_one_winner(
         async with committed() as s:
             try:
                 await svc.create_user(
-                    s, actor_of(admin), env.hasher, login=login, one_time_password=SecretStr(OK_12)
+                    s,
+                    actor_of(admin),
+                    env.hasher,
+                    login=login,
+                    first_name="Иван",
+                    last_name="Петров",
+                    one_time_password=SecretStr(OK_12),
                 )
                 await s.commit()
             except AppError as exc:
@@ -546,7 +640,13 @@ async def test_ac116_taken_login_incl_case_variant_is_login_taken(
     await fails(
         db,
         svc.create_user(
-            db, w.actor, env.hasher, login=attempt, one_time_password=SecretStr(ONE_TIME)
+            db,
+            w.actor,
+            env.hasher,
+            login=attempt,
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(ONE_TIME),
         ),
         "login_taken",
     )
@@ -562,7 +662,13 @@ async def test_ac116_login_taken_by_user_of_other_workspace(
     await fails(
         db,
         svc.create_user(
-            db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+            db,
+            w.actor,
+            env.hasher,
+            login="ivan.petrov",
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(ONE_TIME),
         ),
         "login_taken",
     )
@@ -576,7 +682,13 @@ async def test_ac27_one_time_password_of_11_chars_is_too_short(
     await fails(
         db,
         svc.create_user(
-            db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(SHORT_11)
+            db,
+            w.actor,
+            env.hasher,
+            login="ivan.petrov",
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(SHORT_11),
         ),
         "password_too_short",
     )
@@ -589,7 +701,13 @@ async def test_ac27_one_time_password_of_12_chars_is_accepted(
 ) -> None:
     w = await world(db)
     await svc.create_user(
-        db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(OK_12)
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(OK_12),
     )
     assert await user_by_login(db, "ivan.petrov") is not None
 
@@ -607,7 +725,13 @@ async def test_ac28_common_one_time_password_is_rejected(
     await fails(
         db,
         svc.create_user(
-            db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(common)
+            db,
+            w.actor,
+            env.hasher,
+            login="ivan.petrov",
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(common),
         ),
         "password_too_common",
     )
@@ -622,7 +746,13 @@ async def test_t08_note_surrogate_one_time_password_is_422_not_500(
     w = await world(db)
     with pytest.raises(AppError) as info:
         await svc.create_user(
-            db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(SURROGATE)
+            db,
+            w.actor,
+            env.hasher,
+            login="ivan.petrov",
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(SURROGATE),
         )
     assert info.value.status_code == 422
     await db.rollback()
@@ -647,7 +777,13 @@ async def test_ac39_ac44_ac45_non_account_admins_get_403_on_every_account_action
     await forbidden(
         db,
         svc.create_user(
-            db, actor, env.hasher, login="new.user", one_time_password=SecretStr(ONE_TIME)
+            db,
+            actor,
+            env.hasher,
+            login="new.user",
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(ONE_TIME),
         ),
     )
     await forbidden(db, svc.block_user(db, actor, env.sessions, victim.id))
@@ -694,7 +830,13 @@ async def test_ac121_assign_role_is_second_event_with_role_details(
 ) -> None:
     w = await world(db)
     created = await svc.create_user(
-        db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     await svc.set_role(db, w.actor, created.id, Role.BUSINESS_ADMIN)
     rows = await events(db, w.ws.id)
@@ -1205,7 +1347,13 @@ async def test_ac21_create_user_lands_in_actor_workspace(
     other_ws = await make_workspace(db)
     await db.commit()
     await svc.create_user(
-        db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     row = await user_by_login(db, "ivan.petrov")
     assert row.workspace_id == w.ws.id
@@ -1235,7 +1383,13 @@ async def test_ac67_rollback_removes_event_and_change_together(
     await db.commit()
 
     await svc.create_user(
-        db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     await svc.set_role(db, w.actor, w.target.id, Role.BUSINESS_ADMIN)
     await svc.block_user(db, w.actor, env.sessions, w.target.id)
@@ -1276,7 +1430,13 @@ async def test_ac67_event_write_failure_aborts_the_action(
 
     calls = {
         "create": lambda: svc.create_user(
-            db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+            db,
+            w.actor,
+            env.hasher,
+            login="ivan.petrov",
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(ONE_TIME),
         ),
         "block": lambda: svc.block_user(db, w.actor, env.sessions, w.target.id),
         "unblock": lambda: svc.unblock_user(db, w.actor, w.target.id),
@@ -1324,7 +1484,13 @@ async def test_fr57_one_time_passwords_never_reach_logs_errors_or_events(
     errors: list[BaseException] = []
 
     created = await svc.create_user(
-        db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     await svc.reset_password(
         db, w.actor, env.hasher, env.sessions, created.id, one_time_password=SecretStr(ONE_TIME_2)
@@ -1344,7 +1510,13 @@ async def test_fr57_one_time_passwords_never_reach_logs_errors_or_events(
             await db.rollback()
     try:
         await svc.create_user(
-            db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+            db,
+            w.actor,
+            env.hasher,
+            login="ivan.petrov",
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(ONE_TIME),
         )
     except AppError as exc:
         errors.append(exc)
@@ -1431,7 +1603,13 @@ async def test_t11_note_create_user_and_login_normalize_identically(
             assert expected is None
             with pytest.raises(AppError) as info:
                 await svc.create_user(
-                    db, w.actor, env.hasher, login=raw, one_time_password=SecretStr(ONE_TIME)
+                    db,
+                    w.actor,
+                    env.hasher,
+                    login=raw,
+                    first_name="Иван",
+                    last_name="Петров",
+                    one_time_password=SecretStr(ONE_TIME),
                 )
             assert info.value.status_code == 422
             assert str(info.value.code) == "login_invalid", repr(raw)
@@ -1440,7 +1618,13 @@ async def test_t11_note_create_user_and_login_normalize_identically(
                 await login_as(db, env, mods, raw, ONE_TIME)
             continue
         created = await svc.create_user(
-            db, w.actor, env.hasher, login=raw, one_time_password=SecretStr(ONE_TIME)
+            db,
+            w.actor,
+            env.hasher,
+            login=raw,
+            first_name="Иван",
+            last_name="Петров",
+            one_time_password=SecretStr(ONE_TIME),
         )
         assert created.login == raw  # FR-73a: ответ — написание при вводе
         assert (await user_by_login(db, expected)) is not None  # ключ в БД нормализован
@@ -1925,3 +2109,134 @@ async def test_t16_review_three_admins_six_concurrent_actions_no_deadlock(
                     assert await member_role(s, u.id) == role_events[-1].details["role_to"]
 
     assert db_errors == [], f"{len(db_errors)} ошибок БД из {TRIO_ITERATIONS}: {db_errors[:2]}"
+
+
+# --- R8-T04: имя и фамилия при создании учётной записи (spec 019: FR-3a, FR-3b, AC-33; RG-17) --
+
+
+async def test_019_ac33_create_user_stores_normalized_names_and_not_self_registered(
+    db: AsyncSession, env: SimpleNamespace, svc: Any
+) -> None:
+    w = await world(db)
+    created = await svc.create_user(
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="  Иван ",
+        last_name=" Петров-Сидоров ",
+        one_time_password=SecretStr(ONE_TIME),
+    )
+    assert (created.first_name, created.last_name) == ("Иван", "Петров-Сидоров")
+    res = await db.execute(
+        text("SELECT first_name, last_name, self_registered FROM app_user WHERE id = :u"),
+        {"u": created.id},
+    )
+    assert tuple(res.one()) == ("Иван", "Петров-Сидоров", False)
+
+
+async def test_019_ac33_user_created_event_has_no_name_values(
+    db: AsyncSession, env: SimpleNamespace, svc: Any
+) -> None:
+    w = await world(db)
+    await svc.create_user(
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="Уникум",
+        last_name="Неповторимов",
+        one_time_password=SecretStr(ONE_TIME),
+    )
+    rows = await events(db, w.ws.id)
+    assert [r.action for r in rows] == ["user.created"]
+    blob = repr([tuple(r) for r in rows])
+    assert "Уникум" not in blob
+    assert "Неповторимов" not in blob
+
+
+@pytest.mark.parametrize("bad", ["", "   ", "я" * 101, "Ан\nна", "Ан\x00на"])
+@pytest.mark.parametrize(
+    ("field", "code"), [("first_name", "first_name_invalid"), ("last_name", "last_name_invalid")]
+)
+async def test_019_ac33_create_user_invalid_name_is_422_and_nothing_written(
+    db: AsyncSession, env: SimpleNamespace, svc: Any, field: str, code: str, bad: str
+) -> None:
+    w = await world(db)
+    names = {"first_name": "Иван", "last_name": "Петров", field: bad}
+    await fails(
+        db,
+        svc.create_user(
+            db,
+            w.actor,
+            env.hasher,
+            login="ivan.petrov",
+            one_time_password=SecretStr(ONE_TIME),
+            **names,
+        ),
+        code,
+    )
+    assert await user_by_login(db, "ivan.petrov") is None
+    assert await events(db, w.ws.id) == []
+
+
+async def test_019_rg17_create_user_check_order_login_taken_then_first_then_last_then_password(
+    db: AsyncSession, env: SimpleNamespace, svc: Any
+) -> None:
+    w = await world(db)
+    common: dict[str, Any] = {"one_time_password": SecretStr("short")}
+    await fails(
+        db,
+        svc.create_user(
+            db, w.actor, env.hasher, login="Плохой логин", first_name="", last_name="", **common
+        ),
+        "login_invalid",
+    )
+    await fails(
+        db,
+        svc.create_user(
+            db, w.actor, env.hasher, login="target.user", first_name="", last_name="", **common
+        ),
+        "login_taken",
+    )
+    await fails(
+        db,
+        svc.create_user(
+            db, w.actor, env.hasher, login="new.one", first_name="", last_name="", **common
+        ),
+        "first_name_invalid",
+    )
+    await fails(
+        db,
+        svc.create_user(
+            db, w.actor, env.hasher, login="new.one", first_name="Иван", last_name="", **common
+        ),
+        "last_name_invalid",
+    )
+    await fails(
+        db,
+        svc.create_user(
+            db,
+            w.actor,
+            env.hasher,
+            login="new.one",
+            first_name="Иван",
+            last_name="Петров",
+            email="not-an-email",
+            **common,
+        ),
+        "email_invalid",
+    )
+    await fails(
+        db,
+        svc.create_user(
+            db,
+            w.actor,
+            env.hasher,
+            login="new.one",
+            first_name="Иван",
+            last_name="Петров",
+            **common,
+        ),
+        "password_too_short",
+    )

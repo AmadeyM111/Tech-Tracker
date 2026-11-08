@@ -45,7 +45,14 @@ async def create(
     db: AsyncSession, env: SimpleNamespace, svc: Any, actor: Any, login: str, email: Any
 ) -> Any:
     return await svc.create_user(
-        db, actor, env.hasher, login=login, one_time_password=SecretStr(ONE_TIME), email=email
+        db,
+        actor,
+        env.hasher,
+        login=login,
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
+        email=email,
     )
 
 
@@ -123,7 +130,13 @@ async def test_007_ac1_create_without_email_argument_keeps_email_null(
 ) -> None:
     w = await world(db)
     created = await svc.create_user(
-        db, w.actor, env.hasher, login="ivan.petrov", one_time_password=SecretStr(ONE_TIME)
+        db,
+        w.actor,
+        env.hasher,
+        login="ivan.petrov",
+        first_name="Иван",
+        last_name="Петров",
+        one_time_password=SecretStr(ONE_TIME),
     )
     assert created.email is None
 
@@ -154,6 +167,8 @@ async def test_007_ac1_create_check_order_login_then_email_then_password(
             w.actor,
             env.hasher,
             login="petr.ivanov",
+            first_name="Иван",
+            last_name="Петров",
             one_time_password=SecretStr("short"),
             email="a@x.ru",
         ),
@@ -168,6 +183,8 @@ async def test_007_ac1_create_check_order_login_then_email_then_password(
             w.actor,
             env.hasher,
             login="petr.ivanov",
+            first_name="Иван",
+            last_name="Петров",
             one_time_password=SecretStr("short"),
             email="a",
         ),

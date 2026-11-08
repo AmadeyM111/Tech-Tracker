@@ -172,7 +172,12 @@ async def test_ac21_foreign_user_login_in_create_is_login_taken_not_leaking_prof
 
     response = await env.client.post(
         ADMIN_USERS,
-        json={"login": victim.login, "one_time_password": "Unr3lated-Pa55phrase-91"},
+        json={
+            "login": victim.login,
+            "first_name": "Иван",
+            "last_name": "Петров",
+            "one_time_password": "Unr3lated-Pa55phrase-91",
+        },
         headers=env.auth(token),
     )
 

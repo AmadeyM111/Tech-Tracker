@@ -315,6 +315,7 @@ describe("LoginPage help block (spec 005)", () => {
 // 006-bugreport-ch1, R6-T02: «глазок» на экране входа (AC-1, AC-3, AC-5, AC-6, AC-7, AC-8, AC-9, AC-10).
 const SECRET = "Secret-Pass-123";
 const SHOW = "Показать пароль";
+const HIDE = "Скрыть пароль";
 const pwd = (c: HTMLElement) => field(c, "current-password");
 const eye = (c: HTMLElement) => {
   const b = revealButtons(c)[0];
@@ -360,7 +361,8 @@ describe("LoginPage password reveal (006)", () => {
     expect(pwd(container).value).toBe(SECRET);
     expect(b.getAttribute("aria-pressed")).toBe("true");
     expect(document.activeElement).toBe(b);
-    expect(screen.getByRole("button", { name: SHOW })).toBe(b);
+    // Owner decision 2026-11-08 (plan §10, p. 5): while the password is shown, the button is named «Скрыть пароль».
+    expect(screen.getByRole("button", { name: HIDE })).toBe(b);
     fireEvent.click(b);
     expect(pwd(container).type).toBe("password");
     expect(b.getAttribute("aria-pressed")).toBe("false");
@@ -534,5 +536,135 @@ describe("LoginPage forgot-password link (spec 007)", () => {
     window.dispatchEvent(new Event("focus"));
     await new Promise((r) => setTimeout(r, 50));
     expect(api.passwordResetStatus).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Spec 019 (R8-T18, AC-1, AC-21, FR-12): ссылка «Зарегистрироваться» и абзац 2 справки зависят от того же статуса,
+// что и «Забыли пароль?» (RG-13, Q-1). Существующие случаи enabled:false выше не меняются.
+describe("LoginPage registration link and help (spec 019)", () => {
+  const forgot = () => screen.queryByRole("link", { name: t("auth.forgot_password") });
+  const register = () => screen.queryByRole("link", { name: t("auth.register_link") });
+  const HELP_P2_REGISTRATION =
+    "Учётную запись выдаёт технический администратор, или её можно создать самостоятельно через «Зарегистрироваться». Роль после регистрации назначает технический или бизнес-администратор.";
+  const helpTexts = () => Array.from(helpBlock().querySelectorAll("p")).map((p) => p.textContent);
+
+  it("019_ac21_help_registration_text_is_the_owner_approved_fr12_text", () => {
+    expect(dict["auth.help_p2_registration"]).toBe(HELP_P2_REGISTRATION);
+    expect(dict["auth.register_link"]).toBe("Зарегистрироваться");
+  });
+
+  it("019_ac21_enabled_true_register_link_to_register_is_after_forgot_link_and_before_help", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    const { container } = renderAt("/login", <LoginPage />);
+    const reg = await screen.findByRole("link", { name: t("auth.register_link") });
+    expect(reg.getAttribute("href")).toBe("/register");
+    expect(reg.textContent).toBe(t("auth.register_link"));
+    const forgotLink = screen.getByRole("link", { name: t("auth.forgot_password") });
+    const submit = submitButton(container);
+    const help = container.querySelector("section.ui-login-help")!;
+    expect(submit.compareDocumentPosition(forgotLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(forgotLink.compareDocumentPosition(reg) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(reg.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(help.contains(reg)).toBe(false);
+  });
+
+  it("019_ac21_enabled_true_help_second_paragraph_is_registration_text", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    renderAt("/login", <LoginPage />);
+    await screen.findByRole("link", { name: t("auth.register_link") });
+    const block = helpBlock();
+    expect(block.querySelectorAll("h2").length).toBe(1);
+    expect(helpTexts()).toEqual([HELP_P1, HELP_P2_REGISTRATION]);
+    expect(block.textContent).toBe(HELP_TITLE + HELP_P1 + HELP_P2_REGISTRATION);
+    expect(block.querySelectorAll("a").length).toBe(0);
+  });
+
+  it("019_ac21_enabled_true_tab_order_adds_links_after_submit_and_no_focus_change", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    const { container } = renderAt("/login", <LoginPage />);
+    await screen.findByRole("link", { name: t("auth.register_link") });
+    expect(document.activeElement).toBe(field(container, "username"));
+    const focusable = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((el) => !(el as HTMLButtonElement).disabled);
+    expect(focusable).toEqual([
+      field(container, "username"),
+      field(container, "current-password"),
+      revealButtons(container)[0],
+      submitButton(container),
+      screen.getByRole("link", { name: t("auth.forgot_password") }),
+      screen.getByRole("link", { name: t("auth.register_link") }),
+    ]);
+    expect(focusable.some((el) => helpBlock().contains(el))).toBe(false);
+  });
+
+  it("019_ac21_enabled_true_makes_no_new_requests", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      renderAt("/login", <LoginPage />);
+      await screen.findByRole("link", { name: t("auth.register_link") });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(api.passwordResetStatus).toHaveBeenCalledTimes(1);
+      expect(api.login).not.toHaveBeenCalled();
+      expect(api.requestPasswordReset).not.toHaveBeenCalled();
+      expect(api.confirmPasswordReset).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("019_ac21_enabled_false_has_no_register_link_and_help_is_unchanged", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: false });
+    const { container } = renderAt("/login", <LoginPage />);
+    await waitFor(() => expect(api.passwordResetStatus).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(register()).toBeNull();
+    expect(container.querySelector('a[href="/register"]')).toBeNull();
+    expect(forgot()).toBeNull();
+    // 005 v0.2 (main): one help paragraph; the registration paragraph appears only when enabled (R8-T00)
+    expect(helpTexts()).toEqual([HELP_P1]);
+    expect(helpBlock().textContent).toBe(HELP_TITLE + HELP_P1);
+    expect(helpBlock().textContent).not.toContain(HELP_P2_REGISTRATION);
+  });
+
+  it("019_ac21_status_pending_shows_help_p2_then_registration_text_when_enabled", async () => {
+    const d = deferred<{ enabled: boolean }>();
+    vi.mocked(api.passwordResetStatus).mockReturnValue(d.promise);
+    renderAt("/login", <LoginPage />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(register()).toBeNull();
+    expect(helpTexts()).toEqual([HELP_P1]);
+    d.resolve({ enabled: true });
+    await screen.findByRole("link", { name: t("auth.register_link") });
+    expect(helpTexts()).toEqual([HELP_P1, HELP_P2_REGISTRATION]);
+  });
+
+  it("019_ac21_status_error_keeps_help_p2_and_has_no_register_link", async () => {
+    vi.mocked(api.passwordResetStatus).mockRejectedValue(new ApiError(500, "internal_error", "x"));
+    renderAt("/login", <LoginPage />);
+    await waitFor(() => expect(api.passwordResetStatus).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(register()).toBeNull();
+    expect(helpTexts()).toEqual([HELP_P1]);
+  });
+
+  // Owner decision 2026-11-08 (plan §10, p. 5): the reveal button names the action for the current state (login too).
+  it("019_ac2_reveal_button_name_switches_to_hide_while_password_is_shown", async () => {
+    vi.mocked(api.passwordResetStatus).mockResolvedValue({ enabled: true });
+    const { container } = renderAt("/login", <LoginPage />);
+    await screen.findByRole("link", { name: t("auth.register_link") });
+    const eye = revealButtons(container)[0]!;
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.show_password"));
+    fireEvent.click(eye);
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.hide_password"));
+    expect(field(container, "current-password").type).toBe("text");
+    fireEvent.click(eye);
+    expect(eye.getAttribute("aria-label")).toBe(t("auth.show_password"));
+    expect(field(container, "current-password").type).toBe("password");
   });
 });

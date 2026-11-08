@@ -185,6 +185,17 @@
             ],
             "title": "Email"
           },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -193,6 +204,17 @@
           "is_blocked": {
             "title": "Is Blocked",
             "type": "boolean"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
           },
           "login": {
             "title": "Login",
@@ -211,6 +233,10 @@
                 "type": "null"
               }
             ]
+          },
+          "self_registered": {
+            "title": "Self Registered",
+            "type": "boolean"
           }
         },
         "required": [
@@ -220,7 +246,10 @@
           "is_blocked",
           "must_change_password",
           "created_at",
-          "email"
+          "email",
+          "first_name",
+          "last_name",
+          "self_registered"
         ],
         "title": "AdminUser",
         "type": "object"
@@ -467,7 +496,8 @@
           "labels_manage",
           "crm_read",
           "crm_write",
-          "pipeline_manage"
+          "pipeline_manage",
+          "onboard_accounts"
         ],
         "title": "Capability",
         "type": "string"
@@ -630,6 +660,16 @@
             ],
             "title": "Email"
           },
+          "first_name": {
+            "maxLength": 1024,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 1024,
+            "title": "Last Name",
+            "type": "string"
+          },
           "login": {
             "maxLength": 1024,
             "title": "Login",
@@ -645,7 +685,9 @@
         },
         "required": [
           "login",
-          "one_time_password"
+          "one_time_password",
+          "first_name",
+          "last_name"
         ],
         "title": "CreateUserRequest",
         "type": "object"
@@ -797,10 +839,32 @@
             "title": "Capabilities",
             "type": "array"
           },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
           },
           "login": {
             "title": "Login",
@@ -819,7 +883,9 @@
           "login",
           "role",
           "must_change_password",
-          "capabilities"
+          "capabilities",
+          "first_name",
+          "last_name"
         ],
         "title": "MeResponse",
         "type": "object"
@@ -1102,6 +1168,37 @@
         "title": "Page[TaskListItem]",
         "type": "object"
       },
+      "Page_UnassignedAccountOut_": {
+        "properties": {
+          "has_next": {
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UnassignedAccountOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "has_next"
+        ],
+        "title": "Page[UnassignedAccountOut]",
+        "type": "object"
+      },
       "PasswordResetAccepted": {
         "description": "Единый ответ на запрос сброса (FR-6).",
         "properties": {
@@ -1379,6 +1476,78 @@
         "title": "ProjectRef",
         "type": "object"
       },
+      "RegistrationAccepted": {
+        "description": "Единый ответ на заявку (FR-4, RG-20): одинаков для свободного и занятого адреса.",
+        "properties": {
+          "detail": {
+            "default": "Если адрес можно использовать для регистрации, мы отправили на него письмо с подтверждением. Ссылка действует 30 минут.",
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "title": "RegistrationAccepted",
+        "type": "object"
+      },
+      "RegistrationConfirm": {
+        "additionalProperties": false,
+        "description": "``POST /auth/registration/confirm``: токен из ссылки (FR-8).",
+        "properties": {
+          "token": {
+            "format": "password",
+            "maxLength": 128,
+            "title": "Token",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "RegistrationConfirm",
+        "type": "object"
+      },
+      "RegistrationRequest": {
+        "additionalProperties": false,
+        "description": "``POST /auth/registration/request``: заявка на регистрацию (FR-3).",
+        "properties": {
+          "email": {
+            "maxLength": 1024,
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "maxLength": 1024,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 1024,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "maxLength": 1024,
+            "title": "Login",
+            "type": "string"
+          },
+          "password": {
+            "format": "password",
+            "maxLength": 1024,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "email",
+          "first_name",
+          "last_name",
+          "login",
+          "password"
+        ],
+        "title": "RegistrationRequest",
+        "type": "object"
+      },
       "ResetPasswordRequest": {
         "additionalProperties": false,
         "description": "``POST /admin/users/{user_id}/reset-password`` (FR-65).",
@@ -1464,6 +1633,26 @@
           "email"
         ],
         "title": "SetEmailRequest",
+        "type": "object"
+      },
+      "SetNameRequest": {
+        "additionalProperties": false,
+        "description": "``PUT /admin/users/{user_id}/name``: имя и фамилия, оба обязательны (FR-3c).",
+        "properties": {
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name"
+        ],
+        "title": "SetNameRequest",
         "type": "object"
       },
       "SetRoleRequest": {
@@ -2078,6 +2267,56 @@
         "title": "TokenItem",
         "type": "object"
       },
+      "UnassignedAccountOut": {
+        "description": "Учётная запись без роли: ровно id, логин, имя, фамилия и дата создания (AC-30).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "login",
+          "first_name",
+          "last_name",
+          "created_at"
+        ],
+        "title": "UnassignedAccountOut",
+        "type": "object"
+      },
       "UserRef": {
         "properties": {
           "id": {
@@ -2687,6 +2926,100 @@
           }
         },
         "summary": "Set Email",
+        "tags": [
+          "admin-users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/name": {
+      "put": {
+        "description": "Задаёт имя и фамилию пользователя (FR-3c); сессии не затрагиваются.",
+        "operationId": "set_name",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Set Name",
         "tags": [
           "admin-users"
         ]
@@ -3338,6 +3671,173 @@
         ]
       }
     },
+    "/api/v1/auth/registration/confirm": {
+      "post": {
+        "description": "Подтверждение регистрации по ссылке; успех — 204 без тела и без cookie (AC-16).\n\nНеверная, просроченная или использованная ссылка и занятый адрес — 400\n``registration_token_invalid``. Занятый логин — 409 ``login_taken``. Сессия не создаётся:\nвход отдельным действием.",
+        "operationId": "confirm_registration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Функция отключена или пространство не единственное (code: feature_disabled)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Логин занят учётной записью (code: login_taken)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Слишком много запросов с этого IP-адреса или по этой ссылке (code: rate_limited)"
+          }
+        },
+        "summary": "Confirm Registration",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/registration/request": {
+      "post": {
+        "description": "Заявка на регистрацию; ответ одинаков, занят адрес или свободен (FR-4).\n\nОшибки формы (адрес, имя, фамилия, логин, пароль) и лимит IP отвечают кодами из каталога.\nПисьмо со ссылкой уходит только на свободный адрес и только после ответа.",
+        "operationId": "request_registration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Функция отключена или пространство не единственное (code: feature_disabled)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Слишком много запросов с этого IP-адреса или по этой ссылке (code: rate_limited)"
+          }
+        },
+        "summary": "Request Registration",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/comments/{comment_id}": {
       "delete": {
         "description": "Мягко удаляет комментарий; автор, владелец проекта или БА-участник (AC-58).",
@@ -3557,6 +4057,78 @@
           }
         },
         "summary": "Me",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/me/name": {
+      "put": {
+        "description": "Меняет собственные имя и фамилию (FR-3c); доступно любой роли с сессией.",
+        "operationId": "set_own_name",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Set Own Name",
         "tags": [
           "me"
         ]
@@ -5560,6 +6132,171 @@
         "summary": "Create Subtask",
         "tags": [
           "tasks"
+        ]
+      }
+    },
+    "/api/v1/unassigned-accounts": {
+      "get": {
+        "description": "Учётные записи пространства без роли: ``login ASC, id ASC``; email в ответе нет (AC-30).",
+        "operationId": "list_unassigned_accounts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 1000000000000000,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_UnassignedAccountOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "List Unassigned Accounts",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/api/v1/unassigned-accounts/{user_id}/role": {
+      "put": {
+        "description": "Назначает роль «Пользователь» учётной записи без роли; иное значение и повтор — 403.",
+        "operationId": "assign_user_role",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Assign User Role",
+        "tags": [
+          "accounts"
         ]
       }
     },

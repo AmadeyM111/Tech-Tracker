@@ -101,6 +101,14 @@ async def _build_previous_version_installation(
     # этого теста - run_bootstrap / load_demo_data - идёт через ORM). Колонка добавляется на время
     # создания данных и снимается до обновления: миграция 0008 создаёт её сама (NULL).
     await env.execute(text("ALTER TABLE app_user ADD COLUMN email varchar(254)"))
+    # 019: так же с first_name/last_name/self_registered (их создаёт миграция 0010)
+    await env.execute(
+        text(
+            "ALTER TABLE app_user ADD COLUMN first_name varchar(100), "
+            "ADD COLUMN last_name varchar(100), "
+            "ADD COLUMN self_registered boolean NOT NULL DEFAULT false"
+        )
+    )
     settings = env.settings
     settings.secrets_dir.mkdir(parents=True, exist_ok=True)
     settings.secrets_dir.chmod(0o700)
@@ -122,7 +130,12 @@ async def _build_previous_version_installation(
         mp.setattr(demo, "_REGULAR_PRIORITY", "base")
         await demo.load_demo_data(env.sessionmaker, settings, clock=clock, seed=1)
 
-    await env.execute(text("ALTER TABLE app_user DROP COLUMN email"))
+    await env.execute(
+        text(
+            "ALTER TABLE app_user DROP COLUMN email, DROP COLUMN first_name, "
+            "DROP COLUMN last_name, DROP COLUMN self_registered"
+        )
+    )
     await env.sessionmaker.kw["bind"].dispose()
     passwords = {"admin": FIRST_ADMIN_PASSWORD}
     passwords.update(_demo_passwords(env))

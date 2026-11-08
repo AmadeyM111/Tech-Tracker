@@ -49,7 +49,7 @@ async def _put(env: ApiEnv, token: str | None, user_id: Any, body: Any) -> httpx
 
 
 async def _create(env: ApiEnv, token: str, login: str, **extra: Any) -> httpx.Response:
-    body = {"login": login, OTP_FIELD: OTP, **extra}
+    body = {"login": login, "first_name": "Иван", "last_name": "Петров", OTP_FIELD: OTP, **extra}
     return await env.client.post(ADMIN_USERS, json=body, headers=env.auth(token))
 
 

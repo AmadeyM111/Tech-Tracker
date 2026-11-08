@@ -40,6 +40,8 @@ PUBLIC: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/v1/auth/password-reset/status"),  # R7-T11
         ("POST", "/api/v1/auth/password-reset/request"),  # R7-T11
         ("POST", "/api/v1/auth/password-reset/confirm"),  # R7-T12
+        ("POST", "/api/v1/auth/registration/request"),  # R8-T11
+        ("POST", "/api/v1/auth/registration/confirm"),  # R8-T11
     }
 )
 SOME_ID = "6f9619ff-8b86-4d11-b42d-00c04fc964ff"
@@ -517,7 +519,7 @@ def test_t13_review_me_handler_has_no_assert_statement() -> None:
 
 
 async def test_t13_review_me_handler_rejects_actor_without_role_explicitly(
-    api_env: ApiEnv,
+    api_env: ApiEnv, db: Any
 ) -> None:
     """Прямой вызов обработчика с актором без роли: 403 ``no_role``, а не AssertionError."""
     from app.core.errors import AppError
@@ -535,7 +537,7 @@ async def test_t13_review_me_handler_rejects_actor_without_role_explicitly(
         session_id=b"\x00" * 32,
     )
     with pytest.raises(AppError) as info:
-        await endpoint(actor)
+        await endpoint(actor, db)
     assert info.value.status_code == 403
     assert str(info.value.code) == "no_role"
 

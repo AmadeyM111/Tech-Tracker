@@ -49,7 +49,9 @@ async def test_ac2_ta_creates_12_users_with_3_roles_each_logs_in_and_gets_role(
         otp = f"Otp-{i:02d}-Pa55phrase-xyz-{uuid.uuid4().hex[:8]}"
         role = ROLES[i]
         created = await env.client.post(
-            ADMIN_USERS, json={"login": login, OTP_FIELD: otp}, headers=env.auth(ta_token)
+            ADMIN_USERS,
+            json={"login": login, "first_name": "Иван", "last_name": "Петров", OTP_FIELD: otp},
+            headers=env.auth(ta_token),
         )
         assert created.status_code == 201, created.text
         assert created.json()["role"] is None
@@ -120,7 +122,11 @@ async def test_ac64_ta_scenario_one_entry_per_action_without_password_values(
         assert r.status_code in (200, 201, 204), (method, url, r.text)
         return r
 
-    created = await act("POST", ADMIN_USERS, json={"login": login, OTP_FIELD: otp1})
+    created = await act(
+        "POST",
+        ADMIN_USERS,
+        json={"login": login, "first_name": "Иван", "last_name": "Петров", OTP_FIELD: otp1},
+    )
     uid = created.json()["id"]
     base = f"{ADMIN_USERS}/{uid}"
     expected = [("user.created", uid)]

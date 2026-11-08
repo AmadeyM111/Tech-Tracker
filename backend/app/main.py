@@ -25,6 +25,7 @@ from app.core.secrets import ensure_secret_key
 from app.core.security.passwords import PasswordHasher
 from app.domain.auth.password_reset import ResetPolicy
 from app.domain.auth.provider import LocalPasswordProvider
+from app.domain.auth.registration import RegistrationPolicy
 from app.domain.auth.sessions import SessionStore
 
 
@@ -79,9 +80,13 @@ async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
         state.password_reset_policy = ResetPolicy(
             base_url=settings.public_base_url, limit_key=ensure_secret_key(settings)
         )
+        state.registration_policy = RegistrationPolicy(
+            base_url=settings.public_base_url, limit_key=ensure_secret_key(settings)
+        )
     else:
         state.mailer = None
         state.password_reset_policy = None
+        state.registration_policy = None
     engine = create_engine(settings)
     application.state.engine = engine
     application.state.sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
