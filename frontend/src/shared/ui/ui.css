@@ -355,7 +355,8 @@ h1,
 .ui-dialog {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  /* UI-kit §7: dialog radius 10px. */
+  border-radius: 10px;
   max-width: 28rem;
   padding: 1.5rem;
 }
