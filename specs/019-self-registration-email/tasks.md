@@ -348,7 +348,7 @@ T17, T19, T20, T21), тоже последовательно.
 - **Попытки:** 1. Тесты: vitest tests/features/auth + tests/app — 499 passed; RegisterPage.test — 17 passed; lint чист; pytest test_frontend_scaffold — 44 passed; scope ок. Typecheck: 4 ошибки (UsersPage.tsx:244 — до T20; tests/features/admin/api.test.ts:46,109,110 — из-за CreateUserRequest после T04; закрыть в T20). Отклонения (записаны в plan §4.7): поле Email без type="email" (TextField text|password); на форме кнопка reveal рядом с паролем. Решения: trim логина и имён; feature_disabled → auth.register_disabled (план §4.7). Долг (minor, T22): тесты на пробелы в пароле, имя из пробелов, состояние загрузки и ошибки статуса. Кириллица в новых файлах устранена. В frontend/src вне ru.ts есть кириллица в файлах более ранних задач (features/tasks/api.ts, shared/ui/TextField.tsx, shared/api/schema.d.ts) — проверить, кто внёс.
 
 ## R8-T17 — Фронтенд: экран `/register/confirm`
-- **Статус:** TODO
+- **Статус:** DONE (ревью: самопроверка оркестратора — тесты, кириллица, scope; отдельный ревьюер не запускался; 2026-11-08)
 - **AC:** AC-16 (экран), AC-9, AC-10, AC-28 (сообщения)
 - **Файлы:** `frontend/src/features/auth/RegisterConfirmPage.tsx` (новый), `frontend/src/app/router.tsx`;
   тесты: `frontend/tests/features/auth/RegisterConfirmPage.test.tsx` (новый), `backend/tests/infra/test_frontend_scaffold.py`
@@ -360,7 +360,7 @@ T17, T19, T20, T21), тоже последовательно.
   `login_taken` → свои тексты и ссылка на `/register`; нет токена → `auth.register_link_invalid`; `enabled:false` →
   `auth.register_disabled`.
 - **Готово, когда:** `cd frontend && npx vitest run tests/features/auth` зелёный; `npm run lint` чист; `source .venv/bin/activate && pytest -q backend/tests/infra/test_frontend_scaffold.py` зелёный
-- **Попытки:** 0
+- **Попытки:** 1. Тесты: tests/features/auth — 176 passed (12 новых); lint чист; typecheck — только 4 ожидаемые ошибки T20; scaffold 44 passed; scope ок. Отклонения: (1) статус регистрации не запрашивается — enabled:false видно по ответу confirm (404 feature_disabled) → auth.register_disabled; (2) login_taken показывает auth.register_login_taken, а не error.login_taken; (3) текст ссылки auth.register_again взят из ключей плана. Долг: отдельное ревью T17.
 
 ## R8-T18 — Фронтенд: ссылка «Зарегистрироваться» и справка на `/login`
 - **Статус:** TODO
@@ -521,7 +521,7 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T14 | DONE |
 | R8-T15 | DONE |
 | R8-T16 | DONE |
-| R8-T17 | TODO |
+| R8-T17 | DONE |
 | R8-T18 | TODO |
 | R8-T19 | TODO |
 | R8-T20 | TODO |

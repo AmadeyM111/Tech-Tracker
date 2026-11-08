@@ -274,6 +274,8 @@ def test_t21_src_files_only_expected() -> None:
         "features/auth/PasswordResetRequestPage.tsx",
         # 019/R8-T16: экран регистрации /register
         "features/auth/RegisterPage.tsx",
+        # 019/R8-T17: экран подтверждения регистрации /register/confirm
+        "features/auth/RegisterConfirmPage.tsx",
         # PN-15 (MCP): «Доступ для агентов» (ADR-0018)
         "features/tokens/api.ts", "features/tokens/model.ts", "features/tokens/AgentAccessPage.tsx",
         "features/tokens/TokenList.tsx", "features/tokens/IssuedToken.tsx",

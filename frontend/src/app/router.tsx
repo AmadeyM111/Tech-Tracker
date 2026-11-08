@@ -10,6 +10,7 @@ import { LoginPage } from "../features/auth/LoginPage";
 import { PasswordResetConfirmPage } from "../features/auth/PasswordResetConfirmPage";
 import { PasswordResetRequestPage } from "../features/auth/PasswordResetRequestPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
+import { RegisterConfirmPage } from "../features/auth/RegisterConfirmPage";
 import { RegisterPage } from "../features/auth/RegisterPage";
 import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
 import { MyTasksPage } from "../features/tasks/TaskList";
@@ -383,6 +384,8 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
           </GuestOnly>
         }
       />
+      {/* RG-14: no GuestOnly here, the link from the e-mail works for any session state. */}
+      <Route path="/register/confirm" element={<RegisterConfirmPage />} />
       <Route path="/password-reset" element={<PasswordResetRequestPage />} />
       <Route path="/password-reset/confirm" element={<PasswordResetConfirmPage />} />
       <Route path="/" element={<StartRedirect insideMain={insideMain} />} />
