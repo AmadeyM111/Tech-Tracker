@@ -33,7 +33,8 @@ SCRAM_ITERATIONS: Final = 4096
 ROLE_RE: Final = re.compile(r"[a-z_][a-z0-9_]{0,62}")
 # Таблицы с урезанными правами рабочей роли (FR-2).
 APPEND_ONLY: Final = ("domain_event",)
-READ_ONLY: Final = ("alembic_version",)
+# backup_run пишет только CLI оператора (владелец схемы); API читает статус для ТА (ревью 010).
+READ_ONLY: Final = ("alembic_version", "backup_run")
 
 
 class AppRoleError(RuntimeError):

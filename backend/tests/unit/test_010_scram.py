@@ -76,3 +76,18 @@ def test_010_ac7_production_requires_app_role(tmp_path: Path) -> None:
         app_database_url(_settings(tmp_path))
         == "postgresql+asyncpg://owner:ownerpw@db:5432/tracker"
     )
+
+
+def test_010_backup_run_is_read_only_for_app_role() -> None:
+    """API только читает статус копий; пишет CLI оператора (ревью 010, п. 5)."""
+    from app.core.db_roles import READ_ONLY
+
+    assert "backup_run" in READ_ONLY
+
+
+def test_010_compose_allows_explicit_empty_role() -> None:
+    """``${DB_APP_ROLE-…}``: пустое значение достижимо (FR-7), а не подменяется умолчанием."""
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[3] / "docker-compose.yml").read_text(encoding="utf-8")
+    assert "${DB_APP_ROLE-gtrack_app}" in text

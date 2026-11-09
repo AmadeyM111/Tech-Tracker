@@ -5,6 +5,7 @@ After=docker.service
 
 [Service]
 Type=oneshot
+TimeoutStartSec=1h
 Environment=PATH=/run/current-system/sw/bin
 ExecStart=/usr/local/sbin/gtrack-backup
 Nice=10

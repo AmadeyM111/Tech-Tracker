@@ -43,7 +43,7 @@ services:
       COOKIE_SECURE: "true"
       DATA_DIR: /data
       # Рабочая роль БД процесса API (spec 010): создаётся gtrack bootstrap, пароль — /data/secrets.
-      DB_APP_ROLE: ${DB_APP_ROLE:-gtrack_app}
+      DB_APP_ROLE: ${DB_APP_ROLE-gtrack_app}
       # SECRET_KEY не передаётся: при пустом значении ключ создаётся в /data/secrets/secret_key (D-20).
       INITIAL_ADMIN_LOGIN: ${INITIAL_ADMIN_LOGIN:-admin}
       ARGON2_TIME_COST: ${ARGON2_TIME_COST:-3}

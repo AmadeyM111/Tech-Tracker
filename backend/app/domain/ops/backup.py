@@ -322,7 +322,16 @@ def _build(
 ) -> Path:
     with _private_file(work / DB_MEMBER) as dump:
         runner(
-            [tool(settings, "pg_dump"), "-Fc", "--no-password"],
+            [
+                tool(settings, "pg_dump"),
+                "-Fc",
+                "--no-password",
+                "--lock-wait-timeout=60000",
+                # живые сессии и токены сброса пароля в копию не попадают (ревью 009, п. 3)
+                "--exclude-table-data=user_session",
+                "--exclude-table-data=password_reset_token",
+                "--exclude-table-data=password_reset_attempt",
+            ],
             libpq_env(settings.database_url),
             None,
             dump,
