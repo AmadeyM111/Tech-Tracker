@@ -149,6 +149,34 @@
   border: 1px dashed var(--border);
   border-radius: var(--radius);
 }
+/* 024: диапазон срока «с / по» под пресетами (макет Shared/Design/gtrack-r3, range-*). */
+.sum-range {
+  margin: 4px 0 0;
+  padding: 12px 14px;
+  min-width: 0;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.sum-range legend {
+  padding: 0;
+  color: var(--text-muted);
+}
+.sum-range-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+.sum-range .ui-field {
+  margin-bottom: 0;
+  min-width: 0;
+}
+.sum-range input[type="date"] {
+  min-width: 180px;
+  min-height: 44px;
+}
+.sum-range input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
 .sum-burn-tag {
   display: inline-block;
   margin-left: 6px;
