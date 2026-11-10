@@ -41,6 +41,22 @@ def due_condition(preset: DuePreset, today: date) -> ColumnElement[bool]:
             return Task.due_date.is_(None)
 
 
+def range_condition(due_from: date | None, due_to: date | None) -> ColumnElement[bool]:
+    """Диапазон срока «с / по» (spec 024 FR-3): границы включительно, каждая необязательна.
+
+    Задачи без срока не попадают. Статус не учитывается: «done» входит в диапазон (Q-3).
+    Хотя бы одна граница обязана быть задана (Fail Fast): без неё фильтра нет.
+    """
+    conditions: list[ColumnElement[bool]] = []
+    if due_from is not None:
+        conditions.append(Task.due_date >= due_from)
+    if due_to is not None:
+        conditions.append(Task.due_date <= due_to)
+    if not conditions:
+        raise ValueError("диапазон срока требует хотя бы одну границу")
+    return and_(*conditions)
+
+
 def is_hot(priority: str, due: date | None, status: str, today: date) -> bool:
     """«Горит»: высокий приоритет, срок сегодня или в прошлом, задача не завершена (FR-8)."""
     return (

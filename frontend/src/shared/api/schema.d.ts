@@ -4108,6 +4108,8 @@ export interface operations {
                 status?: components["schemas"]["TaskStatus"] | null;
                 priority?: components["schemas"]["TaskPriority"][];
                 due?: components["schemas"]["DuePreset"] | null;
+                due_from?: string | null;
+                due_to?: string | null;
                 needs_review?: boolean;
             };
             header?: never;
