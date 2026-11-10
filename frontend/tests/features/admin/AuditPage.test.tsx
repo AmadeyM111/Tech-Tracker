@@ -573,3 +573,20 @@ describe("019 audit labels (FR-11, AC-19)", () => {
     expect(fields.textContent).not.toMatch(/first_name|last_name/);
   });
 });
+
+// Аудит #9: пустой журнал на первой странице - без пагинации; непустой - с пагинацией.
+describe("пагинация журнала при пустом списке (аудит #9)", () => {
+  it("empty_first_page_has_no_pagination", async () => {
+    setup({ [AUDIT]: () => j(200, page([])) });
+    const { container } = renderApp("/admin/audit");
+    expect(await screen.findByText(ru["admin.audit.empty"])).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+    expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
+  });
+
+  it("non_empty_list_keeps_pagination", async () => {
+    const { container } = await open();
+    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+  });
+});

@@ -130,3 +130,30 @@ describe("SummaryPage", () => {
     expect(container.querySelector('a[href="/summary"]')).toBeNull();
   });
 });
+
+// Аудит #9: отфильтрованный пустой список на первой странице - без пагинации; непустой - с пагинацией.
+describe("пагинация сводки при пустом списке (аудит #9)", () => {
+  function withTasks(items: unknown[], hasNext: boolean) {
+    installFetch({
+      [ME]: () => j(200, meWith(BA_CAPS, "business_admin")),
+      [COUNTS]: () => j(200, COUNTS_24),
+      [TASKS]: () => j(200, { ...tasksPage(items, items.length), has_next: hasNext }),
+      [PROJECTS]: () => j(200, page([])),
+    });
+  }
+
+  it("empty_list_has_no_pagination_even_when_next_flag_is_set", async () => {
+    withTasks([], true);
+    const { container } = renderApp("/summary");
+    await waitFor(() => expect(container.querySelector(".sum-count-note")).toBeTruthy());
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+    expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
+  });
+
+  it("non_empty_list_with_next_page_keeps_pagination", async () => {
+    withTasks([item("aaaaaaaa-0000-4000-8000-000000000001")], true);
+    const { container } = renderApp("/summary");
+    await waitFor(() => expect(container.querySelector(".ui-pagination")).not.toBeNull());
+  });
+});

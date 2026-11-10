@@ -1044,3 +1044,37 @@ describe("compact accounts table (UX-audit P1)", () => {
     expect(cell(r, "status").getAttribute("data-label")).toBe(ru["admin.users.col_status"]);
   });
 });
+
+// Аудит #9: при пустом списке первой страницы пагинация не в DOM; со страницы > 1 остаётся (вернуться назад).
+describe("пагинация учётных записей при пустом списке (аудит #9)", () => {
+  it("empty_first_page_has_no_pagination", async () => {
+    setup({ [LIST]: () => j(200, page([])) });
+    const { container } = renderApp("/admin/users");
+    expect(await screen.findByText(ru["admin.users.empty"])).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+    expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
+  });
+
+  it("empty_page_above_first_keeps_pagination_so_user_can_go_back", async () => {
+    setup({
+      [LIST]: (r) => {
+        const p = Number(new URL(r.url).searchParams.get("page") ?? "1");
+        return j(200, p === 1 ? page([U_IVANOV], 1, true) : page([], p, false));
+      },
+    });
+    const { container } = renderApp("/admin/users");
+    await waitFor(() => expect(container.querySelector(`tr[data-user-id="${ID_IVANOV}"]`)).toBeTruthy());
+    fireEvent.click(action(container, "next-page"));
+    expect(await screen.findByText(ru["admin.users.empty"])).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+    expect(action(container, "prev-page").disabled).toBe(false);
+  });
+
+  it("non_empty_list_keeps_pagination", async () => {
+    const { container } = await open();
+    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+    expect(action(container, "next-page")).toBeTruthy();
+    expect(action(container, "prev-page")).toBeTruthy();
+  });
+});

@@ -251,3 +251,21 @@ describe("review T82 attempt 2", () => {
     expect(wraps(c)).toBe(true);
   });
 });
+
+// Аудит #9: пустой список проектов - без пагинации (даже если сервер сообщил has_next);
+// непустой список со следующей страницей - с пагинацией.
+describe("пагинация проектов при пустом списке (аудит #9)", () => {
+  it("empty_list_has_no_pagination_even_when_next_flag_is_set", async () => {
+    setup({ [LIST]: () => j(200, page([], 1, true)) });
+    const { container } = renderApp("/projects");
+    expect(await screen.findByText(ru["projects.empty"])).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+    expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
+  });
+
+  it("non_empty_list_with_next_page_keeps_pagination", async () => {
+    const { container } = await open({ [LIST]: () => j(200, page(ITEMS, 1, true)) });
+    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+  });
+});

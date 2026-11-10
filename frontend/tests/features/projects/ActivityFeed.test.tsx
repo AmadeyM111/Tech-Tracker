@@ -151,3 +151,23 @@ describe("лента проекта (FR-38)", () => {
     expect(seen[0]).toBe("1");
   });
 });
+
+// Аудит #9: пустая лента - без пагинации; непустая - с пагинацией.
+describe("пагинация ленты при пустом списке (аудит #9)", () => {
+  it("empty_feed_has_no_pagination", async () => {
+    installFetch(activityRoutes(() => j(200, page([]))));
+    const { container } = renderApp(`/projects/${PID}`);
+    await openActivityTab();
+    expect(await screen.findByText(ru["activity.empty"])).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+  });
+
+  it("non_empty_feed_keeps_pagination", async () => {
+    installFetch(activityRoutes(() => j(200, page([item(1, {})]))));
+    const { container } = renderApp(`/projects/${PID}`);
+    await openActivityTab();
+    await waitFor(() => expect(container.querySelector('[data-field="activity-list"]')).toBeTruthy());
+    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+  });
+});

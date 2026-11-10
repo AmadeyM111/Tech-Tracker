@@ -140,7 +140,8 @@ export function ProjectsPage({ canCreate }: { canCreate: boolean }) {
         </table>
       )}
 
-      {page > 1 || data?.has_next === true ? (
+      {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
+      {page > 1 || ((data?.items.length ?? 0) > 0 && data?.has_next === true) ? (
         <Pagination
           page={page}
           hasNext={data?.has_next ?? false}

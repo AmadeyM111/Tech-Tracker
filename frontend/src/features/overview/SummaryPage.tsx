@@ -272,7 +272,8 @@ export function SummaryPage() {
                 {t("summary.shown", { shown: items.length, total: list.data?.total ?? 0 })}
               </p>
               {items.length > 0 ? <TaskRows items={items} today={today} /> : null}
-              {page > 1 || (list.data?.has_next ?? false) ? (
+              {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
+              {page > 1 || (items.length > 0 && (list.data?.has_next ?? false)) ? (
                 <Pagination page={page} hasNext={list.data?.has_next ?? false} busy={list.isPending} onPage={setPage} />
               ) : null}
             </>

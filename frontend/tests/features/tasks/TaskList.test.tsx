@@ -294,3 +294,28 @@ describe("my tasks page", () => {
   });
 });
 
+
+// Аудит #9: пустой список «Мои задачи» - без пагинации; непустой - с пагинацией.
+describe("пагинация списка задач при пустом списке (аудит #9)", () => {
+  it("my_tasks_empty_first_page_has_no_pagination", async () => {
+    installFetch({
+      [ME]: () => j(200, meWith(USER_CAPS, "user")),
+      [MY_TASKS]: () => j(200, page([])),
+    });
+    const { container } = renderApp("/my-tasks");
+    expect(await screen.findByText(ru["tasks.empty"])).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+    expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
+  });
+
+  it("my_tasks_non_empty_list_keeps_pagination", async () => {
+    installFetch({
+      [ME]: () => j(200, meWith(USER_CAPS, "user")),
+      [MY_TASKS]: () => j(200, page([T1])),
+    });
+    const { container } = renderApp("/my-tasks");
+    await waitFor(() => expect(taskRow(container, TID1)).toBeTruthy());
+    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+  });
+});
