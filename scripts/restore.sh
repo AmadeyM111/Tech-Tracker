@@ -7,7 +7,9 @@
 #   scripts/restore.sh -p <проект-compose> -b <каталог-копии> [--db-only] [--yes]
 #
 #   -p        проект Compose стека; обязателен (стек по умолчанию не выбирается).
-#   -b        каталог копии: db.dump, appdata.tar (опционально), SHA256SUMS.
+#   -b        каталог копии (db.dump, appdata.tar (опционально), SHA256SUMS) ИЛИ файл
+#             gtrack-backup-<UTC>.tar от `gtrack backup`: он распаковывается во временный
+#             каталог, суммы сверяются с manifest.json.
 #   --db-only восстановить только БД; том appdata не трогать.
 #   --yes     не спрашивать подтверждение. Без него введите имя проекта.
 #
@@ -42,6 +44,30 @@ done
 if [ -z "$PROJECT" ] || [ -z "$BACKUP" ]; then
   usage >&2
   exit 2
+fi
+
+TMP_DIR=""
+cleanup() { [ -z "$TMP_DIR" ] || rm -rf "$TMP_DIR"; }
+trap cleanup EXIT
+
+# Копия `gtrack backup` (один tar): состав строго manifest.json + db.dump + appdata.tar;
+# суммы из манифеста превращаются в SHA256SUMS и проверяются обычным путём ниже.
+if [ -f "$BACKUP" ]; then
+  members="$(tar -tf "$BACKUP" | sort | tr '\n' ' ')"
+  [ "$members" = "appdata.tar db.dump manifest.json " ] \
+    || { echo "Состав архива не совпадает с форматом gtrack-backup" >&2; exit 1; }
+  TMP_DIR="$(mktemp -d)"
+  tar -xf "$BACKUP" -C "$TMP_DIR"
+  : > "$TMP_DIR/SHA256SUMS"
+  for name in db.dump appdata.tar; do
+    sum="$(awk -v n="\"$name\": {" 'index($0, n) {f=1} f && /"sha256"/ {gsub(/[",]/, "", $2); print $2; exit}' "$TMP_DIR/manifest.json")"
+    case "$sum" in
+      [0-9a-f]*) [ "${#sum}" = 64 ] || { echo "Манифест повреждён ($name)" >&2; exit 1; } ;;
+      *) echo "Манифест повреждён ($name)" >&2; exit 1 ;;
+    esac
+    echo "$sum  $name" >> "$TMP_DIR/SHA256SUMS"
+  done
+  BACKUP="$TMP_DIR"
 fi
 
 compose() { docker compose -p "$PROJECT" "$@"; }

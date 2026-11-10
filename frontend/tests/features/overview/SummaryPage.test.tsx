@@ -7,7 +7,7 @@ import { CAPS_ALL, installFetch, j, meWith, page, renderApp } from "../admin/hel
 const ME = "GET /api/v1/me";
 const COUNTS = "GET /api/v1/me/overview";
 const TASKS = "GET /api/v1/me/overview/tasks";
-const PROJECTS = "GET /api/v1/projects";
+const PROJECTS = "GET /api/v1/me/overview/projects";
 const BA_CAPS = ["business_access", "project_create", "task_assign_others"];
 const P1 = "33333333-3333-4333-8333-333333333333";
 

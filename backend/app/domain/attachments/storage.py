@@ -48,10 +48,19 @@ def check_free_space(root: Path, min_free_mb: int) -> None:
         raise StorageFull()
 
 
+def private_root(root: Path) -> None:
+    """Каталог вложений и ``incoming`` — 0700 (ревью 011): ``mkdir(parents=True)`` задаёт режим
+    только последнему звену, а каталог, созданный раньше (или при umask 000), мог быть шире."""
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    root.chmod(0o700)
+    (root / INCOMING).mkdir(mode=0o700, exist_ok=True)
+    (root / INCOMING).chmod(0o700)
+
+
 async def stage(root: Path, chunks: AsyncIterator[bytes], *, max_bytes: int) -> StagedFile:
     """Пишет поток во временный файл; > ``max_bytes`` — 413, пустой — 422."""
+    private_root(root)
     incoming = root / INCOMING
-    incoming.mkdir(mode=0o700, parents=True, exist_ok=True)
     key = uuid4().hex
     path = incoming / key
     digest = hashlib.sha256()
@@ -82,6 +91,7 @@ def publish(root: Path, staged: StagedFile) -> Path:
     """Переносит файл под ключ (атомарно, тот же том) и возвращает итоговый путь."""
     target = final_path(root, staged.key)
     target.parent.mkdir(mode=0o700, exist_ok=True)
+    target.parent.chmod(0o700)
     os.replace(staged.path, target)
     return target
 

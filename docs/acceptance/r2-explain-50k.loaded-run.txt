@@ -1,0 +1,934 @@
+Данные: {'task': 50000, 'project': 50, 'notification': 50000, 'app_user': 21}; PostgreSQL: 16.15 (Debian 16.15-1.pgdg13+2)
+
+## Актор perf.all (член 50 проектов, видны 50 000 задач)
+
+### Плитки: overview_counts
+время вызова функции, мс: min 195.2 / median 200.8 / max 216.5 (7 запусков, прогретый кэш)
+
+```
+SELECT count(*) AS count_1, count(*) FILTER (WHERE task.status = $1::VARCHAR) AS anon_1, count(*) FILTER (WHER ...
+Aggregate  (cost=19.41..19.42 rows=1 width=48) (actual time=233.494..233.495 rows=1 loops=1)
+  Buffers: shared hit=183432
+  ->  Nested Loop  (cost=0.43..19.38 rows=1 width=64) (actual time=0.027..229.214 rows=50000 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 1226714
+        Buffers: shared hit=183432
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=64) (actual time=0.009..29.958 rows=50000 loops=1)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Buffers: shared hit=48388
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=32) (actual time=0.001..0.003 rows=26 loops=50000)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+              Buffers: shared hit=135044
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.006 rows=50 loops=1)
+                      Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                      Rows Removed by Filter: 10
+                      Buffers: shared hit=2
+Planning Time: 0.103 ms
+Execution Time: 233.516 ms
+```
+
+### Сводка, список без фильтров
+время вызова функции, мс: min 361.3 / median 363.2 / max 374.6 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.39..19.39 rows=1 width=728) (actual time=222.032..222.037 rows=51 loops=1)
+  Buffers: shared hit=183432
+  ->  Sort  (cost=19.39..19.39 rows=1 width=728) (actual time=222.032..222.034 rows=51 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: top-N heapsort  Memory: 39kB
+        Buffers: shared hit=183432
+        ->  Nested Loop  (cost=0.43..19.38 rows=1 width=728) (actual time=0.029..216.852 rows=50000 loops=1)
+              Join Filter: (project.id = task.project_id)
+              Rows Removed by Join Filter: 1226714
+              Buffers: shared hit=183432
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.011..25.728 rows=50000 loops=1)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Buffers: shared hit=48388
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.003 rows=26 loops=50000)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+                    Buffers: shared hit=135044
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.006 rows=50 loops=1)
+                            Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                            Rows Removed by Filter: 10
+                            Buffers: shared hit=2
+Planning Time: 0.122 ms
+Execution Time: 222.058 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.38..19.39 rows=1 width=8) (actual time=200.673..200.674 rows=1 loops=1)
+  Buffers: shared hit=183432
+  ->  Nested Loop  (cost=0.43..19.38 rows=1 width=0) (actual time=0.025..199.451 rows=50000 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 1226714
+        Buffers: shared hit=183432
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.008..14.834 rows=50000 loops=1)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Buffers: shared hit=48388
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.003 rows=26 loops=50000)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+              Buffers: shared hit=135044
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.006 rows=50 loops=1)
+                      Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                      Rows Removed by Filter: 10
+                      Buffers: shared hit=2
+Planning Time: 0.105 ms
+Execution Time: 200.693 ms
+```
+
+### Сводка, статус in_progress
+время вызова функции, мс: min 106.7 / median 109.5 / max 113.4 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.39..19.40 rows=1 width=728) (actual time=60.536..60.539 rows=51 loops=1)
+  Buffers: shared hit=78914
+  ->  Sort  (cost=19.39..19.40 rows=1 width=728) (actual time=60.535..60.536 rows=51 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: top-N heapsort  Memory: 38kB
+        Buffers: shared hit=78914
+        ->  Nested Loop  (cost=0.43..19.38 rows=1 width=728) (actual time=0.056..59.323 rows=11313 loops=1)
+              Join Filter: (project.id = task.project_id)
+              Rows Removed by Join Filter: 276668
+              Buffers: shared hit=78914
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.016..16.539 rows=11313 loops=1)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: (status = 'in_progress'::text)
+                    Rows Removed by Filter: 38687
+                    Buffers: shared hit=48388
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.003 rows=25 loops=11313)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+                    Buffers: shared hit=30526
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.020 rows=50 loops=1)
+                            Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                            Rows Removed by Filter: 10
+                            Buffers: shared hit=2
+Planning Time: 0.130 ms
+Execution Time: 60.579 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.38..19.39 rows=1 width=8) (actual time=64.281..64.282 rows=1 loops=1)
+  Buffers: shared hit=78914
+  ->  Nested Loop  (cost=0.43..19.38 rows=1 width=0) (actual time=0.030..63.980 rows=11313 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 276668
+        Buffers: shared hit=78914
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.011..19.401 rows=11313 loops=1)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: (status = 'in_progress'::text)
+              Rows Removed by Filter: 38687
+              Buffers: shared hit=48388
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.003 rows=25 loops=11313)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+              Buffers: shared hit=30526
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.005 rows=50 loops=1)
+                      Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                      Rows Removed by Filter: 10
+                      Buffers: shared hit=2
+Planning Time: 0.105 ms
+Execution Time: 64.298 ms
+```
+
+### Сводка, приоритет high+medium + срок «Просрочено»
+время вызова функции, мс: min 87.7 / median 88.2 / max 94.5 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.40..19.40 rows=1 width=728) (actual time=52.247..52.251 rows=51 loops=1)
+  Buffers: shared hit=50205
+  ->  Sort  (cost=19.40..19.40 rows=1 width=728) (actual time=52.246..52.248 rows=51 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: top-N heapsort  Memory: 38kB
+        Buffers: shared hit=50205
+        ->  Nested Loop  (cost=0.43..19.39 rows=1 width=728) (actual time=0.026..50.982 rows=11100 loops=1)
+              Join Filter: (project.id = task.project_id)
+              Rows Removed by Join Filter: 273360
+              Buffers: shared hit=50205
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.010..8.279 rows=11100 loops=1)
+                    Index Cond: ((workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid) AND (due_date < '2026-11-10'::date))
+                    Filter: ((priority = ANY ('{high,medium}'::text[])) AND (status <> 'done'::text))
+                    Rows Removed by Filter: 9172
+                    Buffers: shared hit=20212
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.003 rows=26 loops=11100)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+                    Buffers: shared hit=29993
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.006 rows=50 loops=1)
+                            Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                            Rows Removed by Filter: 10
+                            Buffers: shared hit=2
+Planning Time: 0.133 ms
+Execution Time: 52.284 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.39..19.40 rows=1 width=8) (actual time=53.091..53.093 rows=1 loops=1)
+  Buffers: shared hit=50205
+  ->  Nested Loop  (cost=0.43..19.39 rows=1 width=0) (actual time=0.023..52.796 rows=11100 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 273360
+        Buffers: shared hit=50205
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.007..9.845 rows=11100 loops=1)
+              Index Cond: ((workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid) AND (due_date < '2026-11-10'::date))
+              Filter: ((priority = ANY ('{high,medium}'::text[])) AND (status <> 'done'::text))
+              Rows Removed by Filter: 9172
+              Buffers: shared hit=20212
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.003 rows=26 loops=11100)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+              Buffers: shared hit=29993
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.006 rows=50 loops=1)
+                      Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                      Rows Removed by Filter: 10
+                      Buffers: shared hit=2
+Planning Time: 0.087 ms
+Execution Time: 53.110 ms
+```
+
+### Сводка, срок «Без срока»
+время вызова функции, мс: min 76.3 / median 78.4 / max 78.7 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.39..19.40 rows=1 width=728) (actual time=44.535..44.539 rows=51 loops=1)
+  Buffers: shared hit=35550
+  ->  Sort  (cost=19.39..19.40 rows=1 width=728) (actual time=44.534..44.536 rows=51 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: top-N heapsort  Memory: 47kB
+        Buffers: shared hit=35550
+        ->  Nested Loop  (cost=0.43..19.38 rows=1 width=728) (actual time=0.062..43.207 rows=9961 loops=1)
+              Join Filter: (project.id = task.project_id)
+              Rows Removed by Join Filter: 245031
+              Buffers: shared hit=35550
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.024..5.104 rows=9961 loops=1)
+                    Index Cond: ((workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid) AND (due_date IS NULL))
+                    Buffers: shared hit=8620
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.003 rows=26 loops=9961)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+                    Buffers: shared hit=26930
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.006 rows=50 loops=1)
+                            Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                            Rows Removed by Filter: 10
+                            Buffers: shared hit=2
+Planning Time: 0.120 ms
+Execution Time: 44.565 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.38..19.39 rows=1 width=8) (actual time=43.433..43.434 rows=1 loops=1)
+  Buffers: shared hit=35550
+  ->  Nested Loop  (cost=0.43..19.38 rows=1 width=0) (actual time=0.033..43.131 rows=9961 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 245031
+        Buffers: shared hit=35550
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.017..5.356 rows=9961 loops=1)
+              Index Cond: ((workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid) AND (due_date IS NULL))
+              Buffers: shared hit=8620
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.003 rows=26 loops=9961)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+              Buffers: shared hit=26930
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.006 rows=50 loops=1)
+                      Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                      Rows Removed by Filter: 10
+                      Buffers: shared hit=2
+Planning Time: 0.098 ms
+Execution Time: 43.454 ms
+```
+
+### Сводка, «Нужно проверить»
+время вызова функции, мс: min 148.5 / median 159.6 / max 163.5 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.40..19.40 rows=1 width=728) (actual time=102.794..102.795 rows=0 loops=1)
+  Buffers: shared hit=82509
+  ->  Sort  (cost=19.40..19.40 rows=1 width=728) (actual time=102.793..102.794 rows=0 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=82509
+        ->  Nested Loop  (cost=0.43..19.39 rows=1 width=728) (actual time=102.791..102.791 rows=0 loops=1)
+              Join Filter: ((project.id = task.project_id) AND ((task.created_by = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (project.owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)))
+              Rows Removed by Join Filter: 568650
+              Buffers: shared hit=82509
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.010..21.564 rows=11373 loops=1)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: (status = 'review'::text)
+                    Rows Removed by Filter: 38627
+                    Buffers: shared hit=48388
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=32) (actual time=0.001..0.006 rows=50 loops=11373)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+                    Buffers: shared hit=34121
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.006 rows=50 loops=1)
+                            Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                            Rows Removed by Filter: 10
+                            Buffers: shared hit=2
+Planning Time: 0.144 ms
+Execution Time: 102.814 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.39..19.40 rows=1 width=8) (actual time=166.618..166.619 rows=1 loops=1)
+  Buffers: shared hit=82509
+  ->  Nested Loop  (cost=0.43..19.39 rows=1 width=0) (actual time=166.615..166.616 rows=0 loops=1)
+        Join Filter: ((project.id = task.project_id) AND ((task.created_by = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (project.owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)))
+        Rows Removed by Join Filter: 568650
+        Buffers: shared hit=82509
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=32) (actual time=0.009..59.091 rows=11373 loops=1)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: (status = 'review'::text)
+              Rows Removed by Filter: 38627
+              Buffers: shared hit=48388
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=32) (actual time=0.001..0.008 rows=50 loops=11373)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+              Buffers: shared hit=34121
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.006 rows=50 loops=1)
+                      Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                      Rows Removed by Filter: 10
+                      Buffers: shared hit=2
+Planning Time: 0.105 ms
+Execution Time: 166.647 ms
+```
+
+### Сводка, последняя страница без фильтров (OFFSET)
+время вызова функции, мс: min 382.4 / median 397.7 / max 416.3 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.39..19.40 rows=1 width=728) (actual time=264.529..264.540 rows=51 loops=1)
+  Buffers: shared hit=183432, temp read=861 written=1000
+  ->  Sort  (cost=19.39..19.39 rows=1 width=728) (actual time=257.797..263.789 rows=40001 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: external merge  Disk: 7976kB
+        Buffers: shared hit=183432, temp read=861 written=1000
+        ->  Nested Loop  (cost=0.43..19.38 rows=1 width=728) (actual time=0.023..227.598 rows=50000 loops=1)
+              Join Filter: (project.id = task.project_id)
+              Rows Removed by Join Filter: 1226714
+              Buffers: shared hit=183432
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.007..30.936 rows=50000 loops=1)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Buffers: shared hit=48388
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.003 rows=26 loops=50000)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+                    Buffers: shared hit=135044
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.005 rows=50 loops=1)
+                            Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                            Rows Removed by Filter: 10
+                            Buffers: shared hit=2
+Planning Time: 0.110 ms
+Execution Time: 264.940 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.38..19.39 rows=1 width=8) (actual time=215.237..215.238 rows=1 loops=1)
+  Buffers: shared hit=183432
+  ->  Nested Loop  (cost=0.43..19.38 rows=1 width=0) (actual time=0.031..213.857 rows=50000 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 1226714
+        Buffers: shared hit=183432
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.012..25.268 rows=50000 loops=1)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Buffers: shared hit=48388
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.003 rows=26 loops=50000)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+              Buffers: shared hit=135044
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.003..0.006 rows=50 loops=1)
+                      Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                      Rows Removed by Filter: 10
+                      Buffers: shared hit=2
+Planning Time: 0.105 ms
+Execution Time: 215.257 ms
+```
+
+### Уведомления: unread_count
+время вызова функции, мс: min 5.0 / median 6.2 / max 11.3 (7 запусков, прогретый кэш)
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=38.67..38.68 rows=1 width=8) (actual time=5.221..5.223 rows=1 loops=1)
+  Buffers: shared hit=21866
+  ->  Nested Loop  (cost=0.72..38.67 rows=1 width=0) (actual time=0.047..5.124 rows=3679 loops=1)
+        Buffers: shared hit=21866
+        ->  Nested Loop  (cost=0.58..16.69 rows=1 width=16) (actual time=0.031..3.683 rows=3679 loops=1)
+              Buffers: shared hit=14506
+              ->  Index Scan using ix_notification_recipient_id_read_at_created_at on notification  (cost=0.29..8.31 rows=1 width=32) (actual time=0.012..0.847 rows=3679 loops=1)
+                    Index Cond: ((recipient_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) AND (read_at IS NULL) AND (created_at >= '2026-08-12 09:22:59.715303+00'::timestamp with time zone))
+                    Filter: (((comment_id IS NULL) OR (SubPlan 3)) AND (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid))
+                    Buffers: shared hit=3469
+                    SubPlan 3
+                      ->  Seq Scan on comment  (cost=0.00..0.00 rows=1 width=0) (never executed)
+                            Filter: ((deleted_at IS NULL) AND (id = notification.comment_id))
+              ->  Index Scan using pk_task on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.001..0.001 rows=1 loops=3679)
+                    Index Cond: (id = notification.task_id)
+                    Filter: (deleted_at IS NULL)
+                    Buffers: shared hit=11037
+        ->  Index Scan using pk_project on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.000..0.000 rows=1 loops=3679)
+              Index Cond: (id = notification.project_id)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+              Buffers: shared hit=7360
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.002..0.005 rows=50 loops=1)
+                      Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                      Rows Removed by Filter: 10
+                      Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=6
+Planning Time: 0.145 ms
+Execution Time: 5.243 ms
+```
+
+### Уведомления: list (стр. 1, 20)
+время вызова функции, мс: min 12.5 / median 14.3 / max 19.0 (7 запусков, прогретый кэш)
+
+```
+SELECT notification.recipient_id, notification.kind, notification.task_id, notification.project_id, notificati ...
+Limit  (cost=47.58..47.59 rows=1 width=192) (actual time=12.792..12.795 rows=21 loops=1)
+  Buffers: shared hit=45356
+  ->  Sort  (cost=47.58..47.59 rows=1 width=192) (actual time=12.791..12.794 rows=21 loops=1)
+        Sort Key: notification.created_at DESC, notification.id DESC
+        Sort Method: top-N heapsort  Memory: 33kB
+        Buffers: shared hit=45356
+        ->  Nested Loop  (cost=13.64..47.57 rows=1 width=192) (actual time=0.609..11.963 rows=8984 loops=1)
+              Buffers: shared hit=45356
+              ->  Nested Loop  (cost=13.50..25.59 rows=1 width=192) (actual time=0.596..8.396 rows=8984 loops=1)
+                    Buffers: shared hit=27386
+                    ->  Bitmap Heap Scan on notification  (cost=13.21..17.22 rows=1 width=192) (actual time=0.593..1.442 rows=8984 loops=1)
+                          Recheck Cond: ((workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid) AND (recipient_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) AND (created_at >= '2026-08-12 09:22:59.715303+00'::timestamp with time zone))
+                          Filter: ((comment_id IS NULL) OR (SubPlan 3))
+                          Heap Blocks: exact=366
+                          Buffers: shared hit=434
+                          ->  BitmapAnd  (cost=13.21..13.21 rows=1 width=0) (actual time=0.569..0.570 rows=0 loops=1)
+                                Buffers: shared hit=68
+                                ->  Bitmap Index Scan on ix_notification_workspace_id  (cost=0.00..6.17 rows=250 width=0) (actual time=0.385..0.385 rows=50000 loops=1)
+                                      Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                                      Buffers: shared hit=41
+                                ->  Bitmap Index Scan on ix_notification_recipient_id_read_at_created_at  (cost=0.00..6.79 rows=83 width=0) (actual time=0.159..0.159 rows=8984 loops=1)
+                                      Index Cond: ((recipient_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) AND (created_at >= '2026-08-12 09:22:59.715303+00'::timestamp with time zone))
+                                      Buffers: shared hit=27
+                          SubPlan 3
+                            ->  Seq Scan on comment  (cost=0.00..0.00 rows=1 width=0) (never executed)
+                                  Filter: ((deleted_at IS NULL) AND (id = notification.comment_id))
+                    ->  Index Scan using pk_task on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.001..0.001 rows=1 loops=8984)
+                          Index Cond: (id = notification.task_id)
+                          Filter: (deleted_at IS NULL)
+                          Buffers: shared hit=26952
+              ->  Index Scan using pk_project on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.000..0.000 rows=1 loops=8984)
+                    Index Cond: (id = notification.project_id)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid) OR (hashed SubPlan 2)))
+                    Buffers: shared hit=17970
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.001..0.005 rows=50 loops=1)
+                            Filter: (user_id = '82b4a9ee-566d-4131-8719-3fdb65e74c6f'::uuid)
+                            Rows Removed by Filter: 10
+                            Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=6
+Planning Time: 0.144 ms
+Execution Time: 12.825 ms
+```
+
+```
+SELECT task.id, task.title  ...
+Bitmap Heap Scan on task  (cost=86.00..158.31 rows=20 width=532) (actual time=0.016..0.023 rows=20 loops=1)
+  Recheck Cond: (id = ANY ('{8633939b-d9eb-4770-a644-ab06a6bb0ee1,519c2af2-397f-4b9a-ad0c-6a4a8d186e9f,1d981bb8-75e4-4536-9e6c-b620c8b6b24f,0e5d9d22-6527-4170-a0c6-77b9524ba184,90f27605-b4af-44c8-ad11-267cda30e936,97087b95-ab95-4fd5-a738-090b5b935bd7,3ff28247-0e12-4ee0-ba5b-b5443a821228,38c4bbfd-a55c-4ddb-a2bc-41cbe0e28ad9,ef2d9394-631e-4a3f-8978-802d06bbd892,0a33feea-96a2-4913-a3a7-d416c14b11ae,199cf0ce-1b65-42b8-9936-a18441450e86,c9354911-8b7c-4d9e-a9e6-c831dcc61735,c270d875-4cb2-4525-b54a-fe2227d29481,47cf82a7-3585-411e-a320-fdc14b284a5f,7bc2adf8-aa9a-4596-b126-087b713f6614,bae7e464-2cb0-44ff-aedf-8c04a99c1bbe,f60ff3ce-13c5-466e-8d03-9f2f4c81c039,3e50d9bc-1cfc-4862-aea1-e7bdcd3379c7,fee2f490-8702-4791-a6cb-1cdf6f34bfa4,dab9f250-4398-400f-87ad-1cb2995c86c7}'::uuid[]))
+  Heap Blocks: exact=20
+  Buffers: shared hit=60
+  ->  Bitmap Index Scan on pk_task  (cost=0.00..85.95 rows=20 width=0) (actual time=0.014..0.014 rows=20 loops=1)
+        Index Cond: (id = ANY ('{8633939b-d9eb-4770-a644-ab06a6bb0ee1,519c2af2-397f-4b9a-ad0c-6a4a8d186e9f,1d981bb8-75e4-4536-9e6c-b620c8b6b24f,0e5d9d22-6527-4170-a0c6-77b9524ba184,90f27605-b4af-44c8-ad11-267cda30e936,97087b95-ab95-4fd5-a738-090b5b935bd7,3ff28247-0e12-4ee0-ba5b-b5443a821228,38c4bbfd-a55c-4ddb-a2bc-41cbe0e28ad9,ef2d9394-631e-4a3f-8978-802d06bbd892,0a33feea-96a2-4913-a3a7-d416c14b11ae,199cf0ce-1b65-42b8-9936-a18441450e86,c9354911-8b7c-4d9e-a9e6-c831dcc61735,c270d875-4cb2-4525-b54a-fe2227d29481,47cf82a7-3585-411e-a320-fdc14b284a5f,7bc2adf8-aa9a-4596-b126-087b713f6614,bae7e464-2cb0-44ff-aedf-8c04a99c1bbe,f60ff3ce-13c5-466e-8d03-9f2f4c81c039,3e50d9bc-1cfc-4862-aea1-e7bdcd3379c7,fee2f490-8702-4791-a6cb-1cdf6f34bfa4,dab9f250-4398-400f-87ad-1cb2995c86c7}'::uuid[]))
+        Buffers: shared hit=40
+Planning Time: 0.037 ms
+Execution Time: 0.030 ms
+```
+
+## Актор perf.some (член 10 проектов)
+
+### Плитки: overview_counts
+время вызова функции, мс: min 227.2 / median 238.6 / max 241.1 (7 запусков, прогретый кэш)
+
+```
+SELECT count(*) AS count_1, count(*) FILTER (WHERE task.status = $1::VARCHAR) AS anon_1, count(*) FILTER (WHER ...
+Aggregate  (cost=19.41..19.42 rows=1 width=48) (actual time=220.194..220.195 rows=1 loops=1)
+  Buffers: shared hit=188419
+  ->  Nested Loop  (cost=0.43..19.38 rows=1 width=64) (actual time=0.017..219.230 rows=9971 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 445113
+        Buffers: shared hit=188419
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=64) (actual time=0.006..18.156 rows=50000 loops=1)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Buffers: shared hit=48388
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=32) (actual time=0.001..0.004 rows=9 loops=50000)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+              Rows Removed by Filter: 32
+              Buffers: shared hit=140031
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.004..0.005 rows=10 loops=1)
+                      Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                      Rows Removed by Filter: 50
+                      Buffers: shared hit=2
+Planning Time: 0.116 ms
+Execution Time: 220.217 ms
+```
+
+### Сводка, список без фильтров
+время вызова функции, мс: min 441.4 / median 458.5 / max 508.0 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.39..19.39 rows=1 width=728) (actual time=233.728..233.732 rows=51 loops=1)
+  Buffers: shared hit=188419
+  ->  Sort  (cost=19.39..19.39 rows=1 width=728) (actual time=233.727..233.729 rows=51 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: top-N heapsort  Memory: 38kB
+        Buffers: shared hit=188419
+        ->  Nested Loop  (cost=0.43..19.38 rows=1 width=728) (actual time=0.028..232.428 rows=9971 loops=1)
+              Join Filter: (project.id = task.project_id)
+              Rows Removed by Join Filter: 445113
+              Buffers: shared hit=188419
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.016..27.124 rows=50000 loops=1)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Buffers: shared hit=48388
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.004 rows=9 loops=50000)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+                    Rows Removed by Filter: 32
+                    Buffers: shared hit=140031
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.004..0.005 rows=10 loops=1)
+                            Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                            Rows Removed by Filter: 50
+                            Buffers: shared hit=2
+Planning Time: 0.110 ms
+Execution Time: 233.746 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.38..19.39 rows=1 width=8) (actual time=235.816..235.818 rows=1 loops=1)
+  Buffers: shared hit=188419
+  ->  Nested Loop  (cost=0.43..19.38 rows=1 width=0) (actual time=0.023..235.482 rows=9971 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 445113
+        Buffers: shared hit=188419
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.005..28.198 rows=50000 loops=1)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Buffers: shared hit=48388
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.004 rows=9 loops=50000)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+              Rows Removed by Filter: 32
+              Buffers: shared hit=140031
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.005..0.006 rows=10 loops=1)
+                      Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                      Rows Removed by Filter: 50
+                      Buffers: shared hit=2
+Planning Time: 0.082 ms
+Execution Time: 235.834 ms
+```
+
+### Сводка, статус in_progress
+время вызова функции, мс: min 118.1 / median 125.2 / max 133.3 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.39..19.40 rows=1 width=728) (actual time=66.739..66.743 rows=51 loops=1)
+  Buffers: shared hit=80063
+  ->  Sort  (cost=19.39..19.40 rows=1 width=728) (actual time=66.738..66.740 rows=51 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: top-N heapsort  Memory: 38kB
+        Buffers: shared hit=80063
+        ->  Nested Loop  (cost=0.43..19.38 rows=1 width=728) (actual time=0.042..66.388 rows=2266 loops=1)
+              Join Filter: (project.id = task.project_id)
+              Rows Removed by Join Filter: 101050
+              Buffers: shared hit=80063
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.011..19.293 rows=11313 loops=1)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: (status = 'in_progress'::text)
+                    Rows Removed by Filter: 38687
+                    Buffers: shared hit=48388
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.004 rows=9 loops=11313)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+                    Rows Removed by Filter: 32
+                    Buffers: shared hit=31675
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.005..0.005 rows=10 loops=1)
+                            Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                            Rows Removed by Filter: 50
+                            Buffers: shared hit=2
+Planning Time: 0.125 ms
+Execution Time: 66.760 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.38..19.39 rows=1 width=8) (actual time=63.926..63.927 rows=1 loops=1)
+  Buffers: shared hit=80063
+  ->  Nested Loop  (cost=0.43..19.38 rows=1 width=0) (actual time=0.037..63.810 rows=2266 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 101050
+        Buffers: shared hit=80063
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.013..17.912 rows=11313 loops=1)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: (status = 'in_progress'::text)
+              Rows Removed by Filter: 38687
+              Buffers: shared hit=48388
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.004 rows=9 loops=11313)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+              Rows Removed by Filter: 32
+              Buffers: shared hit=31675
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.005..0.005 rows=10 loops=1)
+                      Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                      Rows Removed by Filter: 50
+                      Buffers: shared hit=2
+Planning Time: 0.119 ms
+Execution Time: 63.948 ms
+```
+
+### Сводка, приоритет high+medium + срок «Просрочено»
+время вызова функции, мс: min 109.6 / median 114.0 / max 130.3 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.40..19.40 rows=1 width=728) (actual time=61.698..61.702 rows=51 loops=1)
+  Buffers: shared hit=51316
+  ->  Sort  (cost=19.40..19.40 rows=1 width=728) (actual time=61.697..61.699 rows=51 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: top-N heapsort  Memory: 38kB
+        Buffers: shared hit=51316
+        ->  Nested Loop  (cost=0.43..19.39 rows=1 width=728) (actual time=0.022..61.260 rows=2198 loops=1)
+              Join Filter: (project.id = task.project_id)
+              Rows Removed by Join Filter: 98961
+              Buffers: shared hit=51316
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.009..13.526 rows=11100 loops=1)
+                    Index Cond: ((workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid) AND (due_date < '2026-11-10'::date))
+                    Filter: ((priority = ANY ('{high,medium}'::text[])) AND (status <> 'done'::text))
+                    Rows Removed by Filter: 9172
+                    Buffers: shared hit=20212
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.004 rows=9 loops=11100)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+                    Rows Removed by Filter: 32
+                    Buffers: shared hit=31104
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.004..0.005 rows=10 loops=1)
+                            Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                            Rows Removed by Filter: 50
+                            Buffers: shared hit=2
+Planning Time: 0.120 ms
+Execution Time: 61.725 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.39..19.40 rows=1 width=8) (actual time=56.543..56.544 rows=1 loops=1)
+  Buffers: shared hit=51316
+  ->  Nested Loop  (cost=0.43..19.39 rows=1 width=0) (actual time=0.019..56.471 rows=2198 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 98961
+        Buffers: shared hit=51316
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.008..10.659 rows=11100 loops=1)
+              Index Cond: ((workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid) AND (due_date < '2026-11-10'::date))
+              Filter: ((priority = ANY ('{high,medium}'::text[])) AND (status <> 'done'::text))
+              Rows Removed by Filter: 9172
+              Buffers: shared hit=20212
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.004 rows=9 loops=11100)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+              Rows Removed by Filter: 32
+              Buffers: shared hit=31104
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.004..0.005 rows=10 loops=1)
+                      Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                      Rows Removed by Filter: 50
+                      Buffers: shared hit=2
+Planning Time: 0.121 ms
+Execution Time: 56.565 ms
+```
+
+### Сводка, срок «Без срока»
+время вызова функции, мс: min 91.6 / median 93.2 / max 106.1 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.39..19.40 rows=1 width=728) (actual time=47.664..47.668 rows=51 loops=1)
+  Buffers: shared hit=36502
+  ->  Sort  (cost=19.39..19.40 rows=1 width=728) (actual time=47.663..47.665 rows=51 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: top-N heapsort  Memory: 47kB
+        Buffers: shared hit=36502
+        ->  Nested Loop  (cost=0.43..19.38 rows=1 width=728) (actual time=0.024..47.273 rows=2003 loops=1)
+              Join Filter: (project.id = task.project_id)
+              Rows Removed by Join Filter: 88511
+              Buffers: shared hit=36502
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.014..5.459 rows=9961 loops=1)
+                    Index Cond: ((workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid) AND (due_date IS NULL))
+                    Buffers: shared hit=8620
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.004 rows=9 loops=9961)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+                    Rows Removed by Filter: 32
+                    Buffers: shared hit=27882
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.004..0.005 rows=10 loops=1)
+                            Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                            Rows Removed by Filter: 50
+                            Buffers: shared hit=2
+Planning Time: 0.114 ms
+Execution Time: 47.684 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.38..19.39 rows=1 width=8) (actual time=47.238..47.239 rows=1 loops=1)
+  Buffers: shared hit=36502
+  ->  Nested Loop  (cost=0.43..19.38 rows=1 width=0) (actual time=0.025..47.161 rows=2003 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 88511
+        Buffers: shared hit=36502
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.014..5.835 rows=9961 loops=1)
+              Index Cond: ((workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid) AND (due_date IS NULL))
+              Buffers: shared hit=8620
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.004 rows=9 loops=9961)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+              Rows Removed by Filter: 32
+              Buffers: shared hit=27882
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.005..0.005 rows=10 loops=1)
+                      Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                      Rows Removed by Filter: 50
+                      Buffers: shared hit=2
+Planning Time: 0.107 ms
+Execution Time: 47.257 ms
+```
+
+### Сводка, «Нужно проверить»
+время вызова функции, мс: min 140.2 / median 144.7 / max 165.8 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.40..19.40 rows=1 width=728) (actual time=73.952..73.953 rows=0 loops=1)
+  Buffers: shared hit=82509
+  ->  Sort  (cost=19.40..19.40 rows=1 width=728) (actual time=73.951..73.951 rows=0 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=82509
+        ->  Nested Loop  (cost=0.43..19.39 rows=1 width=728) (actual time=73.948..73.948 rows=0 loops=1)
+              Join Filter: ((project.id = task.project_id) AND ((task.created_by = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (project.owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)))
+              Rows Removed by Join Filter: 113730
+              Buffers: shared hit=82509
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.008..18.142 rows=11373 loops=1)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: (status = 'review'::text)
+                    Rows Removed by Filter: 38627
+                    Buffers: shared hit=48388
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=32) (actual time=0.001..0.005 rows=10 loops=11373)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+                    Rows Removed by Filter: 40
+                    Buffers: shared hit=34121
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.004..0.005 rows=10 loops=1)
+                            Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                            Rows Removed by Filter: 50
+                            Buffers: shared hit=2
+Planning Time: 0.126 ms
+Execution Time: 73.970 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.39..19.40 rows=1 width=8) (actual time=67.597..67.598 rows=1 loops=1)
+  Buffers: shared hit=82509
+  ->  Nested Loop  (cost=0.43..19.39 rows=1 width=0) (actual time=67.594..67.595 rows=0 loops=1)
+        Join Filter: ((project.id = task.project_id) AND ((task.created_by = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (project.owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)))
+        Rows Removed by Join Filter: 113730
+        Buffers: shared hit=82509
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=32) (actual time=0.008..13.593 rows=11373 loops=1)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: (status = 'review'::text)
+              Rows Removed by Filter: 38627
+              Buffers: shared hit=48388
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=32) (actual time=0.001..0.004 rows=10 loops=11373)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+              Rows Removed by Filter: 40
+              Buffers: shared hit=34121
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.004..0.005 rows=10 loops=1)
+                      Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                      Rows Removed by Filter: 50
+                      Buffers: shared hit=2
+Planning Time: 0.112 ms
+Execution Time: 67.618 ms
+```
+
+### Сводка, последняя страница без фильтров (OFFSET)
+время вызова функции, мс: min 452.7 / median 459.9 / max 510.8 (7 запусков, прогретый кэш)
+
+```
+SELECT task.project_id, task.parent_id, task.title, task.status, task.priority, task.due_date, task.assignee_i ...
+Limit  (cost=19.39..19.40 rows=1 width=728) (actual time=251.438..251.440 rows=0 loops=1)
+  Buffers: shared hit=188419
+  ->  Sort  (cost=19.39..19.39 rows=1 width=728) (actual time=250.994..251.257 rows=9971 loops=1)
+        Sort Key: task.due_date, task.id
+        Sort Method: quicksort  Memory: 2912kB
+        Buffers: shared hit=188419
+        ->  Nested Loop  (cost=0.43..19.38 rows=1 width=728) (actual time=0.022..245.115 rows=9971 loops=1)
+              Join Filter: (project.id = task.project_id)
+              Rows Removed by Join Filter: 445113
+              Buffers: shared hit=188419
+              ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=728) (actual time=0.009..33.516 rows=50000 loops=1)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Buffers: shared hit=48388
+              ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.004 rows=9 loops=50000)
+                    Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+                    Rows Removed by Filter: 32
+                    Buffers: shared hit=140031
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.005..0.006 rows=10 loops=1)
+                            Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                            Rows Removed by Filter: 50
+                            Buffers: shared hit=2
+Planning Time: 0.137 ms
+Execution Time: 251.568 ms
+```
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=19.38..19.39 rows=1 width=8) (actual time=237.819..237.820 rows=1 loops=1)
+  Buffers: shared hit=188419
+  ->  Nested Loop  (cost=0.43..19.38 rows=1 width=0) (actual time=0.022..237.496 rows=9971 loops=1)
+        Join Filter: (project.id = task.project_id)
+        Rows Removed by Join Filter: 445113
+        Buffers: shared hit=188419
+        ->  Index Scan using ix_task_workspace_id_assignee_id_due_date on task  (cost=0.29..8.31 rows=1 width=16) (actual time=0.009..28.916 rows=50000 loops=1)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Buffers: shared hit=48388
+        ->  Index Scan using ix_project_workspace_id on project  (cost=0.14..11.06 rows=1 width=16) (actual time=0.001..0.004 rows=9 loops=50000)
+              Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+              Rows Removed by Filter: 32
+              Buffers: shared hit=140031
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (actual time=0.004..0.005 rows=10 loops=1)
+                      Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+                      Rows Removed by Filter: 50
+                      Buffers: shared hit=2
+Planning Time: 0.099 ms
+Execution Time: 237.838 ms
+```
+
+### Уведомления: unread_count
+время вызова функции, мс: min 0.6 / median 1.3 / max 2.6 (7 запусков, прогретый кэш)
+
+```
+SELECT count(*) AS count_1  ...
+Aggregate  (cost=38.67..38.68 rows=1 width=8) (actual time=0.008..0.009 rows=1 loops=1)
+  Buffers: shared hit=2
+  ->  Nested Loop  (cost=0.72..38.67 rows=1 width=0) (actual time=0.007..0.007 rows=0 loops=1)
+        Buffers: shared hit=2
+        ->  Nested Loop  (cost=0.58..16.69 rows=1 width=16) (actual time=0.007..0.007 rows=0 loops=1)
+              Buffers: shared hit=2
+              ->  Index Scan using ix_notification_recipient_id_read_at_created_at on notification  (cost=0.29..8.31 rows=1 width=32) (actual time=0.007..0.007 rows=0 loops=1)
+                    Index Cond: ((recipient_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) AND (read_at IS NULL) AND (created_at >= '2026-08-12 09:22:59.715303+00'::timestamp with time zone))
+                    Filter: (((comment_id IS NULL) OR (SubPlan 3)) AND (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid))
+                    Buffers: shared hit=2
+                    SubPlan 3
+                      ->  Seq Scan on comment  (cost=0.00..0.00 rows=1 width=0) (never executed)
+                            Filter: ((deleted_at IS NULL) AND (id = notification.comment_id))
+              ->  Index Scan using pk_task on task  (cost=0.29..8.31 rows=1 width=16) (never executed)
+                    Index Cond: (id = notification.task_id)
+                    Filter: (deleted_at IS NULL)
+        ->  Index Scan using pk_project on project  (cost=0.14..11.06 rows=1 width=16) (never executed)
+              Index Cond: (id = notification.project_id)
+              Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+              SubPlan 2
+                ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (never executed)
+                      Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+Planning:
+  Buffers: shared hit=6
+Planning Time: 0.225 ms
+Execution Time: 0.028 ms
+```
+
+### Уведомления: list (стр. 1, 20)
+время вызова функции, мс: min 0.9 / median 0.9 / max 1.4 (7 запусков, прогретый кэш)
+
+```
+SELECT notification.recipient_id, notification.kind, notification.task_id, notification.project_id, notificati ...
+Limit  (cost=47.58..47.59 rows=1 width=192) (actual time=0.402..0.403 rows=0 loops=1)
+  Buffers: shared hit=43
+  ->  Sort  (cost=47.58..47.59 rows=1 width=192) (actual time=0.402..0.402 rows=0 loops=1)
+        Sort Key: notification.created_at DESC, notification.id DESC
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=43
+        ->  Nested Loop  (cost=13.64..47.57 rows=1 width=192) (actual time=0.401..0.401 rows=0 loops=1)
+              Buffers: shared hit=43
+              ->  Nested Loop  (cost=13.50..25.59 rows=1 width=192) (actual time=0.401..0.401 rows=0 loops=1)
+                    Buffers: shared hit=43
+                    ->  Bitmap Heap Scan on notification  (cost=13.21..17.22 rows=1 width=192) (actual time=0.400..0.401 rows=0 loops=1)
+                          Recheck Cond: ((workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid) AND (recipient_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) AND (created_at >= '2026-08-12 09:22:59.715303+00'::timestamp with time zone))
+                          Filter: ((comment_id IS NULL) OR (SubPlan 3))
+                          Buffers: shared hit=43
+                          ->  BitmapAnd  (cost=13.21..13.21 rows=1 width=0) (actual time=0.393..0.393 rows=0 loops=1)
+                                Buffers: shared hit=43
+                                ->  Bitmap Index Scan on ix_notification_workspace_id  (cost=0.00..6.17 rows=250 width=0) (actual time=0.372..0.372 rows=50000 loops=1)
+                                      Index Cond: (workspace_id = '5dfbb5ee-c410-44d6-a416-315de2719964'::uuid)
+                                      Buffers: shared hit=41
+                                ->  Bitmap Index Scan on ix_notification_recipient_id_read_at_created_at  (cost=0.00..6.79 rows=83 width=0) (actual time=0.001..0.001 rows=0 loops=1)
+                                      Index Cond: ((recipient_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) AND (created_at >= '2026-08-12 09:22:59.715303+00'::timestamp with time zone))
+                                      Buffers: shared hit=2
+                          SubPlan 3
+                            ->  Seq Scan on comment  (cost=0.00..0.00 rows=1 width=0) (never executed)
+                                  Filter: ((deleted_at IS NULL) AND (id = notification.comment_id))
+                    ->  Index Scan using pk_task on task  (cost=0.29..8.31 rows=1 width=16) (never executed)
+                          Index Cond: (id = notification.task_id)
+                          Filter: (deleted_at IS NULL)
+              ->  Index Scan using pk_project on project  (cost=0.14..11.06 rows=1 width=16) (never executed)
+                    Index Cond: (id = notification.project_id)
+                    Filter: ((deleted_at IS NULL) AND ((owner_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid) OR (hashed SubPlan 2)))
+                    SubPlan 2
+                      ->  Seq Scan on project_member  (cost=0.00..2.75 rows=1 width=16) (never executed)
+                            Filter: (user_id = '5c513afb-60f1-4326-be92-9843c46082d9'::uuid)
+Planning:
+  Buffers: shared hit=6
+Planning Time: 0.154 ms
+Execution Time: 0.414 ms
+```
