@@ -109,6 +109,7 @@ export const ru = {
   "admin.users.reset_password": "Сбросить пароль",
   "admin.users.revoke_sessions": "Завершить сессии",
   "admin.users.set_role": "Применить роль",
+  "admin.users.more": "Ещё",
   "admin.users.block_aria": "Заблокировать {login}",
   "admin.users.unblock_aria": "Разблокировать {login}",
   "admin.users.reset_password_aria": "Сбросить пароль {login}",

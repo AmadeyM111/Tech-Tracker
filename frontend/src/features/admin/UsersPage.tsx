@@ -71,80 +71,34 @@ function UserRow(props: RowProps) {
   const current = user.role ?? "";
   const selected = draft ?? current;
   const params = { login: user.login };
+  // UX-audit P1: три колонки. Логин, email и источник - в первой; имя, роль и состояние - во второй;
+  // основное действие - в третьей, остальные - в <details> «Ещё». Все кнопки остаются в DOM.
   return (
     <tr data-user-id={user.id}>
-      <td data-field="login">{user.login}</td>
-      <td data-field="first_name">{user.first_name || t("admin.users.name_missing")}</td>
-      <td data-field="last_name">{user.last_name || t("admin.users.name_missing")}</td>
-      <td data-field="origin">{user.self_registered ? t("admin.users.self_registered") : ""}</td>
-      <td data-field="email">{user.email ?? t("admin.users.email_missing")}</td>
-      <td data-field="role">{roleText(user.role)}</td>
-      <td data-field="status">
-        {t(user.is_blocked ? "admin.users.status_blocked" : "admin.users.status_active")}
+      <td className="ui-users-table__account">
+        <span className="ui-users-login" data-field="login">
+          {user.login}
+        </span>
+        <span className="ui-users-email" data-field="email" data-label={t("admin.users.email_column")}>
+          {user.email ?? t("admin.users.email_missing")}
+        </span>
+        <span className="ui-users-origin" data-field="origin" data-label={t("admin.users.origin_column")}>
+          {user.self_registered ? t("admin.users.self_registered") : ""}
+        </span>
       </td>
-      <td>
-        <div className="ui-actions">
-          {user.is_blocked ? (
-            <button
-              type="button"
-              data-action="unblock"
-              aria-label={t("admin.users.unblock_aria", params)}
-              disabled={disabled}
-              onClick={props.onUnblock}
-            >
-              {t("admin.users.unblock")}
-            </button>
-          ) : (
-            <button
-              type="button"
-              data-action="block"
-              aria-label={t("admin.users.block_aria", params)}
-              disabled={disabled}
-              onClick={props.onBlock}
-            >
-              {t("admin.users.block")}
-            </button>
-          )}
-          <button
-            type="button"
-            data-action="reset-password"
-            aria-label={t("admin.users.reset_password_aria", params)}
-            disabled={disabled}
-            onClick={props.onReset}
-          >
-            {t("admin.users.reset_password")}
-          </button>
-          <button
-            type="button"
-            data-action="revoke-sessions"
-            aria-label={t("admin.users.revoke_sessions_aria", params)}
-            disabled={disabled}
-            onClick={props.onRevoke}
-          >
-            {t("admin.users.revoke_sessions")}
-          </button>
-          <button
-            type="button"
-            data-action="edit-email"
-            aria-label={t("admin.users.edit_email_aria", params)}
-            disabled={disabled}
-            onClick={props.onEditEmail}
-          >
-            {t("admin.users.edit_email")}
-          </button>
-          <button
-            type="button"
-            data-action="edit-name"
-            aria-label={t("admin.users.edit_name_aria", params)}
-            disabled={disabled}
-            onClick={props.onEditName}
-          >
-            {t("admin.users.edit_name")}
-          </button>
+      <td className="ui-users-table__person">
+        <span data-field="first_name" data-label={t("admin.users.first_name_column")}>
+          {user.first_name || t("admin.users.name_missing")}
+        </span>{" "}
+        <span data-field="last_name" data-label={t("admin.users.last_name_column")}>
+          {user.last_name || t("admin.users.name_missing")}
+        </span>
+        <div className="ui-users-table__role" data-label={t("admin.users.col_role")}>
           {canAssignRoles ? (
             <>
               <select
                 name="role"
+                data-field="role"
                 aria-label={t("admin.users.role_select_aria", params)}
                 value={selected}
                 disabled={disabled}
@@ -170,7 +124,78 @@ function UserRow(props: RowProps) {
                 {t("admin.users.set_role")}
               </button>
             </>
-          ) : null}
+          ) : (
+            <span data-field="role">{roleText(user.role)}</span>
+          )}
+        </div>
+        <span className="ui-users-status" data-field="status" data-label={t("admin.users.col_status")}>
+          {t(user.is_blocked ? "admin.users.status_blocked" : "admin.users.status_active")}
+        </span>
+      </td>
+      <td className="ui-users-table__actions">
+        <div className="ui-actions">
+          {user.is_blocked ? (
+            <button
+              type="button"
+              data-action="unblock"
+              aria-label={t("admin.users.unblock_aria", params)}
+              disabled={disabled}
+              onClick={props.onUnblock}
+            >
+              {t("admin.users.unblock")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              data-action="block"
+              aria-label={t("admin.users.block_aria", params)}
+              disabled={disabled}
+              onClick={props.onBlock}
+            >
+              {t("admin.users.block")}
+            </button>
+          )}
+          <details className="ui-users-more">
+            <summary>{t("admin.users.more")}</summary>
+            <div className="ui-actions">
+              <button
+                type="button"
+                data-action="reset-password"
+                aria-label={t("admin.users.reset_password_aria", params)}
+                disabled={disabled}
+                onClick={props.onReset}
+              >
+                {t("admin.users.reset_password")}
+              </button>
+              <button
+                type="button"
+                data-action="revoke-sessions"
+                aria-label={t("admin.users.revoke_sessions_aria", params)}
+                disabled={disabled}
+                onClick={props.onRevoke}
+              >
+                {t("admin.users.revoke_sessions")}
+              </button>
+              <button
+                type="button"
+                data-action="edit-email"
+                aria-label={t("admin.users.edit_email_aria", params)}
+                disabled={disabled}
+                onClick={props.onEditEmail}
+              >
+                {t("admin.users.edit_email")}
+              </button>
+              <button
+                type="button"
+                data-action="edit-name"
+                aria-label={t("admin.users.edit_name_aria", params)}
+                disabled={disabled}
+                onClick={props.onEditName}
+              >
+                {t("admin.users.edit_name")}
+              </button>
+            </div>
+          </details>
         </div>
       </td>
     </tr>
@@ -384,16 +409,25 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
       ) : data.items.length === 0 ? (
         <p role="status">{t("admin.users.empty")}</p>
       ) : (
-        <table className="ui-table" aria-label={t("admin.users.list_label")} ref={tableRef} tabIndex={-1}>
+        <table
+          className="ui-table ui-users-table"
+          aria-label={t("admin.users.list_label")}
+          ref={tableRef}
+          tabIndex={-1}
+        >
           <thead>
             <tr>
-              <th scope="col">{t("admin.users.col_login")}</th>
-              <th scope="col">{t("admin.users.first_name_column")}</th>
-              <th scope="col">{t("admin.users.last_name_column")}</th>
-              <th scope="col">{t("admin.users.origin_column")}</th>
-              <th scope="col">{t("admin.users.email_column")}</th>
-              <th scope="col">{t("admin.users.col_role")}</th>
-              <th scope="col">{t("admin.users.col_status")}</th>
+              <th scope="col">
+                {[t("admin.users.col_login"), t("admin.users.email_column"), t("admin.users.origin_column")].join(" · ")}
+              </th>
+              <th scope="col">
+                {[
+                  t("admin.users.first_name_column"),
+                  t("admin.users.last_name_column"),
+                  t("admin.users.col_role"),
+                  t("admin.users.col_status"),
+                ].join(" · ")}
+              </th>
               <th scope="col">{t("admin.users.col_actions")}</th>
             </tr>
           </thead>

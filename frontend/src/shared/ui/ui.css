@@ -351,6 +351,80 @@ h1,
   background: var(--surface);
 }
 
+/* UX-audit P1 (accounts): compact row, three columns. Scoped to .ui-users-table; the shared .ui-table rules above stay as they are. */
+.ui-users-table td {
+  vertical-align: top;
+}
+
+.ui-users-table__account {
+  width: 28%;
+}
+
+.ui-users-table__person {
+  width: 38%;
+}
+
+.ui-users-table__actions {
+  width: 34%;
+}
+
+.ui-users-login {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.ui-users-email,
+.ui-users-origin,
+.ui-users-status {
+  display: block;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.ui-users-origin:empty {
+  display: none;
+}
+
+.ui-users-table__role {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.ui-users-table__role select {
+  min-height: 44px;
+  min-width: 10rem;
+}
+
+.ui-users-table__role [data-action="set-role"] {
+  min-height: 44px;
+}
+
+/* Secondary actions: native disclosure, the summary looks like a secondary button (44px touch target). */
+.ui-users-more > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+
+.ui-users-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ui-users-more > .ui-actions {
+  margin-top: 8px;
+}
+
 .ui-actions {
   display: flex;
   flex-wrap: wrap;
@@ -901,5 +975,43 @@ h1 input[name="title"] {
 @media (max-width: 719px) {
   .notif {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* UX-audit P1 (accounts): 360 px, the table becomes a list of cards; each field shows its label (ru.ts) from data-label. */
+@media (max-width: 719px) {
+  .ui-users-table,
+  .ui-users-table tbody,
+  .ui-users-table tr,
+  .ui-users-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .ui-users-table thead {
+    display: none;
+  }
+
+  .ui-users-table tr {
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .ui-users-table td {
+    padding: 4px 0;
+    border-bottom: 0;
+  }
+
+  .ui-users-table [data-field="first_name"],
+  .ui-users-table [data-field="last_name"] {
+    display: block;
+  }
+
+  .ui-users-table [data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--text-muted);
   }
 }
