@@ -6,6 +6,7 @@ After=docker.service
 
 [Service]
 Type=oneshot
+TimeoutStartSec=1h
 Environment=GTRACK_API_CONTAINER=gtrack-api-1
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:/run/current-system/sw/bin
 EnvironmentFile=-/etc/gtrack/backup.env
