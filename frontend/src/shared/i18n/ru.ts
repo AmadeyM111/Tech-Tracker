@@ -482,6 +482,10 @@ export const ru = {
   "auth.register_first_name_label": "Имя",
   "auth.register_last_name_label": "Фамилия",
   "auth.register_password_label": "Пароль",
+  "auth.register_email_required": "Введите email",
+  "auth.register_first_name_required": "Введите имя",
+  "auth.register_last_name_required": "Введите фамилию",
+  "auth.register_password_required": "Введите пароль",
   "auth.register_submit": "Зарегистрироваться",
   "auth.register_sent":
     "Если адрес можно использовать для регистрации, мы отправили на него письмо с подтверждением. Ссылка действует 30 минут.",
