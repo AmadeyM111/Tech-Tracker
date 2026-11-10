@@ -285,9 +285,22 @@ select:disabled {
 
 /* Long unbroken names must not break the layout (NFR-6). */
 h1,
-.ui-table td,
 .ui-pre,
 .ui-list {
+  overflow-wrap: anywhere;
+}
+
+/* Table cells wrap by words (UI-kit, 2026-11-08): `anywhere` shrinks the column to single letters.
+   Only long e-mail addresses may break inside a word. */
+.ui-table td {
+  overflow-wrap: break-word;
+}
+
+.ui-table td[data-field="login"],
+.ui-table td[data-field="name"],
+.ui-table td[data-field="title"],
+.ui-table td[data-field="email"] {
+  /* Long unbroken identifiers and names still wrap anywhere (NFR-6). */
   overflow-wrap: anywhere;
 }
 
@@ -314,6 +327,18 @@ h1,
 
 .ui-table td[data-field="login"] {
   min-width: 12rem;
+}
+
+/* Name, origin and e-mail columns keep a readable width; the e-mail may break inside a word. */
+.ui-table td[data-field="first_name"],
+.ui-table td[data-field="last_name"],
+.ui-table td[data-field="origin"] {
+  min-width: 8rem;
+}
+
+.ui-table td[data-field="email"] {
+  min-width: 10rem;
+  overflow-wrap: anywhere;
 }
 
 .ui-table th {
