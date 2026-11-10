@@ -42,7 +42,7 @@ class UserRef:
     login: str
 
 
-def _like_pattern(q: str) -> str:
+def like_contains_pattern(q: str) -> str:
     """Подстрока для ``ILIKE ... ESCAPE '\\'``: ``\\``, ``%`` и ``_`` — литералы (D-24)."""
     escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
@@ -68,7 +68,7 @@ async def list_directory(
         .order_by(AppUser.login, AppUser.id)
     )
     if q:
-        stmt = stmt.where(AppUser.login.ilike(_like_pattern(q), escape="\\"))
+        stmt = stmt.where(AppUser.login.ilike(like_contains_pattern(q), escape="\\"))
     offset = (params.page - 1) * params.page_size
     stmt = stmt.limit(params.page_size + 1).offset(literal(offset, BigInteger()))
     rows = (await db.execute(stmt)).all()

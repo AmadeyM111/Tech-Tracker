@@ -92,8 +92,9 @@ async def test_ac2_list_returns_workspace_users_with_documented_fields(api_env: 
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert set(body) == {"items", "page", "page_size", "has_next"}
+    assert set(body) == {"items", "page", "page_size", "has_next", "total"}
     assert (body["page"], body["page_size"], body["has_next"]) == (1, 50, False)
+    assert body["total"] == 4  # все записи пространства, не размер страницы
     by_id = {item["id"]: item for item in body["items"]}
     assert set(by_id) == {str(u.id) for u in (admin, ivan, blocked, fresh)}
     for item in body["items"]:
@@ -1199,7 +1200,7 @@ async def test_d34_t17_list_response_is_page_of_one_named_item_schema(api_env: A
     op = _admin_operations(api_env)[("GET", "/api/v1/admin/users")]
     ref = op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
     page = schemas[ref.rsplit("/", 1)[-1]]
-    assert set(page["properties"]) == {"items", "page", "page_size", "has_next"}
+    assert set(page["properties"]) == {"items", "page", "page_size", "has_next", "total"}
     item_ref = page["properties"]["items"]["items"]["$ref"]
     item = schemas[item_ref.rsplit("/", 1)[-1]]
     assert set(item["properties"]) == ADMIN_VIEW_FIELDS

@@ -18,7 +18,9 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from app.api.deps import get_active_actor, require_capability
 from app.api.openapi import error_response, error_responses
 from app.api.v1.schemas.admin import (
+    AccountListQuery,
     AdminUser,
+    AdminUserPage,
     CreateUserRequest,
     ResetPasswordRequest,
     SetEmailRequest,
@@ -26,7 +28,6 @@ from app.api.v1.schemas.admin import (
     SetRoleRequest,
 )
 from app.core.db import DbSession
-from app.core.pagination import Page, PageParams
 from app.core.security.passwords import PasswordHasher
 from app.domain.access.roles import Actor, Capability
 from app.domain.auth.sessions import SessionStore
@@ -43,17 +44,22 @@ router = APIRouter(
 CurrentActor = Annotated[Actor, Depends(get_active_actor)]
 
 
-@router.get("", response_model=Page[AdminUser], responses=error_responses(422))
+@router.get("", response_model=AdminUserPage, responses=error_responses(422))
 async def list_users(
-    db: DbSession, actor: CurrentActor, params: Annotated[PageParams, Query()]
-) -> Page[AdminUser]:
-    """Страница учётных записей пространства: ``login ASC, id ASC`` (D-34)."""
-    accounts, has_next = await service.list_accounts(db, actor, params)
-    return Page[AdminUser](
+    db: DbSession, actor: CurrentActor, params: Annotated[AccountListQuery, Query()]
+) -> AdminUserPage:
+    """Страница учётных записей пространства: ``login ASC, id ASC`` (D-34).
+
+    ``q`` — поиск по логину, имени, фамилии и email; ``total`` — всего найдено (все страницы).
+    """
+    accounts, has_next = await service.list_accounts(db, actor, params, q=params.q)
+    total = await service.count_accounts(db, actor, q=params.q)
+    return AdminUserPage(
         items=[AdminUser.model_validate(account) for account in accounts],
         page=params.page,
         page_size=params.page_size,
         has_next=has_next,
+        total=total,
     )
 
 
