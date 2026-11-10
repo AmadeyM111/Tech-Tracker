@@ -13,8 +13,8 @@
 
 ## C25-T02 — Формирование CSV (чистая функция)
 - **Статус:** TODO · **AC:** AC-4, AC-5, AC-6, AC-12 · **Оценка:** 0,5 дня
-- **Файлы:** `backend/app/domain/overview/csv.py`, `backend/tests/unit/test_025_csv.py`
-- **Готово, когда:** `pytest -q backend/tests/unit/test_025_csv.py` зелёный; разбор `csv.reader(delimiter=";")` возвращает исходные значения.
+- **Файлы:** `backend/app/domain/overview/export_csv.py`, `backend/tests/unit/test_025_csv_render.py`
+- **Готово, когда:** `pytest -q backend/tests/unit/test_025_csv_render.py` зелёный; разбор `csv.reader(delimiter=";")` возвращает исходные значения.
 
 ## C25-T03 — Эндпоинт, лимит, аудит
 - **Статус:** TODO · **AC:** AC-1, AC-2, AC-7, AC-8, AC-9, AC-10 · **Оценка:** 1 день · **Зависит от:** C25-T01, C25-T02

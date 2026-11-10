@@ -61,6 +61,7 @@ const ACTION_CODES: readonly string[] = [
   "user.role_removed",
   "user.self_registered",
   "user.name_changed",
+  "user.overview_exported",
   "project.ownership_transferred",
 ];
 // Field names with a readable text; any other name is shown as it is.
@@ -92,6 +93,8 @@ function detailsText(entry: AuditEntry): string {
       return roleName(to);
     case "user.role_removed":
       return roleName(from);
+    case "user.overview_exported":
+      return t("admin.audit.rows", { n: entry.details?.["rows"] ?? "" });
     case "user.role_changed":
       return t("admin.audit.role_change", { from: roleName(from), to: roleName(to) });
     default:

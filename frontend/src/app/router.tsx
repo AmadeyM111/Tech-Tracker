@@ -524,7 +524,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/summary"
         element={
           <RoleScreen insideMain={insideMain} capability="business_access">
-            {() => <SummaryPage />}
+            {(profile) => <SummaryPage canExport={profile.capabilities.includes("export_overview")} />}
           </RoleScreen>
         }
       />

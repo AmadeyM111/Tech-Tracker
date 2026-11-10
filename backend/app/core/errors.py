@@ -89,6 +89,8 @@ class ErrorCode(StrEnum):
     last_name_invalid = "last_name_invalid"
     # [011]
     attachment_empty = "attachment_empty"
+    # [025]
+    export_too_large = "export_too_large"
 
 
 class AppError(Exception):
