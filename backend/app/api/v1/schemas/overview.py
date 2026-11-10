@@ -5,9 +5,10 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.api.v1.schemas.common import ProjectRef, UserRef
+from app.api.v1.schemas.tasks import DueDate
 from app.core.pagination import PageParams
 from app.domain.overview.due import DuePreset
 from app.domain.tasks.models import TaskPriority, TaskStatus
@@ -27,13 +28,28 @@ class OverviewCountsOut(BaseModel):
 
 
 class OverviewTaskQuery(PageParams):
-    """``?project_id&status&priority=…&due&needs_review&page&page_size``."""
+    """``?project_id&status&priority=…&due&due_from&due_to&needs_review&page&page_size``.
+
+    Пресет ``due`` и диапазон ``due_from``/``due_to`` взаимоисключающие (spec 024 FR-2, Q-1);
+    ``due_from > due_to`` — ошибка (FR-2). Оба нарушения — 422 ``validation_error``.
+    """
 
     project_id: UUID | None = None
     status: TaskStatus | None = None
     priority: list[TaskPriority] = Field(default_factory=list)
     due: DuePreset | None = None
+    due_from: DueDate | None = None
+    due_to: DueDate | None = None
     needs_review: bool = False
+
+    @model_validator(mode="after")
+    def _range_rules(self) -> OverviewTaskQuery:
+        has_range = self.due_from is not None or self.due_to is not None
+        if has_range and self.due is not None:
+            raise ValueError("срок-пресет нельзя задать вместе с диапазоном дат")
+        if self.due_from is not None and self.due_to is not None and self.due_from > self.due_to:
+            raise ValueError("дата «с» не может быть позже даты «по»")
+        return self
 
 
 class OverviewTaskItem(BaseModel):

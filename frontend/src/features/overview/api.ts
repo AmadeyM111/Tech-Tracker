@@ -43,12 +43,16 @@ export async function listOverviewTasks(
     status?: components["schemas"]["TaskStatus"];
     priority?: components["schemas"]["TaskPriority"][];
     due?: components["schemas"]["DuePreset"];
+    due_from?: string;
+    due_to?: string;
     needs_review?: boolean;
   } = { page, page_size: PAGE_SIZE };
   if (filters.projectId !== null) query.project_id = filters.projectId;
   if (filters.status !== null) query.status = filters.status;
   if (filters.priorities.length > 0) query.priority = [...filters.priorities];
   if (filters.due !== null) query.due = filters.due;
+  if (filters.dateFrom !== null) query.due_from = filters.dateFrom;
+  if (filters.dateTo !== null) query.due_to = filters.dateTo;
   if (filters.needsReview) query.needs_review = true;
   const { data } = await getAppClient().GET("/api/v1/me/overview/tasks", {
     params: { query },

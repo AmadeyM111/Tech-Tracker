@@ -1,7 +1,8 @@
 """«Сводка»: ``GET /api/v1/me/overview`` и ``/me/overview/{tasks,projects}`` (spec 008).
 
 Гейт — router-level ``require_capability(BUSINESS_ACCESS)``: ТА и «без роли» получают 403.
-Одно значение ``status`` и ``due`` (Q-7): повтор параметра — 422, а не «последнее победило».
+Одно значение ``status``, ``due`` и границ диапазона (Q-7, spec 024 FR-1): повтор параметра — 422,
+а не «последнее победило».
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ router = APIRouter(
 )
 
 CurrentActor = Annotated[Actor, Depends(get_active_actor)]
-_SINGLE = ("project_id", "status", "due", "needs_review", "page", "page_size")
+_SINGLE = ("project_id", "status", "due", "due_from", "due_to", "needs_review", "page", "page_size")
 
 
 @router.get("", response_model=OverviewCountsOut)
@@ -77,6 +78,8 @@ async def list_overview_tasks(
             status=query.status,
             priorities=frozenset(query.priority),
             due=query.due,
+            due_from=query.due_from,
+            due_to=query.due_to,
             needs_review=query.needs_review,
         ),
         PageParams(page=query.page, page_size=query.page_size),

@@ -19,7 +19,7 @@ import statistics
 import sys
 import time
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from app.core.pagination import PageParams
 from app.domain.access.roles import Actor, Role
@@ -255,6 +255,9 @@ async def main() -> int:
                     due=DuePreset.OVERDUE,
                 ),
                 "срок «Без срока»": OverviewFilter(due=DuePreset.NONE),
+                "диапазон срока «с / по» (неделя, 024)": OverviewFilter(
+                    due_from=today, due_to=today + timedelta(days=6)
+                ),
                 "«Нужно проверить»": OverviewFilter(needs_review=True),
             }
             for name, flt in cases.items():
