@@ -483,6 +483,17 @@ export const ru = {
   "agent_tokens.revoke_title": "Отозвать токен?",
   "agent_tokens.revoke_message":
     "Токен «{name}» перестанет работать. Агент, который его использует, потеряет доступ к трекеру. Вернуть токен после отзыва нельзя.",
+  // 026 FR-4: блок «Инструкция для Claude Code» на странице «Доступ для агентов» (текст - docs/ai-integration.md, Claude Code).
+  "agent_tokens.instructions_title": "Инструкция для Claude Code",
+  "agent_tokens.instructions_intro":
+    "Адрес MCP-эндпоинта — адрес этого сайта с путём /mcp. Токен передаётся в переменной окружения GTRACK_TOKEN: выпустите его выше и не вставляйте в репозиторий и в общие файлы конфигурации.",
+  "agent_tokens.instructions_variant_a": "Вариант A — HTTP: агент подключается по адресу, токен передаётся в заголовке",
+  "agent_tokens.instructions_variant_b": "Вариант B — stdio: агент запускает мост gtrack mcp (нужен установленный пакет трекера)",
+  // Команды из docs/ai-integration.md; {origin} - адрес страницы, токен в команде не выводится (читается из $GTRACK_TOKEN).
+  "agent_tokens.instructions_cmd_a": "claude mcp add --transport http gtrack {origin}/mcp \\\n  --header \"Authorization: Bearer $GTRACK_TOKEN\"",
+  "agent_tokens.instructions_cmd_b": "claude mcp add gtrack -e GTRACK_TOKEN=$GTRACK_TOKEN -e GTRACK_URL={origin} \\\n  -- gtrack mcp",
+  "agent_tokens.instructions_variant_b_note":
+    "Команда claude mcp add сохраняет значение переменной в конфигурации Claude Code. Используйте вариант B, если хотите, чтобы токен не попадал в URL и заголовки; в обоих случаях он хранится на вашей машине в пользовательской конфигурации.",
   // 019: самостоятельная регистрация, справка, профиль, имена, учётные записи без роли (plan §4.7).
   "auth.register_link": "Зарегистрироваться",
   "auth.register_title": "Регистрация",
