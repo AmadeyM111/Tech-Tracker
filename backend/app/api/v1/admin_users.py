@@ -51,6 +51,9 @@ async def list_users(
     """Страница учётных записей пространства: ``login ASC, id ASC`` (D-34).
 
     ``q`` — поиск по логину, имени, фамилии и email; ``total`` — всего найдено (все страницы).
+
+    Исключение из D-34 только для этого списка (решение 2026-11-10, ``specs/001-pilot-r1/plan.md`` D-34a):
+    учётных записей в пространстве десятки, поэтому ``total`` считается отдельным COUNT.
     """
     accounts, has_next = await service.list_accounts(db, actor, params, q=params.q)
     total = await service.count_accounts(db, actor, q=params.q)
