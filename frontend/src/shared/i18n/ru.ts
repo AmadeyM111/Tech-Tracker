@@ -400,6 +400,8 @@ export const ru = {
   "boards.filter_label": "Исполнитель",
   "boards.filter_all": "Все исполнители",
   "boards.filter_none": "Без исполнителя",
+  "boards.filter_priority_label": "Приоритет",
+  "boards.filter_priority_all": "Все приоритеты",
   "user_picker.empty": "Подходящих пользователей не найдено",
   "user_picker.loading": "Идёт поиск…",
   "user_picker.count": "Найдено пользователей: {count}",

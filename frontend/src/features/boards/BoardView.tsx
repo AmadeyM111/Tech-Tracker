@@ -213,6 +213,8 @@ function applyMove(
   });
 }
 
+const PRIORITIES = ["low", "medium", "high"] as const;
+
 export function BoardView({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const alert = useAlertState();
@@ -228,6 +230,9 @@ export function BoardView({ projectId }: { projectId: string }) {
   // Assignee filter: "" = all, "none" = unassigned, otherwise a user id. Component state only.
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const filterId = useId();
+  // Priority filter: "" = all, otherwise low / medium / high. Component state only.
+  const [priorityFilter, setPriorityFilter] = useState("");
+  const priorityId = useId();
   // A move request is in flight: a second drop is ignored until it is answered.
   const moving = useRef(false);
   const [{ detect: collisionDetection, geometry }] = useState(makeCollisionDetection);
@@ -268,10 +273,12 @@ export function BoardView({ projectId }: { projectId: string }) {
   // come back as a filter when his card appears again.
   if (columns !== undefined && assigneeFilter !== filter) setAssigneeFilter(filter);
   const shown = useMemo(() => {
-    if (columns === undefined || filter === "") return columns;
-    const keep = (card: BoardCard) => (filter === "none" ? card.assignee === null : card.assignee?.id === filter);
+    if (columns === undefined || (filter === "" && priorityFilter === "")) return columns;
+    const keepAssignee = (card: BoardCard) =>
+      filter === "" || (filter === "none" ? card.assignee === null : card.assignee?.id === filter);
+    const keep = (card: BoardCard) => keepAssignee(card) && (priorityFilter === "" || card.priority === priorityFilter);
     return columns.map((c) => ({ ...c, tasks: c.tasks.filter(keep) }));
-  }, [columns, filter]);
+  }, [columns, filter, priorityFilter]);
   const cardsById = useMemo(() => {
     const map = new Map<string, BoardCard>();
     for (const column of columns ?? []) for (const card of column.tasks) map.set(card.id, card);
@@ -437,7 +444,7 @@ export function BoardView({ projectId }: { projectId: string }) {
         ) : null
       ) : (
         <>
-          <div className="ui-board-filter">
+          <div className="ui-board-filter" style={{ flexWrap: "wrap" }}>
             <label htmlFor={filterId}>{t("boards.filter_label")}</label>
             <select
               id={filterId}
@@ -450,6 +457,20 @@ export function BoardView({ projectId }: { projectId: string }) {
               {assignees.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.login}
+                </option>
+              ))}
+            </select>
+            <label htmlFor={priorityId}>{t("boards.filter_priority_label")}</label>
+            <select
+              id={priorityId}
+              name="board-priority"
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+            >
+              <option value="">{t("boards.filter_priority_all")}</option>
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {t(`tasks.priority.${p}`)}
                 </option>
               ))}
             </select>

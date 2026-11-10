@@ -242,6 +242,17 @@ describe("my tasks page", () => {
     expect(taskRow(container, TID3)).toBeTruthy();
   });
 
+  it("p2_cards_for_360px_show_same_tasks_with_project_status_and_due", async () => {
+    const { container } = await open();
+    await waitFor(() => expect(taskRow(container, TID1)).toBeTruthy());
+    const card = container.querySelector<HTMLElement>(`.task-cards li[data-card-id="${TID1}"]`)!;
+    expect(card.querySelector("a")!.getAttribute("href")).toBe(`/tasks/${TID1}`);
+    expect(card.textContent).toContain("Альфа");
+    expect(container.querySelectorAll(".task-cards li")).toHaveLength(2);
+    const due = container.querySelector(`.task-cards li[data-card-id="${TID3}"]`)!;
+    expect(due.textContent).toContain("01.01.2026");
+  });
+
   it("ac6_has_no_filters_and_no_create_form", async () => {
     const { container } = await open();
     await waitFor(() => expect(taskRow(container, TID1)).toBeTruthy());
