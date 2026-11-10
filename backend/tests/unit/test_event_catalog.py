@@ -32,6 +32,8 @@ USER_ACTIONS = {
     # 019 (plan RG-10)
     "user.self_registered",
     "user.name_changed",
+    # 025 (ADR-0023): выгрузка CSV «Сводки» — аудит автора выгрузки
+    "user.overview_exported",
 }
 
 F = frozenset
