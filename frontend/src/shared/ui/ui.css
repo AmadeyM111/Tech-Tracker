@@ -868,6 +868,14 @@ h1 input[name="title"] {
   min-height: 44px;
   /* Font size inherits the body 19px (UI-kit §1–2); base button rule has font: inherit. */
 }
+/* Ссылка в виде кнопки («Назад» на экране без прав, аудит #10): размеры и отступы как у кнопки. */
+a.ui-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 4px 14px;
+  text-decoration: none;
+}
 
 /* UI-kit §1–2: badge — 1 px border, 6 px radius, 15 px font. Modifiers: --accent, --danger. */
 .ui-badge {
