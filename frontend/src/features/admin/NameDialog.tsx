@@ -1,9 +1,23 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { ApiError } from "../../shared/api/client";
-import { errorMessage, t } from "../../shared/i18n";
+import { errorMessage, t, type MessageKey } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { TextField } from "../../shared/ui/TextField";
+
+type NameField = "first" | "last";
+
+// Text under an empty name field (P2 of the PR #29 design review).
+const EMPTY_TEXT: Record<NameField, MessageKey> = {
+  first: "admin.users.first_name_required",
+  last: "admin.users.last_name_required",
+};
+
+// Server codes that refer to one name field: the text goes under that field, not into the general block.
+const FIELD_CODES: Record<string, NameField | undefined> = {
+  first_name_invalid: "first",
+  last_name_invalid: "last",
+};
 
 export interface NameDialogProps {
   login: string;
@@ -24,6 +38,10 @@ export function NameDialog(props: NameDialogProps) {
   const [first, setFirst] = useState(firstName);
   const [last, setLast] = useState(lastName);
   const [pending, setPending] = useState(false);
+  // Fields that were empty on the last submit (cleared on the next submit).
+  const [emptyKeys, setEmptyKeys] = useState<NameField[]>([]);
+  // A server error that refers to one field; its text goes under that field.
+  const [fieldError, setFieldError] = useState<{ field: NameField; message: string } | null>(null);
   const firstRef = useRef<HTMLInputElement>(null);
   const lastRef = useRef<HTMLInputElement>(null);
   const saveRef = useRef<HTMLButtonElement>(null);
@@ -37,19 +55,32 @@ export function NameDialog(props: NameDialogProps) {
     };
   }, []);
 
+  // The field of a server error takes focus once the form is enabled again (the inputs are disabled while pending).
+  useEffect(() => {
+    if (fieldError !== null) (fieldError.field === "first" ? firstRef : lastRef).current?.focus();
+  }, [fieldError]);
+
+  function errorFor(key: NameField): string | null {
+    if (emptyKeys.includes(key)) return t(EMPTY_TEXT[key]);
+    return fieldError?.field === key ? fieldError.message : null;
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (pending) return;
     alert.clear();
+    setFieldError(null);
     const trimmedFirst = first.trim();
     const trimmedLast = last.trim();
-    // Empty names are refused here, before any request (same rules as the server, RG-3).
-    if (trimmedFirst === "") {
-      alert.show(errorMessage("first_name_invalid"));
-      return;
-    }
-    if (trimmedLast === "") {
-      alert.show(errorMessage("last_name_invalid"));
+    // Empty names (spaces count as empty) are refused here, before any request (same rules as the server, RG-3).
+    // The first empty field takes focus; the general alert above the button does not.
+    const missing: NameField[] = [];
+    if (trimmedFirst === "") missing.push("first");
+    if (trimmedLast === "") missing.push("last");
+    setEmptyKeys(missing);
+    if (missing.length > 0) {
+      alert.show(errorMessage("validation_error"));
+      (missing[0] === "first" ? firstRef : lastRef).current?.focus();
       return;
     }
     setPending(true);
@@ -57,7 +88,13 @@ export function NameDialog(props: NameDialogProps) {
       await onSave(trimmedFirst, trimmedLast);
       onClose();
     } catch (e) {
-      alert.show(errorMessage(e instanceof ApiError ? e.code : "unknown"));
+      const code = e instanceof ApiError ? e.code : "unknown";
+      const field = Object.hasOwn(FIELD_CODES, code) ? FIELD_CODES[code] : undefined;
+      if (field === undefined) {
+        alert.show(errorMessage(code));
+      } else {
+        setFieldError({ field, message: errorMessage(code) });
+      }
       setPending(false);
     }
   }
@@ -106,6 +143,7 @@ export function NameDialog(props: NameDialogProps) {
             onChange={setFirst}
             autoComplete="given-name"
             inputRef={firstRef}
+            error={errorFor("first")}
             disabled={pending}
           />
           <TextField
@@ -115,9 +153,10 @@ export function NameDialog(props: NameDialogProps) {
             onChange={setLast}
             autoComplete="family-name"
             inputRef={lastRef}
+            error={errorFor("last")}
             disabled={pending}
           />
-          <ErrorAlert message={alert.message} seq={alert.seq} />
+          <ErrorAlert message={alert.message} seq={alert.seq} focus={emptyKeys.length === 0} />
           <button type="submit" data-action="save" ref={saveRef} disabled={pending}>
             {t("admin.users.name_save")}
           </button>{" "}
