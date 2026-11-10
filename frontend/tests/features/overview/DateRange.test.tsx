@@ -148,6 +148,36 @@ describe("диапазон срока «с / по»", () => {
     expect(f.count(TASKS)).toBe(before);
   });
 
+  // Аудит check-pr36, п. 4: пресет, затем обе даты — ни один пресет не остаётся нажатым.
+  it("audit_preset_then_both_bounds_releases_preset_and_sends_range", async () => {
+    const { container, f } = await openSummary();
+    fireEvent.click(preset(container, "today"));
+    await waitFor(() => expect(f.query(f.last(TASKS)).get("due")).toBe("today"));
+    fireEvent.change(from(container), { target: { value: "2026-11-09" } });
+    fireEvent.change(to(container), { target: { value: "2026-11-13" } });
+    await waitFor(() => expect(f.query(f.last(TASKS)).get("due_to")).toBe("2026-11-13"));
+    const q = f.query(f.last(TASKS));
+    expect(q.get("due_from")).toBe("2026-11-09");
+    expect(q.get("due")).toBeNull();
+    for (const d of ["overdue", "today", "tomorrow", "week", "none"]) {
+      expect(preset(container, d).getAttribute("aria-pressed")).toBe("false");
+    }
+  });
+
+  // Аудит check-pr36, п. 5: «с» 20.11, затем «по» 13.11 — ошибка видна, запроса нет.
+  it("audit_from_later_than_to_entered_second_shows_error_and_sends_no_request", async () => {
+    const { container, f } = await openSummary();
+    fireEvent.change(from(container), { target: { value: "2026-11-20" } });
+    await waitFor(() => expect(f.query(f.last(TASKS)).get("due_from")).toBe("2026-11-20"));
+    const before = f.count(TASKS);
+    fireEvent.change(to(container), { target: { value: "2026-11-13" } });
+    const alert = await screen.findByText(ERROR);
+    expect(alert.closest('[role="alert"]')).not.toBeNull();
+    expect(from(container).getAttribute("aria-invalid")).toBe("true");
+    expect(to(container).getAttribute("aria-invalid")).toBeNull();
+    expect(f.count(TASKS)).toBe(before);
+  });
+
   it("ac8_equal_dates_are_valid", async () => {
     const { container } = await openSummary();
     fireEvent.change(from(container), { target: { value: "2026-11-13" } });
