@@ -1,6 +1,6 @@
 # Tasks: «Сводка» — диапазон дат (024)
 
-Статусы: TODO | IN_PROGRESS | DONE | BLOCKED. Статусы ведёт оркестратор. Spec DRAFT: задачи не берутся до APPROVED.
+Статусы: TODO | IN_PROGRESS | DONE | BLOCKED. Статусы ведёт оркестратор. Spec APPROVED 2026-11-10.
 
 ## Общие условия
 - ID — `D24-Tnn`; рамки: `python scripts/task_scope.py D24-Tnn`. Не трогать `CLAUDE.md`, `AGENTS.md`, `docs/adr/**`, `spec.md`, применённые миграции, общий `ui.css`.

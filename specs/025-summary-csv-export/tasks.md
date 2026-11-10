@@ -1,9 +1,9 @@
 # Tasks: «Сводка» — CSV (025)
 
-Статусы: TODO | IN_PROGRESS | DONE | BLOCKED. Статусы ведёт оркестратор. Spec DRAFT: задачи не берутся до APPROVED.
+Статусы: TODO | IN_PROGRESS | DONE | BLOCKED. Статусы ведёт оркестратор. Spec APPROVED 2026-11-10.
 
 ## Общие условия
-- ID — `C25-Tnn`; рамки: `python scripts/task_scope.py C25-Tnn`. Не трогать `CLAUDE.md`, `AGENTS.md`, `spec.md`, применённые миграции, общий `ui.css`. ADR-0023 переводится из «предложено» в «принято» владельцем.
+- ID — `C25-Tnn`; рамки: `python scripts/task_scope.py C25-Tnn`. Не трогать `CLAUDE.md`, `AGENTS.md`, `spec.md`, применённые миграции, общий `ui.css`. ADR-0023 принят вместе со спекой.
 - БД — только `*_test`. Проверка: `bash scripts/check.sh`. Оценка пакета ≈ 2,75 дня. Миграций нет.
 
 ## C25-T01 — Возможность `export_overview`

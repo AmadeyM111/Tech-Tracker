@@ -1,50 +1,43 @@
 # Plan: Карточка «Подключить ИИ-агента» (026)
 
-- **Spec:** ./spec.md (DRAFT) · **ADR:** 0024 (черновик)
-- **Статус:** DRAFT
+- **Spec:** ./spec.md (APPROVED)
+- **Статус:** APPROVED
 
 ## 1. Подход
-Закрытые подсказки хранятся в новой таблице `user_hint_dismissal(user_id, hint_key, dismissed_at)` (миграция `0014`, аддитивная).
-`GET /me` получает поле `dismissed_hints` (один запрос по `user_id`); закрытие и возврат — `POST`/`DELETE
-/api/v1/me/hints/{key}/dismiss`. Допустимые ключи — константа (`ai_agent`); остальное — 404. Фронт: компонент
-`AiAgentHint` на «Сводке» читает `dismissed_hints` из уже загруженного профиля, закрывает оптимистично с откатом при
-ошибке; кнопка возврата — в «Профиле». Таблица, а не столбец `app_user`, чтобы следующие подсказки не требовали миграций.
+Только фронтенд. Компонент `AiAgentHint` на «Сводке» читает флаг закрытия из `localStorage` (ключ с id пользователя из профиля) и
+показывает карточку, пока флага нет. Работа с хранилищем — в маленьком модуле `hintStorage.ts` с защитой от исключений (приватный режим, квота).
+На странице «Доступ для агентов» добавляется блок «Инструкция для Claude Code» с якорем; ссылка карточки ведёт на него. Бэкенд, API и миграции не меняются.
 
 ## 2. Решения
 | Решение | Выбрано | Отвергнутые | Почему |
 |---|---|---|---|
-| PH-1 Хранение | таблица `user_hint_dismissal` | столбец `app_user.hints text[]`; `localStorage` | расширяемо без новых миграций; серверное состояние по ТЗ (T-13 F5) |
-| PH-2 Чтение | поле в `GET /me` | отдельный `GET /me/hints` | нет лишнего запроса и мигания карточки при загрузке |
-| PH-3 Идемпотентность | `INSERT … ON CONFLICT DO NOTHING`; `DELETE` без ошибки при отсутствии | 409 на повтор | повторные клики и гонки безопасны |
-| PH-4 Ключи | белый список в коде | произвольные строки | нет мусора в таблице; 404 на неизвестный |
-| PH-5 Аудит | не пишется | событие в `domain_event` | настройка интерфейса, не бизнес-данные |
-| PH-6 Инструкция | решает Q-3 (рекомендация: блок на «Доступ для агентов») | внешняя ссылка | приложение не раздаёт `docs/` |
+| PH-1 Хранение | `localStorage`, ключ `gtrack.hint.ai_agent.<userId>` (решение владельца Q-6) | таблица и `dismissed_hints` в `GET /me` (миграция `0014`) | владелец выбрал браузер: без миграции и API; цена — состояние не переходит между браузерами |
+| PH-2 Ключ | с id пользователя | общий ключ | два пользователя в одном браузере не влияют друг на друга |
+| PH-3 Сбой хранилища | молча показывать карточку и закрывать в памяти | показывать ошибку | подсказка не должна давать ошибок |
+| PH-4 Инструкция | блок на странице «Доступ для агентов» (Q-3) | внешняя ссылка; новая страница | приложение не раздаёт `docs/`; блок рядом с выпуском токена |
+| PH-5 Текст | «Агент увидит и сможет изменить всё, что доступно вам…» (Q-8) | «увидит» из макета | токен даёт запись (ADR-0018) |
 
 ## 3. Затрагиваемые файлы
-- `backend/migrations/versions/0014_user_hint_dismissal.py`, `backend/app/domain/users/hints.py` (модель, функции), `backend/app/domain/registry.py`, `docs/data-model.md`.
-- `backend/app/api/v1/me.py`, `schemas/auth.py` (`MeResponse.dismissed_hints`), новый роутер `hints` (в `api/v1/__init__.py`).
-- `docs/api/openapi.json`, `frontend/src/shared/api/schema.d.ts`.
-- `frontend/src/features/overview/AiAgentHint.tsx` (новый), `SummaryPage.tsx`, `summary.css` (или `hints.css`), `frontend/src/features/auth/*` (тип профиля), `frontend/src/features/auth/ProfilePage.tsx` (кнопка возврата), `shared/i18n/ru.ts`.
-- Тесты: `backend/tests/db/test_026_schema.py`, `backend/tests/api/test_026_hints.py`, `frontend/tests/features/overview/AiAgentHint.test.tsx`; обновить проверки голов миграций (как при 0011–0013: `test_migrations`, `test_007_schema` и др.).
-- Документация: `docs/ai-integration.md` (если Q-3 — блок в приложении, текст берётся оттуда).
+- `frontend/src/features/overview/AiAgentHint.tsx`, `frontend/src/features/overview/hintStorage.ts` — новые; `SummaryPage.tsx`, `summary.css` (или `hint.css`).
+- `frontend/src/features/tokens/AgentAccessPage.tsx` — блок «Инструкция для Claude Code»; `frontend/src/shared/i18n/ru.ts`.
+- Тесты: `frontend/tests/features/overview/AiAgentHint.test.tsx`, тест страницы «Доступ для агентов»; `backend/tests/infra/test_frontend_scaffold.py` (белый список новых файлов).
+- Документация: `docs/acceptance/mvp-demo.md`; `docs/ai-integration.md` остаётся источником текста.
 
 ## 4. Интерфейсы
-```python
-HINT_KEYS: Final = frozenset({"ai_agent"})
-async def dismissed_hints(db, user_id) -> list[str]: ...
-async def dismiss_hint(db, user_id, key) -> None: ...   # ON CONFLICT DO NOTHING
-async def restore_hint(db, user_id, key) -> None: ...
+```ts
+export function isHintDismissed(userId: string): boolean;   // false при любой ошибке хранилища
+export function dismissHint(userId: string): void;           // молча при ошибке
 ```
-HTTP: `POST|DELETE /api/v1/me/hints/{key}/dismiss` → 204 | 401 | 404; `GET /api/v1/me` + `dismissed_hints: list[str]`.
 
 ## 5. Тестовая стратегия и трассировка
 | AC | Тест |
 |---|---|
-| AC-2, AC-3, AC-5, AC-6 | `test_026_hints.py` (API) |
-| AC-10 | `test_026_schema.py` + `test_migrations.py` (upgrade/downgrade) |
-| AC-1, AC-4, AC-7, AC-8, AC-9 | `AiAgentHint.test.tsx`, словарь `ru.ts` |
+| AC-1, AC-6 | `AiAgentHint.test.tsx` (+ словарь) |
+| AC-2, AC-3, AC-4 | `AiAgentHint.test.tsx` (localStorage, два пользователя, исключение) |
+| AC-5 | тест меню/маршрутов ТА |
+| AC-7 | тест страницы «Доступ для агентов» |
+| AC-8 | `AiAgentHint.test.tsx` (клавиатура, фокус) |
 
 ## 6. Риски
-- Поле в `GET /me` расширяет контракт ответа (аддитивно); клиенты MCP его не используют.
-- Номер миграции `0014` может быть занят к моменту старта R3 — проверить REGISTRY и ветки.
-- Текст карточки пока предложение; изменения текста после утверждения владельцем — только словарь.
+- Очистка данных сайта возвращает карточку (принято владельцем).
+- Фрагмент инструкции должен совпадать с `docs/ai-integration.md`: при изменении документа менять и словарь.

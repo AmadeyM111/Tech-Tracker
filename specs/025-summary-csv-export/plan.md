@@ -1,7 +1,7 @@
 # Plan: «Сводка» — CSV (025)
 
-- **Spec:** ./spec.md (DRAFT) · **ADR:** 0023 (черновик)
-- **Статус:** DRAFT
+- **Spec:** ./spec.md (APPROVED) · **ADR:** 0023 (черновик)
+- **Статус:** APPROVED
 
 ## 1. Подход
 Выборка строится той же `_filter_conditions`, что у списка, но без пагинации и с `LIMIT CSV_MAX_ROWS + 1` одним запросом

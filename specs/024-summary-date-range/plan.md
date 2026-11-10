@@ -1,7 +1,7 @@
 # Plan: «Сводка» — диапазон дат (024)
 
-- **Spec:** ./spec.md (DRAFT)
-- **Статус:** DRAFT
+- **Spec:** ./spec.md (APPROVED)
+- **Статус:** APPROVED
 
 ## 1. Подход
 В `domain/overview/due.py` добавляется чистая функция `range_condition(due_from, due_to)`; `OverviewFilter` получает
