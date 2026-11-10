@@ -2,8 +2,10 @@
 
 Пример: Суриков Антон → ``surikov.anton``; Петрова-Иванова, Анна → ``petrova-ivanova.anna``.
 Кириллица переводится по таблице загранпаспорта РФ (ГОСТ 52535.1, решение владельца 2026-11-09);
-Ъ и Ь опускаются. ASCII-буквы и цифры сохраняются в нижнем регистре, дефис внутри части сохраняется,
-прочие символы (пробелы, апострофы, точки, иероглифы) убираются. Ведущие и хвостовые дефисы каждой
+Ъ и Ь опускаются. Украинские и белорусские буквы: і→i, ї→i, є→e, ґ→g, ў→u. Латиница с диакритикой
+приводится к базовой букве (NFKD: é→e, ü→u; ß→ss, æ→ae, ø→o, ł→l, đ→d, œ→oe). ASCII-буквы и цифры
+сохраняются в нижнем регистре, дефис внутри части сохраняется, прочие символы (пробелы, апострофы,
+точки, иероглифы) убираются. Ведущие и хвостовые дефисы каждой
 части убираются.
 
 Модуль чистый: без БД и без времени. Занятость логина проверяет домен (``registration.py``).
@@ -12,6 +14,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Iterator
 from typing import Final
 
@@ -28,18 +31,33 @@ BASE_MAX_LENGTH: Final = 56
 # Наибольший номер суффикса при выборе логина на заявке (base, base.2 … base.999).
 LOGIN_SUFFIX_LIMIT: Final = 999
 
+# Дополнение к паспортной таблице (решение 2026-11-10): украинские и белорусские буквы.
+TRANSLIT_EXTRA: Final[dict[str, str]] = {"і": "i", "ї": "i", "є": "e", "ґ": "g", "ў": "u"}
+# Латинские буквы, которые NFKD не раскладывает.
+LATIN_EXTRA: Final[dict[str, str]] = {
+    "ß": "ss", "æ": "ae", "œ": "oe", "ø": "o", "ł": "l", "đ": "d", "ð": "d", "þ": "th",
+}  # fmt: skip
+
 _KEEP: Final = re.compile(r"[a-z0-9-]")
+
+
+def _char_slug(ch: str) -> str:
+    """Латинский вид одного символа; пустая строка — символ убирается."""
+    if ch in TRANSLIT:
+        return TRANSLIT[ch]
+    if ch in TRANSLIT_EXTRA:
+        return TRANSLIT_EXTRA[ch]
+    if _KEEP.fullmatch(ch) is not None:
+        return ch
+    if ch in LATIN_EXTRA:
+        return LATIN_EXTRA[ch]
+    # é→e, ü→u: базовая ASCII-буква после NFKD; остаются только a-z (кириллица и иероглифы — нет).
+    return "".join(c for c in unicodedata.normalize("NFKD", ch) if "a" <= c <= "z")
 
 
 def name_slug(value: str) -> str | None:
     """Латинская часть имени для логина; ``None``, если после очистки ничего не осталось."""
-    parts: list[str] = []
-    for ch in value.lower():
-        if ch in TRANSLIT:
-            parts.append(TRANSLIT[ch])
-        elif _KEEP.fullmatch(ch) is not None:
-            parts.append(ch)
-    slug = "".join(parts).strip("-")
+    slug = "".join(_char_slug(ch) for ch in value.lower()).strip("-")
     return slug or None
 
 

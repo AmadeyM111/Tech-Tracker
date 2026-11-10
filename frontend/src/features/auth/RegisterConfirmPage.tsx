@@ -105,6 +105,7 @@ export function RegisterConfirmPage() {
               {t("auth.register_copy")}
             </button>
           </div>
+          <p className="reg-hint">{t("auth.register_login_save")}</p>
           <p className="reg-hint">{t("auth.register_login_hint")}</p>
         </div>
         <ErrorAlert message={alert.message} seq={alert.seq} />
