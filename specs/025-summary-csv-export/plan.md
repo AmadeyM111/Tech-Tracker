@@ -29,7 +29,7 @@
 - `backend/app/api/v1/overview.py`, `schemas/overview.py` — маршрут `/tasks.csv`; `backend/app/core/config.py` — `csv_max_rows`; `core/errors.py` — код `export_too_large`.
 - `backend/app/domain/events/catalog.py`, `writer.py` — действие и ключ деталей; фронт-словарь действий журнала (`admin.audit.action.*`).
 - `frontend/src/features/overview/{SummaryPage.tsx,api.ts,summary.css}`, `shared/i18n/ru.ts`, `shared/api/schema.d.ts`, `docs/api/openapi.json`.
-- Тесты: `backend/tests/unit/test_025_csv.py`, `backend/tests/api/test_025_csv.py`, `frontend/tests/features/overview/CsvExport.test.tsx`.
+- Тесты: `backend/tests/unit/test_025_csv_render.py`, `backend/tests/api/test_025_csv.py`, `frontend/tests/features/overview/CsvExport.test.tsx`.
 - `docs/acceptance/mvp-demo.md`, `docs/data-model.md` (если ключи деталей) — документация.
 
 ## 4. Интерфейсы
