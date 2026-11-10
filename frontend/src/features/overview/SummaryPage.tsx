@@ -1,12 +1,13 @@
 // The /summary screen (008): tiles, filters, task list with the "hot" mark, empty state.
 // FR-1...FR-12; mockup Shared/Design/gtrack-summary (approved 2026-11-08). Polling every 15 s (FR-12).
 import { useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
+import { AiAgentHint } from "./AiAgentHint";
 import { getOverview, listOverviewProjects, listOverviewTasks, type OverviewCounts, type OverviewTaskItem } from "./api";
 import {
   DUE_PRESETS,
@@ -230,7 +231,8 @@ function TaskRows({ items, today }: { items: OverviewTaskItem[]; today: string }
   );
 }
 
-export function SummaryPage() {
+export function SummaryPage({ userId }: { userId: string }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [filters, setFilters] = useState<SummaryFilters>(NO_FILTERS);
   const [page, setPage] = useState(1);
   const change = (next: SummaryFilters) => {
@@ -250,7 +252,10 @@ export function SummaryPage() {
   const items = list.data?.items;
   return (
     <section className="ui-wide">
-      <h1>{t("summary.title")}</h1>
+      <AiAgentHint userId={userId} onDismiss={() => headingRef.current?.focus()} />
+      <h1 ref={headingRef} tabIndex={-1}>
+        {t("summary.title")}
+      </h1>
       <ErrorAlert
         message={counts.isError ? errorMessage(codeOf(counts.error)) : list.isError ? errorMessage(codeOf(list.error)) : null}
       />

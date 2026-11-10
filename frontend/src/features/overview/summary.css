@@ -177,3 +177,42 @@
     display: block;
   }
 }
+
+/* 026 «Подключить ИИ-агента к GTrack»: card above the heading (mockup gtrack-r3, ai-card). */
+.ai-card {
+  position: relative;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 1.0625rem;
+}
+.ai-card h2 {
+  margin: 0 0 6px;
+  padding-right: 96px; /* room for the close button in the corner */
+  font-size: 1.25rem;
+}
+.ai-card p {
+  margin: 0 0 8px;
+  padding-right: 96px;
+  color: var(--text-muted);
+}
+.ai-card .ai-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+.ai-card .ai-links a {
+  color: var(--accent);
+}
+.ai-card .ai-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 1rem;
+}

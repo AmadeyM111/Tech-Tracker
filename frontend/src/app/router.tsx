@@ -524,7 +524,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/summary"
         element={
           <RoleScreen insideMain={insideMain} capability="business_access">
-            {() => <SummaryPage />}
+            {(profile) => <SummaryPage userId={profile.id} />}
           </RoleScreen>
         }
       />

@@ -276,6 +276,14 @@ export const ru = {
   "summary.empty": "Задач пока нет. Они появятся, когда вас добавят в проект или вы создадите задачу.",
   "summary.hot": "Горит",
   "summary.overdue": "просрочено",
+  // 026: карточка «Подключить ИИ-агента к GTrack» на «Сводке» (features/overview/AiAgentHint.tsx).
+  "ai_hint.title": "Подключить ИИ-агента к GTrack",
+  "ai_hint.text":
+    "Агент увидит и сможет изменить всё, что доступно вам: свои проекты и задачи. Чтобы подключить локального агента, выпустите токен в разделе «Доступ для агентов».",
+  "ai_hint.link_tokens": "Доступ для агентов",
+  "ai_hint.link_instructions": "Инструкция для Claude Code",
+  "ai_hint.close": "Скрыть",
+  "ai_hint.close_aria": "Скрыть подсказку про ИИ-агента",
   "tasks.col_title": "Название",
   "tasks.col_project": "Проект",
   "tasks.parent_label": "Родительская задача",
