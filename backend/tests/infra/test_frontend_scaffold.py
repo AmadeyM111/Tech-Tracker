@@ -256,6 +256,8 @@ def test_t21_src_files_only_expected() -> None:
         # 008 «Сводка»
         "features/overview/SummaryPage.tsx", "features/overview/api.ts",
         "features/overview/filters.ts", "features/overview/summary.css",
+        # 026: AI agent hint card on the summary screen and its browser-side closing state
+        "features/overview/AiAgentHint.tsx", "features/overview/hintStorage.ts",
         "features/admin/BackupBanner.tsx",  # 009/FR-7
         "features/attachments/Attachments.tsx", "features/attachments/api.ts",  # 011
         "features/notifications/api.ts", "features/notifications/Badge.tsx",  # 012

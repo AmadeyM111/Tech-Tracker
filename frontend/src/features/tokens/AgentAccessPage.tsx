@@ -1,7 +1,8 @@
 // "Доступ для агентов" (PN-15, ADR-0018): the user's agent tokens, issue and revoke.
 // Only the page state holds an issued token; it is dropped on dismiss and never cached.
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useLocation } from "react-router-dom";
 
 import { t } from "../../shared/i18n";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
@@ -20,12 +21,43 @@ import { IssuedToken } from "./IssuedToken";
 import { TokenList } from "./TokenList";
 import { failureMessage, nameProblem } from "./model";
 
+const INSTRUCTIONS_ID = "claude-code-instructions";
+
+/**
+ * Claude Code setup (docs/ai-integration.md, variants A and B). The MCP address is this site's origin
+ * plus /mcp; the token is never printed: the commands read it from $GTRACK_TOKEN.
+ */
+function ClaudeCodeInstructions() {
+  const titleId = useId();
+  const origin = window.location.origin;
+  return (
+    <section id={INSTRUCTIONS_ID} aria-labelledby={titleId}>
+      <h2 id={titleId}>{t("agent_tokens.instructions_title")}</h2>
+      <p>{t("agent_tokens.instructions_intro")}</p>
+      <h3>{t("agent_tokens.instructions_variant_a")}</h3>
+      <pre className="ui-pre">
+        <code>{t("agent_tokens.instructions_cmd_a", { origin })}</code>
+      </pre>
+      <h3>{t("agent_tokens.instructions_variant_b")}</h3>
+      <pre className="ui-pre">
+        <code>{t("agent_tokens.instructions_cmd_b", { origin })}</code>
+      </pre>
+      <p>{t("agent_tokens.instructions_variant_b_note")}</p>
+    </section>
+  );
+}
+
 export function AgentAccessPage() {
   const queryClient = useQueryClient();
   const alert = useAlertState();
   const tokens = useAgentTokens();
   const headingRef = useRef<HTMLHeadingElement>(null);
   useFocusHeadingOnArrival(headingRef);
+  // The summary card links here with the block's anchor: the SPA route change does not scroll by itself.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash === `#${INSTRUCTIONS_ID}`) document.getElementById(INSTRUCTIONS_ID)?.scrollIntoView();
+  }, [hash]);
   const nameRef = useRef<HTMLInputElement>(null);
   const listTitleRef = useRef<HTMLHeadingElement>(null);
   // One request at a time: a second submit or confirm while one is in flight is ignored.
@@ -119,6 +151,8 @@ export function AgentAccessPage() {
           {t("agent_tokens.create_submit")}
         </button>
       </form>
+
+      <ClaudeCodeInstructions />
 
       <h2 ref={listTitleRef} tabIndex={-1}>
         {t("agent_tokens.list_title")}
