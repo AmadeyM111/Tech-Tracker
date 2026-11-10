@@ -19,7 +19,7 @@ from app.core.errors import Forbidden, NotFound
 from app.core.pagination import PageParams, paginate
 from app.domain.access.policy import can_read_project_content
 from app.domain.access.roles import Actor, Capability
-from app.domain.overview.due import DuePreset, due_condition, is_hot
+from app.domain.overview.due import DuePreset, due_condition, is_hot, range_condition
 from app.domain.overview.export_csv import ExportRow
 from app.domain.projects.models import Project, ProjectMember
 from app.domain.projects.queries import load_project_facts
@@ -47,6 +47,8 @@ class OverviewFilter:
     status: TaskStatus | None = None
     priorities: frozenset[TaskPriority] = frozenset()
     due: DuePreset | None = None
+    due_from: date | None = None
+    due_to: date | None = None
     needs_review: bool = False
 
 
@@ -159,6 +161,8 @@ async def _filter_conditions(
         conditions.append(Task.priority.in_(sorted(f.priorities)))
     if f.due is not None:
         conditions.append(due_condition(f.due, today))
+    if f.due_from is not None or f.due_to is not None:
+        conditions.append(range_condition(f.due_from, f.due_to))
     if f.needs_review:
         conditions.append(_needs_review(actor))
     return conditions

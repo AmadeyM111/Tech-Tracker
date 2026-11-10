@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 
 import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
-import { ErrorAlert } from "../../shared/ui/ErrorAlert";
+import { ErrorAlert, FieldError } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
 import { downloadOverviewCsv, getOverview, listOverviewProjects, listOverviewTasks, type OverviewCounts, type OverviewTaskItem } from "./api";
 import {
@@ -15,8 +15,11 @@ import {
   STATUSES,
   activeTile,
   applyTile,
+  rangeInvalid,
+  setRangeBound,
   toggleDue,
   togglePriority,
+  type RangeBound,
   type SummaryFilters,
   type Tile,
 } from "./filters";
@@ -70,6 +73,40 @@ function Tiles(props: { counts: OverviewCounts | undefined; filters: SummaryFilt
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Due range «с / по» (024 FR-5, FR-6): native date fields, caption «даты по Москве». */
+function DateRange(props: { filters: SummaryFilters; onChange: (f: SummaryFilters) => void }) {
+  const { filters, onChange } = props;
+  const baseId = useId();
+  const errorId = `${baseId}-range-error`;
+  const invalid = rangeInvalid(filters);
+  const field = (bound: RangeBound, value: string | null, label: string, invalidField: boolean) => (
+    <div className="ui-field sum-range-field">
+      <label htmlFor={`${baseId}-${bound}`}>{label}</label>
+      <input
+        id={`${baseId}-${bound}`}
+        type="date"
+        name={bound === "from" ? "due_from" : "due_to"}
+        value={value ?? ""}
+        aria-invalid={invalidField ? "true" : undefined}
+        aria-describedby={invalidField ? errorId : undefined}
+        onChange={(e) => onChange(setRangeBound(filters, bound, e.target.value))}
+      />
+    </div>
+  );
+  return (
+    <>
+      <fieldset className="sum-range">
+        <legend className="sum-flabel">{t("summary.range_caption")}</legend>
+        <div className="sum-range-fields">
+          {field("from", filters.dateFrom, t("summary.range_from"), invalid)}
+          {field("to", filters.dateTo, t("summary.range_to"), false)}
+        </div>
+      </fieldset>
+      <FieldError id={errorId} message={invalid ? t("summary.range_error") : null} />
+    </>
   );
 }
 
@@ -157,6 +194,7 @@ function Filters(props: { filters: SummaryFilters; onChange: (f: SummaryFilters)
             </button>
           ))}
         </div>
+        <DateRange filters={filters} onChange={onChange} />
       </fieldset>
     </form>
   );
@@ -243,12 +281,17 @@ function saveFile(blob: Blob, filename: string): void {
 }
 
 export function SummaryPage({ canExport = false }: { canExport?: boolean }) {
+  // filters: что показано в полях; applied: по чему запрошен список (024 Q-4: при ошибке диапазона
+  // запрос не уходит и список остаётся прежним, пока «с» не станет не позже «по»).
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SummaryFilters>(NO_FILTERS);
+  const [applied, setApplied] = useState<SummaryFilters>(NO_FILTERS);
   const [page, setPage] = useState(1);
   const change = (next: SummaryFilters) => {
     setFilters(next);
+    if (rangeInvalid(next)) return;
+    setApplied(next);
     setPage(1);
   };
   const counts = usePolledQuery({
@@ -256,14 +299,14 @@ export function SummaryPage({ canExport = false }: { canExport?: boolean }) {
     queryFn: ({ headers, signal }) => getOverview({ headers, signal }),
   });
   const list = usePolledQuery({
-    queryKey: ["overview", "tasks", { filters, page }],
-    queryFn: ({ headers, signal }) => listOverviewTasks(filters, page, { headers, signal }),
+    queryKey: ["overview", "tasks", { filters: applied, page }],
+    queryFn: ({ headers, signal }) => listOverviewTasks(applied, page, { headers, signal }),
   });
   const onExport = async () => {
     setExporting(true);
     setExportError(null);
     try {
-      const file = await downloadOverviewCsv(filters);
+      const file = await downloadOverviewCsv(applied);
       saveFile(file.blob, file.filename);
     } catch (e) {
       setExportError(errorMessage(codeOf(e)));

@@ -192,6 +192,29 @@ describe("025 CSV export button", () => {
     expect(q.has("page")).toBe(false);
   });
 
+  it("export_sends_the_date_range_and_the_applied_filters_only", async () => {
+    const f = setupExport(EXPORT_CAPS);
+    const saved = stubDownload();
+    renderApp("/summary");
+    const from = (await screen.findByLabelText("с")) as HTMLInputElement;
+    const to = screen.getByLabelText("по") as HTMLInputElement;
+    fireEvent.change(from, { target: { value: "2026-11-16" } });
+    fireEvent.change(to, { target: { value: "2026-11-20" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Скачать CSV" }));
+    await waitFor(() => expect(saved).toHaveLength(1));
+    const q = f.query(f.last(CSV));
+    expect(q.get("due_from")).toBe("2026-11-16");
+    expect(q.get("due_to")).toBe("2026-11-20");
+    expect(q.has("due")).toBe(false);
+    // «с» позже «по»: запрос списка не уходит, выгрузка идёт по последней действующей выборке
+    fireEvent.change(from, { target: { value: "2026-12-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "Скачать CSV" }));
+    await waitFor(() => expect(saved).toHaveLength(2));
+    const again = f.query(f.last(CSV));
+    expect(again.get("due_from")).toBe("2026-11-16");
+    expect(again.get("due_to")).toBe("2026-11-20");
+  });
+
   it("button_is_disabled_with_status_text_while_preparing", async () => {
     const gate = deferred<Response>();
     setupExport(EXPORT_CAPS, () => gate.promise);

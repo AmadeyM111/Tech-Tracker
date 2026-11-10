@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.api.v1.schemas.common import ProjectRef, UserRef
+from app.api.v1.schemas.tasks import DueDate
 from app.core.pagination import PageParams
 from app.domain.overview.due import DuePreset
 from app.domain.tasks.models import TaskPriority, TaskStatus
@@ -26,24 +28,37 @@ class OverviewCountsOut(BaseModel):
     needs_review: int
 
 
-class OverviewTaskQuery(PageParams):
-    """``?project_id&status&priority=…&due&needs_review&page&page_size``."""
+class _DueRules(BaseModel):
+    """Общие фильтры списка и выгрузки.
+
+    Пресет ``due`` и диапазон ``due_from``/``due_to`` взаимоисключающие (spec 024 FR-2, Q-1);
+    ``due_from > due_to`` — ошибка (FR-2). Оба нарушения — 422 ``validation_error``.
+    """
 
     project_id: UUID | None = None
     status: TaskStatus | None = None
     priority: list[TaskPriority] = Field(default_factory=list)
     due: DuePreset | None = None
+    due_from: DueDate | None = None
+    due_to: DueDate | None = None
     needs_review: bool = False
 
+    @model_validator(mode="after")
+    def _range_rules(self) -> Self:
+        has_range = self.due_from is not None or self.due_to is not None
+        if has_range and self.due is not None:
+            raise ValueError("срок-пресет нельзя задать вместе с диапазоном дат")
+        if self.due_from is not None and self.due_to is not None and self.due_from > self.due_to:
+            raise ValueError("дата «с» не может быть позже даты «по»")
+        return self
 
-class OverviewCsvQuery(BaseModel):
-    """``?project_id&status&priority=…&due&needs_review``: фильтры списка без страниц (spec 025)."""
 
-    project_id: UUID | None = None
-    status: TaskStatus | None = None
-    priority: list[TaskPriority] = Field(default_factory=list)
-    due: DuePreset | None = None
-    needs_review: bool = False
+class OverviewTaskQuery(_DueRules, PageParams):
+    """``?project_id&status&priority=…&due&due_from&due_to&needs_review&page&page_size``."""
+
+
+class OverviewCsvQuery(_DueRules):
+    """Те же фильтры без страниц (spec 025 FR-1): выгрузка берёт всю выборку."""
 
 
 class OverviewTaskItem(BaseModel):

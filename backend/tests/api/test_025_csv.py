@@ -196,3 +196,51 @@ async def test_025_ac12_empty_selection_gives_header_only(api_env: ApiEnv) -> No
         CSV + "?status=todo&status=done", headers=api_env.auth(w.token)
     )
     assert repeated.status_code == 422
+
+
+async def test_025_024_range_params_apply_to_csv_like_to_the_list(api_env: ApiEnv) -> None:
+    """Спека 024 + 025: ``due_from``/``due_to`` отбирают строки выгрузки так же, как список."""
+    w = await _world(api_env)
+    days = {"вчера": -1, "сегодня": 0, "через 3": 3, "через 10": 10}
+    for title, delta in days.items():
+        await _task(w, w.mine, title=title, due_date=TODAY + timedelta(days=delta))
+    await _task(w, w.mine, title="без срока")
+    await _task(w, w.mine, title="готово", status="done", due_date=TODAY + timedelta(days=1))
+
+    def titles(rows: list[list[str]]) -> set[str]:
+        return {r[1] for r in rows[1:]}
+
+    both = _rows(
+        await _get(
+            w, CSV, due_from=TODAY.isoformat(), due_to=(TODAY + timedelta(days=3)).isoformat()
+        )
+    )
+    assert titles(both) == {"сегодня", "через 3", "готово"}  # границы включены, done не исключён
+    listed = (
+        await _get(
+            w, TASKS, due_from=TODAY.isoformat(), due_to=(TODAY + timedelta(days=3)).isoformat()
+        )
+    ).json()
+    assert titles(both) == {i["title"] for i in listed["items"]}
+    only_from = _rows(await _get(w, CSV, due_from=(TODAY + timedelta(days=3)).isoformat()))
+    assert titles(only_from) == {"через 3", "через 10"}  # без срока не попадает
+    only_to = _rows(await _get(w, CSV, due_to=TODAY.isoformat()))
+    assert titles(only_to) == {"вчера", "сегодня"}
+
+
+async def test_025_024_range_validation_errors_are_422_and_write_no_event(api_env: ApiEnv) -> None:
+    w = await _world(api_env)
+    cases = [
+        {"due": "today", "due_from": TODAY.isoformat()},  # пресет вместе с диапазоном
+        {"due_from": "2026-10-20", "due_to": "2026-10-13"},  # «с» позже «по»
+        {"due_from": "13.10.2026"},  # неверный формат
+    ]
+    for params in cases:
+        r = await _get(w, CSV, **params)
+        assert r.status_code == 422, params
+        assert r.json()["code"] == "validation_error"
+    repeated = await api_env.client.get(
+        CSV + "?due_from=2026-10-01&due_from=2026-10-02", headers=api_env.auth(w.token)
+    )
+    assert repeated.status_code == 422
+    assert await _events(api_env) == []
