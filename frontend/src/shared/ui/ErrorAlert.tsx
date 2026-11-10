@@ -20,12 +20,15 @@ export function useAlertState(): AlertState {
   return { message: state?.message ?? null, seq: state?.seq ?? 0, show, clear };
 }
 
-/** Error message announced to assistants; takes focus when it appears (NFR-7). */
-export function ErrorAlert({ message, seq = 0 }: { message: string | null; seq?: number }) {
+/**
+ * Error message announced to assistants; takes focus when it appears (NFR-7).
+ * `focus={false}`: the caller moves focus itself (e.g. to the first empty field).
+ */
+export function ErrorAlert({ message, seq = 0, focus = true }: { message: string | null; seq?: number; focus?: boolean }) {
   const ref = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
-    if (message !== null) ref.current?.focus();
-  }, [message, seq]);
+    if (focus && message !== null) ref.current?.focus();
+  }, [message, seq, focus]);
   if (message === null) return null;
   return (
     <p ref={ref} role="alert" tabIndex={-1} className="ui-error-alert">
@@ -35,12 +38,13 @@ export function ErrorAlert({ message, seq = 0 }: { message: string | null; seq?:
   );
 }
 
-/** Message next to a field: role="alert", never takes focus (006/FR-19, FR-28). */
+/** Message under a field: role="alert", never takes focus (006/FR-19, FR-28). Icon and text as in the field-error mockup. */
 export function FieldError({ id, message }: { id: string; message: string | null }) {
   if (message === null) return null;
   return (
-    <p id={id} role="alert" className="ui-error">
-      {message}
+    <p id={id} role="alert" className="ui-error ui-field-error">
+      <Icon name="alert" />
+      <span>{message}</span>
     </p>
   );
 }

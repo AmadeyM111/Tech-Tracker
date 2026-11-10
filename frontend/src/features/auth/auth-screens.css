@@ -78,6 +78,12 @@
   border-color: var(--danger);
 }
 
+/* Registration: the text under a field (design register-err-empty): the spacing comes from .ui-field gap. */
+.reg-form .ui-field .ui-field-error {
+  margin: 0;
+  font-size: 1.0625rem;
+}
+
 /* Registration: the status plate after a successful request. */
 .reg-status {
   margin: 0 0 16px;

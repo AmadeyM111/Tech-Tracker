@@ -107,6 +107,93 @@ describe("RegisterPage (019/R8-T16)", () => {
     },
   );
 
+  // Design register-err-empty (2026-11-10): under each empty field its text and a red mark; the general alert stays above the button.
+  const EMPTY_FIELDS: [string, string][] = [
+    ["email", "Введите email"],
+    ["given-name", "Введите имя"],
+    ["family-name", "Введите фамилию"],
+    ["new-password", "Введите пароль"],
+  ];
+
+  it.each(EMPTY_FIELDS)("019_ac2_empty_%s_shows_field_error_under_the_field", async (autocomplete, text) => {
+    const calls = stubNet(STATUS_ON);
+    const { container } = open();
+    await screen.findByRole("heading", { level: 1 });
+    fill(container, { ...VALUES, [autocomplete]: "" });
+    fireEvent.click(submitButton(container));
+    const message = await screen.findByText(text);
+    const error = message.closest<HTMLElement>(".ui-error");
+    const input = field(container, autocomplete);
+    expect(error).not.toBeNull();
+    expect(error?.getAttribute("role")).toBe("alert");
+    expect(input.closest(".ui-field")?.contains(error)).toBe(true);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")?.split(" ")).toContain(error?.id);
+    expect(sent(calls)).toHaveLength(0);
+  });
+
+  it.each(EMPTY_FIELDS)("019_ac2_whitespace_only_%s_counts_as_empty", async (autocomplete, text) => {
+    const calls = stubNet(STATUS_ON);
+    const { container } = open();
+    await screen.findByRole("heading", { level: 1 });
+    fill(container, { ...VALUES, [autocomplete]: "   " });
+    fireEvent.click(submitButton(container));
+    expect(await screen.findByText(text)).toBeTruthy();
+    expect(field(container, autocomplete).getAttribute("aria-invalid")).toBe("true");
+    expect(sent(calls)).toHaveLength(0);
+  });
+
+  it.each(EMPTY_FIELDS)("019_ac2_empty_%s_takes_focus_on_submit", async (autocomplete) => {
+    stubNet(STATUS_ON);
+    const { container } = open();
+    await screen.findByRole("heading", { level: 1 });
+    fill(container, { ...VALUES, [autocomplete]: "" });
+    submitButton(container).focus();
+    fireEvent.click(submitButton(container));
+    await waitFor(() => expect(document.activeElement).toBe(field(container, autocomplete)));
+  });
+
+  it("019_ac2_focus_goes_to_the_first_empty_field_in_form_order", async () => {
+    stubNet(STATUS_ON);
+    const { container } = open();
+    await screen.findByRole("heading", { level: 1 });
+    fill(container, { ...VALUES, "given-name": "", "family-name": "", "new-password": "" });
+    submitButton(container).focus();
+    fireEvent.click(submitButton(container));
+    await screen.findByText("Введите имя");
+    expect(document.activeElement).toBe(field(container, "given-name"));
+  });
+
+  it("019_ac2_empty_fields_keep_general_alert_without_repeating_field_text", async () => {
+    stubNet(STATUS_ON);
+    const { container } = open();
+    await screen.findByRole("heading", { level: 1 });
+    fill(container, { ...VALUES, email: "" });
+    submitButton(container).focus();
+    fireEvent.click(submitButton(container));
+    await screen.findByText("Введите email");
+    const alert = container.querySelector(".ui-error-alert");
+    expect(alert?.textContent).toBe(errorMessage("validation_error"));
+    expect(alert?.getAttribute("role")).toBe("alert");
+    expect(screen.getAllByText("Введите email")).toHaveLength(1);
+    // The general alert does not take focus away from the first empty field.
+    expect(document.activeElement).toBe(field(container, "email"));
+  });
+
+  it("019_ac2_field_error_is_cleared_by_next_submit", async () => {
+    const calls = stubNet({ ...STATUS_ON, [REQUEST]: () => json(200, { detail: "x" }) });
+    const { container } = open();
+    await screen.findByRole("heading", { level: 1 });
+    fill(container, { ...VALUES, email: "" });
+    fireEvent.click(submitButton(container));
+    await screen.findByText("Введите email");
+    fill(container, { email: "New@Example.RU" });
+    fireEvent.click(submitButton(container));
+    await waitFor(() => expect(sent(calls)).toHaveLength(1));
+    expect(screen.queryByText("Введите email")).toBeNull();
+    expect(container.querySelector(".ui-error")).toBeNull();
+  });
+
   it("019_ac2_request_body_matches_schema_and_is_trimmed", async () => {
     const calls = stubNet({ ...STATUS_ON, [REQUEST]: () => json(200, { detail: "x" }) });
     const { container } = open();
