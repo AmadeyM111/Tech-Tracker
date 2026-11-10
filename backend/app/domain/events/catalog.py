@@ -39,6 +39,7 @@ class EventAction(StrEnum):
     USER_TOKEN_REVOKED = "user.token_revoked"
     USER_SELF_REGISTERED = "user.self_registered"
     USER_NAME_CHANGED = "user.name_changed"
+    USER_OVERVIEW_EXPORTED = "user.overview_exported"
     PROJECT_UPDATED = "project.updated"
     PROJECT_OWNERSHIP_TRANSFERRED = "project.ownership_transferred"
     PROJECT_ARCHIVED = "project.archived"
@@ -90,6 +91,7 @@ EVENT_CATALOG: Final[Mapping[EventAction, EventSpec]] = {
     EventAction.USER_TOKEN_CREATED: _USER_AUDITED,
     EventAction.USER_TOKEN_REVOKED: _USER_AUDITED,
     EventAction.USER_SELF_REGISTERED: _USER_AUDITED,
+    EventAction.USER_OVERVIEW_EXPORTED: _USER_AUDITED,
     EventAction.USER_NAME_CHANGED: EventSpec(
         entity_type=EntityType.USER,
         audit=True,

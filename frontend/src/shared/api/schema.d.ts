@@ -680,6 +680,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/overview/tasks.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Overview Tasks
+         * @description Выборка «Сводки» с фильтрами целиком в CSV; только БА (ADR-0023, FR-1…FR-8).
+         */
+        get: operations["export_overview_tasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/tasks": {
         parameters: {
             query?: never;
@@ -1323,7 +1343,7 @@ export interface components {
          * @description Возможность; значение — имя члена в нижнем регистре (``auto()`` у ``StrEnum``).
          * @enum {string}
          */
-        Capability: "manage_accounts" | "assign_roles" | "view_audit" | "business_access" | "project_create" | "project_manage_any" | "task_assign_others" | "labels_manage" | "crm_read" | "crm_write" | "pipeline_manage" | "onboard_accounts";
+        Capability: "manage_accounts" | "assign_roles" | "view_audit" | "business_access" | "project_create" | "project_manage_any" | "task_assign_others" | "labels_manage" | "crm_read" | "crm_write" | "pipeline_manage" | "onboard_accounts" | "export_overview";
         /**
          * ChangePasswordRequest
          * @description ``POST /auth/password`` (FR-56): ответ 204 без тела.
@@ -4111,6 +4131,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OverviewTaskPage"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_overview_tasks: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+                status?: components["schemas"]["TaskStatus"] | null;
+                priority?: components["schemas"]["TaskPriority"][];
+                due?: components["schemas"]["DuePreset"] | null;
+                needs_review?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV выборки «Сводки» (spec 025) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
                 };
             };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */

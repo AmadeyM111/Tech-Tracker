@@ -35,6 +35,7 @@ ALL_CAPS = (
     "CRM_WRITE",
     "PIPELINE_MANAGE",
     "ONBOARD_ACCOUNTS",  # 019 (plan RG-11): только БА
+    "EXPORT_OVERVIEW",  # 025: только БА
 )
 _TA = {"MANAGE_ACCOUNTS", "ASSIGN_ROLES", "VIEW_AUDIT"}
 _BA = {
@@ -50,10 +51,12 @@ _BA = {
 EXPECTED: dict[str, frozenset[str]] = {
     "TECH_ADMIN": frozenset(_TA),
     # 002/FR-8 (R3-T01): БА получает PROJECT_MANAGE_ANY
-    "BUSINESS_ADMIN": frozenset(_BA | {"PROJECT_MANAGE_ANY", "ONBOARD_ACCOUNTS"}),
+    "BUSINESS_ADMIN": frozenset(
+        _BA | {"PROJECT_MANAGE_ANY", "ONBOARD_ACCOUNTS", "EXPORT_OVERVIEW"}
+    ),
     "USER": frozenset({"BUSINESS_ACCESS"}),
 }
-BUSINESS_CAPS = frozenset(_BA | {"PROJECT_MANAGE_ANY", "ONBOARD_ACCOUNTS"})
+BUSINESS_CAPS = frozenset(_BA | {"PROJECT_MANAGE_ANY", "ONBOARD_ACCOUNTS", "EXPORT_OVERVIEW"})
 CELLS = [(r, c) for r in ALL_ROLES for c in ALL_CAPS]
 
 
@@ -264,3 +267,12 @@ def test_019_ac30_onboard_accounts_only_business_admin(roles: ModuleType) -> Non
     }
     assert holders == {"BUSINESS_ADMIN"}
     assert roles.Capability.ONBOARD_ACCOUNTS.value == "onboard_accounts"
+
+
+def test_025_export_overview_only_business_admin(roles: ModuleType) -> None:
+    """025/ADR-0023: EXPORT_OVERVIEW (CSV «Сводки») только у БА; у ТА и Пользователя её нет."""
+    holders = {
+        r.name for r in roles.Role if roles.Capability.EXPORT_OVERVIEW in roles.ROLE_CAPABILITIES[r]
+    }
+    assert holders == {"BUSINESS_ADMIN"}
+    assert roles.Capability.EXPORT_OVERVIEW.value == "export_overview"

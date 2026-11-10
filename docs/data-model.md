@@ -322,7 +322,7 @@
 | `deal_id` | uuid | да | сделка для истории сделки (R1.3); внешнего ключа нет |
 | `in_audit` | boolean | нет | событие попадает в журнал аудита |
 | `changes` | jsonb | да | список `{field, old, new}` (с R1.1); в API аудита не отдаётся |
-| `details` | jsonb | да | только для `entity_type = user`: `role_from`, `role_to`; паролей и секретов нет |
+| `details` | jsonb | да | только для `entity_type = user`: `role_from`, `role_to`, `rows` (025: число строк выгрузки CSV строкой); паролей и секретов нет |
 | `client_name` | text | да | имя токена агента, через который сделано действие (миграция 0009, ADR-0018); `NULL` — веб-интерфейс; `CHECK` `ck_domain_event_client_name_length`: `client_name IS NULL OR char_length(client_name) BETWEEN 1 AND 64` |
 
 #### Индексы
@@ -374,6 +374,7 @@ TRUNCATE` — в бэклоге (plan D-8).
 | `user.role_assigned` | `details.role_from`, `details.role_to` |
 | `user.role_changed` | `details.role_from`, `details.role_to` |
 | `user.role_removed` | `details.role_from`, `details.role_to` |
+| `user.overview_exported` | `details.rows` (число строк CSV «Сводки», спека 025); фильтры и содержимое не пишутся |
 
 **Записи от «системы» при обновлении 0006.** Миграция 0006 добавляет в `domain_event` по одной
 записи на каждого бывшего пользователя с ролью «Смешанная» (СМ; роль `mixed` в журнале

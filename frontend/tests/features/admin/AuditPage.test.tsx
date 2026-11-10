@@ -532,6 +532,26 @@ describe("007 audit actions (FR-15)", () => {
   });
 });
 
+describe("025 audit label for the CSV export", () => {
+  it("shows_russian_action_and_row_count_from_details", async () => {
+    const exported = {
+      id: 600,
+      occurred_at: "2026-10-13T09:00:00Z",
+      actor: { kind: "user", id: ADMIN_ID, login: "demo.ba1" },
+      action: "user.overview_exported",
+      entity_type: "user",
+      entity_id: ADMIN_ID,
+      entity_deleted: false,
+      changed_fields: [],
+      details: { rows: "120" },
+    };
+    const { container } = await open({ [AUDIT]: () => j(200, page([exported])) });
+    const row = entry(container, 600);
+    expect(cell(row, "action").textContent).toBe("Выгрузка «Сводки» в CSV");
+    expect(cell(row, "details").textContent).toBe("Строк: 120");
+  });
+});
+
 describe("019 audit labels (FR-11, AC-19)", () => {
   const SELF = {
     id: 500,

@@ -114,6 +114,26 @@
   margin: 8px 0;
   color: var(--text-muted);
 }
+.sum-count-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.sum-csv {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.sum-csv-note {
+  color: var(--text-muted);
+}
+.sum-csv-btn {
+  min-height: 44px;
+  padding: 8px 16px;
+}
 .sum-table td[data-overdue="true"],
 .sum-cards [data-overdue="true"] {
   color: var(--danger);

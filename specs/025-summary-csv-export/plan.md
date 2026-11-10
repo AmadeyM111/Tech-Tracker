@@ -24,7 +24,7 @@
 
 ## 3. Затрагиваемые файлы
 - `backend/app/domain/access/roles.py` — `EXPORT_OVERVIEW` у БА; тесты матрицы ролей, `GET /me`.
-- `backend/app/domain/overview/csv.py` — новый: `render_csv`, `escape_cell`.
+- `backend/app/domain/overview/export_csv.py` — новый: `render_csv`, `escape_cell`.
 - `backend/app/domain/overview/queries.py` — `overview_rows_for_export` (общие условия, лимит).
 - `backend/app/api/v1/overview.py`, `schemas/overview.py` — маршрут `/tasks.csv`; `backend/app/core/config.py` — `csv_max_rows`; `core/errors.py` — код `export_too_large`.
 - `backend/app/domain/events/catalog.py`, `writer.py` — действие и ключ деталей; фронт-словарь действий журнала (`admin.audit.action.*`).

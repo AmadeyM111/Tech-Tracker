@@ -36,6 +36,16 @@ class OverviewTaskQuery(PageParams):
     needs_review: bool = False
 
 
+class OverviewCsvQuery(BaseModel):
+    """``?project_id&status&priority=…&due&needs_review``: фильтры списка без страниц (spec 025)."""
+
+    project_id: UUID | None = None
+    status: TaskStatus | None = None
+    priority: list[TaskPriority] = Field(default_factory=list)
+    due: DuePreset | None = None
+    needs_review: bool = False
+
+
 class OverviewTaskItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
