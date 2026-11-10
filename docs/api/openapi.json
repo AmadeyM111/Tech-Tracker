@@ -1998,6 +1998,20 @@
         "title": "RegistrationConfirm",
         "type": "object"
       },
+      "RegistrationConfirmed": {
+        "description": "Ответ подтверждения (200, v0.5): логин учётной записи. Сессии и cookie нет (AC-16).",
+        "properties": {
+          "login": {
+            "title": "Login",
+            "type": "string"
+          }
+        },
+        "required": [
+          "login"
+        ],
+        "title": "RegistrationConfirmed",
+        "type": "object"
+      },
       "RegistrationRequest": {
         "additionalProperties": false,
         "description": "``POST /auth/registration/request``: заявка на регистрацию (FR-3).",
@@ -2018,9 +2032,17 @@
             "type": "string"
           },
           "login": {
-            "maxLength": 1024,
-            "title": "Login",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "title": "Login"
           },
           "password": {
             "format": "password",
@@ -2034,7 +2056,6 @@
           "email",
           "first_name",
           "last_name",
-          "login",
           "password"
         ],
         "title": "RegistrationRequest",
@@ -4357,7 +4378,7 @@
     },
     "/api/v1/auth/registration/confirm": {
       "post": {
-        "description": "Подтверждение регистрации по ссылке; успех — 204 без тела и без cookie (AC-16).\n\nНеверная, просроченная или использованная ссылка и занятый адрес — 400\n``registration_token_invalid``. Занятый логин — 409 ``login_taken``. Сессия не создаётся:\nвход отдельным действием.",
+        "description": "Подтверждение по ссылке; успех — 200 с логином учётной записи, без cookie (AC-16).\n\nНеверная, просроченная или использованная ссылка и занятый адрес — 400\n``registration_token_invalid``. Логин выбирает сервер (v0.5): занятый логин заявки заменяется\nследующим свободным, поэтому 409 ``login_taken`` возможен только если заняты все попытки.\nСессия не создаётся: вход отдельным действием.",
         "operationId": "confirm_registration",
         "requestBody": {
           "content": {
@@ -4370,7 +4391,14 @@
           "required": true
         },
         "responses": {
-          "204": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationConfirmed"
+                }
+              }
+            },
             "description": "Successful Response"
           },
           "400": {
@@ -4411,7 +4439,7 @@
                 }
               }
             },
-            "description": "Логин занят учётной записью (code: login_taken)"
+            "description": "Все логины заняты, учётная запись не создана (code: login_taken)"
           },
           "422": {
             "content": {

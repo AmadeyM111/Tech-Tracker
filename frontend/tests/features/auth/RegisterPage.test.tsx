@@ -25,12 +25,12 @@ const ME_BODY = {
   capabilities: ["business_access"],
 };
 
-// Field values keyed by autocomplete; spaces around email, first name, last name and login must be trimmed in the request.
+// Field values keyed by autocomplete; spaces around email, first name and last name must be trimmed in the request.
+// v0.5 (2026-11-09): there is no login field, the server generates it.
 const VALUES: Record<string, string> = {
   email: " New@Example.RU ",
   "given-name": " Ivan ",
   "family-name": " Petrov ",
-  username: " ivanov ",
   "new-password": PASSWORD,
 };
 
@@ -64,16 +64,15 @@ const open = () => renderAt("/register", <RegisterPage />, "/register");
 afterEach(() => vi.unstubAllGlobals());
 
 describe("RegisterPage (019/R8-T16)", () => {
-  it("019_ac2_renders_five_fields_and_one_submit_button", async () => {
+  it("019_ac2_renders_four_fields_and_one_submit_button", async () => {
     stubNet(STATUS_ON);
     const { container } = open();
     expect(await screen.findByRole("heading", { level: 1, name: t("auth.register_title") })).toBeTruthy();
-    expect(container.querySelectorAll("input")).toHaveLength(5);
+    expect(container.querySelectorAll("input")).toHaveLength(4);
     const labels: [string, string][] = [
       ["email", t("auth.register_email_label")],
       ["given-name", t("auth.register_first_name_label")],
       ["family-name", t("auth.register_last_name_label")],
-      ["username", t("auth.register_login_label")],
       ["new-password", t("auth.register_password_label")],
     ];
     for (const [autocomplete, label] of labels) {
@@ -95,7 +94,7 @@ describe("RegisterPage (019/R8-T16)", () => {
     expect(document.activeElement).toBe(field(container, "email"));
   });
 
-  it.each(["email", "given-name", "family-name", "username", "new-password"])(
+  it.each(["email", "given-name", "family-name", "new-password"])(
     "019_ac2_empty_%s_is_rejected_without_request",
     async (autocomplete) => {
       const calls = stubNet(STATUS_ON);
@@ -121,7 +120,6 @@ describe("RegisterPage (019/R8-T16)", () => {
       email: "New@Example.RU",
       first_name: "Ivan",
       last_name: "Petrov",
-      login: "ivanov",
       password: PASSWORD,
     });
     expect(request.url).not.toContain(PASSWORD);
@@ -165,7 +163,7 @@ describe("RegisterPage (019/R8-T16)", () => {
   });
 
   it.each([
-    ["login_taken", 422],
+    ["first_name_invalid", 422],
     ["email_invalid", 422],
     ["rate_limited", 429],
   ])("019_ac2_error_%s_shows_dictionary_text_and_keeps_form", async (code, status) => {
@@ -181,7 +179,6 @@ describe("RegisterPage (019/R8-T16)", () => {
 
   // Design 2026-11-08 (registration-019-design.md, §4.1): the field that caused the error is marked invalid.
   it.each([
-    ["login_taken", 422, "username"],
     ["email_invalid", 422, "email"],
   ])("019_ac2_error_%s_marks_only_the_%s_field_invalid", async (code, status, autocomplete) => {
     stubNet({ ...STATUS_ON, [REQUEST]: () => json(status, { detail: "x", code }) });
@@ -191,7 +188,7 @@ describe("RegisterPage (019/R8-T16)", () => {
     fireEvent.click(submitButton(container));
     await screen.findByText(errorMessage(code));
     expect(field(container, autocomplete).getAttribute("aria-invalid")).toBe("true");
-    const others = ["email", "username", "given-name", "family-name", "new-password"].filter((a) => a !== autocomplete);
+    const others = ["email", "given-name", "family-name", "new-password"].filter((a) => a !== autocomplete);
     for (const other of others) {
       expect(field(container, other).getAttribute("aria-invalid")).toBeNull();
     }
