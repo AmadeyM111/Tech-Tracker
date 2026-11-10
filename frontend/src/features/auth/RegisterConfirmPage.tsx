@@ -1,5 +1,6 @@
 // 019/R8-T17: confirmation screen /register/confirm (RG-15, FR-8). The token is read once from the
 // `#token=` fragment, the fragment is removed from the address bar, and the request is sent by the button only.
+// v0.5 (2026-11-09): the success state shows the login the server created (mockup register-confirm-success).
 import { GTrackLogo } from "../../shared/ui/GTrackLogo";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -16,9 +17,9 @@ function readToken(): string | null {
   return value === null || value === "" ? null : value;
 }
 
-// Codes with their own wording on this screen; every other code uses the common error dictionary.
+// feature_disabled has its own wording on this screen; every other code uses the common error dictionary.
+// v0.5: there is no "login taken" state here, the server picks the next free login itself.
 function messageFor(code: string): string {
-  if (code === "login_taken") return t("auth.register_login_taken");
   if (code === "feature_disabled") return t("auth.register_disabled");
   return errorMessage(code);
 }
@@ -28,7 +29,8 @@ export function RegisterConfirmPage() {
   const busy = useRef(false);
   const [token] = useState(readToken);
   const [pending, setPending] = useState(false);
-  const [done, setDone] = useState(false);
+  // The login of the created account; null until the confirmation succeeds.
+  const [login, setLogin] = useState<string | null>(null);
   const [restart, setRestart] = useState(false);
 
   // RG-15: the token must not stay in the address bar or in the history entry.
@@ -44,16 +46,24 @@ export function RegisterConfirmPage() {
     setRestart(false);
     alert.clear();
     try {
-      await confirmRegistration(token);
-      setDone(true);
+      setLogin(await confirmRegistration(token));
     } catch (e) {
       const code = e instanceof ApiError ? e.code : "unknown";
-      // A spent or expired link and a taken login both need a new request from the start.
-      setRestart(code === "registration_token_invalid" || code === "login_taken");
+      // A spent or expired link needs a new request from the start.
+      setRestart(code === "registration_token_invalid");
       alert.show(messageFor(code));
     } finally {
       busy.current = false;
       setPending(false);
+    }
+  }
+
+  async function copyLogin(value: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      // Clipboard API is unavailable or refused: the login stays selectable on screen.
+      alert.show(t("auth.register_copy_failed"));
     }
   }
 
@@ -76,8 +86,8 @@ export function RegisterConfirmPage() {
     );
   }
 
-  // AC-16: no session is created here, so the success state only points to the login screen.
-  if (done) {
+  // AC-16: no session is created here, so the success state only shows the login and points to /login.
+  if (login !== null) {
     return (
       <section className="ui-form login-card">
         <div className="ui-brand">
@@ -87,11 +97,20 @@ export function RegisterConfirmPage() {
         <p role="status" className="reg-status">
           {t("auth.register_confirmed")}
         </p>
-        <div className="login-links">
-          <Link to="/login" className="login-submit">
-            {t("auth.register_login_link")}
-          </Link>
+        <div className="login-id">
+          <span className="login-id-label">{t("auth.register_your_login")}</span>
+          <div className="login-id-row">
+            <code className="login-id-value">{login}</code>
+            <button type="button" className="ui-btn-secondary" onClick={() => void copyLogin(login)}>
+              {t("auth.register_copy")}
+            </button>
+          </div>
+          <p className="reg-hint">{t("auth.register_login_hint")}</p>
         </div>
+        <ErrorAlert message={alert.message} seq={alert.seq} />
+        <Link to="/login" className="login-submit">
+          {t("auth.register_login_link")}
+        </Link>
       </section>
     );
   }

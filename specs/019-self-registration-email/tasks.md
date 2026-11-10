@@ -511,6 +511,28 @@ T17, T19, T20, T21), тоже последовательно.
 | NFR-9 | R8-T12 |
 | NFR-8 | R8-T22, R8-T00 (после слияния с `main`) |
 
+## R8-T23 — Логин генерируется (2026-11-09, spec v0.5)
+- **Статус:** DONE (2026-11-09)
+- **AC:** AC-1, AC-2 (четыре поля), AC-16 (200 с логином), AC-27 и AC-28 (суффикс вместо `login_taken` при подаче и
+  подтверждении), RG-7, RG-8, RG-19 (письмо без логина), NFR-1 (логин не в логах)
+- **Файлы:** `backend/app/domain/auth/login_generation.py` (новый), `backend/app/domain/auth/registration.py`,
+  `backend/app/api/v1/registration.py`, `backend/app/api/v1/schemas/registration.py`,
+  `backend/tests/unit/test_019_login_generation.py` (новый), `backend/tests/domain/test_019_request_registration.py`,
+  `backend/tests/domain/test_019_confirm_registration.py`, `backend/tests/api/test_019_registration_api.py`,
+  `backend/tests/api/test_019_registration_leaks.py`, `backend/tests/api/test_019_ta_manages_self_registered.py`,
+  `frontend/src/features/auth/RegisterPage.tsx`, `frontend/src/features/auth/RegisterConfirmPage.tsx`,
+  `frontend/src/features/auth/api.ts`, `frontend/src/features/auth/auth-screens.css`, `frontend/src/shared/i18n/ru.ts`,
+  `frontend/tests/features/auth/RegisterPage.test.tsx`, `frontend/tests/features/auth/RegisterConfirmPage.test.tsx`,
+  `frontend/tests/features/auth/api.test.ts`, `frontend/tests/shared/i18n.test.ts`,
+  `specs/019-self-registration-email/spec.md` (версия 0.5), `specs/019-self-registration-email/plan.md` (раздел 11)
+- **Зависит от:** R8-T22 (состояние после интеграции), R8-T09, R8-T11, R8-T16, R8-T17
+- **Описание:** Решения владельца 2026-11-09. Поле «Логин» на `/register` убрано, логин генерирует сервер из фамилии и
+  имени (латиница, таблица паспорта РФ по ГОСТ 52535.1, суффиксы `.2`…`.999`). Миграций нет. Подтверждение возвращает 200
+  с логином; занятость логина при подтверждении сервер решает суффиксом, без `login_taken` пользователю. Письмо без логина
+  (RG-19). Таблица транслитерации: Ё, Й, Щ, Ъ/Ь, Ж, Х, Ы — подтвердить владельцем (spec v0.5, раздел «Версия 0.5»).
+- **Попытки:** 1. Тесты: unit `test_019_login_generation` (88 passed), domain и API 019, фронтенд `tests/features/auth`
+  и `tests/shared/i18n.test.ts`. Существующие тесты, фиксировавшие старое поведение, обновлены (список в PR).
+
 ## Таблица статусов
 | Задача | Статус |
 |---|---|
@@ -536,4 +558,5 @@ T17, T19, T20, T21), тоже последовательно.
 | R8-T20 | DONE |
 | R8-T21 | DONE |
 | R8-T22 | DONE |
+| R8-T23 | DONE |
 | R8-T00 | TODO |

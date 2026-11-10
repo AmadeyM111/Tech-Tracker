@@ -436,11 +436,12 @@ export interface paths {
         put?: never;
         /**
          * Confirm Registration
-         * @description Подтверждение регистрации по ссылке; успех — 204 без тела и без cookie (AC-16).
+         * @description Подтверждение по ссылке; успех — 200 с логином учётной записи, без cookie (AC-16).
          *
          *     Неверная, просроченная или использованная ссылка и занятый адрес — 400
-         *     ``registration_token_invalid``. Занятый логин — 409 ``login_taken``. Сессия не создаётся:
-         *     вход отдельным действием.
+         *     ``registration_token_invalid``. Логин выбирает сервер (v0.5): занятый логин заявки заменяется
+         *     следующим свободным, поэтому 409 ``login_taken`` возможен только если заняты все попытки.
+         *     Сессия не создаётся: вход отдельным действием.
          */
         post: operations["confirm_registration"];
         delete?: never;
@@ -1876,6 +1877,14 @@ export interface components {
             token: string;
         };
         /**
+         * RegistrationConfirmed
+         * @description Ответ подтверждения (200, v0.5): логин учётной записи. Сессии и cookie нет (AC-16).
+         */
+        RegistrationConfirmed: {
+            /** Login */
+            login: string;
+        };
+        /**
          * RegistrationRequest
          * @description ``POST /auth/registration/request``: заявка на регистрацию (FR-3).
          */
@@ -1886,8 +1895,11 @@ export interface components {
             first_name: string;
             /** Last Name */
             last_name: string;
-            /** Login */
-            login: string;
+            /**
+             * Login
+             * @deprecated
+             */
+            login?: string | null;
             /**
              * Password
              * Format: password
@@ -3435,11 +3447,13 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RegistrationConfirmed"];
+                };
             };
             /** @description Некорректный JSON в теле запроса (code: bad_request) */
             400: {
@@ -3468,7 +3482,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Логин занят учётной записью (code: login_taken) */
+            /** @description Все логины заняты, учётная запись не создана (code: login_taken) */
             409: {
                 headers: {
                     [name: string]: unknown;

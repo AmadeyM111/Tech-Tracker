@@ -43,9 +43,8 @@ VALID: dict[str, str] = {
     "email": "anna@example.ru",
     "first_name": "Анна",
     "last_name": "Петрова-Иванова",
-    "login": "Anna_P",
     "password": PASSWORD,
-}
+}  # v0.5: логина в форме нет, сервер генерирует petrova-ivanova.anna
 
 
 @pytest.fixture
@@ -64,7 +63,6 @@ def make_form(**overrides: str) -> reg.RegistrationForm:
         email=data["email"],
         first_name=data["first_name"],
         last_name=data["last_name"],
-        login=data["login"],
         password=SecretStr(data["password"]),
     )
 
@@ -326,28 +324,28 @@ async def test_019_request_stores_normalized_fields_and_expiry(
     fixed_clock: FixedClock,
 ) -> None:
     await make_workspace(db)
-    await ask(db, policy, hasher, fixed_clock, login="Anna_P", first_name=" Анна ")
+    await ask(db, policy, hasher, fixed_clock, first_name=" Анна ")
     (row,) = await request_rows(db)
     assert row.email == "anna@example.ru"
-    assert row.login == "anna_p"
-    assert row.login_display == "Anna_P"
+    assert row.login == "petrova-ivanova.anna"
+    assert row.login_display == "petrova-ivanova.anna"
     assert row.first_name == "Анна"
     assert row.last_name == "Петрова-Иванова"
     assert row.created_at == fixed_clock.now()
     assert row.expires_at == fixed_clock.now() + timedelta(minutes=30)
 
 
-async def test_019_login_case_is_kept_for_display_and_lowered_for_key(
+async def test_019_generated_login_is_lowercase_and_display_equals_key(
     db: AsyncSession,
     policy: reg.RegistrationPolicy,
     hasher: PasswordHasher,
     fixed_clock: FixedClock,
 ) -> None:
     await make_workspace(db)
-    await ask(db, policy, hasher, fixed_clock, login="Ab_c")
+    await ask(db, policy, hasher, fixed_clock, last_name="SURIKOV", first_name="Антон")
     (row,) = await request_rows(db)
-    assert row.login == "ab_c"
-    assert row.login_display == "Ab_c"
+    assert row.login == "surikov.anton"
+    assert row.login_display == "surikov.anton"
 
 
 async def test_019_ac9_repeat_request_replaces_token_and_data(
@@ -357,7 +355,7 @@ async def test_019_ac9_repeat_request_replaces_token_and_data(
     fixed_clock: FixedClock,
 ) -> None:
     await make_workspace(db)
-    first = token_of(await ask(db, policy, hasher, fixed_clock, login="anna_p", first_name="Анна"))
+    first = token_of(await ask(db, policy, hasher, fixed_clock, first_name="Анна"))
     fixed_clock.advance(timedelta(minutes=5))
     second_password = "Another-Pw-2026-x"
     second = token_of(
@@ -366,7 +364,6 @@ async def test_019_ac9_repeat_request_replaces_token_and_data(
             policy,
             hasher,
             fixed_clock,
-            login="anna_two",
             first_name="Мария",
             password=second_password,
         )
@@ -376,8 +373,8 @@ async def test_019_ac9_repeat_request_replaces_token_and_data(
     row = rows[0]
     assert bytes(row.token_hash) == sha256(second)
     assert bytes(row.token_hash) != sha256(first)
-    assert row.login == "anna_two"
-    assert row.login_display == "anna_two"
+    assert row.login == "petrova-ivanova.mariia"
+    assert row.login_display == "petrova-ivanova.mariia"
     assert row.first_name == "Мария"
     assert hasher.verify(row.password_hash, second_password)
     assert row.created_at == fixed_clock.now()
@@ -497,10 +494,10 @@ async def test_019_ac7_free_address_runs_argon2_once(
         {"email": ""},
         {"first_name": "  "},
         {"last_name": ""},
-        {"login": "ab"},
+        {"last_name": "李"},
         {"password": "short-pass"},
     ],
-    ids=["email", "first_name", "last_name", "login_format", "password"],
+    ids=["email", "first_name", "last_name", "last_name_no_latin", "password"],
 )
 async def test_019_rg7_no_argon2_before_validation_passes(
     db: AsyncSession,
@@ -514,21 +511,6 @@ async def test_019_rg7_no_argon2_before_validation_passes(
     calls = spy_hash(monkeypatch)
     with pytest.raises(Unprocessable):
         await ask(db, policy, hasher, fixed_clock, **overrides)
-    assert calls == []
-
-
-async def test_019_rg7_no_argon2_when_login_taken(
-    db: AsyncSession,
-    policy: reg.RegistrationPolicy,
-    hasher: PasswordHasher,
-    fixed_clock: FixedClock,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    ws = await make_workspace(db)
-    await make_user(db, workspace=ws, login="newuser")
-    calls = spy_hash(monkeypatch)
-    with pytest.raises(Unprocessable):
-        await ask(db, policy, hasher, fixed_clock, login="newuser")
     assert calls == []
 
 
@@ -593,49 +575,178 @@ async def test_019_ac29_bad_last_name_is_last_name_invalid(
     assert await count_requests(db) == 0
 
 
-@pytest.mark.parametrize("login", ["ab", "Пётр", "-abc", "a" * 65, "a b c", "anna!"])
-async def test_019_bad_login_format_is_login_invalid(
+async def test_019_login_held_by_user_gets_next_suffix(
     db: AsyncSession,
     policy: reg.RegistrationPolicy,
     hasher: PasswordHasher,
     fixed_clock: FixedClock,
-    login: str,
+) -> None:
+    ws = await make_workspace(db)
+    await make_user(db, workspace=ws, login="surikov.anton", email="busy@example.ru")
+    message = await ask(
+        db,
+        policy,
+        hasher,
+        fixed_clock,
+        email="free@example.ru",
+        last_name="Суриков",
+        first_name="Антон",
+    )
+    assert message is not None
+    (row,) = await request_rows(db)
+    assert row.login == "surikov.anton.2"
+    assert row.login_display == "surikov.anton.2"
+
+
+async def test_019_busy_address_with_taken_login_gives_same_answer(
+    db: AsyncSession,
+    policy: reg.RegistrationPolicy,
+    hasher: PasswordHasher,
+    fixed_clock: FixedClock,
+) -> None:
+    ws = await make_workspace(db)
+    await make_user(db, workspace=ws, login="surikov.anton", email="busy@example.ru")
+    free = await ask(
+        db,
+        policy,
+        hasher,
+        fixed_clock,
+        email="free@example.ru",
+        last_name="Суриков",
+        first_name="Антон",
+    )
+    busy = await ask(
+        db,
+        policy,
+        hasher,
+        fixed_clock,
+        email="busy@example.ru",
+        last_name="Суриков",
+        first_name="Антон",
+    )
+    assert free is not None
+    assert busy is None
+    assert await count_requests(db) == 1
+
+
+async def test_019_active_request_of_other_address_blocks_login(
+    db: AsyncSession,
+    policy: reg.RegistrationPolicy,
+    hasher: PasswordHasher,
+    fixed_clock: FixedClock,
 ) -> None:
     await make_workspace(db)
-    with pytest.raises(Unprocessable) as exc:
-        await ask(db, policy, hasher, fixed_clock, login=login)
-    assert exc.value.code == "login_invalid"
+    await ask(
+        db,
+        policy,
+        hasher,
+        fixed_clock,
+        email="first@example.ru",
+        last_name="Суриков",
+        first_name="Антон",
+    )
+    await ask(
+        db,
+        policy,
+        hasher,
+        fixed_clock,
+        email="second@example.ru",
+        last_name="Суриков",
+        first_name="Антон",
+    )
+    logins = {row.email: row.login for row in await request_rows(db)}
+    assert logins == {"first@example.ru": "surikov.anton", "second@example.ru": "surikov.anton.2"}
 
 
-async def test_019_ac27_taken_login_gives_same_answer_for_free_and_taken_address(
+async def test_019_expired_request_does_not_block_login(
+    db: AsyncSession,
+    policy: reg.RegistrationPolicy,
+    hasher: PasswordHasher,
+    fixed_clock: FixedClock,
+) -> None:
+    await make_workspace(db)
+    await ask(
+        db,
+        policy,
+        hasher,
+        fixed_clock,
+        email="first@example.ru",
+        last_name="Суриков",
+        first_name="Антон",
+    )
+    fixed_clock.advance(timedelta(minutes=31))
+    await ask(
+        db,
+        policy,
+        hasher,
+        fixed_clock,
+        email="second@example.ru",
+        last_name="Суриков",
+        first_name="Антон",
+    )
+    logins = {row.email: row.login for row in await request_rows(db)}
+    assert logins == {"second@example.ru": "surikov.anton"}
+
+
+async def test_019_own_request_of_same_address_does_not_block_itself(
+    db: AsyncSession,
+    policy: reg.RegistrationPolicy,
+    hasher: PasswordHasher,
+    fixed_clock: FixedClock,
+) -> None:
+    await make_workspace(db)
+    await ask(db, policy, hasher, fixed_clock, last_name="Суриков", first_name="Антон")
+    fixed_clock.advance(timedelta(minutes=5))
+    await ask(db, policy, hasher, fixed_clock, last_name="Суриков", first_name="Антон")
+    (row,) = await request_rows(db)
+    assert row.login == "surikov.anton"
+
+
+async def test_019_suffix_skips_every_taken_candidate(
     db: AsyncSession,
     policy: reg.RegistrationPolicy,
     hasher: PasswordHasher,
     fixed_clock: FixedClock,
 ) -> None:
     ws = await make_workspace(db)
-    await make_user(db, workspace=ws, login="newuser", email="busy@example.ru")
-    answers: list[tuple[int, str, str]] = []
-    for email in ("free@example.ru", "busy@example.ru"):
-        with pytest.raises(Unprocessable) as exc:
-            await ask(db, policy, hasher, fixed_clock, email=email, login="newuser")
-        answers.append((exc.value.status_code, exc.value.code, exc.value.detail))
-    assert answers[0] == answers[1]
-    assert answers[0][1] == "login_taken"
-    assert await count_requests(db) == 0
+    await make_user(db, workspace=ws, login="surikov.anton", email="busy@example.ru")
+    await ask(
+        db,
+        policy,
+        hasher,
+        fixed_clock,
+        email="first@example.ru",
+        last_name="Суриков",
+        first_name="Антон",
+    )
+    await ask(
+        db,
+        policy,
+        hasher,
+        fixed_clock,
+        email="second@example.ru",
+        last_name="Суриков",
+        first_name="Антон",
+    )
+    logins = {row.email: row.login for row in await request_rows(db)}
+    assert logins == {"first@example.ru": "surikov.anton.2", "second@example.ru": "surikov.anton.3"}
 
 
-async def test_019_ac27_taken_login_ignores_case(
+async def test_019_login_in_form_is_not_part_of_the_form(
     db: AsyncSession,
     policy: reg.RegistrationPolicy,
     hasher: PasswordHasher,
     fixed_clock: FixedClock,
 ) -> None:
-    ws = await make_workspace(db)
-    await make_user(db, workspace=ws, login="ab_c")
-    with pytest.raises(Unprocessable) as exc:
-        await ask(db, policy, hasher, fixed_clock, login="Ab_c")
-    assert exc.value.code == "login_taken"
+    await make_workspace(db)
+    with pytest.raises(TypeError):
+        reg.RegistrationForm(  # type: ignore[call-arg]
+            email="anna@example.ru",
+            first_name="Анна",
+            last_name="Петрова-Иванова",
+            login="anna",
+            password=SecretStr(PASSWORD),
+        )
 
 
 @pytest.mark.parametrize(
@@ -676,22 +787,20 @@ async def test_019_ac15_password_of_12_chars_is_accepted(
 @pytest.mark.parametrize(
     ("overrides", "code"),
     [
-        ({"email": "bad", "login": "newuser", "password": "short"}, "email_invalid"),
-        ({"first_name": "", "login": "newuser", "password": "short"}, "first_name_invalid"),
-        ({"last_name": "", "login": "newuser", "password": "short"}, "last_name_invalid"),
-        ({"login": "ab", "password": "short"}, "login_invalid"),
-        ({"login": "newuser", "password": "short"}, "login_taken"),
-        ({"email": "busy@example.ru", "login": "newuser"}, "login_taken"),
+        ({"email": "bad", "password": "short"}, "email_invalid"),
+        ({"first_name": "", "password": "short"}, "first_name_invalid"),
+        ({"last_name": "", "password": "short"}, "last_name_invalid"),
+        ({"last_name": "李", "password": "short"}, "last_name_invalid"),
+        ({"first_name": "李", "password": "short"}, "first_name_invalid"),
         ({"email": "busy@example.ru", "password": "short"}, "password_too_short"),
         ({"password": "short"}, "password_too_short"),
     ],
     ids=[
-        "email_before_login",
-        "first_name_before_login",
-        "last_name_before_login",
-        "login_format",
-        "login_before_password",
-        "login_before_taken_address",
+        "email_before_name_and_password",
+        "first_name_before_password",
+        "last_name_before_password",
+        "last_name_no_latin",
+        "first_name_no_latin",
         "password_before_taken_address",
         "password_only",
     ],
@@ -805,9 +914,8 @@ async def test_019_rg5_422_attempts_count_toward_ip_limit(
     hasher: PasswordHasher,
     fixed_clock: FixedClock,
 ) -> None:
-    ws = await make_workspace(db)
-    await make_user(db, workspace=ws, login="newuser")
-    bad_forms = [{"login": "newuser"}, {"email": "bad"}, {"password": "short"}]
+    await make_workspace(db)
+    bad_forms = [{"last_name": "李"}, {"email": "bad"}, {"password": "short"}]
     for i in range(10):
         with pytest.raises(Unprocessable):
             await ask(db, policy, hasher, fixed_clock, **bad_forms[i % 3])
@@ -838,8 +946,7 @@ async def test_019_rg6_422_attempt_survives_request_rollback(
     fixed_clock: FixedClock,
 ) -> None:
     async with committed() as s:
-        ws = await make_workspace(s)
-        await make_user(s, workspace=ws, login="newuser")
+        await make_workspace(s)
         await s.commit()
     async with committed() as s:
         with pytest.raises(Unprocessable):
@@ -847,7 +954,7 @@ async def test_019_rg6_422_attempt_survives_request_rollback(
                 s,
                 policy,
                 hasher,
-                form=make_form(login="newuser"),
+                form=make_form(last_name="李"),
                 client_ip=IP,
                 now=fixed_clock.now(),
             )

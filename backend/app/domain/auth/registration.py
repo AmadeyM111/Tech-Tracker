@@ -1,16 +1,18 @@
 """Самостоятельная регистрация по email (spec 019: FR-3..FR-11; plan §4.3, RG-1, RG-5..RG-9, RG-19).
 
 Заявка (``request_registration``), порядок — RG-7: пространство (RG-9) → лимит заявок с IP,
-попытка фиксируется до разбора формы (RG-5, RG-6) → email → имя → фамилия → логин (формат,
-занятость) → пароль → Argon2 (во всех ветках после валидации) → занятость адреса в ``app_user``
-(любой статус) → если адрес свободен: удаление истёкших заявок, upsert по email (RG-1), письмо.
+попытка фиксируется до разбора формы (RG-5, RG-6) → email → имя → фамилия (очистка до латиницы) →
+логин генерируется сервером и выбирается первый свободный кандидат (v0.5) → пароль → Argon2 (во всех
+ветках после валидации) → занятость адреса в ``app_user`` (любой статус) → если адрес свободен:
+удаление истёкших заявок, upsert по email (RG-1), письмо.
 Ответ при занятом и свободном адресе одинаков (FR-4): функция возвращает ``None`` вместо письма.
 
 Подтверждение (``confirm_registration``), порядок — RG-8: пространство (RG-9, первым, как в RG-7) →
 лимиты по IP и по ссылке (429) → заявка по хешу токена с ``expires_at > now`` и ``FOR UPDATE``
-(иначе 400) → адрес занят: заявка удаляется, 400 → логин занят: заявка удаляется, 409 → учётная
-запись в savepoint (гонки) → членство без роли → удаление заявки → событие. Сессия не создаётся
-(AC-16).
+(иначе 400) → адрес занят: заявка удаляется, 400 → кандидаты логина (логин из заявки, затем
+``база.N``): первый свободный вставляется в savepoint; при гонке (``ON CONFLICT (login)``) берётся
+следующий; после ``CONFIRM_LOGIN_ATTEMPTS`` попыток — 409 → членство без роли → удаление заявки →
+событие. Сессия не создаётся (AC-16). Возвращает логин учётной записи.
 
 Модуль не пишет логов и не включает ПДн, пароль и токен в тексты исключений (NFR-1). Транзакцию
 запроса фиксирует ``get_db``. Внутри модуля ``commit_durably`` вызывается в местах RG-6: после
@@ -22,6 +24,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from itertools import chain, islice
 from typing import TYPE_CHECKING, Final, Literal, NoReturn
 from uuid import UUID, uuid4
 
@@ -47,8 +50,8 @@ from app.core.security.passwords import (
     validate_new_password,
 )
 from app.domain.auth import password_reset
+from app.domain.auth.login_generation import login_base, login_candidates, name_slug
 from app.domain.auth.models import RegistrationRequest
-from app.domain.auth.provider import normalize_login
 from app.domain.auth.registration_limits import Scope, register_attempt
 from app.domain.auth.registration_mail import build_registration_mail
 from app.domain.events.catalog import EventAction
@@ -66,6 +69,8 @@ ACCEPTED_DETAIL: Final = (
     "Если адрес можно использовать для регистрации, мы отправили на него письмо с "
     "подтверждением. Ссылка действует 30 минут."
 )
+# Попыток вставки учётной записи при подтверждении (логин из заявки и суффиксы), затем 409.
+CONFIRM_LOGIN_ATTEMPTS: Final = 100
 
 
 @dataclass(frozen=True)
@@ -76,21 +81,22 @@ class RegistrationPolicy:
 
 @dataclass(frozen=True)
 class RegistrationForm:
+    """Форма заявки (v0.5: логина нет, его выбирает сервер)."""
+
     email: str = field(repr=False)
     first_name: str = field(repr=False)
     last_name: str = field(repr=False)
-    login: str = field(repr=False)
     password: SecretStr
 
 
 @dataclass(frozen=True)
 class _Checked:
-    """Значения формы после нормализации (FR-3, FR-3a)."""
+    """Значения формы после нормализации (FR-3, FR-3a) и выбранный логин (v0.5)."""
 
     email: str = field(repr=False)
     first_name: str = field(repr=False)
     last_name: str = field(repr=False)
-    login: str = field(repr=False)  # ключ: normalize_login
+    login: str = field(repr=False)
 
 
 def confirm_link(base_url: str, token: str) -> str:
@@ -144,22 +150,43 @@ async def _email_taken(db: AsyncSession, email: str) -> bool:
     return (await db.execute(select(AppUser.id).where(AppUser.email == email))).first() is not None
 
 
-async def _validate_form(db: AsyncSession, form: RegistrationForm) -> _Checked:
-    """RG-7: email → имя → фамилия → логин (формат, занятость) → пароль. Не зависит от адреса."""
+async def _request_login(db: AsyncSession, base: str, email: str, now: datetime) -> str:
+    """Первый свободный кандидат ``base``, ``base.2`` … (v0.5).
+
+    Занят логин учётной записью (``app_user``) или активной заявкой с ДРУГИМ адресом. Своя заявка
+    этого адреса не блокирует себя. Если заняты все кандидаты — ``login_taken`` (422).
+    """
+    candidates = list(login_candidates(base))
+    taken = set(await db.scalars(select(AppUser.login).where(AppUser.login.in_(candidates))))
+    taken |= set(
+        await db.scalars(
+            select(RegistrationRequest.login).where(
+                RegistrationRequest.login.in_(candidates),
+                RegistrationRequest.email != email,
+                RegistrationRequest.expires_at > now,
+            )
+        )
+    )
+    for candidate in candidates:
+        if candidate not in taken:
+            return candidate
+    raise Unprocessable("Логин уже занят", code=ErrorCode.login_taken)
+
+
+async def _validate_form(db: AsyncSession, form: RegistrationForm, now: datetime) -> _Checked:
+    """RG-7: email → имя → фамилия (латиница) → логин (выбор) → пароль. Не зависит от адреса."""
     email = normalize_email(form.email)
     if email is None:
         raise Unprocessable("Недопустимый email", code=ErrorCode.email_invalid)
     first = normalize_person_name(form.first_name)
-    if first is None:
+    first_slug = name_slug(first) if first is not None else None
+    if first is None or first_slug is None:
         raise Unprocessable("Недопустимое имя", code=ErrorCode.first_name_invalid)
     last = normalize_person_name(form.last_name)
-    if last is None:
+    last_slug = name_slug(last) if last is not None else None
+    if last is None or last_slug is None:
         raise Unprocessable("Недопустимая фамилия", code=ErrorCode.last_name_invalid)
-    login = normalize_login(form.login)
-    if login is None:
-        raise Unprocessable("Недопустимый логин", code=ErrorCode.login_invalid)
-    if await _login_taken(db, login):
-        raise Unprocessable("Логин уже занят", code=ErrorCode.login_taken)
+    login = await _request_login(db, login_base(last_slug, first_slug), email, now)
     _check_password(form.password.get_secret_value())
     return _Checked(email=email, first_name=first, last_name=last, login=login)
 
@@ -173,16 +200,18 @@ async def _upsert_request(
     db: AsyncSession,
     *,
     checked: _Checked,
-    login_display: str,
     password_hash: str,
     token_digest: bytes,
     now: datetime,
 ) -> None:
-    """RG-1: заявка на тот же адрес заменяет токен, логин, имя, фамилию, хеш пароля и сроки."""
+    """RG-1: заявка на тот же адрес заменяет токен, логин, имя, фамилию, хеш пароля и сроки.
+
+    Логин сгенерирован сервером и нижнего регистра, поэтому ``login_display`` равен ``login``.
+    """
     stmt = pg_insert(RegistrationRequest).values(
         email=checked.email,
         login=checked.login,
-        login_display=login_display,
+        login_display=checked.login,
         first_name=checked.first_name,
         last_name=checked.last_name,
         password_hash=password_hash,
@@ -227,7 +256,7 @@ async def request_registration(
         raise FeatureDisabled()
     await _single_workspace_id(db)
     await _admit(db, policy, [("request_ip", _ip_value(client_ip))], now)
-    checked = await _validate_form(db, form)
+    checked = await _validate_form(db, form, now)
     password_hash = await hash_in_thread(hasher, form.password.get_secret_value())
     if await _email_taken(db, checked.email):
         return None
@@ -236,7 +265,6 @@ async def request_registration(
     await _upsert_request(
         db,
         checked=checked,
-        login_display=form.login,
         password_hash=password_hash,
         token_digest=digest,
         now=now,
@@ -273,10 +301,21 @@ async def _consume_and_fail(
     raise error
 
 
-async def _insert_account(
-    db: AsyncSession, req: RegistrationRequest, now: datetime
+def _base_of(req: RegistrationRequest) -> str:
+    """База логина из имени и фамилии заявки. Имена прошли проверку очистки при заявке (RG-7)."""
+    last = name_slug(req.last_name)
+    first = name_slug(req.first_name)
+    if last is None or first is None:
+        # Fail Fast: заявка с именем без латиницы не может появиться через ``request_registration``.
+        raise RuntimeError("registration_request: имя без латинской части")
+    return login_base(last, first)
+
+
+async def _insert_row(
+    db: AsyncSession, req: RegistrationRequest, login: str, now: datetime
 ) -> UUID | Literal["email", "login"]:
-    """Учётная запись из заявки (AC-13). Вставка в savepoint, как в ``users/service.create_user``.
+    """Одна попытка вставки учётной записи с логином ``login`` (AC-13). В savepoint, как в
+    ``users/service.create_user``.
 
     Возвращает id новой записи; ``"login"`` — логин занят параллельной транзакцией
     (``ON CONFLICT (login) DO NOTHING`` не вставил строку); ``"email"`` — адрес занят параллельно
@@ -287,8 +326,8 @@ async def _insert_account(
         pg_insert(AppUser)
         .values(
             id=user_id,
-            login=req.login,
-            login_display=req.login_display,
+            login=login,
+            login_display=login,
             email=req.email,
             first_name=req.first_name,
             last_name=req.last_name,
@@ -315,6 +354,31 @@ async def _insert_account(
     return user_id if inserted is not None else "login"
 
 
+async def _create_account(
+    db: AsyncSession, req: RegistrationRequest, now: datetime
+) -> tuple[UUID, str] | Literal["email", "login"]:
+    """Учётная запись с первым свободным логином (v0.5, RG-8).
+
+    Кандидаты: логин из заявки, затем ``база.N`` (база пересчитана из имени и фамилии заявки).
+    Логин, занятый в ``app_user``, пропускается; проигранная гонка (``ON CONFLICT``) тоже переводит
+    к следующему кандидату. Не более ``CONFIRM_LOGIN_ATTEMPTS`` попыток. Возвращает ``(id, логин)``,
+    ``"email"`` — адрес занят параллельно, ``"login"`` — все попытки заняты.
+    """
+    base = _base_of(req)
+    candidates = islice(
+        dict.fromkeys(chain([req.login], login_candidates(base))), CONFIRM_LOGIN_ATTEMPTS
+    )
+    for login in candidates:
+        if await _login_taken(db, login):
+            continue
+        outcome = await _insert_row(db, req, login, now)
+        if isinstance(outcome, UUID):
+            return outcome, login
+        if outcome == "email":
+            return "email"
+    return "login"
+
+
 async def confirm_registration(
     db: AsyncSession,
     policy: RegistrationPolicy | None,
@@ -322,17 +386,19 @@ async def confirm_registration(
     token: SecretStr,
     client_ip: str | None,
     now: datetime,
-) -> None:
+) -> str:
     """Подтверждение регистрации по ссылке (FR-8, FR-9, FR-10, FR-11; RG-8).
 
     Порядок: политика → пространство (RG-9, первым, как в RG-7; неверный токен при нуле или двух
     пространствах даёт 404, а не 400) → лимиты по IP и по ссылке → заявка по токену → адрес →
-    логин → вставка → членство → удаление заявки → событие.
+    логин (первый свободный кандидат) → вставка → членство → удаление заявки → событие.
 
     Создаёт учётную запись ``self_registered=True`` без роли в единственном пространстве и пишет
-    ``user.self_registered`` (актор и объект — новый пользователь). Ошибки: ``FeatureDisabled``,
+    ``user.self_registered`` (актор и объект — новый пользователь). Возвращает логин учётной записи
+    (v0.5: он может отличаться от логина заявки, если тот занят). Ошибки: ``FeatureDisabled``,
     ``RateLimited`` (429), ``RegistrationTokenInvalid`` (400: токен не найден или истёк,
-    адрес занят), ``LoginTakenConflict`` (409). Сессия не создаётся (AC-16).
+    адрес занят), ``LoginTakenConflict`` (409, только если все попытки заняты). Сессия не создаётся
+    (AC-16).
     """
     if policy is None:
         raise FeatureDisabled()
@@ -347,16 +413,15 @@ async def confirm_registration(
     req = await _load_request(db, password_reset.token_hash(raw), now)
     if await _email_taken(db, req.email):
         await _consume_and_fail(db, req.id, RegistrationTokenInvalid())
-    if await _login_taken(db, req.login):
-        await _consume_and_fail(db, req.id, LoginTakenConflict())
-    outcome = await _insert_account(db, req, now)
+    outcome = await _create_account(db, req, now)
     if isinstance(outcome, str):
         race_error = RegistrationTokenInvalid() if outcome == "email" else LoginTakenConflict()
         await _consume_and_fail(db, req.id, race_error)
+    user_id, login = outcome
     await db.execute(
         pg_insert(WorkspaceMember).values(
             workspace_id=workspace_id,
-            user_id=outcome,
+            user_id=user_id,
             role=None,
             created_at=now,
             updated_at=now,
@@ -367,7 +432,8 @@ async def confirm_registration(
     await record_event(
         db,
         workspace_id=workspace_id,
-        actor_id=outcome,
+        actor_id=user_id,
         action=EventAction.USER_SELF_REGISTERED,
-        entity_id=outcome,
+        entity_id=user_id,
     )
+    return login
