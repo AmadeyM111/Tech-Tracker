@@ -34,9 +34,13 @@ function invalidBody(status: number): ApiError {
   return new ApiError(status, INVALID_RESPONSE, "invalid response body");
 }
 
-export async function listUsers(p: PageParams): Promise<Page<AdminUser>> {
-  const query: { page: number; page_size?: number } = { page: p.page };
+export type AdminUserPage = components["schemas"]["AdminUserPage"];
+
+/** Список учётных записей; `q` (поиск по логину, имени, фамилии, email) уходит, только если непустой. */
+export async function listUsers(p: PageParams & { q?: string }): Promise<AdminUserPage> {
+  const query: { page: number; page_size?: number; q?: string } = { page: p.page };
   if (p.pageSize !== undefined) query.page_size = p.pageSize;
+  if (p.q !== undefined && p.q !== "") query.q = p.q;
   const { data } = await getAppClient().GET("/api/v1/admin/users", { params: { query } });
   if (data === undefined) throw invalidBody(200);
   return data;

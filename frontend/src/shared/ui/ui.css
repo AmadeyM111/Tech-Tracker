@@ -1015,3 +1015,37 @@ h1 input[name="title"] {
     color: var(--text-muted);
   }
 }
+
+/* Поиск учётных записей (макет ta-accounts-search): поле и кнопка «Сбросить» в строке, на 360 px - столбиком. */
+.ui-accounts-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.ui-accounts-search .ui-field {
+  margin: 0;
+}
+
+.ui-accounts-search input {
+  min-height: 44px;
+  width: 100%;
+}
+
+.ui-accounts-search button {
+  min-height: 44px;
+  padding: 8px 14px;
+}
+
+.ui-search-count {
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+@media (max-width: 719px) {
+  .ui-accounts-search {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

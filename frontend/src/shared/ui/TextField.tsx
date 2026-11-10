@@ -12,7 +12,7 @@ export interface TextFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  type?: "text" | "password";
+  type?: "text" | "password" | "search";
   autoComplete: string;
   inputRef?: Ref<HTMLInputElement>;
   invalid?: boolean;
