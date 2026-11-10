@@ -42,6 +42,17 @@ describe("admin api (T24)", () => {
     expect(q(calls[1]!).get("page_size")).toBe("20");
   });
 
+  it("list_users_sends_q_only_when_non_empty", async () => {
+    const calls = stub(() => j(200, { ...page([U_IVANOV]), total: 1 }));
+    const res = await listUsers({ page: 1, q: "ivan" });
+    expect(res.total).toBe(1);
+    expect(q(calls[0]!).get("q")).toBe("ivan");
+    await listUsers({ page: 1, q: "" });
+    expect(q(calls[1]!).has("q")).toBe(false);
+    await listUsers({ page: 1 });
+    expect(q(calls[2]!).has("q")).toBe(false);
+  });
+
   it("create_user_posts_exact_body_and_returns_user", async () => {
     const calls = stub(() => j(201, U_IVANOV));
     const res = await createUser({

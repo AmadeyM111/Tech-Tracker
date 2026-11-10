@@ -56,6 +56,7 @@ from app.domain.auth.sessions import SessionStore
 from app.domain.events.catalog import EventAction
 from app.domain.events.writer import UserEventDetails, record_event
 from app.domain.tokens.service import revoke_all_for_user as revoke_agent_tokens
+from app.domain.users.directory import like_contains_pattern
 from app.domain.users.email import normalize_email
 from app.domain.users.models import AppUser
 from app.domain.users.names import normalize_person_name
@@ -631,14 +632,26 @@ async def set_role(
     return target.to_account(role=new_role)
 
 
+def _account_search(q: str) -> ColumnElement[bool]:
+    """Поиск по логину, имени, фамилии и email: подстрока без учёта регистра (``q`` уже обрезан)."""
+    pattern = like_contains_pattern(q)
+    return or_(
+        AppUser.login.ilike(pattern, escape="\\"),
+        AppUser.first_name.ilike(pattern, escape="\\"),
+        AppUser.last_name.ilike(pattern, escape="\\"),
+        AppUser.email.ilike(pattern, escape="\\"),
+    )
+
+
 async def list_accounts(
-    db: AsyncSession, actor: Actor, params: PageParams
+    db: AsyncSession, actor: Actor, params: PageParams, *, q: str | None = None
 ) -> tuple[list[UserAccount], bool]:
     """Страница учётных записей пространства актора (FR-4, AC-2, D-34).
 
     Сортировка ``login ASC, id ASC`` (``id`` — тай-брейкер, страницы не пересекаются). Роль
     читается вторым запросом по идентификаторам страницы: ``paginate`` работает с одной
-    сущностью. Второй элемент — признак следующей страницы.
+    сущностью. Второй элемент — признак следующей страницы. ``q`` (непустой, обрезанный) —
+    поиск, см. ``_account_search``; ``count_accounts`` считает те же записи для ``total``.
     """
     _require(actor, Capability.MANAGE_ACCOUNTS)
     stmt = (
@@ -661,6 +674,8 @@ async def list_accounts(
         .where(WorkspaceMember.workspace_id == actor.workspace_id)
         .order_by(AppUser.login, AppUser.id)
     )
+    if q:
+        stmt = stmt.where(_account_search(q))
     users, has_next = await paginate(db, stmt, params)
     if not users:
         return [], has_next
@@ -687,6 +702,23 @@ async def list_accounts(
         for user in users
     ]
     return items, has_next
+
+
+async def count_accounts(db: AsyncSession, actor: Actor, *, q: str | None = None) -> int:
+    """Число учётных записей пространства актора, подходящих под ``q`` (``total`` списка).
+
+    Фильтр тот же, что у ``list_accounts``: счётчик относится ко всем страницам, а не к текущей.
+    """
+    _require(actor, Capability.MANAGE_ACCOUNTS)
+    stmt = (
+        select(func.count())
+        .select_from(AppUser)
+        .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
+        .where(WorkspaceMember.workspace_id == actor.workspace_id)
+    )
+    if q:
+        stmt = stmt.where(_account_search(q))
+    return (await db.execute(stmt)).scalar_one()
 
 
 async def get_account(db: AsyncSession, actor: Actor, user_id: UUID, /) -> UserAccount:
