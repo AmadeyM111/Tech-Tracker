@@ -362,3 +362,40 @@ def test_009_restore_uses_single_transaction_and_ignores_stale_stage(
     restore_argv = next(a for a, _ in runner.calls if "--dbname" in a)
     assert "--single-transaction" in restore_argv
     assert sorted(p.name for p in fresh.iterdir()) == ["secrets"]
+
+
+def test_009_review_restore_unpacks_data_before_pg_restore_and_failure_leaves_both_empty(
+    env: Settings, tmp_path: Path
+) -> None:
+    """Ревью 009, п. 1: данные распаковываются до ``pg_restore``; сбой любого шага — цели пусты."""
+    path = _backup(env, tmp_path / "b", FakeRunner())
+    fresh = tmp_path / "fresh"
+    target = env.model_copy(update={"data_dir": fresh})
+
+    seen: dict[str, list[str]] = {}
+
+    class Probe(FakeRunner):
+        def __call__(self, argv, env, stdin, stdout):  # type: ignore[no-untyped-def]
+            if "--dbname" in argv:  # pg_restore: данные уже во временном каталоге, на месте их нет
+                seen["entries"] = sorted(p.name for p in fresh.iterdir())
+            super().__call__(argv, env, stdin, stdout)
+
+    restore_backup(target, path, db_tables=[], runner=Probe())
+    assert seen["entries"] != ["secrets"]  # до pg_restore данные ещё не перенесены
+    assert all(n.startswith(".gtrack-restore-") for n in seen["entries"])
+    assert sorted(p.name for p in fresh.iterdir()) == ["secrets"]
+
+    # pg_restore упал: каталог данных пуст (повторный restore не упирётся в отказ)
+    again = tmp_path / "again"
+    failing = target.model_copy(update={"data_dir": again})
+
+    class Failing(FakeRunner):
+        def __call__(self, argv, env, stdin, stdout):  # type: ignore[no-untyped-def]
+            if "--dbname" in argv:  # сам pg_restore (не проверочный --list)
+                raise BackupError("pg_restore_failed", "pg_restore: код 1")
+            super().__call__(argv, env, stdin, stdout)
+
+    with pytest.raises(BackupError):
+        restore_backup(failing, path, db_tables=[], runner=Failing())
+    assert list(again.iterdir()) == []
+    restore_backup(failing, path, db_tables=[], runner=FakeRunner())

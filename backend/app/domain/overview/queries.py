@@ -118,6 +118,31 @@ async def overview_counts(db: AsyncSession, actor: Actor) -> OverviewCounts:
     return OverviewCounts(total, todo, in_progress, review, done, needs_review)
 
 
+MY_PROJECTS_LIMIT = 500
+
+
+async def overview_projects(db: AsyncSession, actor: Actor) -> list[tuple[UUID, str]]:
+    """Мои проекты для фильтра «Сводки» (владелец или участник, неудалённые), по имени.
+
+    Тот же предикат членства, что у задач сводки (PS-1): в фильтре нет проектов, по которым
+    сводка пуста или отвечает 404. Без постраничности: не более ``MY_PROJECTS_LIMIT``.
+    """
+    _require_business(actor)
+    is_member = or_(
+        Project.owner_id == actor.user_id,
+        exists().where(
+            ProjectMember.project_id == Project.id, ProjectMember.user_id == actor.user_id
+        ),
+    )
+    rows = await db.execute(
+        select(Project.id, Project.name)
+        .where(Project.workspace_id == actor.workspace_id, Project.deleted_at.is_(None), is_member)
+        .order_by(func.lower(Project.name), Project.id)
+        .limit(MY_PROJECTS_LIMIT)
+    )
+    return [(row.id, row.name) for row in rows]
+
+
 async def _filter_conditions(
     db: AsyncSession, actor: Actor, f: OverviewFilter, today: date
 ) -> list[Any]:

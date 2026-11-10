@@ -58,3 +58,9 @@ class OverviewTaskPage(BaseModel):
     page_size: int
     has_next: bool
     total: int
+
+
+class OverviewProjectList(BaseModel):
+    """Мои проекты для фильтра «Сводки» (без постраничности, по имени)."""
+
+    items: list[ProjectRef]

@@ -1256,6 +1256,23 @@
         "title": "OverviewCountsOut",
         "type": "object"
       },
+      "OverviewProjectList": {
+        "description": "Мои проекты для фильтра «Сводки» (без постраничности, по имени).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectRef"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "OverviewProjectList",
+        "type": "object"
+      },
       "OverviewTaskItem": {
         "properties": {
           "assignee": {
@@ -5078,6 +5095,48 @@
           }
         },
         "summary": "Get Overview",
+        "tags": [
+          "overview"
+        ]
+      }
+    },
+    "/api/v1/me/overview/projects": {
+      "get": {
+        "description": "Мои проекты (владелец или участник) для фильтра по проекту, по имени.",
+        "operationId": "list_overview_projects",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewProjectList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          }
+        },
+        "summary": "List Overview Projects",
         "tags": [
           "overview"
         ]

@@ -1,4 +1,4 @@
-"""«Сводка»: ``GET /api/v1/me/overview`` и ``GET /api/v1/me/overview/tasks`` (spec 008).
+"""«Сводка»: ``GET /api/v1/me/overview`` и ``/me/overview/{tasks,projects}`` (spec 008).
 
 Гейт — router-level ``require_capability(BUSINESS_ACCESS)``: ТА и «без роли» получают 403.
 Одно значение ``status`` и ``due`` (Q-7): повтор параметра — 422, а не «последнее победило».
@@ -12,8 +12,10 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from app.api.deps import get_active_actor, require_capability
 from app.api.openapi import error_responses
+from app.api.v1.schemas.common import ProjectRef
 from app.api.v1.schemas.overview import (
     OverviewCountsOut,
+    OverviewProjectList,
     OverviewTaskItem,
     OverviewTaskPage,
     OverviewTaskQuery,
@@ -23,7 +25,12 @@ from app.core.db import DbSession
 from app.core.errors import ErrorCode, Unprocessable
 from app.core.pagination import PageParams
 from app.domain.access.roles import Actor, Capability
-from app.domain.overview.queries import OverviewFilter, overview_counts, overview_tasks
+from app.domain.overview.queries import (
+    OverviewFilter,
+    overview_counts,
+    overview_projects,
+    overview_tasks,
+)
 
 router = APIRouter(
     prefix="/me/overview",
@@ -40,6 +47,13 @@ _SINGLE = ("project_id", "status", "due", "needs_review", "page", "page_size")
 async def get_overview(db: DbSession, actor: CurrentActor) -> OverviewCountsOut:
     """Плитки «Сводки» по всем моим проектам; фильтров нет (Q-2)."""
     return OverviewCountsOut.model_validate(await overview_counts(db, actor))
+
+
+@router.get("/projects", response_model=OverviewProjectList)
+async def list_overview_projects(db: DbSession, actor: CurrentActor) -> OverviewProjectList:
+    """Мои проекты (владелец или участник) для фильтра по проекту, по имени."""
+    rows = await overview_projects(db, actor)
+    return OverviewProjectList(items=[ProjectRef(id=i, name=n) for i, n in rows])
 
 
 @router.get("/tasks", response_model=OverviewTaskPage, responses=error_responses(404, 422))

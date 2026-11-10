@@ -149,7 +149,7 @@
   border: 1px dashed var(--border);
   border-radius: var(--radius);
 }
-.burn-tag {
+.sum-burn-tag {
   display: inline-block;
   margin-left: 6px;
   padding: 0 6px;

@@ -640,6 +640,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/overview/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Overview Projects
+         * @description Мои проекты (владелец или участник) для фильтра по проекту, по имени.
+         */
+        get: operations["list_overview_projects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/overview/tasks": {
         parameters: {
             query?: never;
@@ -1558,6 +1578,14 @@ export interface components {
             todo: number;
             /** Total */
             total: number;
+        };
+        /**
+         * OverviewProjectList
+         * @description Мои проекты для фильтра «Сводки» (без постраничности, по имени).
+         */
+        OverviewProjectList: {
+            /** Items */
+            items: components["schemas"]["ProjectRef"][];
         };
         /** OverviewTaskItem */
         OverviewTaskItem: {
@@ -3998,6 +4026,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OverviewCountsOut"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_overview_projects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewProjectList"];
                 };
             };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */

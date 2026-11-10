@@ -47,3 +47,13 @@ def test_011_free_space_threshold(tmp_path: Path) -> None:
     storage.check_free_space(tmp_path, 0)
     with pytest.raises(StorageFull):
         storage.check_free_space(tmp_path, 10**12)
+
+
+async def test_review_directories_are_private_even_if_created_wider(tmp_path: Path) -> None:
+    root = tmp_path / "attachments"
+    root.mkdir(mode=0o755)
+    root.chmod(0o755)  # каталог уже есть и шире нужного (umask, ручное создание)
+    staged = await storage.stage(root, _chunks(b"%PDF-1"), max_bytes=1000)
+    target = storage.publish(root, staged)
+    for d in (root, root / storage.INCOMING, target.parent):
+        assert d.stat().st_mode & 0o777 == 0o700, d

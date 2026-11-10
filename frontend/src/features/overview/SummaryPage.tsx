@@ -7,8 +7,7 @@ import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
-import { listProjects } from "../projects/api";
-import { getOverview, listOverviewTasks, type OverviewCounts, type OverviewTaskItem } from "./api";
+import { getOverview, listOverviewProjects, listOverviewTasks, type OverviewCounts, type OverviewTaskItem } from "./api";
 import {
   DUE_PRESETS,
   NO_FILTERS,
@@ -78,8 +77,8 @@ function Filters(props: { filters: SummaryFilters; onChange: (f: SummaryFilters)
   const { filters, onChange } = props;
   const baseId = useId();
   const projects = useQuery({
-    queryKey: ["projects", "summary-filter"],
-    queryFn: () => listProjects({ page: 1, pageSize: 100 }),
+    queryKey: ["overview", "projects"],
+    queryFn: () => listOverviewProjects(),
     staleTime: 60_000,
   });
   return (
@@ -174,7 +173,7 @@ function Due({ task, today }: { task: OverviewTaskItem; today: string }) {
 }
 
 function Hot({ task }: { task: OverviewTaskItem }) {
-  return task.hot ? <span className="burn-tag">{t("summary.hot")}</span> : null;
+  return task.hot ? <span className="sum-burn-tag">{t("summary.hot")}</span> : null;
 }
 
 function TaskRows({ items, today }: { items: OverviewTaskItem[]; today: string }) {
