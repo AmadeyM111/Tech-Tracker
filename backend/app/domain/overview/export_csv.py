@@ -63,7 +63,8 @@ def _moment(value: datetime) -> str:
 
 
 def _link(base_url: str | None, task_id: UUID) -> str:
-    return "" if not base_url else f"{base_url.rstrip('/')}/tasks/{task_id}"
+    """Полный адрес при заданном ``PUBLIC_BASE_URL``, иначе относительный путь ``/tasks/<id>``."""
+    return f"{base_url.rstrip('/')}/tasks/{task_id}" if base_url else f"/tasks/{task_id}"
 
 
 def render_csv(rows: Sequence[ExportRow], *, base_url: str | None) -> bytes:

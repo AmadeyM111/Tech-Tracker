@@ -59,7 +59,20 @@ def test_025_ac5_dates_and_labels_in_moscow_time() -> None:
 
 def test_025_empty_assignee_due_and_link() -> None:
     row = _parse(render_csv([_row(assignee=None, due_date=None)], base_url=None))[1]
-    assert row[4] == "" and row[5] == "" and row[8] == ""
+    assert row[4] == "" and row[5] == ""
+
+
+@pytest.mark.parametrize("base_url", [None, ""])
+def test_025_link_is_relative_without_public_base_url(base_url: str | None) -> None:
+    """Дизайн-проверка #35: без PUBLIC_BASE_URL в «Ссылке» путь ``/tasks/<id>``, не пусто."""
+    row = _parse(render_csv([_row()], base_url=base_url))[1]
+    assert row[8] == f"/tasks/{TID}"
+
+
+@pytest.mark.parametrize("base_url", ["https://gt.example", "https://gt.example/"])
+def test_025_link_is_absolute_with_public_base_url(base_url: str) -> None:
+    row = _parse(render_csv([_row()], base_url=base_url))[1]
+    assert row[8] == f"https://gt.example/tasks/{TID}"
 
 
 @pytest.mark.parametrize("value", ["=1+1", "+1", "-1", "@SUM(A1)", "\tx", "\rx"])

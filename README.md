@@ -197,7 +197,7 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
   паролей (по умолчанию 3, 131072 КиБ, 2).
 - `CSV_MAX_ROWS` (необязательно, в `.env.example` нет) - предел строк выгрузки «Скачать CSV» на «Сводке»
   (по умолчанию 10000; больше - отказ `export_too_large` без усечения). Колонка «Ссылка» файла строится
-  из `PUBLIC_BASE_URL`; без него она пустая.
+  из `PUBLIC_BASE_URL`; без него в ней относительный путь `/tasks/<id>`.
 - `SECRET_KEY` в `.env.example` нет и из `.env` в `api` не пробрасывается: ключ создаётся один
   раз и хранится в `/data/secrets/secret_key` (том `appdata`, 32 байта, режим 0600). Если
   `SECRET_KEY` всё же задан в окружении `api` (например, в своём compose-файле), значение короче
@@ -664,7 +664,7 @@ The session cookie always carries the `Secure` flag (the shipped configuration h
   parameters (defaults 3, 131072 KiB, 2).
 - `CSV_MAX_ROWS` (optional, not in `.env.example`) - row limit of the "Скачать CSV" export on the summary
   screen (default 10000; more means the `export_too_large` refusal, never a truncated file). The "Ссылка"
-  column of the file is built from `PUBLIC_BASE_URL`; it is empty without it.
+  column of the file is built from `PUBLIC_BASE_URL`; without it the column holds the relative path `/tasks/<id>`.
 - `SECRET_KEY` is not in `.env.example` and is not passed from `.env` to `api`: the key is
   created once and stored in `/data/secrets/secret_key` (the `appdata` volume, 32 bytes, mode
   0600). If `SECRET_KEY` is set in the `api` environment anyway (for example in your own compose

@@ -244,3 +244,13 @@ async def test_025_024_range_validation_errors_are_422_and_write_no_event(api_en
     )
     assert repeated.status_code == 422
     assert await _events(api_env) == []
+
+
+async def test_025_link_column_with_and_without_public_base_url(api_env: ApiEnv) -> None:
+    w = await _world(api_env)
+    task = await _task(w, w.mine, title="со ссылкой")
+    settings = api_env.app.state.settings
+    settings.public_base_url = None
+    assert _rows(await _get(w, CSV))[1][8] == f"/tasks/{task.id}"
+    settings.public_base_url = "https://gt.example/"
+    assert _rows(await _get(w, CSV))[1][8] == f"https://gt.example/tasks/{task.id}"
