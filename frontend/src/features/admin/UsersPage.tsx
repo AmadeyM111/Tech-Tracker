@@ -542,12 +542,15 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
         </table>
       )}
 
-      <Pagination
-        page={page}
-        hasNext={data?.has_next ?? false}
-        busy={users.isPlaceholderData || pending}
-        onPage={changePage}
-      />
+      {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
+      {page > 1 || ((data?.items.length ?? 0) > 0 && (data?.has_next ?? false)) ? (
+        <Pagination
+          page={page}
+          hasNext={data?.has_next ?? false}
+          busy={users.isPlaceholderData || pending}
+          onPage={changePage}
+        />
+      ) : null}
 
       {emailUser === null ? null : (
         <EmailDialog

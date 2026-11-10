@@ -162,3 +162,29 @@ describe("mentions (FR-1, FR-2)", () => {
     expect(await screen.findByText("Нет участников с логином, начинающимся на «zz».")).toBeTruthy();
   });
 });
+
+// Аудит #9: пустой список уведомлений - без пагинации (даже при has_next); непустой с next - с пагинацией.
+describe("пагинация уведомлений при пустом списке (аудит #9)", () => {
+  it("empty_list_has_no_pagination_even_when_next_flag_is_set", async () => {
+    installFetch({
+      [ME]: () => j(200, meWith(BA_CAPS, "business_admin")),
+      [UNREAD]: () => j(200, { unread: 0 }),
+      [LIST]: () => j(200, { ...listOf([], 0), has_next: true }),
+    });
+    const { container } = renderApp("/notifications");
+    expect(await screen.findByText("Уведомлений пока нет")).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+  });
+
+  it("non_empty_list_with_next_page_keeps_pagination", async () => {
+    installFetch({
+      [ME]: () => j(200, meWith(BA_CAPS, "business_admin")),
+      [UNREAD]: () => j(200, { unread: 1 }),
+      [LIST]: () => j(200, { ...listOf([note("aaaaaaaa-0000-4000-8000-000000000002")], 1), has_next: true }),
+    });
+    const { container } = renderApp("/notifications");
+    await waitFor(() => expect(container.querySelector(".notif-list")).toBeTruthy());
+    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+  });
+});

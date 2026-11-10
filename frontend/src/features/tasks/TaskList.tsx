@@ -131,8 +131,8 @@ function ListView(props: ListViewProps) {
       ) : (
         <TaskTable items={items} withProject={withProject} />
       )}
-      {/* Not before the first answer (or after a failed first load): no empty navigation landmark. */}
-      {items !== undefined || page > 1 ? (
+      {/* Not before the first answer (or after a failed first load), not for an empty first page (аудит #9): no empty navigation landmark. */}
+      {page > 1 || (items !== undefined && items.length > 0 && hasNext) ? (
         <Pagination page={page} hasNext={hasNext} busy={isPending} onPage={onPage} />
       ) : null}
     </>

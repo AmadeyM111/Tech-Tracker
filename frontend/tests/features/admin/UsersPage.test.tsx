@@ -235,13 +235,11 @@ describe("create user (FR-4, FR-55, FR-65, FR-73, OI-108)", () => {
     expect(DICT).toContain(hint?.textContent);
   });
 
-  it("t98_fr73a_login_hint_says_shown_as_entered_and_case_ignored_on_login", async () => {
+  it("t98_fr73a_login_hint_lists_allowed_characters", async () => {
     const { container } = await open();
     const hint = document.getElementById(loginInput(container).getAttribute("aria-describedby") ?? "");
     expect(hint?.textContent).toBe(ru["admin.users.login_hint"]);
-    expect(hint?.textContent).toContain("показывается так, как введён");
-    expect(hint?.textContent).toContain("регистр не учитывается");
-    expect(hint?.textContent).not.toMatch(/\. Регистр не учитывается$/);
+    expect(hint?.textContent).toBe("Латинские буквы, цифры, точка, подчёркивание, дефис");
   });
 
   it("fr4_create_without_role_sends_login_and_client_generated_password_only", async () => {
@@ -1042,5 +1040,39 @@ describe("compact accounts table (UX-audit P1)", () => {
     expect(cell(r, "first_name").getAttribute("data-label")).toBe(ru["admin.users.first_name_column"]);
     expect(cell(r, "last_name").getAttribute("data-label")).toBe(ru["admin.users.last_name_column"]);
     expect(cell(r, "status").getAttribute("data-label")).toBe(ru["admin.users.col_status"]);
+  });
+});
+
+// Аудит #9: при пустом списке первой страницы пагинация не в DOM; со страницы > 1 остаётся (вернуться назад).
+describe("пагинация учётных записей при пустом списке (аудит #9)", () => {
+  it("empty_first_page_has_no_pagination", async () => {
+    setup({ [LIST]: () => j(200, page([])) });
+    const { container } = renderApp("/admin/users");
+    expect(await screen.findByText(ru["admin.users.empty"])).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+    expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
+  });
+
+  it("empty_page_above_first_keeps_pagination_so_user_can_go_back", async () => {
+    setup({
+      [LIST]: (r) => {
+        const p = Number(new URL(r.url).searchParams.get("page") ?? "1");
+        return j(200, p === 1 ? page([U_IVANOV], 1, true) : page([], p, false));
+      },
+    });
+    const { container } = renderApp("/admin/users");
+    await waitFor(() => expect(container.querySelector(`tr[data-user-id="${ID_IVANOV}"]`)).toBeTruthy());
+    fireEvent.click(action(container, "next-page"));
+    expect(await screen.findByText(ru["admin.users.empty"])).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+    expect(action(container, "prev-page").disabled).toBe(false);
+  });
+
+  it("non_empty_list_single_page_hides_pagination", async () => {
+    const { container } = await open();
+    // Audit #9 (P3, design check): a single page without has_next shows no pagination.
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
   });
 });

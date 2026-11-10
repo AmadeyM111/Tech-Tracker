@@ -347,3 +347,20 @@ describe("polling (FR-29)", () => {
     expect(createArea(container).value).toBe("Мой черновик");
   });
 });
+
+// Аудит #9: пустой список комментариев - без пагинации; непустой - с пагинацией.
+describe("пагинация комментариев при пустом списке (аудит #9)", () => {
+  it("empty_first_page_has_no_pagination", async () => {
+    const { container } = await openWithComments([]);
+    expect(await screen.findByText(d("comments.empty"))).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+    expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
+  });
+
+  it("non_empty_list_single_page_hides_pagination", async () => {
+    const { container } = await openWithComments([comment(CID1, "Привет")]);
+    await screen.findByText("Привет");
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+  });
+});
