@@ -2872,7 +2872,7 @@
   "paths": {
     "/api/v1/admin/audit": {
       "get": {
-        "description": "Страница журнала пространства: ``id DESC``, фильтры ``entity_type`` и ``actor_id``.",
+        "description": "Страница журнала: ``id DESC``, фильтры ``entity_type``, ``actor_id``, ``actor_login``.",
         "operationId": "list_audit",
         "parameters": [
           {
@@ -2930,6 +2930,23 @@
                 }
               ],
               "title": "Actor Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_login",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Login"
             }
           }
         ],

@@ -1,6 +1,6 @@
 // T24: журнал аудита /admin/audit (контракт разметки - в шапке helpers.tsx).
 // AC: FR-41 (только метаданные, BR-2), FR-47 (постранично), FR-59, NFR-6, NFR-7, AC-64/65.
-// Фильтры - только те, что есть в схеме API (GET /admin/audit): entity_type и actor_id;
+// Фильтры - только те, что есть в схеме API (GET /admin/audit): entity_type и actor_login (логин автора);
 // фильтров по периоду и действию в API нет, клиентские фильтры страницы не вводятся.
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
@@ -80,7 +80,7 @@ const entry = (c: HTMLElement, id: number) => {
 };
 
 function filterForm(c: HTMLElement) {
-  const actor = c.querySelector<HTMLInputElement>('input[name="actor_id"]');
+  const actor = c.querySelector<HTMLInputElement>('input[name="actor_login"]');
   const type = c.querySelector<HTMLSelectElement>('select[name="entity_type"]');
   if (!actor || !type) throw new Error("no filter controls");
   const submit = actor.form?.querySelector<HTMLButtonElement>('button[type="submit"]');
@@ -158,6 +158,30 @@ describe("audit list (FR-41)", () => {
   });
 });
 
+describe("P2: логин вместо UUID, карточки на 360 px", () => {
+  it("filter_label_is_login_and_uuid_is_collapsed_in_details", async () => {
+    const { container } = await open();
+    expect(filterForm(container).actor.labels?.[0]?.textContent).toBe("Учётная запись (логин)");
+    expect(container.textContent).not.toContain("UUID");
+    const u = entry(container, 7);
+    const block = cell(u, "entity_id");
+    expect(block.tagName).toBe("DETAILS");
+    expect((block as HTMLDetailsElement).open).toBe(false);
+    expect(block.textContent).toContain(ID_IVANOV);
+    expect(u.querySelectorAll("td")).toHaveLength(5);
+  });
+
+  it("cards_show_the_same_entries_with_login_and_collapsed_id", async () => {
+    const { container } = await open();
+    const cards = container.querySelectorAll<HTMLElement>(".audit-cards li");
+    expect(cards).toHaveLength(2);
+    const first = cards[0] as HTMLElement;
+    expect(first.textContent).toContain("admin");
+    expect(first.querySelector("details")?.textContent).toContain(ID_IVANOV);
+    expect((first.querySelector("details") as HTMLDetailsElement).open).toBe(false);
+  });
+});
+
 describe("pagination (FR-47)", () => {
   it("next_prev_buttons_follow_has_next_and_request_page", async () => {
     const { container } = await open({
@@ -176,7 +200,7 @@ describe("pagination (FR-47)", () => {
   });
 });
 
-describe("filters (entity_type, actor_id)", () => {
+describe("filters (entity_type, actor_login)", () => {
   it("entity_type_select_has_all_types_with_dictionary_labels", async () => {
     const { container } = await open();
     const { type } = filterForm(container);
@@ -198,11 +222,12 @@ describe("filters (entity_type, actor_id)", () => {
     await waitFor(() => expect(f.query(f.last(AUDIT)).get("page")).toBe("2"));
     const { actor, type, submit } = filterForm(container);
     fireEvent.change(type, { target: { value: "deal" } });
-    fireEvent.change(actor, { target: { value: ` ${ADMIN_ID} ` } });
+    fireEvent.change(actor, { target: { value: " demo.ba1 " } });
     fireEvent.click(submit);
     await waitFor(() => expect(f.query(f.last(AUDIT)).get("entity_type")).toBe("deal"));
     const q = f.query(f.last(AUDIT));
-    expect(q.get("actor_id")).toBe(ADMIN_ID);
+    expect(q.get("actor_login")).toBe("demo.ba1");
+    expect(q.has("actor_id")).toBe(false);
     expect(q.get("page")).toBe("1");
   });
 
@@ -210,26 +235,26 @@ describe("filters (entity_type, actor_id)", () => {
     const { container } = await open();
     const first = f.query(f.last(AUDIT));
     expect(first.has("entity_type")).toBe(false);
-    expect(first.has("actor_id")).toBe(false);
+    expect(first.has("actor_login")).toBe(false);
     const { actor, type, submit } = filterForm(container);
     fireEvent.change(type, { target: { value: "task" } });
     fireEvent.click(submit);
     await waitFor(() => expect(f.query(f.last(AUDIT)).get("entity_type")).toBe("task"));
-    fireEvent.change(actor, { target: { value: ADMIN_ID } });
+    fireEvent.change(actor, { target: { value: "demo" } });
     fireEvent.click(action(container, "reset-filters"));
     await waitFor(() => expect(f.query(f.last(AUDIT)).has("entity_type")).toBe(false));
-    expect(f.query(f.last(AUDIT)).has("actor_id")).toBe(false);
+    expect(f.query(f.last(AUDIT)).has("actor_login")).toBe(false);
     expect(filterForm(container).type.value).toBe("");
     expect(filterForm(container).actor.value).toBe("");
   });
 
-  it("validation_422_for_bad_actor_id_is_shown_via_error_message_and_focused", async () => {
+  it("validation_422_for_bad_actor_login_is_shown_via_error_message_and_focused", async () => {
     const { container } = await open({
       [AUDIT]: (r) =>
-        new URL(r.url).searchParams.has("actor_id") ? err(422, "validation_error") : j(200, page([E_USER])),
+        new URL(r.url).searchParams.has("actor_login") ? err(422, "validation_error") : j(200, page([E_USER])),
     });
     const { actor, submit } = filterForm(container);
-    fireEvent.change(actor, { target: { value: "not-a-uuid" } });
+    fireEvent.change(actor, { target: { value: "x".repeat(65) } });
     fireEvent.click(submit);
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe(errorMessage("validation_error"));

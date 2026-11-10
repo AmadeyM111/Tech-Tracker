@@ -161,6 +161,7 @@ async def list_audit(
     *,
     entity_type: EntityType | None = None,
     actor_id: UUID | None = None,
+    actor_login: str | None = None,
 ) -> tuple[list[AuditRecord], bool]:
     """Страница журнала аудита пространства актора, ``id DESC``; второй элемент — ``has_next``.
 
@@ -177,6 +178,20 @@ async def list_audit(
         stmt = stmt.where(DomainEvent.entity_type == entity_type.value)
     if actor_id is not None:
         stmt = stmt.where(DomainEvent.actor_id == actor_id)
+    if actor_login is not None:
+        # Логин автора (ключ нормализован в нижний регистр): префикс, `%`/`_` экранируются.
+        prefix = actor_login.strip().lower().replace("\\", "\\\\")
+        prefix = prefix.replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(
+            DomainEvent.actor_id.in_(
+                select(AppUser.id)
+                .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
+                .where(
+                    WorkspaceMember.workspace_id == actor.workspace_id,
+                    AppUser.login.like(prefix + "%", escape="\\"),
+                )
+            )
+        )
     events, has_next = await paginate(db, stmt.order_by(DomainEvent.id.desc()), params)
     return await _to_records(db, actor.workspace_id, events), has_next
 

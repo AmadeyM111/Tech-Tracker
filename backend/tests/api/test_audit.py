@@ -293,6 +293,40 @@ async def test_t18_invalid_page_params_are_422(api_env: ApiEnv, params: dict[str
     assert (r.status_code, code_of(r)) == (422, "validation_error")
 
 
+async def test_p2_filter_by_actor_login_prefix_case_and_isolation(api_env: ApiEnv) -> None:
+    env = api_env
+    ws, admin, token = await admin_in_new_workspace(env)
+    ba1, _ = await seed(env, ws, "tech_admin", sessions=0, login="demo.ba1")
+    ba2, _ = await seed(env, ws, "tech_admin", sessions=0, login="demo.ba2")
+    other, _ = await seed(env, ws, "tech_admin", sessions=0, login="demox.user")
+    e1, e2, e3, e_sys = await _add_events(
+        env,
+        ws.id,
+        [
+            {"actor_id": ba1.id, "entity_type": "user"},
+            {"actor_id": ba2.id, "entity_type": "user"},
+            {"actor_id": other.id, "entity_type": "user"},
+            {"actor_id": None, "entity_type": "user"},
+        ],
+    )
+
+    async def ids(**p: Any) -> list[int]:
+        return [e["id"] for e in await _all_entries(env, token, **p)]
+
+    assert await ids(actor_login="demo.ba1") == [e1]
+    assert await ids(actor_login=" DEMO.BA ") == [e2, e1]  # префикс, без регистра, пробелы по краям
+    assert await ids(actor_login="demo.ba%") == []  # % не шаблон
+    assert await ids(actor_login="demo_ba1") == []  # _ не шаблон
+    assert await ids(actor_login="nobody") == []
+    assert await ids(actor_login="") == [e_sys, e3, e2, e1]  # пустая строка = без фильтра
+    assert await ids(actor_login="demo.ba", entity_type="project") == []
+    assert (await _get_list(env, token, actor_login="x" * 65)).status_code == 422
+
+    ws_b, _, token_b = await admin_in_new_workspace(env)
+    assert ws_b.id != ws.id
+    assert await _all_entries(env, token_b, actor_login="demo.ba") == []
+
+
 async def test_t18_filter_entity_type_and_actor_id(api_env: ApiEnv) -> None:
     env = api_env
     ws, admin, token = await admin_in_new_workspace(env)
