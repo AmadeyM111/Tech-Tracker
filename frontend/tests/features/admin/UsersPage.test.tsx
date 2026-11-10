@@ -122,12 +122,18 @@ describe("list and pagination (UF-2)", () => {
     const pe = row(container, ID_PETROV);
     expect(cell(iv, "login").textContent).toBe("ivanov");
     expect(cell(pe, "login").textContent).toBe("petrov");
+    // Роль - select (UX-audit P1): текст ячейки - все варианты, поэтому читаем выбранный.
+    const roleOf = (r: HTMLElement): string => {
+      const el = cell(r, "role");
+      if (el instanceof HTMLSelectElement) return el.options[el.selectedIndex]?.textContent ?? "";
+      return el.textContent ?? "";
+    };
     for (const r of [iv, pe, row(container, U_ADMIN.id)]) {
-      expect(DICT).toContain(cell(r, "role").textContent);
+      expect(DICT).toContain(roleOf(r));
       expect(DICT).toContain(cell(r, "status").textContent);
     }
     // роль не назначена и назначена выглядят по-разному, активна и заблокирована - тоже
-    expect(cell(iv, "role").textContent).not.toBe(cell(pe, "role").textContent);
+    expect(roleOf(iv)).not.toBe(roleOf(pe));
     expect(cell(iv, "status").textContent).not.toBe(cell(pe, "status").textContent);
     expect(f.query(f.last(LIST)).get("page")).toBe("1");
   });
@@ -870,18 +876,22 @@ describe("names and origin (019, R8-T20)", () => {
     expect(cell(iv, "last_name").textContent).toBe("Ivanov");
     expect(cell(iv, "origin").textContent).toBe(ru["admin.users.self_registered"]);
     const pe = row(container, ID_PETROV);
+    // PR #26 check (P2): both names empty -> one placeholder, never "не указано не указано".
     expect(cell(pe, "first_name").textContent).toBe(ru["admin.users.name_missing"]);
-    expect(cell(pe, "last_name").textContent).toBe(ru["admin.users.name_missing"]);
+    expect(pe.querySelector('[data-field="last_name"]')).toBeNull();
+    expect(pe.textContent).not.toContain(`${ru["admin.users.name_missing"]} ${ru["admin.users.name_missing"]}`);
     expect(cell(pe, "origin").textContent).toBe("");
     expect(cell(row(container, U_ADMIN.id), "origin").textContent).toBe("");
-    const headers = Array.from(container.querySelectorAll("th")).map((th) => th.textContent);
-    expect(headers).toEqual(
-      expect.arrayContaining([
-        ru["admin.users.first_name_column"],
-        ru["admin.users.last_name_column"],
-        ru["admin.users.origin_column"],
-      ]),
-    );
+    // UX-audit P1: колонки сведены к трём; подписи стоят в заголовках через « · » - каждая должна быть в одном из них.
+    const headers = Array.from(container.querySelectorAll("th")).map((th) => th.textContent ?? "");
+    const labels = [
+      ru["admin.users.first_name_column"],
+      ru["admin.users.last_name_column"],
+      ru["admin.users.origin_column"],
+    ];
+    for (const label of labels) {
+      expect(headers.some((h) => h.split(" · ").includes(label)), label).toBe(true);
+    }
   });
 
   it("019_ac33_create_form_has_first_and_last_name_fields_in_same_form", async () => {
@@ -960,5 +970,77 @@ describe("names and origin (019, R8-T20)", () => {
     await waitFor(() => expect(cell(row(container, ID_IVANOV), "first_name").textContent).toBe("Ivan"));
     expect(cell(row(container, ID_IVANOV), "last_name").textContent).toBe("Ivanov");
     expect(f.last(LIST).headers.get("X-GT-Background")).toBeNull();
+  });
+});
+
+// UX-audit P1 (ta-accounts-to-be): компактная строка. Все кнопки остаются в DOM;
+// основное действие - снаружи, остальные - в <details> с подписью «Ещё».
+describe("compact accounts table (UX-audit P1)", () => {
+  it("secondary_actions_are_in_more_details_and_primary_stays_outside", async () => {
+    const { container } = await open();
+    for (const id of [ID_IVANOV, ID_PETROV]) {
+      const r = row(container, id);
+      const more = r.querySelector("details");
+      if (more === null) throw new Error("no details in row");
+      expect(more.querySelector("summary")?.textContent).toBe(ru["admin.users.more"]);
+      for (const name of ["reset-password", "revoke-sessions", "edit-email", "edit-name"]) {
+        expect(action(more, name)).toBeTruthy();
+      }
+      const primary = action(r, id === ID_PETROV ? "unblock" : "block");
+      expect(more.contains(primary)).toBe(false);
+      expect(more.querySelector('button[data-action="block"], button[data-action="unblock"]')).toBeNull();
+      expect(more.querySelector('button[data-action="set-role"]')).toBeNull();
+    }
+  });
+
+  it("actions_inside_details_still_open_their_flows", async () => {
+    const { container } = await open();
+    fireEvent.click(action(row(container, ID_IVANOV), "reset-password"));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("ivanov");
+  });
+
+  it("table_has_three_columns_and_three_cells_per_row", async () => {
+    const { container } = await open();
+    const table = container.querySelector("table.ui-users-table");
+    if (table === null) throw new Error("no table.ui-users-table");
+    expect(table.querySelectorAll("thead th")).toHaveLength(3);
+    for (const id of [ID_IVANOV, ID_PETROV, U_ADMIN.id]) {
+      expect(row(container, id).querySelectorAll("td")).toHaveLength(3);
+    }
+  });
+
+  it("login_and_email_share_one_cell_and_origin_too", async () => {
+    const { container } = await open({
+      [LIST]: () => j(200, page([{ ...U_IVANOV, email: "ivanov@example.com", self_registered: true }])),
+    });
+    const r = row(container, ID_IVANOV);
+    const td = cell(r, "login").closest("td");
+    expect(cell(r, "email").closest("td")).toBe(td);
+    expect(cell(r, "origin").closest("td")).toBe(td);
+    expect(cell(r, "login").textContent).toBe("ivanov");
+    expect(cell(r, "email").getAttribute("data-label")).toBe(ru["admin.users.email_column"]);
+    expect(cell(r, "origin").getAttribute("data-label")).toBe(ru["admin.users.origin_column"]);
+  });
+
+  it("role_controls_sit_with_name_and_status_not_in_actions_column", async () => {
+    const { container } = await open({}, CAPS_ALL);
+    const r = row(container, ID_IVANOV);
+    const select = r.querySelector<HTMLSelectElement>('select[name="role"]');
+    if (select === null) throw new Error("no role select");
+    expect(select.closest(".ui-users-table__actions")).toBeNull();
+    expect(select.closest(".ui-users-table__person")).toBeTruthy();
+    expect(action(r, "set-role").closest(".ui-users-table__person")).toBeTruthy();
+    expect(select.closest("[data-label]")?.getAttribute("data-label")).toBe(ru["admin.users.col_role"]);
+  });
+
+  it("name_and_status_fields_carry_labels_for_the_360px_cards", async () => {
+    const { container } = await open({
+      [LIST]: () => j(200, page([{ ...U_IVANOV, first_name: "Ivan", last_name: "Ivanov" }])),
+    });
+    const r = row(container, ID_IVANOV);
+    expect(cell(r, "first_name").getAttribute("data-label")).toBe(ru["admin.users.first_name_column"]);
+    expect(cell(r, "last_name").getAttribute("data-label")).toBe(ru["admin.users.last_name_column"]);
+    expect(cell(r, "status").getAttribute("data-label")).toBe(ru["admin.users.col_status"]);
   });
 });

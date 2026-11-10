@@ -479,7 +479,10 @@ export function CreateTaskDialog({
   const taskFields = (
     <>
       <div className="ui-field">
-        <label htmlFor={`${id}-title-input`}>{t("tasks.title_label")}</label>
+        <label htmlFor={`${id}-title-input`}>
+          {t("tasks.title_label")}
+          <RequiredMark />
+        </label>
         <input
           id={`${id}-title-input`}
           ref={titleRef}

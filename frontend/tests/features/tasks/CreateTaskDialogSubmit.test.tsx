@@ -44,7 +44,7 @@ import {
 
 const dialog = () => screen.getByRole("dialog");
 const projectSelect = () => within(dialog()).getByLabelText(ru["tasks.project_label"]) as HTMLSelectElement;
-const titleInput = () => within(dialog()).getByLabelText(ru["tasks.title_label"]) as HTMLInputElement;
+const titleInput = () => within(dialog()).getByLabelText(exactLabel(ru["tasks.title_label"])) as HTMLInputElement;
 const submitBtn = () =>
   within(dialog()).getByRole("button", { name: ru["tasks.create_submit"] }) as HTMLButtonElement;
 const cancelBtn = () => within(dialog()).getByRole("button", { name: ru["admin.cancel"] }) as HTMLButtonElement;
