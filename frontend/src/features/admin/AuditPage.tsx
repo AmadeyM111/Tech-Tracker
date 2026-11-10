@@ -264,12 +264,15 @@ export function AuditPage() {
         </>
       )}
 
-      <Pagination
-        page={page}
-        hasNext={data?.has_next ?? false}
-        busy={audit.isPlaceholderData}
-        onPage={setPage}
-      />
+      {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
+      {page > 1 || ((data?.items.length ?? 0) > 0 && (data?.has_next ?? false)) ? (
+        <Pagination
+          page={page}
+          hasNext={data?.has_next ?? false}
+          busy={audit.isPlaceholderData}
+          onPage={setPage}
+        />
+      ) : null}
     </section>
   );
 }

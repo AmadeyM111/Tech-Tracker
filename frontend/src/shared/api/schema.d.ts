@@ -74,6 +74,12 @@ export interface paths {
         /**
          * List Users
          * @description Страница учётных записей пространства: ``login ASC, id ASC`` (D-34).
+         *
+         *     ``q`` — поиск по логину, имени, фамилии и email; ``total`` — всего найдено (все страницы).
+         *
+         *     Исключение из D-34 только для этого списка (решение 2026-11-10,
+         *     ``specs/001-pilot-r1/plan.md``, D-34a): учётных записей в пространстве десятки,
+         *     поэтому ``total`` считается отдельным COUNT.
          */
         get: operations["list_users"];
         put?: never;
@@ -1213,6 +1219,22 @@ export interface components {
             self_registered: boolean;
         };
         /**
+         * AdminUserPage
+         * @description Страница ``GET /admin/users``; ``total`` — все записи под ``q``, не размер страницы.
+         */
+        AdminUserPage: {
+            /** Has Next */
+            has_next: boolean;
+            /** Items */
+            items: components["schemas"]["AdminUser"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /**
          * AttachmentOut
          * @description Вложение задачи: метаданные и права; путь хранения не отдаётся.
          */
@@ -1657,17 +1679,6 @@ export interface components {
             has_next: boolean;
             /** Items */
             items: components["schemas"]["ActivityItem"][];
-            /** Page */
-            page: number;
-            /** Page Size */
-            page_size: number;
-        };
-        /** Page[AdminUser] */
-        Page_AdminUser_: {
-            /** Has Next */
-            has_next: boolean;
-            /** Items */
-            items: components["schemas"]["AdminUser"][];
             /** Page */
             page: number;
             /** Page Size */
@@ -2445,6 +2456,7 @@ export interface operations {
             query?: {
                 page?: number;
                 page_size?: number;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -2458,7 +2470,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_AdminUser_"];
+                    "application/json": components["schemas"]["AdminUserPage"];
                 };
             };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */

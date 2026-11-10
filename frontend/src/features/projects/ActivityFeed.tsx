@@ -145,12 +145,15 @@ export function ActivityFeed({ projectId }: { projectId: string }) {
           ))}
         </ol>
       )}
-      <Pagination
-        page={page}
-        hasNext={feed.data.has_next}
-        busy={feed.isFetching}
-        onPage={setPage}
-      />
+      {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
+      {page > 1 || (items.length > 0 && feed.data.has_next) ? (
+        <Pagination
+          page={page}
+          hasNext={feed.data.has_next}
+          busy={feed.isFetching}
+          onPage={setPage}
+        />
+      ) : null}
     </section>
   );
 }

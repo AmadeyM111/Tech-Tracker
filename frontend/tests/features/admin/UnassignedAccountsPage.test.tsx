@@ -181,3 +181,20 @@ describe("019 AC-26 / AC-30 access by capability onboard_accounts", () => {
     expect(f.count(ME)).toBe(1);
   });
 });
+
+// Аудит #9: пустой список первой страницы - без пагинации; непустой - с пагинацией.
+describe("пагинация неназначенных учётных записей при пустом списке (аудит #9)", () => {
+  it("empty_first_page_has_no_pagination", async () => {
+    setup({ [LIST]: () => j(200, page([])) });
+    const { container } = renderApp("/unassigned-accounts");
+    expect(await screen.findByText(ru["accounts.unassigned_empty"])).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+    expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
+  });
+
+  it("non_empty_list_single_page_hides_pagination", async () => {
+    const { container } = await open();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+  });
+});

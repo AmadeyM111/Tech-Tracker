@@ -9,15 +9,25 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from app.api.v1.schemas.auth import MAX_CREDENTIAL_LENGTH, Password
+from app.core.pagination import Page, PageParams
 from app.domain.access.roles import Role
 
 EMAIL_MAX_LENGTH = 254
+# Поиск по учётным записям: длина после обрезки краёв пробелов не больше 100 (422 иначе).
+ACCOUNT_SEARCH_MAX_LENGTH = 100
+
+
+def _trim_or_none(value: Any) -> Any:
+    """Края обрезаются по пробелам; пустая строка после обрезки — ``None`` (без фильтра)."""
+    if isinstance(value, str):
+        return value.strip() or None
+    return value
 
 
 class AdminUser(BaseModel):
@@ -35,6 +45,24 @@ class AdminUser(BaseModel):
     first_name: str | None
     last_name: str | None
     self_registered: bool
+
+
+class AdminUserPage(Page[AdminUser]):
+    """Страница ``GET /admin/users``; ``total`` — все записи под ``q``, не размер страницы."""
+
+    total: int
+
+
+class AccountListQuery(PageParams):
+    """``?q&page&page_size`` списка учётных записей; ``q`` без учёта регистра по логину, имени,
+    фамилии и email."""
+
+    # Fail Fast: длина <= 100 после обрезки и без NUL (PostgreSQL не принимает \x00) -> 422.
+    # Ограничения стоят внутри str: снаружи они задели бы None (пустой q после обрезки).
+    q: Annotated[
+        Annotated[str, Field(max_length=ACCOUNT_SEARCH_MAX_LENGTH, pattern=r"^[^\x00]*$")] | None,
+        BeforeValidator(_trim_or_none),
+    ] = None
 
 
 class CreateUserRequest(BaseModel):

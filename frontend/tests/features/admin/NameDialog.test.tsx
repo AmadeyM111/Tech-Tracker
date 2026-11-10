@@ -101,28 +101,42 @@ describe("NameDialog (019, R8-T20)", () => {
     expect(f.count(NAME_PUT)).toBe(0);
   });
 
+  // P2 (PR #29 design review): an empty name shows «Введите имя» / «Введите фамилию» under its own field.
   it.each([
-    ["first", "   ", "Ivanov", "first_name_invalid"],
-    ["last", "Ivan", "", "last_name_invalid"],
-  ])("019_ac35_empty_%s_name_sends_nothing_and_stays_open", async (_n, first, last, code) => {
-    const { dialog } = await openDialog();
-    fireEvent.change(field(dialog, ru["admin.users.first_name_label"]), { target: { value: first } });
-    fireEvent.change(field(dialog, ru["admin.users.last_name_label"]), { target: { value: last } });
-    fireEvent.click(within(dialog).getByRole("button", { name: ru["admin.users.name_save"] }));
-    const alert = await within(dialog).findByRole("alert");
-    expect(alert.textContent).toBe(errorMessage(code));
-    expect(f.count(NAME_PUT)).toBe(0);
-    expect(screen.queryByRole("dialog")).toBe(dialog);
-  });
-
-  it.each([["first_name_invalid"], ["last_name_invalid"]])(
-    "019_ac35_server_%s_is_shown_in_dialog_which_stays_open",
-    async (code) => {
-      const { dialog } = await openDialog(() => err(422, code));
+    ["first", "   ", "Ivanov", "admin.users.first_name_label", "admin.users.first_name_required"],
+    ["last", "Ivan", "", "admin.users.last_name_label", "admin.users.last_name_required"],
+  ] as const)(
+    "019_ac35_empty_%s_name_is_under_its_field_and_sends_nothing",
+    async (_n, first, last, labelKey, textKey) => {
+      const { dialog } = await openDialog();
+      fireEvent.change(field(dialog, ru["admin.users.first_name_label"]), { target: { value: first } });
+      fireEvent.change(field(dialog, ru["admin.users.last_name_label"]), { target: { value: last } });
       fireEvent.click(within(dialog).getByRole("button", { name: ru["admin.users.name_save"] }));
-      const alert = await within(dialog).findByRole("alert");
-      expect(alert.textContent).toBe(errorMessage(code));
+      const input = field(dialog, ru[labelKey]);
+      const error = (await within(dialog).findByText(ru[textKey])).closest<HTMLElement>(".ui-field-error");
+      expect(error?.getAttribute("role")).toBe("alert");
+      expect(input.closest(".ui-field")?.contains(error)).toBe(true);
+      expect(input.getAttribute("aria-invalid")).toBe("true");
+      expect(input.getAttribute("aria-describedby")?.split(" ")).toContain(error?.id);
+      expect(document.activeElement).toBe(input);
+      expect(f.count(NAME_PUT)).toBe(0);
       expect(screen.queryByRole("dialog")).toBe(dialog);
     },
   );
+
+  // Server codes of the name fields: the rule text goes under the field it refers to, not into a general block.
+  it.each([
+    ["first_name_invalid", "admin.users.first_name_label"],
+    ["last_name_invalid", "admin.users.last_name_label"],
+  ] as const)("019_ac35_server_%s_is_under_its_field_and_dialog_stays_open", async (code, labelKey) => {
+    const { dialog } = await openDialog(() => err(422, code));
+    fireEvent.click(within(dialog).getByRole("button", { name: ru["admin.users.name_save"] }));
+    const error = (await within(dialog).findByText(errorMessage(code))).closest<HTMLElement>(".ui-field-error");
+    const input = field(dialog, ru[labelKey]);
+    expect(input.closest(".ui-field")?.contains(error)).toBe(true);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(within(dialog).queryByRole("alert")).toBe(error);
+    expect(document.activeElement).toBe(input);
+    expect(screen.queryByRole("dialog")).toBe(dialog);
+  });
 });

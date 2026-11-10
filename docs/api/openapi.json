@@ -254,6 +254,43 @@
         "title": "AdminUser",
         "type": "object"
       },
+      "AdminUserPage": {
+        "description": "Страница ``GET /admin/users``; ``total`` — все записи под ``q``, не размер страницы.",
+        "properties": {
+          "has_next": {
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "has_next",
+          "total"
+        ],
+        "title": "AdminUserPage",
+        "type": "object"
+      },
       "AttachmentOut": {
         "description": "Вложение задачи: метаданные и права; путь хранения не отдаётся.",
         "properties": {
@@ -1428,37 +1465,6 @@
           "has_next"
         ],
         "title": "Page[ActivityItem]",
-        "type": "object"
-      },
-      "Page_AdminUser_": {
-        "properties": {
-          "has_next": {
-            "title": "Has Next",
-            "type": "boolean"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/AdminUser"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "page": {
-            "title": "Page",
-            "type": "integer"
-          },
-          "page_size": {
-            "title": "Page Size",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "items",
-          "page",
-          "page_size",
-          "has_next"
-        ],
-        "title": "Page[AdminUser]",
         "type": "object"
       },
       "Page_AttachmentOut_": {
@@ -3133,7 +3139,7 @@
     },
     "/api/v1/admin/users": {
       "get": {
-        "description": "Страница учётных записей пространства: ``login ASC, id ASC`` (D-34).",
+        "description": "Страница учётных записей пространства: ``login ASC, id ASC`` (D-34).\n\n``q`` — поиск по логину, имени, фамилии и email; ``total`` — всего найдено (все страницы).\n\nИсключение из D-34 только для этого списка (решение 2026-11-10,\n``specs/001-pilot-r1/plan.md``, D-34a): учётных записей в пространстве десятки,\nпоэтому ``total`` считается отдельным COUNT.",
         "operationId": "list_users",
         "parameters": [
           {
@@ -3159,6 +3165,24 @@
               "title": "Page Size",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "pattern": "^[^\\x00]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
           }
         ],
         "responses": {
@@ -3166,7 +3190,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_AdminUser_"
+                  "$ref": "#/components/schemas/AdminUserPage"
                 }
               }
             },

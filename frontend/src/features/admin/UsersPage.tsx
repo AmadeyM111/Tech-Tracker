@@ -27,6 +27,8 @@ import { NameDialog } from "./NameDialog";
 
 const USERS_KEY = ["admin", "users"] as const;
 const ROLES: readonly Role[] = ["tech_admin", "business_admin", "user"];
+// Поиск применяется через 300 мс после последнего символа; Enter и «Сбросить» - сразу.
+const SEARCH_DEBOUNCE_MS = 300;
 
 type Confirmation =
   | { kind: "block" | "reset" | "revoke" | "remove_role"; user: AdminUser };
@@ -226,6 +228,9 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
   const alert = useAlertState();
   const busy = useRef(false);
   const [page, setPage] = useState(1);
+  // `search` - что введено в поле; `query` - что применено к списку (обрезано по краям).
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
   const [login, setLogin] = useState("");
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -243,8 +248,8 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
   const restoreRow = useRef<string | null>(null);
 
   const users = useQuery({
-    queryKey: [...USERS_KEY, page],
-    queryFn: () => listUsers({ page }),
+    queryKey: [...USERS_KEY, page, query],
+    queryFn: () => listUsers({ page, q: query }),
     placeholderData: keepPreviousData,
     retry: false,
   });
@@ -252,6 +257,17 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
   useEffect(() => {
     if (shown !== null) shownRef.current?.focus();
   }, [shown]);
+
+  // Отложенное применение ввода: новый символ отменяет предыдущий таймер.
+  useEffect(() => {
+    const next = search.trim();
+    if (next === query) return;
+    const timer = setTimeout(() => {
+      setQuery(next);
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [search, query]);
 
   // The controls are disabled while an action runs, which drops the focus to
   // <body>; when they come back, the focus returns to the same row (or the table).
@@ -355,6 +371,21 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
     setPage(next);
   }
 
+  // Enter в поле поиска применяет запрос сразу, без задержки.
+  function onSearchSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    alert.clear();
+    setQuery(search.trim());
+    setPage(1);
+  }
+
+  function resetSearch(): void {
+    alert.clear();
+    setSearch("");
+    setQuery("");
+    setPage(1);
+  }
+
   const listError =
     users.isError && alert.message === null
       ? errorMessage(users.error instanceof ApiError ? users.error.code : "unknown")
@@ -421,12 +452,45 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
         </button>
       </form>
 
+      <form
+        className="ui-accounts-search"
+        role="search"
+        aria-label={t("admin.users.search_form_aria")}
+        onSubmit={onSearchSubmit}
+      >
+        <TextField
+          type="search"
+          label={t("admin.users.search_label")}
+          name="q"
+          value={search}
+          onChange={setSearch}
+          autoComplete="off"
+        />
+        <button type="button" onClick={resetSearch}>
+          {t("admin.users.search_reset")}
+        </button>
+      </form>
+      {query !== "" && data !== undefined && data.items.length > 0 ? (
+        <p role="status" className="ui-search-count" data-field="search-count">
+          {t("admin.users.search_count", { count: data.total })}
+        </p>
+      ) : null}
+
       {data === undefined ? (
         users.isPending ? (
           <p role="status">{t("admin.loading")}</p>
         ) : null
       ) : data.items.length === 0 ? (
-        <p role="status">{t("admin.users.empty")}</p>
+        query === "" ? (
+          <p role="status">{t("admin.users.empty")}</p>
+        ) : (
+          <div data-field="search-none">
+            <p role="status" className="ui-search-count">
+              {t("admin.users.search_none")}
+            </p>
+            <p className="ui-hint">{t("admin.users.search_none_hint")}</p>
+          </div>
+        )
       ) : (
         <table
           className="ui-table ui-users-table"
@@ -478,12 +542,15 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
         </table>
       )}
 
-      <Pagination
-        page={page}
-        hasNext={data?.has_next ?? false}
-        busy={users.isPlaceholderData || pending}
-        onPage={changePage}
-      />
+      {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
+      {page > 1 || ((data?.items.length ?? 0) > 0 && (data?.has_next ?? false)) ? (
+        <Pagination
+          page={page}
+          hasNext={data?.has_next ?? false}
+          busy={users.isPlaceholderData || pending}
+          onPage={changePage}
+        />
+      ) : null}
 
       {emailUser === null ? null : (
         <EmailDialog
