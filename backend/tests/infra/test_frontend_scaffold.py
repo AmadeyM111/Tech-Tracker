@@ -251,6 +251,7 @@ def test_t21_src_files_only_expected() -> None:
         # T24
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
         "features/admin/password.ts", "features/admin/EmailDialog.tsx",
+        "features/admin/audit.css",  # P2: журнал аудита, карточки на 360 px
         # 008 «Сводка»
         "features/overview/SummaryPage.tsx", "features/overview/api.ts",
         "features/overview/filters.ts", "features/overview/summary.css",

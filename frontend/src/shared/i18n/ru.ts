@@ -130,7 +130,7 @@ export const ru = {
   "admin.audit.filters_title": "Фильтры",
   "admin.audit.entity_type_label": "Тип объекта",
   "admin.audit.entity_any": "Любой",
-  "admin.audit.actor_label": "Идентификатор автора (UUID)",
+  "admin.audit.actor_label": "Учётная запись (логин)",
   "admin.audit.apply": "Применить",
   "admin.audit.reset": "Сбросить фильтры",
   "admin.audit.list_label": "Записи журнала",

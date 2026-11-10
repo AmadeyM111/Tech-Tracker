@@ -1,0 +1,68 @@
+.audit-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 12px 16px;
+  align-items: end;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.audit-filters .ui-field {
+  margin: 0;
+}
+.audit-filters select,
+.audit-filters input {
+  width: 100%;
+  min-height: 44px;
+}
+.audit-filters button {
+  min-height: 44px;
+  padding: 8px 14px;
+}
+.audit-id summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--accent);
+}
+.audit-uuid {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.audit-cards {
+  display: none;
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.audit-cards li {
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.audit-cards .c-title {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.audit-cards .c-meta {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 719px) {
+  .audit-table-wrap {
+    display: none;
+  }
+  .audit-cards {
+    display: block;
+  }
+}

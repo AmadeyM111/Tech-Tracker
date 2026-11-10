@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * List Audit
-         * @description Страница журнала пространства: ``id DESC``, фильтры ``entity_type`` и ``actor_id``.
+         * @description Страница журнала: ``id DESC``, фильтры ``entity_type``, ``actor_id``, ``actor_login``.
          */
         get: operations["list_audit"];
         put?: never;
@@ -2250,6 +2250,7 @@ export interface operations {
                 page_size?: number;
                 entity_type?: components["schemas"]["EntityType"] | null;
                 actor_id?: string | null;
+                actor_login?: string | null;
             };
             header?: never;
             path?: never;

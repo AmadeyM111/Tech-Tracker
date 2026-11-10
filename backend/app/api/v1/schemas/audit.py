@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.pagination import PageParams
 from app.domain.events.catalog import EntityType
@@ -40,7 +40,9 @@ class AuditEntry(BaseModel):
 
 
 class AuditListQuery(PageParams):
-    """``?page&page_size&entity_type&actor_id``: одна модель параметров запроса."""
+    """``?page&page_size&entity_type&actor_id&actor_login``: одна модель параметров запроса."""
 
     entity_type: EntityType | None = None
     actor_id: UUID | None = None
+    # Логин автора (начало логина, без учёта регистра); пустая строка = без фильтра.
+    actor_login: str | None = Field(default=None, max_length=64)
