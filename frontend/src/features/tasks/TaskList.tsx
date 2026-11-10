@@ -14,6 +14,7 @@ import {
   type TaskStatus,
 } from "./api";
 import { CreateTaskForm } from "./CreateTaskForm";
+import "./tasks.css";
 
 const STATUSES: readonly TaskStatus[] = ["todo", "in_progress", "review", "done"];
 const YMD = /^(\d{4})-(\d{2})-(\d{2})/;
@@ -29,7 +30,48 @@ function codeOf(e: unknown): string {
   return typeof code === "string" ? code : "unknown";
 }
 
+function dueText(task: TaskListItem) {
+  return task.due_date === null ? (
+    t("tasks.due_none")
+  ) : (
+    <time dateTime={task.due_date}>{formatDate(task.due_date)}</time>
+  );
+}
+
+// Below 720 px the table becomes cards (same data, no horizontal scroll).
+function TaskCards({ items, withProject }: { items: TaskListItem[]; withProject: boolean }) {
+  return (
+    <ul className="task-cards" aria-label={t("tasks.list_label")}>
+      {items.map((task) => (
+        <li key={task.id} data-card-id={task.id}>
+          <a className="c-title" href={`/tasks/${task.id}`}>
+            {task.title}
+          </a>
+          <span className="c-meta">
+            {withProject ? `${task.project.name} · ` : ""}
+            {t(`tasks.status.${task.status}`)} · {t(`tasks.priority.${task.priority}`)}
+          </span>
+          <span className="c-meta">
+            {task.assignee === null ? t("tasks.assignee_none") : task.assignee.login} · {dueText(task)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function TaskTable({ items, withProject }: { items: TaskListItem[]; withProject: boolean }) {
+  return (
+    <>
+      <div className="task-table-wrap">
+        <TaskTableBody items={items} withProject={withProject} />
+      </div>
+      <TaskCards items={items} withProject={withProject} />
+    </>
+  );
+}
+
+function TaskTableBody({ items, withProject }: { items: TaskListItem[]; withProject: boolean }) {
   return (
     <table className="ui-table" aria-label={t("tasks.list_label")}>
       <thead>
@@ -56,13 +98,7 @@ function TaskTable({ items, withProject }: { items: TaskListItem[]; withProject:
             <td data-field="status">{t(`tasks.status.${task.status}`)}</td>
             <td data-field="priority">{t(`tasks.priority.${task.priority}`)}</td>
             <td data-field="assignee">{task.assignee === null ? t("tasks.assignee_none") : task.assignee.login}</td>
-            <td data-field="due_date">
-              {task.due_date === null ? (
-                t("tasks.due_none")
-              ) : (
-                <time dateTime={task.due_date}>{formatDate(task.due_date)}</time>
-              )}
-            </td>
+            <td data-field="due_date">{dueText(task)}</td>
           </tr>
         ))}
       </tbody>

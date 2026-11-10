@@ -1,5 +1,5 @@
 // T91 (3): клиентский фильтр доски по исполнителю. Контракт - в шапке ./helpers.
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -86,6 +86,25 @@ describe("T91 assignee filter", () => {
     expect(idsIn(container, "in_progress")).toEqual([]);
     expect(empty(container, "in_progress")).toBe(true);
     expect(idsIn(container, "done")).toEqual([TE]);
+  });
+
+  it("p2_priority_filter_next_to_assignee_combines_with_it", async () => {
+    const { container } = await openBoard();
+    const prio = screen.getByRole("combobox", { name: "Приоритет" }) as HTMLSelectElement;
+    expect(Array.from(prio.options).map((o) => [o.value, o.textContent])).toEqual([
+      ["", "Все приоритеты"],
+      ["low", "Низкий"],
+      ["medium", "Средний"],
+      ["high", "Высокий"],
+    ]);
+    fireEvent.change(prio, { target: { value: "high" } });
+    await waitFor(() => expect(idsIn(container, "todo")).toEqual([TA]));
+    expect(idsIn(container, "in_progress")).toEqual([]);
+    pickFilter(R_ME.id); // исполнитель И приоритет: у R_ME нет задач высокого приоритета
+    await waitFor(() => expect(idsIn(container, "todo")).toEqual([]));
+    pickFilter("");
+    fireEvent.change(prio, { target: { value: "" } });
+    await waitFor(() => expect(idsIn(container, "todo")).toEqual([TA, TB, TC]));
   });
 
   it("t91_back_to_all_restores_every_card", async () => {
