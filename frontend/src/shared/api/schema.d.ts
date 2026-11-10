@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * List Audit
-         * @description Страница журнала пространства: ``id DESC``, фильтры ``entity_type`` и ``actor_id``.
+         * @description Страница журнала: ``id DESC``, фильтры ``entity_type``, ``actor_id``, ``actor_login``.
          */
         get: operations["list_audit"];
         put?: never;
@@ -441,11 +441,12 @@ export interface paths {
         put?: never;
         /**
          * Confirm Registration
-         * @description Подтверждение регистрации по ссылке; успех — 204 без тела и без cookie (AC-16).
+         * @description Подтверждение по ссылке; успех — 200 с логином учётной записи, без cookie (AC-16).
          *
          *     Неверная, просроченная или использованная ссылка и занятый адрес — 400
-         *     ``registration_token_invalid``. Занятый логин — 409 ``login_taken``. Сессия не создаётся:
-         *     вход отдельным действием.
+         *     ``registration_token_invalid``. Логин выбирает сервер (v0.5): занятый логин заявки заменяется
+         *     следующим свободным, поэтому 409 ``login_taken`` возможен только если заняты все попытки.
+         *     Сессия не создаётся: вход отдельным действием.
          */
         post: operations["confirm_registration"];
         delete?: never;
@@ -636,6 +637,26 @@ export interface paths {
          * @description Плитки «Сводки» по всем моим проектам; фильтров нет (Q-2).
          */
         get: operations["get_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/overview/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Overview Projects
+         * @description Мои проекты (владелец или участник) для фильтра по проекту, по имени.
+         */
+        get: operations["list_overview_projects"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1579,6 +1600,14 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * OverviewProjectList
+         * @description Мои проекты для фильтра «Сводки» (без постраничности, по имени).
+         */
+        OverviewProjectList: {
+            /** Items */
+            items: components["schemas"]["ProjectRef"][];
+        };
         /** OverviewTaskItem */
         OverviewTaskItem: {
             assignee: components["schemas"]["UserRef"] | null;
@@ -1886,6 +1915,14 @@ export interface components {
             token: string;
         };
         /**
+         * RegistrationConfirmed
+         * @description Ответ подтверждения (200, v0.5): логин учётной записи. Сессии и cookie нет (AC-16).
+         */
+        RegistrationConfirmed: {
+            /** Login */
+            login: string;
+        };
+        /**
          * RegistrationRequest
          * @description ``POST /auth/registration/request``: заявка на регистрацию (FR-3).
          */
@@ -1896,8 +1933,11 @@ export interface components {
             first_name: string;
             /** Last Name */
             last_name: string;
-            /** Login */
-            login: string;
+            /**
+             * Login
+             * @deprecated
+             */
+            login?: string | null;
             /**
              * Password
              * Format: password
@@ -2248,6 +2288,7 @@ export interface operations {
                 page_size?: number;
                 entity_type?: components["schemas"]["EntityType"] | null;
                 actor_id?: string | null;
+                actor_login?: string | null;
             };
             header?: never;
             path?: never;
@@ -3446,11 +3487,13 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RegistrationConfirmed"];
+                };
             };
             /** @description Некорректный JSON в теле запроса (code: bad_request) */
             400: {
@@ -3479,7 +3522,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Логин занят учётной записью (code: login_taken) */
+            /** @description Все логины заняты, учётная запись не создана (code: login_taken) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3995,6 +4038,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OverviewCountsOut"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_overview_projects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewProjectList"];
                 };
             };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */

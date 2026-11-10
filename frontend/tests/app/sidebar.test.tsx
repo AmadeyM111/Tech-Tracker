@@ -230,7 +230,8 @@ describe("AC-30 tab order of the U /my-tasks screen (004/AC-12)", () => {
     // непустой список задач: после меню есть первый элемент содержимого (ссылка на задачу)
     setup("user", { "GET /api/v1/me/tasks": () => j(200, page([taskItem(TID1, "Подготовить отчёт")])) });
     const { container } = await openMenu("/my-tasks");
-    const taskLink = await screen.findByRole("link", { name: "Подготовить отчёт" });
+    // таблица и карточки (360 px) есть в DOM одновременно; CSS прячет лишнее, первая ссылка - таблица
+    const taskLink = (await screen.findAllByRole("link", { name: "Подготовить отчёт" }))[0]!;
     const tabbable = Array.from(
       container.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);

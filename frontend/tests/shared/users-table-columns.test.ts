@@ -110,3 +110,12 @@ describe("users accounts table: compact row and 360 px cards (UX-audit P1)", () 
     expect(rule(".ui-table td")["display"]).toBeUndefined();
   });
 });
+
+// PR #26 design check (P2/P3): one name placeholder, role select fits 360 px, no duplicate e-mail label.
+describe("accounts table after the PR #26 check", () => {
+  it("the role select can shrink to the card width on 360 px", () => {
+    const mobile = /@media \(max-width: 719px\)\s*\{([\s\S]*)\}\s*$/.exec(css) ?? /@media \(max-width: 719px\)\s*\{([\s\S]*?)\n\}/.exec(css);
+    expect(mobile).not.toBeNull();
+    expect(mobile![1]).toMatch(/\.ui-users-table__role select\s*\{[^}]*max-width:\s*100%/);
+  });
+});

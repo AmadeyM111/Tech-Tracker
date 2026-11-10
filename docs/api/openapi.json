@@ -1293,6 +1293,23 @@
         "title": "OverviewCountsOut",
         "type": "object"
       },
+      "OverviewProjectList": {
+        "description": "Мои проекты для фильтра «Сводки» (без постраничности, по имени).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectRef"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "OverviewProjectList",
+        "type": "object"
+      },
       "OverviewTaskItem": {
         "properties": {
           "assignee": {
@@ -2004,6 +2021,20 @@
         "title": "RegistrationConfirm",
         "type": "object"
       },
+      "RegistrationConfirmed": {
+        "description": "Ответ подтверждения (200, v0.5): логин учётной записи. Сессии и cookie нет (AC-16).",
+        "properties": {
+          "login": {
+            "title": "Login",
+            "type": "string"
+          }
+        },
+        "required": [
+          "login"
+        ],
+        "title": "RegistrationConfirmed",
+        "type": "object"
+      },
       "RegistrationRequest": {
         "additionalProperties": false,
         "description": "``POST /auth/registration/request``: заявка на регистрацию (FR-3).",
@@ -2024,9 +2055,17 @@
             "type": "string"
           },
           "login": {
-            "maxLength": 1024,
-            "title": "Login",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "title": "Login"
           },
           "password": {
             "format": "password",
@@ -2040,7 +2079,6 @@
           "email",
           "first_name",
           "last_name",
-          "login",
           "password"
         ],
         "title": "RegistrationRequest",
@@ -2857,7 +2895,7 @@
   "paths": {
     "/api/v1/admin/audit": {
       "get": {
-        "description": "Страница журнала пространства: ``id DESC``, фильтры ``entity_type`` и ``actor_id``.",
+        "description": "Страница журнала: ``id DESC``, фильтры ``entity_type``, ``actor_id``, ``actor_login``.",
         "operationId": "list_audit",
         "parameters": [
           {
@@ -2915,6 +2953,23 @@
                 }
               ],
               "title": "Actor Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_login",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Login"
             }
           }
         ],
@@ -4381,7 +4436,7 @@
     },
     "/api/v1/auth/registration/confirm": {
       "post": {
-        "description": "Подтверждение регистрации по ссылке; успех — 204 без тела и без cookie (AC-16).\n\nНеверная, просроченная или использованная ссылка и занятый адрес — 400\n``registration_token_invalid``. Занятый логин — 409 ``login_taken``. Сессия не создаётся:\nвход отдельным действием.",
+        "description": "Подтверждение по ссылке; успех — 200 с логином учётной записи, без cookie (AC-16).\n\nНеверная, просроченная или использованная ссылка и занятый адрес — 400\n``registration_token_invalid``. Логин выбирает сервер (v0.5): занятый логин заявки заменяется\nследующим свободным, поэтому 409 ``login_taken`` возможен только если заняты все попытки.\nСессия не создаётся: вход отдельным действием.",
         "operationId": "confirm_registration",
         "requestBody": {
           "content": {
@@ -4394,7 +4449,14 @@
           "required": true
         },
         "responses": {
-          "204": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationConfirmed"
+                }
+              }
+            },
             "description": "Successful Response"
           },
           "400": {
@@ -4435,7 +4497,7 @@
                 }
               }
             },
-            "description": "Логин занят учётной записью (code: login_taken)"
+            "description": "Все логины заняты, учётная запись не создана (code: login_taken)"
           },
           "422": {
             "content": {
@@ -5074,6 +5136,48 @@
           }
         },
         "summary": "Get Overview",
+        "tags": [
+          "overview"
+        ]
+      }
+    },
+    "/api/v1/me/overview/projects": {
+      "get": {
+        "description": "Мои проекты (владелец или участник) для фильтра по проекту, по имени.",
+        "operationId": "list_overview_projects",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewProjectList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          }
+        },
+        "summary": "List Overview Projects",
         "tags": [
           "overview"
         ]

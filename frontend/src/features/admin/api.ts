@@ -27,7 +27,7 @@ export interface PageParams {
 
 export interface AuditParams extends PageParams {
   entityType?: EntityType;
-  actorId?: string;
+  actorLogin?: string;
 }
 
 function invalidBody(status: number): ApiError {
@@ -131,12 +131,12 @@ export async function assignUserRole(id: string): Promise<void> {
 }
 
 export async function listAudit(p: AuditParams): Promise<Page<AuditEntry>> {
-  const query: { page: number; page_size?: number; entity_type?: EntityType; actor_id?: string } = {
+  const query: { page: number; page_size?: number; entity_type?: EntityType; actor_login?: string } = {
     page: p.page,
   };
   if (p.pageSize !== undefined) query.page_size = p.pageSize;
   if (p.entityType !== undefined) query.entity_type = p.entityType;
-  if (p.actorId !== undefined) query.actor_id = p.actorId;
+  if (p.actorLogin !== undefined) query.actor_login = p.actorLogin;
   const { data } = await getAppClient().GET("/api/v1/admin/audit", { params: { query } });
   if (data === undefined) throw invalidBody(200);
   return data;

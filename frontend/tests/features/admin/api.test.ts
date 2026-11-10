@@ -109,9 +109,9 @@ describe("admin api (T24)", () => {
     expect(q(calls[0]!).get("page")).toBe("3");
     expect(q(calls[0]!).has("entity_type")).toBe(false);
     expect(q(calls[0]!).has("actor_id")).toBe(false);
-    await listAudit({ page: 1, entityType: "deal", actorId: ID_IVANOV });
+    await listAudit({ page: 1, entityType: "deal", actorLogin: "demo.ba1" });
     expect(q(calls[1]!).get("entity_type")).toBe("deal");
-    expect(q(calls[1]!).get("actor_id")).toBe(ID_IVANOV);
+    expect(q(calls[1]!).get("actor_login")).toBe("demo.ba1");
   });
 
   it("errors_reject_with_api_error_code_and_status", async () => {

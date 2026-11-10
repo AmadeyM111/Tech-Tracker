@@ -53,7 +53,8 @@ ACCEPTED = {
 EMAIL = "zinaida.mark.4e8b@example.test"
 FIRST = "Зинаида"
 LAST = "Фотиева-Лейкова"
-LOGIN = "Leak.Probe.9f2e"
+# Логин, который сервер выбирает для FIRST и LAST (v0.5): фотиева-лейкова, зинаида.
+LOGIN = "fotieva-leikova.zinaida"
 PW = "Zq7-leak-probe-9f2e-pw"
 NEW_PW = "Qw8-reset-probe-4c1d-pw"
 WRONG_PW = "Wr0ng-probe-7a7a-pw"
@@ -141,7 +142,7 @@ async def reg_ws(reset_api_env: ApiEnv) -> WorkspaceRow:
 
 
 def _body() -> dict[str, Any]:
-    return {"email": EMAIL, "first_name": FIRST, "last_name": LAST, "login": LOGIN, "password": PW}
+    return {"email": EMAIL, "first_name": FIRST, "last_name": LAST, "password": PW}
 
 
 def _last_mail(env: ApiEnv) -> Any:
@@ -223,7 +224,7 @@ async def _run_scenario(env: ApiEnv, ws: WorkspaceRow) -> Scenario:
 
     # 4. подтверждение по ссылке из письма
     confirmed = keep(await env.client.post(CONFIRM, json={"token": registration_token}))
-    assert confirmed.status_code == 204
+    assert (confirmed.status_code, confirmed.json()) == (200, {"login": LOGIN})
     rows = await env.execute(
         text(
             "SELECT id, login_display, first_name, last_name, self_registered, "
@@ -358,7 +359,11 @@ async def test_019_scenario_api_responses_have_no_token_hash_or_key_hash(
         keys = _json_keys(response.json()) if response.content else set()
         assert not sorted(keys & FORBIDDEN_KEYS), where
         if path in PUBLIC_PATHS:
-            _assert_no_markers(_visible(response), scenario.personal, where)
+            # v0.5: подтверждение называет логин владельцу ссылки; email и имя в публичных — нет
+            personal = {k: v for k, v in scenario.personal.items() if "логин" not in k}
+            if path != CONFIRM:
+                personal = scenario.personal
+            _assert_no_markers(_visible(response), personal, where)
         if path == UNASSIGNED:
             _assert_no_markers(_visible(response), {"email": EMAIL}, where)
             assert all("email" not in item for item in response.json()["items"]), where

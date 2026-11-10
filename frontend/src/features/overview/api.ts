@@ -7,6 +7,7 @@ import type { SummaryFilters } from "./filters";
 export type OverviewCounts = components["schemas"]["OverviewCountsOut"];
 export type OverviewTaskPage = components["schemas"]["OverviewTaskPage"];
 export type OverviewTaskItem = components["schemas"]["OverviewTaskItem"];
+export type OverviewProjectList = components["schemas"]["OverviewProjectList"];
 
 export const PAGE_SIZE = 50;
 
@@ -19,6 +20,13 @@ export async function getOverview(options: ReadOptions = {}): Promise<OverviewCo
     headers: options.headers,
     signal: options.signal,
   });
+  if (data === undefined) throw invalidBody(200);
+  return data;
+}
+
+/** My projects (owner or member) for the project filter: no paging, by name. */
+export async function listOverviewProjects(): Promise<OverviewProjectList> {
+  const { data } = await getAppClient().GET("/api/v1/me/overview/projects");
   if (data === undefined) throw invalidBody(200);
   return data;
 }

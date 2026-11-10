@@ -2,7 +2,8 @@
 
 Трассировка plan §6 на уровне HTTP: AC-1, AC-4…AC-16, AC-18, AC-27…AC-29, AC-38. Контракт:
 ``POST /api/v1/auth/registration/request`` -> 200 ``{"detail": FR-4}`` для любого корректно
-заполненного адреса; ``POST .../confirm`` -> 204 без тела и cookie. Без пространства или при
+заполненного адреса; ``POST .../confirm`` -> 200 ``{"login": ...}`` (логин выбирает сервер, v0.5),
+без cookie. Без пространства или при
 двух пространствах оба POST -> 404 ``feature_disabled`` (RG-9). SMTP всегда подменён
 (``RecordingMailer`` через ``reset_api_env``); при выключенной функции (``api_env``) писем нет.
 """
@@ -55,7 +56,7 @@ MAIL_SUBJECT = "Подтверждение регистрации"
 PW = "Zq7-registration-pw"  # 19 символов, не в списке частых
 FIRST = "Анна"
 LAST = "Петрова-Иванова"
-LOGIN = "anna.petrova"
+LOGIN = "petrova-ivanova.anna"  # логин, который сервер выбирает для FIRST и LAST (v0.5)
 
 
 def _body(email: str, **overrides: Any) -> dict[str, Any]:
@@ -63,7 +64,6 @@ def _body(email: str, **overrides: Any) -> dict[str, Any]:
         "email": email,
         "first_name": FIRST,
         "last_name": LAST,
-        "login": LOGIN,
         "password": PW,
     }
     values.update(overrides)
@@ -208,7 +208,7 @@ async def test_019_request_schema_and_json_errors(
     env = reset_api_env
     for body in (
         _body("a@example.test", extra=1),
-        {k: v for k, v in _body("a@example.test").items() if k != "login"},
+        {k: v for k, v in _body("a@example.test").items() if k != "email"},
         _body("a@example.test", password=5),
     ):
         response = await env.client.post(REQUEST, json=body)
@@ -529,7 +529,7 @@ async def test_019_ac9_second_request_revokes_first_token(
     stale = await _post_confirm(env, first)
     assert (stale.status_code, code_of(stale)) == (400, "registration_token_invalid")
     fresh = await _post_confirm(env, second)
-    assert fresh.status_code == 204
+    assert fresh.status_code == 200
     assert await _accounts(env, "twice@example.test") == 1
 
 
@@ -551,7 +551,7 @@ async def test_019_ac10_token_expires_after_30_minutes(
     token2 = _last_token(env)
     env.clock.advance(timedelta(minutes=29, seconds=59))
     in_time = await _post_confirm(env, token2)
-    assert in_time.status_code == 204
+    assert in_time.status_code == 200
     assert await _accounts(env, "exp2@example.test") == 1
 
 
@@ -584,12 +584,12 @@ async def test_019_ac12_unconfirmed_request_is_invisible_and_cannot_log_in(
 ) -> None:
     env = reset_api_env
     _, (ta_token,) = await seed(env, reg_ws, "tech_admin")
-    accepted = await env.client.post(REQUEST, json=_body("pending@example.test", login="newbie"))
+    accepted = await env.client.post(REQUEST, json=_body("pending@example.test"))
     assert (accepted.status_code, accepted.json()) == (200, ACCEPTED)
     listed = await env.client.get(ADMIN_USERS, headers=env.auth(ta_token))
     assert listed.status_code == 200
-    assert "newbie" not in [item["login"] for item in listed.json()["items"]]
-    login = await env.login("newbie", PW)
+    assert LOGIN not in [item["login"] for item in listed.json()["items"]]
+    login = await env.login(LOGIN, PW)
     assert (login.status_code, code_of(login)) == (401, "invalid_credentials")
 
 
@@ -601,11 +601,11 @@ async def test_019_ac13_confirm_creates_account_without_role_then_reset_works(
 ) -> None:
     env = reset_api_env
     address = "anna@example.test"
-    await env.client.post(REQUEST, json=_body(address, login="Anna.Petrova"))
+    await env.client.post(REQUEST, json=_body(address))
     token = _last_token(env)
     response = await _post_confirm(env, token)
-    assert response.status_code == 204
-    assert response.content == b""
+    assert response.status_code == 200
+    assert response.json() == {"login": LOGIN}
     assert "set-cookie" not in response.headers
 
     rows = await _rows(
@@ -616,7 +616,7 @@ async def test_019_ac13_confirm_creates_account_without_role_then_reset_works(
     )
     assert len(rows) == 1
     user_id, login, display, first, last, self_registered, must_change = rows[0]
-    assert (login, display) == ("anna.petrova", "Anna.Petrova")
+    assert (login, display) == (LOGIN, LOGIN)
     assert (first, last) == (FIRST, LAST)
     assert self_registered is True
     assert must_change is False
@@ -630,7 +630,9 @@ async def test_019_ac13_confirm_creates_account_without_role_then_reset_works(
     assert int(projects[0][0]) == 0
     assert await env.session_ids(user_id) == []
 
-    assert (await env.login("Anna.Petrova", PW)).status_code == 200
+    assert (
+        await env.login("Petrova-Ivanova.Anna", PW)
+    ).status_code == 200  # логин без учёта регистра
     reset = await env.client.post(RESET_REQUEST, json={"email": address})
     assert reset.status_code == 200
     assert _mails(env)[-1].to == address
@@ -645,7 +647,7 @@ async def test_019_ac14_address_taken_by_admin_blocks_confirm(
     env = reset_api_env
     _, (ta_token,) = await seed(env, reg_ws, "tech_admin")
     victim = await env.new_user(workspace=reg_ws, role="user")
-    await env.client.post(REQUEST, json=_body("clash@example.test", login="clashuser"))
+    await env.client.post(REQUEST, json=_body("clash@example.test"))
     token = _last_token(env)
     moved = await env.client.put(
         f"{ADMIN_USERS}/{victim.id}/email",
@@ -656,8 +658,6 @@ async def test_019_ac14_address_taken_by_admin_blocks_confirm(
     response = await _post_confirm(env, token)
     assert (response.status_code, code_of(response)) == (400, "registration_token_invalid")
     assert await _accounts(env, "clash@example.test") == 1
-    clashed = await _rows(env, "SELECT count(*) FROM app_user WHERE login = 'clashuser'")
-    assert int(clashed[0][0]) == 0
 
 
 # --- AC-15: пароль -----------------------------------------------------------------------
@@ -695,7 +695,7 @@ async def test_019_ac16_confirm_has_no_cookie_and_repeat_is_400(
     await env.client.post(REQUEST, json=_body("once@example.test"))
     token = _last_token(env)
     first = await _post_confirm(env, token)
-    assert (first.status_code, first.content) == (204, b"")
+    assert (first.status_code, first.json()) == (200, {"login": LOGIN})
     assert "set-cookie" not in first.headers
     user = await _rows(env, "SELECT id FROM app_user WHERE email = :e", e="once@example.test")
     assert await env.session_ids(user[0][0]) == []
@@ -774,13 +774,12 @@ async def test_019_rg5_422_requests_count_toward_ip_limit(
 ) -> None:
     env = reset_api_env
     ip = "203.0.113.20"
-    await env.new_user(workspace=reg_ws, role="user", login="takenuser")
     for n in range(10):
         if n % 2:
-            body = _body(f"busy{n}@example.test", login="takenuser")  # login_taken
-            code = "login_taken"
+            body = _body(f"busy{n}@example.test", last_name="李")  # last_name_invalid
+            code = "last_name_invalid"
         else:
-            body = _body("not-an-address", login=f"probe{n}")  # email_invalid
+            body = _body("not-an-address")  # email_invalid
             code = "email_invalid"
         response = await _from_ip(env, ip, "POST", REQUEST, json=body)
         assert (response.status_code, code_of(response)) == (422, code), n
@@ -796,14 +795,14 @@ async def test_019_ac19_one_self_registered_event_after_confirm_only(
     reg_ws: WorkspaceRow, reset_api_env: ApiEnv
 ) -> None:
     env = reset_api_env
-    await env.client.post(REQUEST, json=_body("audit@example.test", login="auditor"))
+    await env.client.post(REQUEST, json=_body("audit@example.test"))
     await _post_confirm(env, "x" * 43)  # неверный токен: событий быть не должно
     assert [
         r for r in await events(env, workspace_id=reg_ws.id) if r[3] == "user.self_registered"
     ] == []
-    await env.client.post(REQUEST, json=_body("audit2@example.test", login="auditor2"))
+    await env.client.post(REQUEST, json=_body("audit2@example.test"))
     token = _last_token(env)
-    assert (await _post_confirm(env, token)).status_code == 204
+    assert (await _post_confirm(env, token)).status_code == 200
     rows = [r for r in await events(env, workspace_id=reg_ws.id) if r[3] == "user.self_registered"]
     assert len(rows) == 1
     user = await _rows(env, "SELECT id FROM app_user WHERE email = :e", e="audit2@example.test")
@@ -813,50 +812,53 @@ async def test_019_ac19_one_self_registered_event_after_confirm_only(
     assert list(changed or []) == []
 
 
-# --- AC-27: логин раньше адреса ---------------------------------------------------------
+# --- AC-27: занятый логин не отличает ответ заявки, суффикс выбирается при подтверждении -------
 
 
 async def test_019_ac27_taken_login_same_answer_for_free_and_taken_address(
     reg_ws: WorkspaceRow, reset_api_env: ApiEnv
 ) -> None:
     env = reset_api_env
-    await env.new_user(workspace=reg_ws, role="user", login="takenlogin")
+    await env.new_user(workspace=reg_ws, role="user", login=LOGIN)
     await env.new_user(workspace=reg_ws, role="user", login="owner", email="owner@example.test")
-    free = await env.client.post(REQUEST, json=_body("free@example.test", login="takenlogin"))
-    taken = await env.client.post(REQUEST, json=_body("owner@example.test", login="takenlogin"))
-    for response in (free, taken):
-        assert (response.status_code, code_of(response)) == (422, "login_taken")
+    free = await env.client.post(REQUEST, json=_body("free@example.test"))
+    taken = await env.client.post(REQUEST, json=_body("owner@example.test"))
+    assert (free.status_code, free.json()) == (200, ACCEPTED)
+    assert (taken.status_code, taken.json()) == (200, ACCEPTED)
     assert free.content == taken.content
-    assert _mails(env) == []
+    assert len(_mails(env)) == 1  # письмо только на свободный адрес
 
 
-async def test_019_ac27_login_case_is_ignored(reg_ws: WorkspaceRow, reset_api_env: ApiEnv) -> None:
+async def test_019_old_client_login_field_is_ignored(
+    reg_ws: WorkspaceRow, reset_api_env: ApiEnv
+) -> None:
     env = reset_api_env
-    await env.new_user(workspace=reg_ws, role="user", login="ab_c")
-    response = await env.client.post(REQUEST, json=_body("case@example.test", login="Ab_c"))
-    assert (response.status_code, code_of(response)) == (422, "login_taken")
-    assert _mails(env) == []
+    response = await env.client.post(REQUEST, json=_body("case@example.test", login="!!bad!!"))
+    assert (response.status_code, response.json()) == (200, ACCEPTED)
+    token = _last_token(env)
+    confirmed = await _post_confirm(env, token)
+    assert confirmed.json() == {"login": LOGIN}  # логин сгенерирован, поле клиента не использовано
 
 
-# --- AC-28: логин занят после заявки ----------------------------------------------------
+# --- AC-28: логин занят после заявки: подтверждение выбирает следующий свободный --------------
 
 
-async def test_019_ac28_login_taken_after_request_gives_409_then_400(
+async def test_019_ac28_login_taken_after_request_gets_next_suffix_on_confirm(
     reg_ws: WorkspaceRow, reset_api_env: ApiEnv
 ) -> None:
     env = reset_api_env
     _, (ta_token,) = await seed(env, reg_ws, "tech_admin")
-    await env.client.post(REQUEST, json=_body("late@example.test", login="newuser"))
+    await env.client.post(REQUEST, json=_body("late@example.test"))
     token = _last_token(env)
     created = await env.client.post(
         ADMIN_USERS,
-        json={"login": "newuser", "first_name": FIRST, "last_name": LAST, OTP_FIELD: OTP},
+        json={"login": LOGIN, "first_name": FIRST, "last_name": LAST, OTP_FIELD: OTP},
         headers=env.auth(ta_token),
     )
     assert created.status_code == 201
     first = await _post_confirm(env, token)
-    assert (first.status_code, code_of(first)) == (409, "login_taken")
-    assert await _accounts(env, "late@example.test") == 0
+    assert (first.status_code, first.json()) == (200, {"login": f"{LOGIN}.2"})
+    assert await _accounts(env, "late@example.test") == 1
     assert await _request_count(env, "late@example.test") == 0
     second = await _post_confirm(env, token)
     assert (second.status_code, code_of(second)) == (400, "registration_token_invalid")
@@ -923,7 +925,6 @@ async def test_019_schema_limit_1024_reaches_domain_1025_is_validation_error(
         ("email", "email_invalid"),
         ("first_name", "first_name_invalid"),
         ("last_name", "last_name_invalid"),
-        ("login", "login_invalid"),
     )
     n = 0
     for field, domain_code in fields:
@@ -931,12 +932,14 @@ async def test_019_schema_limit_1024_reaches_domain_1025_is_validation_error(
             n += 1
             if field == "email":
                 body = _body(_address_of_length(size))
-            elif field == "login":
-                body = _body("bound@example.test", login="a" * size)
             else:
                 body = _body("bound@example.test", **{field: "А" * size})
             response = await _from_ip(env, _ip(n), "POST", REQUEST, json=body)
             assert (response.status_code, code_of(response)) == (422, expected), (field, size)
+    # login (v0.5) принимается и игнорируется, но граница схемы действует: 1025 — validation_error
+    too_long = _body("bound@example.test", login="a" * 1025)
+    response = await _from_ip(env, _ip(n + 1), "POST", REQUEST, json=too_long)
+    assert (response.status_code, code_of(response)) == (422, "validation_error")
     assert _mails(env) == []
 
 
@@ -962,7 +965,7 @@ async def test_019_ac38_sixth_confirm_on_used_link_is_429_account_kept(
     env = reset_api_env
     await env.client.post(REQUEST, json=_body("used@example.test"))
     token = _last_token(env)
-    assert (await _post_confirm(env, token, ip="203.0.113.31")).status_code == 204
+    assert (await _post_confirm(env, token, ip="203.0.113.31")).status_code == 200
     for _ in range(4):
         response = await _post_confirm(env, token, ip="203.0.113.31")
         assert (response.status_code, code_of(response)) == (400, "registration_token_invalid")

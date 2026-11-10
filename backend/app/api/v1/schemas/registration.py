@@ -1,8 +1,9 @@
 """Схемы самостоятельной регистрации (spec 019: FR-3, FR-4, FR-8; plan §4.4, RG-7, RG-20).
 
-Схема ограничивает только тип и размер. Формат адреса, имени, фамилии и логина проверяет домен
+Схема ограничивает только тип и размер. Формат адреса, имени и фамилии проверяет домен
 (RG-7): ошибка получает код поля (``email_invalid``, ``first_name_invalid`` и т. д.), а не
 ``validation_error``. Пароль проходит ту же проверку кодируемости, что и вход (ревью T08).
+Логин генерирует сервер (spec 019 v0.5); поле ``login`` старых клиентов принимается и игнорируется.
 """
 
 from __future__ import annotations
@@ -26,7 +27,13 @@ class RegistrationRequest(BaseModel):
     email: Annotated[str, Field(max_length=_TEXT_MAX_LENGTH)]
     first_name: Annotated[str, Field(max_length=_TEXT_MAX_LENGTH)]
     last_name: Annotated[str, Field(max_length=_TEXT_MAX_LENGTH)]
-    login: Annotated[str, Field(max_length=_TEXT_MAX_LENGTH)]
+    login: Annotated[
+        str | None,
+        Field(
+            max_length=_TEXT_MAX_LENGTH,
+            deprecated="Не используется: логин генерирует сервер (spec 019 v0.5). Игнорируется.",
+        ),
+    ] = None
     password: Password
 
     _password_encodable = field_validator("password")(_require_encodable)
@@ -44,3 +51,9 @@ class RegistrationConfirm(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     token: Annotated[SecretStr, Field(max_length=128)]
+
+
+class RegistrationConfirmed(BaseModel):
+    """Ответ подтверждения (200, v0.5): логин учётной записи. Сессии и cookie нет (AC-16)."""
+
+    login: str

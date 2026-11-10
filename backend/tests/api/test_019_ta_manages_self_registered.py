@@ -47,16 +47,14 @@ async def reg_ws(reset_api_env: ApiEnv) -> WorkspaceRow:
 
 
 async def _register(env: ApiEnv, n: int) -> tuple[uuid.UUID, str]:
-    """Заявка и подтверждение по ссылке из письма; возвращает (id, логин как введён)."""
+    """Заявка и подтверждение по ссылке из письма; возвращает (id, логин, выбранный сервером)."""
     email = f"ta.reg{n}@example.test"
-    login = f"Ta.Reg{n}"
     accepted = await env.client.post(
         REQUEST,
         json={
             "email": email,
             "first_name": FIRST,
             "last_name": LAST,
-            "login": login,
             "password": PW,
         },
     )
@@ -65,7 +63,8 @@ async def _register(env: ApiEnv, n: int) -> tuple[uuid.UUID, str]:
     assert mail.to == email
     token = mail.body.split(REG_LINK, 1)[1].split()[0]
     confirmed = await env.client.post(CONFIRM, json={"token": token})
-    assert confirmed.status_code == 204, confirmed.text
+    assert confirmed.status_code == 200, confirmed.text
+    login = confirmed.json()["login"]  # v0.5: логин выбирает сервер
     rows = await env.execute(text("SELECT id FROM app_user WHERE email = :e").bindparams(e=email))
     assert rows is not None and len(rows) == 1
     return rows[0][0], login

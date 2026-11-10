@@ -7,6 +7,7 @@ import { ErrorAlert } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
 import { TextField } from "../../shared/ui/TextField";
 import { useFocusHeadingOnArrival } from "../auth/session";
+import "./audit.css";
 import { listAudit, type AuditEntry, type EntityType } from "./api";
 
 const ENTITY_TYPES: readonly EntityType[] = [
@@ -21,10 +22,10 @@ const ENTITY_TYPES: readonly EntityType[] = [
 
 interface Filters {
   entityType: EntityType | "";
-  actorId: string;
+  actorLogin: string;
 }
 
-const NO_FILTERS: Filters = { entityType: "", actorId: "" };
+const NO_FILTERS: Filters = { entityType: "", actorLogin: "" };
 
 // Display time is Europe/Moscow (NFR-5); the API speaks UTC.
 const WHEN = new Intl.DateTimeFormat("ru-RU", {
@@ -98,7 +99,22 @@ function detailsText(entry: AuditEntry): string {
   }
 }
 
-// Only metadata is shown (BR-2): which fields changed, never their values.
+// Only metadata is shown (BR-2): which fields changed, never their values. The object id is
+// kept in a collapsed block: an administrator works with logins, the id is for support.
+function Details({ entry }: { entry: AuditEntry }) {
+  return (
+    <>
+      <span data-field="changed_fields">{entry.changed_fields.map(fieldText).join(", ")}</span>
+      <span data-field="details">{detailsText(entry)}</span>
+      <details data-field="entity_id" className="audit-id">
+        <summary>{t("admin.audit.col_details")}</summary>
+        <span className="audit-uuid">{entry.entity_id}</span>
+        {entry.entity_deleted ? ` ${t("admin.audit.entity_deleted")}` : ""}
+      </details>
+    </>
+  );
+}
+
 function EntryRow({ entry }: { entry: AuditEntry }) {
   return (
     <tr data-entry-id={entry.id}>
@@ -106,13 +122,34 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
       <td data-field="actor">{actorText(entry)}</td>
       <td data-field="action">{actionText(entry.action)}</td>
       <td data-field="entity_type">{entityText(entry.entity_type)}</td>
-      <td data-field="entity_id">
-        {entry.entity_id}
-        {entry.entity_deleted ? ` ${t("admin.audit.entity_deleted")}` : ""}
+      <td>
+        <Details entry={entry} />
       </td>
-      <td data-field="changed_fields">{entry.changed_fields.map(fieldText).join(", ")}</td>
-      <td data-field="details">{detailsText(entry)}</td>
     </tr>
+  );
+}
+
+// Below 720 px the table becomes cards (same data, no horizontal scroll).
+function EntryCard({ entry }: { entry: AuditEntry }) {
+  const extra = [entry.changed_fields.map(fieldText).join(", "), detailsText(entry)]
+    .filter((x) => x !== "")
+    .join(" · ");
+  return (
+    <li data-card-id={entry.id}>
+      <span className="c-title">{actionText(entry.action)}</span>
+      <span className="c-meta">
+        {WHEN.format(new Date(entry.occurred_at))} · {actorText(entry)}
+      </span>
+      <span className="c-meta">
+        {entityText(entry.entity_type)}
+        {extra === "" ? "" : `: ${extra}`}
+      </span>
+      <details className="audit-id">
+        <summary>{t("admin.audit.col_details")}</summary>
+        <span className="audit-uuid">{entry.entity_id}</span>
+        {entry.entity_deleted ? ` ${t("admin.audit.entity_deleted")}` : ""}
+      </details>
+    </li>
   );
 }
 
@@ -125,12 +162,12 @@ export function AuditPage() {
   const [applied, setApplied] = useState<Filters>(NO_FILTERS);
 
   const audit = useQuery({
-    queryKey: ["admin", "audit", page, applied.entityType, applied.actorId],
+    queryKey: ["admin", "audit", page, applied.entityType, applied.actorLogin],
     queryFn: () =>
       listAudit({
         page,
         ...(applied.entityType === "" ? {} : { entityType: applied.entityType }),
-        ...(applied.actorId === "" ? {} : { actorId: applied.actorId }),
+        ...(applied.actorLogin === "" ? {} : { actorLogin: applied.actorLogin }),
       }),
     placeholderData: keepPreviousData,
     retry: false,
@@ -138,7 +175,7 @@ export function AuditPage() {
 
   function onApply(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    setApplied({ entityType: draft.entityType, actorId: draft.actorId.trim() });
+    setApplied({ entityType: draft.entityType, actorLogin: draft.actorLogin.trim() });
     setPage(1);
   }
 
@@ -160,7 +197,7 @@ export function AuditPage() {
       </h1>
       <ErrorAlert message={error} seq={audit.errorUpdateCount} />
 
-      <form onSubmit={onApply} noValidate aria-label={t("admin.audit.filters_title")}>
+      <form className="audit-filters" onSubmit={onApply} noValidate aria-label={t("admin.audit.filters_title")}>
         <div className="ui-field">
           <label htmlFor={typeId}>{t("admin.audit.entity_type_label")}</label>
           <select
@@ -179,9 +216,9 @@ export function AuditPage() {
         </div>
         <TextField
           label={t("admin.audit.actor_label")}
-          name="actor_id"
-          value={draft.actorId}
-          onChange={(actorId) => setDraft({ ...draft, actorId })}
+          name="actor_login"
+          value={draft.actorLogin}
+          onChange={(actorLogin) => setDraft({ ...draft, actorLogin })}
           autoComplete="off"
         />
         <button type="submit">{t("admin.audit.apply")}</button>{" "}
@@ -197,24 +234,31 @@ export function AuditPage() {
       ) : data.items.length === 0 ? (
         <p role="status">{t("admin.audit.empty")}</p>
       ) : (
-        <table className="ui-table" aria-label={t("admin.audit.list_label")}>
-          <thead>
-            <tr>
-              <th scope="col">{t("admin.audit.col_time")}</th>
-              <th scope="col">{t("admin.audit.col_actor")}</th>
-              <th scope="col">{t("admin.audit.col_action")}</th>
-              <th scope="col">{t("admin.audit.col_entity_type")}</th>
-              <th scope="col">{t("admin.audit.col_entity_id")}</th>
-              <th scope="col">{t("admin.audit.col_fields")}</th>
-              <th scope="col">{t("admin.audit.col_details")}</th>
-            </tr>
-          </thead>
-          <tbody>
+        <>
+          <div className="audit-table-wrap">
+            <table className="ui-table" aria-label={t("admin.audit.list_label")}>
+              <thead>
+                <tr>
+                  <th scope="col">{t("admin.audit.col_time")}</th>
+                  <th scope="col">{t("admin.audit.col_actor")}</th>
+                  <th scope="col">{t("admin.audit.col_action")}</th>
+                  <th scope="col">{t("admin.audit.col_entity_type")}</th>
+                  <th scope="col">{t("admin.audit.col_details")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.items.map((entry) => (
+                  <EntryRow key={entry.id} entry={entry} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <ul className="audit-cards" aria-label={t("admin.audit.list_label")}>
             {data.items.map((entry) => (
-              <EntryRow key={entry.id} entry={entry} />
+              <EntryCard key={entry.id} entry={entry} />
             ))}
-          </tbody>
-        </table>
+          </ul>
+        </>
       )}
 
       <Pagination
