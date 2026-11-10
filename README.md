@@ -207,6 +207,14 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
 Удаления учётных записей в интерфейсе и API нет и не предусмотрено: пользователя можно
 заблокировать (и сбросить пароль, завершить сессии, сменить или снять роль), но не удалить.
 
+### Логин самостоятельно зарегистрировавшегося пользователя
+
+Логин создаёт сервер из фамилии и имени (`surikov.anton`, при совпадении `surikov.anton.2`) и один раз
+показывает его на экране после подтверждения ссылки; в письме логина нет. Если человек его не записал:
+технический администратор открывает «Учётные записи» (колонки «Логин» и «Email»; поиска на экране нет —
+найти строку по адресу можно поиском браузера Ctrl+F; у самостоятельно зарегистрированных пометка
+«самостоятельная регистрация») и сообщает логин; при необходимости выдаёт новый пароль («Сбросить пароль»).
+
 ### Логины и регистр
 
 Логин показывается в написании при создании учётной записи (например, `Ivanov.Petr`) - везде:
@@ -636,6 +644,13 @@ The session cookie always carries the `Secure` flag (the shipped configuration h
 There is no UI and no API endpoint for deleting accounts, and none is planned: a user can be
 blocked (and have the password reset, sessions revoked, role changed or removed) but accounts
 cannot be deleted.
+
+### Login of a self-registered user
+
+The server builds the login from last and first name (`surikov.anton`, on a clash `surikov.anton.2`) and
+shows it once on the screen after the link is confirmed; the email has no login. If the person did not
+write it down: a tech admin opens "Accounts" (columns "Login" and "Email"; the screen has no search, use
+the browser's Ctrl+F on the address) and tells the login; reset the password if needed.
 
 ### Logins and case
 

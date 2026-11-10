@@ -103,9 +103,33 @@ def test_019_specific_removals() -> None:
     assert name_slug("Анна!") == "anna"
 
 
-def test_019_non_ascii_latin_letters_are_dropped_not_transliterated() -> None:
-    # ASCII-буквы оставляем, прочие символы убираем (решение 2026-11-09): ü не превращается в ue.
-    assert name_slug("Müller") == "mller"
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("Müller", "muller"),
+        ("René", "rene"),
+        ("Dvořák", "dvorak"),
+        ("Łukasz", "lukasz"),
+        ("Søren", "soren"),
+        ("Straße", "strasse"),
+        ("Ковалів", "kovaliv"),
+        ("Їжак", "izhak"),
+        ("Євген", "evgen"),
+        ("Ґанна", "ganna"),
+        ("Ўладзімір", "uladzimir"),
+    ],
+)
+def test_019_diacritics_and_ukrainian_letters_get_base_letters(value: str, expected: str) -> None:
+    # Решение 2026-11-10: диакритика → базовая буква (NFKD), і ї є ґ ў → i i e g u.
+    assert name_slug(value) == expected
+
+
+def test_019_decomposed_cyrillic_input_matches_composed() -> None:
+    # й и ё в виде «буква + диакритика» (NFD) дают тот же результат, что составные.
+    import unicodedata
+
+    for word in ("Йошкар-Ола", "Ёлкин", "Чайка"):
+        assert name_slug(unicodedata.normalize("NFD", word)) == name_slug(word)
 
 
 @pytest.mark.parametrize("value", ["-Анна-", "--Анна--", "-анна"])

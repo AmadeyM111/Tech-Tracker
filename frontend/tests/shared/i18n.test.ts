@@ -292,6 +292,7 @@ const KEYS_019 = [
   "auth.register_copy",
   "auth.register_copy_failed",
   "auth.register_login_hint",
+  "auth.register_login_save",
   "auth.register_again",
   "auth.help_p2_registration",
   "profile.title",

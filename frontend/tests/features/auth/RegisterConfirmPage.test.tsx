@@ -118,6 +118,7 @@ describe("RegisterConfirmPage (019/R8-T17)", () => {
     const status = await screen.findByText(t("auth.register_confirmed"));
     expect(status.closest('[role="status"]')).not.toBeNull();
     expect(screen.getByText(t("auth.register_your_login"))).toBeTruthy();
+    expect(screen.getByText("Запишите логин — он понадобится для входа.")).toBeTruthy();
     expect(screen.getByText(GENERATED).tagName).toBe("CODE");
     const copy = screen.getByRole("button", { name: t("auth.register_copy") });
     expect(copy.classList.contains("ui-btn-secondary")).toBe(true);
