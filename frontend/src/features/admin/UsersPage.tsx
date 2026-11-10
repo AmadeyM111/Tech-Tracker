@@ -79,7 +79,12 @@ function UserRow(props: RowProps) {
         <span className="ui-users-login" data-field="login">
           {user.login}
         </span>
-        <span className="ui-users-email" data-field="email" data-label={t("admin.users.email_column")}>
+        <span
+          className="ui-users-email"
+          data-field="email"
+          // A missing e-mail already reads "email не указан": no label, so the card does not repeat it (P3).
+          data-label={user.email ? t("admin.users.email_column") : undefined}
+        >
           {user.email ?? t("admin.users.email_missing")}
         </span>
         <span className="ui-users-origin" data-field="origin" data-label={t("admin.users.origin_column")}>
@@ -87,12 +92,26 @@ function UserRow(props: RowProps) {
         </span>
       </td>
       <td className="ui-users-table__person">
-        <span data-field="first_name" data-label={t("admin.users.first_name_column")}>
-          {user.first_name || t("admin.users.name_missing")}
-        </span>{" "}
-        <span data-field="last_name" data-label={t("admin.users.last_name_column")}>
-          {user.last_name || t("admin.users.name_missing")}
-        </span>
+        {user.first_name || user.last_name ? (
+          <>
+            {user.first_name && (
+              <span data-field="first_name" data-label={t("admin.users.first_name_column")}>
+                {user.first_name}
+              </span>
+            )}
+            {user.first_name && user.last_name && " "}
+            {user.last_name && (
+              <span data-field="last_name" data-label={t("admin.users.last_name_column")}>
+                {user.last_name}
+              </span>
+            )}
+          </>
+        ) : (
+          // Both names are empty: one placeholder, not "не указано не указано" (UX-audit PR #26 check, P2).
+          <span data-field="first_name" data-label={t("admin.users.first_name_column")}>
+            {t("admin.users.name_missing")}
+          </span>
+        )}
         <div className="ui-users-table__role" data-label={t("admin.users.col_role")}>
           {canAssignRoles ? (
             <>

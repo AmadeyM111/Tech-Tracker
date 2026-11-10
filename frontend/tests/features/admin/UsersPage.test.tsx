@@ -876,8 +876,10 @@ describe("names and origin (019, R8-T20)", () => {
     expect(cell(iv, "last_name").textContent).toBe("Ivanov");
     expect(cell(iv, "origin").textContent).toBe(ru["admin.users.self_registered"]);
     const pe = row(container, ID_PETROV);
+    // PR #26 check (P2): both names empty -> one placeholder, never "не указано не указано".
     expect(cell(pe, "first_name").textContent).toBe(ru["admin.users.name_missing"]);
-    expect(cell(pe, "last_name").textContent).toBe(ru["admin.users.name_missing"]);
+    expect(pe.querySelector('[data-field="last_name"]')).toBeNull();
+    expect(pe.textContent).not.toContain(`${ru["admin.users.name_missing"]} ${ru["admin.users.name_missing"]}`);
     expect(cell(pe, "origin").textContent).toBe("");
     expect(cell(row(container, U_ADMIN.id), "origin").textContent).toBe("");
     // UX-audit P1: колонки сведены к трём; подписи стоят в заголовках через « · » - каждая должна быть в одном из них.
@@ -1010,7 +1012,7 @@ describe("compact accounts table (UX-audit P1)", () => {
 
   it("login_and_email_share_one_cell_and_origin_too", async () => {
     const { container } = await open({
-      [LIST]: () => j(200, page([{ ...U_IVANOV, self_registered: true }])),
+      [LIST]: () => j(200, page([{ ...U_IVANOV, email: "ivanov@example.com", self_registered: true }])),
     });
     const r = row(container, ID_IVANOV);
     const td = cell(r, "login").closest("td");
@@ -1033,7 +1035,9 @@ describe("compact accounts table (UX-audit P1)", () => {
   });
 
   it("name_and_status_fields_carry_labels_for_the_360px_cards", async () => {
-    const { container } = await open();
+    const { container } = await open({
+      [LIST]: () => j(200, page([{ ...U_IVANOV, first_name: "Ivan", last_name: "Ivanov" }])),
+    });
     const r = row(container, ID_IVANOV);
     expect(cell(r, "first_name").getAttribute("data-label")).toBe(ru["admin.users.first_name_column"]);
     expect(cell(r, "last_name").getAttribute("data-label")).toBe(ru["admin.users.last_name_column"]);
