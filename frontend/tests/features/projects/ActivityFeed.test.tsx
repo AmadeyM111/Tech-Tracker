@@ -163,11 +163,11 @@ describe("пагинация ленты при пустом списке (ауд
     expect(container.querySelector('[data-action="next-page"]')).toBeNull();
   });
 
-  it("non_empty_feed_keeps_pagination", async () => {
+  it("non_empty_feed_single_page_hides_pagination", async () => {
     installFetch(activityRoutes(() => j(200, page([item(1, {})]))));
     const { container } = renderApp(`/projects/${PID}`);
     await openActivityTab();
     await waitFor(() => expect(container.querySelector('[data-field="activity-list"]')).toBeTruthy());
-    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
   });
 });

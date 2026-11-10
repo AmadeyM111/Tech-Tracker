@@ -1069,10 +1069,10 @@ describe("пагинация учётных записей при пустом �
     expect(action(container, "prev-page").disabled).toBe(false);
   });
 
-  it("non_empty_list_keeps_pagination", async () => {
+  it("non_empty_list_single_page_hides_pagination", async () => {
     const { container } = await open();
-    expect(container.querySelector(".ui-pagination")).not.toBeNull();
-    expect(action(container, "next-page")).toBeTruthy();
-    expect(action(container, "prev-page")).toBeTruthy();
+    // Audit #9 (P3, design check): a single page without has_next shows no pagination.
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
   });
 });

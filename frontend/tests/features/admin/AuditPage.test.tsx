@@ -585,8 +585,8 @@ describe("пагинация журнала при пустом списке (а
     expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
   });
 
-  it("non_empty_list_keeps_pagination", async () => {
+  it("non_empty_list_single_page_hides_pagination", async () => {
     const { container } = await open();
-    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
   });
 });

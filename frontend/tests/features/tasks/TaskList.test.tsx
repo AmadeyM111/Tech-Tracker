@@ -184,11 +184,11 @@ describe("project tasks tab", () => {
     await waitFor(() => expect(f.query(f.last(PROJ_TASKS)).get("page")).toBe("1"));
   });
 
-  it("uf3_pagination_prev_disabled_on_first_next_disabled_without_has_next", async () => {
+  it("uf3_single_page_hides_pagination", async () => {
+    // Audit #9 (P3, design check): a single page without has_next shows no pagination at all.
     const { container } = await openProject();
     await waitFor(() => expect(taskRow(container, TID1)).toBeTruthy());
-    expect(container.querySelector<HTMLButtonElement>('button[data-action="prev-page"]')!.disabled).toBe(true);
-    expect(container.querySelector<HTMLButtonElement>('button[data-action="next-page"]')!.disabled).toBe(true);
+    expect(container.querySelector(".ui-pagination")).toBeNull();
   });
 
   it("uf3_empty_list_shows_dictionary_text", async () => {
@@ -309,13 +309,13 @@ describe("пагинация списка задач при пустом спи�
     expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
   });
 
-  it("my_tasks_non_empty_list_keeps_pagination", async () => {
+  it("my_tasks_non_empty_list_single_page_hides_pagination", async () => {
     installFetch({
       [ME]: () => j(200, meWith(USER_CAPS, "user")),
       [MY_TASKS]: () => j(200, page([T1])),
     });
     const { container } = renderApp("/my-tasks");
     await waitFor(() => expect(taskRow(container, TID1)).toBeTruthy());
-    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
   });
 });

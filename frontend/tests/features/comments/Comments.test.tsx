@@ -358,9 +358,9 @@ describe("пагинация комментариев при пустом спи
     expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
   });
 
-  it("non_empty_list_keeps_pagination", async () => {
+  it("non_empty_list_single_page_hides_pagination", async () => {
     const { container } = await openWithComments([comment(CID1, "Привет")]);
     await screen.findByText("Привет");
-    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
   });
 });

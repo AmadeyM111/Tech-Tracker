@@ -324,7 +324,7 @@ export function Comments({ taskId, alert, suppressLoadError = false, projectId =
         </ul>
       )}
       {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
-      {(items?.length ?? 0) > 0 || page > 1 ? (
+      {page > 1 || ((items?.length ?? 0) > 0 && (shown?.has_next ?? false)) ? (
         <Pagination
           page={page}
           hasNext={shown?.has_next ?? false}

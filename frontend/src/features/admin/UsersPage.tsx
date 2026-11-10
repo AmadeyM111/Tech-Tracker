@@ -479,7 +479,7 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
       )}
 
       {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
-      {(data?.items.length ?? 0) > 0 || page > 1 ? (
+      {page > 1 || ((data?.items.length ?? 0) > 0 && (data?.has_next ?? false)) ? (
         <Pagination
           page={page}
           hasNext={data?.has_next ?? false}

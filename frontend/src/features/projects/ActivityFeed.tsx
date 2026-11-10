@@ -146,7 +146,7 @@ export function ActivityFeed({ projectId }: { projectId: string }) {
         </ol>
       )}
       {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
-      {items.length > 0 || page > 1 ? (
+      {page > 1 || (items.length > 0 && feed.data.has_next) ? (
         <Pagination
           page={page}
           hasNext={feed.data.has_next}
