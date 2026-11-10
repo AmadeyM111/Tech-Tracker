@@ -30,6 +30,7 @@ EXPECTED_CAPABILITIES: dict[str, list[str]] = {
         "business_access",
         "crm_read",
         "crm_write",
+        "export_overview",  # 025: CSV «Сводки», только БА
         "labels_manage",
         "onboard_accounts",  # 019 (plan RG-11)
         "pipeline_manage",

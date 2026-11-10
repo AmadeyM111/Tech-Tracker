@@ -62,3 +62,37 @@ export async function listOverviewTasks(
   if (data === undefined) throw invalidBody(200);
   return data;
 }
+
+export interface CsvFile {
+  blob: Blob;
+  filename: string;
+}
+
+const FILENAME = /filename="([^"]+)"/;
+
+/** The whole selection as CSV (spec 025, business admin only); the file name comes from the server. */
+export async function downloadOverviewCsv(filters: SummaryFilters): Promise<CsvFile> {
+  const query: {
+    project_id?: string;
+    status?: components["schemas"]["TaskStatus"];
+    priority?: components["schemas"]["TaskPriority"][];
+    due?: components["schemas"]["DuePreset"];
+    due_from?: string;
+    due_to?: string;
+    needs_review?: boolean;
+  } = {};
+  if (filters.projectId !== null) query.project_id = filters.projectId;
+  if (filters.status !== null) query.status = filters.status;
+  if (filters.priorities.length > 0) query.priority = [...filters.priorities];
+  if (filters.due !== null) query.due = filters.due;
+  if (filters.dateFrom !== null) query.due_from = filters.dateFrom;
+  if (filters.dateTo !== null) query.due_to = filters.dateTo;
+  if (filters.needsReview) query.needs_review = true;
+  const { data, response } = await getAppClient().GET("/api/v1/me/overview/tasks.csv", {
+    params: { query },
+    parseAs: "blob",
+  });
+  if (data === undefined) throw invalidBody(200);
+  const match = FILENAME.exec(response.headers.get("Content-Disposition") ?? "");
+  return { blob: data as unknown as Blob, filename: match?.[1] ?? "gtrack-summary.csv" };
+}
