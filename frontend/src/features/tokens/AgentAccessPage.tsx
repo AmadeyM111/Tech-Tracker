@@ -1,7 +1,7 @@
 // "Доступ для агентов" (PN-15, ADR-0018): the user's agent tokens, issue and revoke.
 // Only the page state holds an issued token; it is dropped on dismiss and never cached.
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocation } from "react-router-dom";
 
 import { t } from "../../shared/i18n";
@@ -17,35 +17,11 @@ import {
   type AgentToken,
   type CreatedAgentToken,
 } from "./api";
-import { IssuedToken } from "./IssuedToken";
+import { AgentConnect, AgentMore } from "./AgentConnect";
 import { TokenList } from "./TokenList";
 import { failureMessage, nameProblem } from "./model";
 
-const INSTRUCTIONS_ID = "claude-code-instructions";
-
-/**
- * Claude Code setup (docs/ai-integration.md, variants A and B). The MCP address is this site's origin
- * plus /mcp; the token is never printed: the commands read it from $GTRACK_TOKEN.
- */
-function ClaudeCodeInstructions() {
-  const titleId = useId();
-  const origin = window.location.origin;
-  return (
-    <section id={INSTRUCTIONS_ID} aria-labelledby={titleId}>
-      <h2 id={titleId}>{t("agent_tokens.instructions_title")}</h2>
-      <p>{t("agent_tokens.instructions_intro")}</p>
-      <h3>{t("agent_tokens.instructions_variant_a")}</h3>
-      <pre className="ui-pre">
-        <code>{t("agent_tokens.instructions_cmd_a", { origin })}</code>
-      </pre>
-      <h3>{t("agent_tokens.instructions_variant_b")}</h3>
-      <pre className="ui-pre">
-        <code>{t("agent_tokens.instructions_cmd_b", { origin })}</code>
-      </pre>
-      <p>{t("agent_tokens.instructions_variant_b_note")}</p>
-    </section>
-  );
-}
+const CONNECT_ID = "agent-connect";
 
 export function AgentAccessPage() {
   const queryClient = useQueryClient();
@@ -56,13 +32,13 @@ export function AgentAccessPage() {
   // The summary card links here with the block's anchor: the SPA route change does not scroll by itself.
   const { hash } = useLocation();
   useEffect(() => {
-    if (hash === `#${INSTRUCTIONS_ID}`) document.getElementById(INSTRUCTIONS_ID)?.scrollIntoView();
+    if (hash === `#${CONNECT_ID}`) document.getElementById(CONNECT_ID)?.scrollIntoView();
   }, [hash]);
   const nameRef = useRef<HTMLInputElement>(null);
   const listTitleRef = useRef<HTMLHeadingElement>(null);
   // One request at a time: a second submit or confirm while one is in flight is ignored.
   const busy = useRef(false);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(t("agent_tokens.name_default"));
   const [nameFailed, setNameFailed] = useState(false);
   const [pending, setPending] = useState(false);
   const [issued, setIssued] = useState<CreatedAgentToken | null>(null);
@@ -83,7 +59,7 @@ export function AgentAccessPage() {
     try {
       const created = await createAgentToken(name.trim());
       setIssued(created);
-      setName("");
+      setName(t("agent_tokens.name_default"));
       setNameFailed(false);
     } catch (e) {
       alert.show(failureMessage(e));
@@ -126,33 +102,34 @@ export function AgentAccessPage() {
       <h1 ref={headingRef} tabIndex={-1}>
         {t("agent_tokens.title")}
       </h1>
-      <p>{t("agent_tokens.intro")}</p>
       <ErrorAlert message={alert.message ?? listError} seq={alert.seq} />
 
-      {issued === null ? null : <IssuedToken key={issued.id} token={issued} onDismiss={dismissIssued} />}
-
-      <h2>{t("agent_tokens.create_title")}</h2>
-      <form onSubmit={(e) => void onCreate(e)} noValidate aria-label={t("agent_tokens.create_title")}>
-        <TextField
-          label={t("agent_tokens.name_label")}
-          name="name"
-          value={name}
-          onChange={(value) => {
-            setName(value);
-            setNameFailed(false);
-          }}
-          autoComplete="off"
-          hint={t("agent_tokens.name_hint")}
-          invalid={nameFailed}
-          inputRef={nameRef}
-          disabled={pending}
-        />
-        <button type="submit" disabled={pending}>
-          {t("agent_tokens.create_submit")}
-        </button>
-      </form>
-
-      <ClaudeCodeInstructions />
+      <section id={CONNECT_ID} aria-labelledby="agent-connect-title" className="agent-card">
+        <h2 id="agent-connect-title">{t("agent_connect.title")}</h2>
+        <p>{t("agent_connect.desc_1")}</p>
+        <p>{t("agent_connect.desc_2")}</p>
+        <form onSubmit={(e) => void onCreate(e)} noValidate aria-label={t("agent_tokens.create_title")}>
+          <TextField
+            label={t("agent_tokens.name_label")}
+            name="name"
+            value={name}
+            onChange={(value) => {
+              setName(value);
+              setNameFailed(false);
+            }}
+            autoComplete="off"
+            hint={t("agent_tokens.name_hint")}
+            invalid={nameFailed}
+            inputRef={nameRef}
+            disabled={pending}
+          />
+          <button type="submit" disabled={pending}>
+            {t("agent_tokens.create_submit")}
+          </button>
+        </form>
+        <AgentConnect key={issued?.id ?? "none"} token={issued} onDismiss={dismissIssued} />
+        <AgentMore />
+      </section>
 
       <h2 ref={listTitleRef} tabIndex={-1}>
         {t("agent_tokens.list_title")}

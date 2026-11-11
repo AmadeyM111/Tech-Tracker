@@ -1,0 +1,127 @@
+.agent-connect {
+  margin-top: 12px;
+  max-width: 44rem;
+}
+.agent-connect p {
+  margin: 0 0 8px;
+}
+.agent-note {
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+}
+.agent-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+.agent-seg button {
+  min-height: 44px;
+  padding: 8px 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.agent-seg button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.agent-label {
+  display: block;
+  margin: 8px 0 4px;
+}
+.agent-connect textarea {
+  width: 100%;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.9375rem;
+  resize: vertical;
+}
+.agent-hint {
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+.agent-warn {
+  color: var(--danger);
+  margin-top: 8px;
+}
+.agent-copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 8px;
+}
+.agent-copy-row button {
+  min-height: 44px;
+  padding: 8px 16px;
+}
+.agent-more {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  max-width: 44rem;
+}
+.agent-more summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--accent);
+}
+.agent-more ol {
+  margin: 8px 0 0;
+  padding-left: 1.4em;
+  color: var(--text-muted);
+}
+.agent-more li {
+  margin: 4px 0;
+}
+
+/* The token list becomes cards on narrow screens: label from data-label, no horizontal scroll. */
+@media (max-width: 719px) {
+  .agent-tokens,
+  .agent-tokens tbody,
+  .agent-tokens tr,
+  .agent-tokens td {
+    display: block;
+    width: 100%;
+  }
+  .agent-tokens thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .agent-tokens tr {
+    margin-bottom: 8px;
+    padding: 8px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .agent-tokens td {
+    padding: 4px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .agent-tokens td[data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--text-muted);
+  }
+  .agent-tokens td[data-field="name"] {
+    font-weight: 600;
+  }
+  .agent-tokens td[data-field="actions"] button {
+    min-height: 44px;
+    margin-top: 4px;
+  }
+  .agent-tokens td[data-field="actions"]:empty {
+    display: none;
+  }
+}

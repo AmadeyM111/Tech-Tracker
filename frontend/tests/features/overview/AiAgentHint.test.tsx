@@ -70,7 +70,7 @@ describe("AiAgentHint on the summary screen", () => {
     const tokens = within(aside).getByRole("link", { name: TOKENS_LINK });
     const instructions = within(aside).getByRole("link", { name: INSTRUCTIONS_LINK });
     expect(tokens.getAttribute("href")).toBe("/profile/agents");
-    expect(instructions.getAttribute("href")).toBe("/profile/agents#claude-code-instructions");
+    expect(instructions.getAttribute("href")).toBe("/profile/agents#agent-connect");
     const h1 = await summaryHeading();
     const tiles = await screen.findByRole("list", { name: "Счётчики задач" });
     expect(aside.compareDocumentPosition(h1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -147,8 +147,8 @@ describe("AiAgentHint on the summary screen", () => {
     setup(profile(BA_ID, BA_CAPS, "business_admin"));
     renderApp("/summary");
     fireEvent.click(await screen.findByRole("link", { name: INSTRUCTIONS_LINK }));
-    const block = await screen.findByRole("region", { name: ru["agent_tokens.instructions_title"] });
-    expect(block.id).toBe("claude-code-instructions");
+    const block = await screen.findByRole("region", { name: ru["agent_connect.title"] });
+    expect(block.id).toBe("agent-connect");
     expect(screen.getByRole("heading", { level: 1, name: ru["agent_tokens.title"] })).toBeTruthy();
   });
 
