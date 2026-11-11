@@ -327,7 +327,7 @@ describe("AC-12 order in the document and Tab sequence", () => {
 
   it("004_ac12_BA_projects_tab_sequence_links_task_logout_content", async () => {
     boot(dialogFor(ROLES[0]), "/projects");
-    await screen.findByRole("form", { name: ru["projects.create_title"] });
+    await screen.findByRole("form", { name: ru["projects.create_heading"] });
     const tabbable = Array.from(
       document.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);

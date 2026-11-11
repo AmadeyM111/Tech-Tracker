@@ -127,6 +127,14 @@ describe("card and tabs (UF-3, NFR-7)", () => {
     expect(second).not.toBe(first);
   });
 
+  it("pr42_foreign_project_error_offers_back_to_list", async () => {
+    f = installFetch(projectRoutes(BUSINESS, { [ONE]: () => err(403, "forbidden") }));
+    renderApp(`/projects/${PID}`);
+    await screen.findByRole("alert");
+    const back = screen.getByRole("link", { name: ru["projects.back_to_list"] });
+    expect(back.getAttribute("href")).toBe("/projects");
+  });
+
   it.each([
     [403, "forbidden"],
     [404, "not_found"],

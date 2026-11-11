@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t, type MessageKey } from "../../shared/i18n";
@@ -76,7 +76,14 @@ export function ProjectPage({
     <section className="ui-wide">
       <h1>{t("projects.project_title")}</h1>
       {project.isError ? (
-        <ErrorAlert message={errorMessage(loadCodeOf(project.error))} />
+        <>
+          <ErrorAlert message={errorMessage(loadCodeOf(project.error))} />
+          <p>
+            <Link className="ui-btn-secondary" to="/projects">
+              {t("projects.back_to_list")}
+            </Link>
+          </p>
+        </>
       ) : (
         <p role="status">{t("admin.loading")}</p>
       )}

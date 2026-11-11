@@ -181,7 +181,11 @@ export const ru = {
   "nav.my_tasks": "Мои задачи",
   "nav.summary": "Сводка",
   "nav.create_task": "Задача",
-  "projects.title": "Список проектов",
+  "projects.title": "Проекты",
+  "projects.create_heading": "Создать проект",
+  "projects.list_heading": "Ваши проекты",
+  "projects.error_name_required": "Введите название проекта",
+  "projects.back_to_list": "Назад к списку проектов",
   "projects.project_title": "Карточка проекта",
   "projects.list_label": "Проекты пространства",
   "projects.empty": "У вас пока нет проектов — создайте первый.",  // спека 027, макет projects-empty

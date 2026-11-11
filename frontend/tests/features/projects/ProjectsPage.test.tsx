@@ -165,13 +165,32 @@ describe("create form (FR-14, AC-51)", () => {
     expect(f.count(CREATE)).toBe(1);
   });
 
-  it("ac51_empty_name_sends_nothing_and_shows_validation_alert", async () => {
+  it("ac51_empty_name_sends_nothing_and_shows_error_under_name_field", async () => {
     const { container } = await open({ [CREATE]: () => j(201, detail()) });
     fill(container, "   ", "x");
     submit(container);
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe(errorMessage("validation_error"));
+    const message = await screen.findByText(ru["projects.error_name_required"]);
+    const input = container.querySelector<HTMLInputElement>('input[name="name"]')!;
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBe(message.closest('[role="alert"]')?.id);
+    expect(input.getAttribute("aria-required")).toBe("true");
     expect(f.count(CREATE)).toBe(0);
+  });
+
+  it("027_name_error_clears_when_name_is_typed", async () => {
+    const { container } = await open({ [CREATE]: () => j(201, detail()) });
+    fill(container, "   ", "x");
+    submit(container);
+    await screen.findByText(ru["projects.error_name_required"]);
+    fireEvent.change(container.querySelector('input[name="name"]')!, { target: { value: "Новое" } });
+    expect(screen.queryByText(ru["projects.error_name_required"])).toBeNull();
+  });
+
+  it("pr42_create_and_list_have_their_own_headings", async () => {
+    const { container } = await open();
+    expect(screen.getByRole("heading", { level: 2, name: ru["projects.create_heading"] })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: ru["projects.list_heading"] })).toBeTruthy();
+    expect(container.querySelector('form[data-form="create-project"]')).not.toBeNull();
   });
 
   it.each([

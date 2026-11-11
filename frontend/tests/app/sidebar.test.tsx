@@ -209,7 +209,7 @@ describe("AC-30 tab order of the BA /projects screen", () => {
     // форма создания проекта видна только при project_create (есть у BA)
     setup("business_admin");
     const { container } = await openMenu("/projects");
-    await screen.findByRole("form", { name: ru["projects.create_title"] });
+    await screen.findByRole("form", { name: ru["projects.create_heading"] });
     const tabbable = Array.from(
       container.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
