@@ -464,20 +464,13 @@ export const ru = {
   // PN-15 (MCP): личные токены агентов, раздел «Доступ для агентов» (features/tokens).
   "error.token_limit_reached": "Достигнут лимит активных токенов (10). Отзовите ненужные токены, чтобы выпустить новый",
   "agent_tokens.title": "Доступ для агентов",
-  "agent_tokens.intro":
-    "Агент (например, Claude Code или Codex CLI) подключается к трекеру по персональному токену через MCP. Токен действует 90 дней. Активных токенов может быть не более 10.",
   "agent_tokens.create_title": "Новый токен",
   "agent_tokens.name_label": "Название токена",
   "agent_tokens.name_hint": "От 1 до 64 символов, например «Ноутбук, Claude Code»",
   "agent_tokens.name_required": "Введите название токена",
   "agent_tokens.name_too_long": "Название токена: не более 64 символов",
   "agent_tokens.create_submit": "Создать токен",
-  "agent_tokens.issued_title": "Токен создан",
-  "agent_tokens.issued_warning":
-    "Скопируйте токен сейчас. Он показан только один раз: после того как вы скроете его, посмотреть его снова будет нельзя, понадобится новый токен.",
-  "agent_tokens.token_label": "Токен (только для чтения)",
   "agent_tokens.copy": "Скопировать",
-  "agent_tokens.copied": "Токен скопирован в буфер обмена",
   "agent_tokens.copy_failed": "Не удалось скопировать. Выделите токен и скопируйте его вручную",
   "agent_tokens.dismiss": "Скрыть токен",
   "agent_tokens.list_title": "Ваши токены",
@@ -499,17 +492,26 @@ export const ru = {
   "agent_tokens.revoke_title": "Отозвать токен?",
   "agent_tokens.revoke_message":
     "Токен «{name}» перестанет работать. Агент, который его использует, потеряет доступ к трекеру. Вернуть токен после отзыва нельзя.",
-  // 026 FR-4: блок «Инструкция для Claude Code» на странице «Доступ для агентов» (текст - docs/ai-integration.md, Claude Code).
-  "agent_tokens.instructions_title": "Инструкция для Claude Code",
-  "agent_tokens.instructions_intro":
-    "Адрес MCP-эндпоинта — адрес этого сайта с путём /mcp. Токен передаётся в переменной окружения GTRACK_TOKEN: выпустите его выше и не вставляйте в репозиторий и в общие файлы конфигурации.",
-  "agent_tokens.instructions_variant_a": "Вариант A — HTTP: агент подключается по адресу, токен передаётся в заголовке",
-  "agent_tokens.instructions_variant_b": "Вариант B — stdio: агент запускает мост gtrack mcp (нужен установленный пакет трекера)",
-  // Команды из docs/ai-integration.md; {origin} - адрес страницы, токен в команде не выводится (читается из $GTRACK_TOKEN).
-  "agent_tokens.instructions_cmd_a": "claude mcp add --transport http gtrack {origin}/mcp \\\n  --header \"Authorization: Bearer $GTRACK_TOKEN\"",
-  "agent_tokens.instructions_cmd_b": "claude mcp add gtrack -e GTRACK_TOKEN=$GTRACK_TOKEN -e GTRACK_URL={origin} \\\n  -- gtrack mcp",
-  "agent_tokens.instructions_variant_b_note":
-    "Команда claude mcp add сохраняет значение переменной в конфигурации Claude Code. Используйте вариант B, если хотите, чтобы токен не попадал в URL и заголовки; в обоих случаях он хранится на вашей машине в пользовательской конфигурации.",
+  // Простой блок подключения ИИ-агента (features/tokens/AgentConnect.tsx), тексты утверждены владельцем 2026-11-11.
+  "agent_tokens.name_default": "Мой ИИ-агент",
+  "agent_connect.title": "Подключить ИИ-агента",
+  "agent_connect.desc_1": "Ваш ИИ-агент (например, Claude Code) сможет видеть ваши проекты и задачи и изменять их от вашего имени.",
+  "agent_connect.desc_2": "Создайте токен, скопируйте готовый текст и вставьте его в агента. Это займёт минуту.",
+  "agent_connect.created_title": "Токен создан.",
+  "agent_connect.created_text": "Скопируйте текст ниже сейчас: токен не показывается повторно.",
+  "agent_connect.client_label": "Ваш ИИ-агент",
+  "agent_connect.client_claude": "Claude Code",
+  "agent_connect.client_other": "Другой клиент",
+  "agent_connect.field_label": "Скопируйте и вставьте в своего ИИ-агента",
+  "agent_connect.placeholder": "Создайте токен, и здесь появится готовый текст для агента.",
+  "agent_connect.hint_before": "Подсказка: токен показывается один раз, после выпуска.",
+  "agent_connect.warn_after": "Токен виден только сейчас. Закроете страницу — понадобится новый токен.",
+  "agent_connect.copied": "Скопировано в буфер обмена",
+  "agent_connect.more_title": "Подробнее",
+  "agent_connect.more_1": "Агент подключается по адресу сайта с путём /mcp.",
+  "agent_connect.more_2": "Токен передаётся в заголовке Authorization; в репозиторий и общие конфиги его не вставляйте.",
+  "agent_connect.more_3": "Агент видит и меняет только то, что видите вы: свои проекты и задачи.",
+  "agent_connect.more_4": "Отозвать токен можно в списке ниже; отозванный токен перестаёт работать сразу.",
   // 019: самостоятельная регистрация, справка, профиль, имена, учётные записи без роли (plan §4.7).
   "auth.register_link": "Зарегистрироваться",
   "auth.register_title": "Регистрация",

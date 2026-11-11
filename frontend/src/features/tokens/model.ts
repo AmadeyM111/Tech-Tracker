@@ -53,3 +53,21 @@ export function nameProblem(name: string): MessageKey | null {
 export function failureMessage(error: unknown): string {
   return errorMessage(error instanceof ApiError ? error.code : "unknown");
 }
+
+export type AgentClient = "claude" | "other";
+
+/**
+ * The text the user pastes into the agent (docs/ai-integration.md). The address is the origin of this
+ * page plus /mcp; the token value is put in only here, for the one moment it is shown.
+ */
+export function connectText(client: AgentClient, origin: string, token: string): string {
+  const url = `${origin}/mcp`;
+  if (client === "claude") {
+    return `claude mcp add --transport http gtrack ${url} --header "Authorization: Bearer ${token}"`;
+  }
+  return JSON.stringify(
+    { mcpServers: { gtrack: { type: "http", url, headers: { Authorization: `Bearer ${token}` } } } },
+    null,
+    2,
+  );
+}

@@ -26,7 +26,7 @@ export function AiAgentHint({ userId, onDismiss }: { userId: string; onDismiss: 
       <p>{t("ai_hint.text")}</p>
       <div className="ai-links">
         <Link to="/profile/agents">{t("ai_hint.link_tokens")}</Link>
-        <Link to="/profile/agents#claude-code-instructions">{t("ai_hint.link_instructions")}</Link>
+        <Link to="/profile/agents#agent-connect">{t("ai_hint.link_instructions")}</Link>
       </div>
       <button type="button" className="ui-btn-secondary ai-close" aria-label={t("ai_hint.close_aria")} onClick={close}>
         {t("ai_hint.close")}
