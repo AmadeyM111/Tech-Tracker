@@ -80,3 +80,48 @@
 .agent-more li {
   margin: 4px 0;
 }
+
+/* The token list becomes cards on narrow screens: label from data-label, no horizontal scroll. */
+@media (max-width: 719px) {
+  .agent-tokens,
+  .agent-tokens tbody,
+  .agent-tokens tr,
+  .agent-tokens td {
+    display: block;
+    width: 100%;
+  }
+  .agent-tokens thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .agent-tokens tr {
+    margin-bottom: 8px;
+    padding: 8px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .agent-tokens td {
+    padding: 4px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .agent-tokens td[data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--text-muted);
+  }
+  .agent-tokens td[data-field="name"] {
+    font-weight: 600;
+  }
+  .agent-tokens td[data-field="actions"] button {
+    min-height: 44px;
+    margin-top: 4px;
+  }
+  .agent-tokens td[data-field="actions"]:empty {
+    display: none;
+  }
+}
