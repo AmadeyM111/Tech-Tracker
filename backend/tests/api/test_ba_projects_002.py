@@ -217,7 +217,7 @@ async def test_002_ac17_blocked_owner_replaced_by_any_ba_with_recipient_errors(
     api_env: ApiEnv,
 ) -> None:
     """AC-17 (FR-11): владелец ba.owner заблокирован. ba.out (не участник) передаёт владение
-    ba.member - успех. Отдельная фикстура: u1 - 422 «не та роль», ba.blocked - 422
+    ba.member - успех. Отдельная фикстура: ta1 - 422 «не та роль», ba.blocked - 422
     «заблокирован», ba.free - 422 «не участник», ta1 - 403; владелец не меняется, журнал пуст."""
     env = api_env
     w = await make_world_002(env, with_ba_extra=True)
@@ -227,7 +227,7 @@ async def test_002_ac17_blocked_owner_replaced_by_any_ba_with_recipient_errors(
     before = await snapshot(env, w)
 
     for target, expected in (
-        ("u1", (422, "recipient_wrong_role")),
+        ("ta1", (422, "recipient_wrong_role")),  # ТА; «Пользователь»-участник допустим (027 FR-7)
         ("ba.blocked", (422, "user_blocked")),
         ("ba.free", (422, "not_project_member")),
     ):
