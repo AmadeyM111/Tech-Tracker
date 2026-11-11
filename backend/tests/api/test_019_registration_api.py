@@ -596,7 +596,7 @@ async def test_019_ac12_unconfirmed_request_is_invisible_and_cannot_log_in(
 # --- AC-13: подтверждение создаёт учётную запись без роли ------------------------------
 
 
-async def test_019_ac13_confirm_creates_account_without_role_then_reset_works(
+async def test_019_ac13_confirm_creates_account_with_user_role_then_reset_works(
     reg_ws: WorkspaceRow, reset_api_env: ApiEnv
 ) -> None:
     env = reset_api_env
@@ -625,7 +625,9 @@ async def test_019_ac13_confirm_creates_account_without_role_then_reset_works(
         "SELECT workspace_id, role FROM workspace_member WHERE user_id = :u",
         u=user_id,
     )
-    assert [(row[0], row[1]) for row in members] == [(reg_ws.id, None)]
+    assert [(row[0], row[1]) for row in members] == [
+        (reg_ws.id, "user")
+    ]  # роль — сразу (2026-11-11)
     projects = await _rows(env, "SELECT count(*) FROM project_member WHERE user_id = :u", u=user_id)
     assert int(projects[0][0]) == 0
     assert await env.session_ids(user_id) == []

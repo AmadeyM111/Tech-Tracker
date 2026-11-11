@@ -11,8 +11,10 @@
 лимиты по IP и по ссылке (429) → заявка по хешу токена с ``expires_at > now`` и ``FOR UPDATE``
 (иначе 400) → адрес занят: заявка удаляется, 400 → кандидаты логина (логин из заявки, затем
 ``база.N``): первый свободный вставляется в savepoint; при гонке (``ON CONFLICT (login)``) берётся
-следующий; после ``CONFIRM_LOGIN_ATTEMPTS`` попыток — 409 → членство без роли → удаление заявки →
-событие. Сессия не создаётся (AC-16). Возвращает логин учётной записи.
+следующий; после ``CONFIRM_LOGIN_ATTEMPTS`` попыток — 409 → членство с ролью «Пользователь»
+(решение владельца 2026-11-11) → удаление заявки → события ``user.self_registered`` и
+``user.role_assigned`` (автор второго — «система»). Сессия не создаётся (AC-16). Возвращает
+логин учётной записи.
 
 Модуль не пишет логов и не включает ПДн, пароль и токен в тексты исключений (NFR-1). Транзакцию
 запроса фиксирует ``get_db``. Внутри модуля ``commit_durably`` вызывается в местах RG-6: после
@@ -49,13 +51,14 @@ from app.core.security.passwords import (
     hash_in_thread,
     validate_new_password,
 )
+from app.domain.access.roles import Role
 from app.domain.auth import password_reset
 from app.domain.auth.login_generation import login_base, login_candidates, name_slug
 from app.domain.auth.models import RegistrationRequest
 from app.domain.auth.registration_limits import Scope, register_attempt
 from app.domain.auth.registration_mail import build_registration_mail
 from app.domain.events.catalog import EventAction
-from app.domain.events.writer import record_event
+from app.domain.events.writer import UserEventDetails, record_event
 from app.domain.users.email import normalize_email
 from app.domain.users.models import AppUser
 from app.domain.users.names import normalize_person_name
@@ -393,9 +396,11 @@ async def confirm_registration(
     пространствах даёт 404, а не 400) → лимиты по IP и по ссылке → заявка по токену → адрес →
     логин (первый свободный кандидат) → вставка → членство → удаление заявки → событие.
 
-    Создаёт учётную запись ``self_registered=True`` без роли в единственном пространстве и пишет
-    ``user.self_registered`` (актор и объект — новый пользователь). Возвращает логин учётной записи
-    (v0.5: он может отличаться от логина заявки, если тот занят). Ошибки: ``FeatureDisabled``,
+    Создаёт учётную запись ``self_registered=True`` с ролью «Пользователь» в единственном
+    пространстве и пишет ``user.self_registered`` (актор и объект — новый пользователь) и
+    ``user.role_assigned`` (актор — «система», ``role_from=None``, ``role_to=user``). Возвращает
+    логин учётной записи (v0.5: он может отличаться от логина заявки, если тот занят). Ошибки:
+    ``FeatureDisabled``,
     ``RateLimited`` (429), ``RegistrationTokenInvalid`` (400: токен не найден или истёк,
     адрес занят), ``LoginTakenConflict`` (409, только если все попытки заняты). Сессия не создаётся
     (AC-16).
@@ -422,7 +427,7 @@ async def confirm_registration(
         pg_insert(WorkspaceMember).values(
             workspace_id=workspace_id,
             user_id=user_id,
-            role=None,
+            role=Role.USER.value,  # владелец, 2026-11-11: сразу «Пользователь»
             created_at=now,
             updated_at=now,
             created_by=None,
@@ -435,5 +440,14 @@ async def confirm_registration(
         actor_id=user_id,
         action=EventAction.USER_SELF_REGISTERED,
         entity_id=user_id,
+    )
+    # Роль назначена в той же транзакции; событие как при назначении роли, автор — «система».
+    await record_event(
+        db,
+        workspace_id=workspace_id,
+        actor_id=None,
+        action=EventAction.USER_ROLE_ASSIGNED,
+        entity_id=user_id,
+        details=UserEventDetails(role_from=None, role_to=Role.USER.value),
     )
     return login

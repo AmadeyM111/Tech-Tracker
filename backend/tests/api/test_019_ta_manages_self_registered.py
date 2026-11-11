@@ -98,7 +98,7 @@ async def test_019_ac22_ta_list_shows_self_registered_with_names_and_flag(
     assert (view["first_name"], view["last_name"]) == (FIRST, LAST)
     assert view["self_registered"] is True
     assert view["email"] == "ta.reg1@example.test"
-    assert view["role"] is None
+    assert view["role"] == "user"  # роль назначена при подтверждении (2026-11-11)
     assert view["is_blocked"] is False
     assert view["must_change_password"] is False
 
@@ -142,31 +142,29 @@ async def test_019_ac22_ta_blocks_resets_and_assigns_each_role(
     assert (await _admin_view(env, ta_token, user_id))["role"] == expected_role
 
 
-async def test_019_ta_assigns_user_role_then_projects_200_in_same_session(
+async def test_019_self_registered_works_at_once_and_ta_can_change_the_role(
     reset_api_env: ApiEnv, reg_ws: WorkspaceRow
 ) -> None:
-    """AC-25, AC-26 (ТА): вход без роли, роль «Пользователь», /projects 200 в той же сессии."""
+    """AC-25, AC-26: сразу роль «Пользователь» и /projects 200; ТА может сменить роль."""
     env = reset_api_env
     _, (ta_token,) = await seed(env, reg_ws, "tech_admin", login="ta.role")
     user_id, login = await _register(env, 3)
 
     entered = await env.login(login, PW)
     assert entered.status_code == 200, entered.text
-    assert entered.json()["user"]["role"] is None
+    assert entered.json()["user"]["role"] == "user"
     session = env.token_from(entered)
     assert session
-    denied = await env.client.get(PROJECTS, headers=env.auth(session))
-    assert (denied.status_code, code_of(denied)) == (403, "no_role")
-
-    assigned = await admin_call(env, ta_token, "role_user", user_id)
-    assert assigned.status_code == 200, assigned.text
-
     projects = await env.client.get(PROJECTS, headers=env.auth(session))
     assert projects.status_code == 200, projects.text
     me = await env.me(session)
     assert me.status_code == 200, me.text
     assert me.json()["role"] == "user"
     assert me.json()["first_name"] == FIRST and me.json()["last_name"] == LAST
+
+    promoted = await admin_call(env, ta_token, "role_ba", user_id)  # ТА может сменить роль
+    assert promoted.status_code == 200, promoted.text
+    assert (await env.me(session)).json()["role"] == "business_admin"  # та же сессия (FR-67)
 
 
 async def test_019_ac33_ta_creates_account_with_names_one_time_password_and_must_change(
