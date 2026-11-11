@@ -8,10 +8,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.api.v1.schemas.common import UserRef
 from app.domain.access.roles import Role
@@ -51,9 +51,20 @@ class OwnerChange(BaseModel):
 
 
 class MemberAdd(BaseModel):
+    """Ровно одно из: ``user_id`` (БА) или точные ``login``/``email`` (spec 027 FR-4)."""
+
     model_config = ConfigDict(extra="forbid")
 
-    user_id: UUID
+    user_id: UUID | None = None
+    login: str | None = Field(default=None, min_length=1, max_length=64)
+    email: str | None = Field(default=None, min_length=1, max_length=254)
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> Self:
+        given = [v for v in (self.user_id, self.login, self.email) if v is not None]
+        if len(given) != 1:
+            raise ValueError("укажите ровно одно из user_id, login, email")
+        return self
 
 
 class ProjectPermissions(BaseModel):

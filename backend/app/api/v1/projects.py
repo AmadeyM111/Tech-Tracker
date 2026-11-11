@@ -104,7 +104,7 @@ async def update_project(
 async def change_owner(
     project_id: UUID, body: OwnerChange, db: DbSession, actor: CurrentActor
 ) -> ProjectDetail:
-    """Передаёт владение участнику-БА (FR-14a); пишет событие аудита."""
+    """Передаёт владение участнику с ролью БА или «Пользователь» (027 FR-7); пишет аудит."""
     view = await service.transfer_ownership(db, actor, project_id, new_owner_id=body.user_id)
     return ProjectDetail.model_validate(view)
 
@@ -189,8 +189,14 @@ def _activity_item(row: activity.FeedRow) -> ActivityItem:
 async def add_member(
     project_id: UUID, body: MemberAdd, db: DbSession, actor: CurrentActor
 ) -> Response:
-    """Добавляет участника; уже участник — 204 без изменений (D-46)."""
-    await members.add_member(db, actor, project_id, body.user_id)
+    """Добавляет участника по ``user_id`` (БА) или точному логину/email (027 FR-4).
+
+    По ``user_id`` повтор — 204 (D-46); по логину/email — 422 ``member_already_added``;
+    не найден — 422 ``recipient_not_found``; «Пользователь» — не больше 20 попыток в час (429).
+    """
+    await members.add_member(
+        db, actor, project_id, user_id=body.user_id, login=body.login, email=body.email
+    )
     return Response(status_code=204)
 
 

@@ -17,7 +17,7 @@ from app.domain.access.roles import ROLE_CAPABILITIES, Capability, Role
 class RecipientPurpose(StrEnum):
     PROJECT_MEMBER = auto()  # БА, «Пользователь»
     TASK_ASSIGNEE = auto()  # БА, «Пользователь» + участник проекта
-    PROJECT_OWNER = auto()  # БА + участник проекта
+    PROJECT_OWNER = auto()  # БА, «Пользователь» + участник проекта
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,8 +32,8 @@ class RecipientFacts:
 _REQUIRED_CAPABILITY = {
     RecipientPurpose.PROJECT_MEMBER: Capability.BUSINESS_ACCESS,
     RecipientPurpose.TASK_ASSIGNEE: Capability.BUSINESS_ACCESS,
-    # Передача владения — только БА (002/FR-8); владелец-«Пользователь» — этап 2 (спека 027).
-    RecipientPurpose.PROJECT_OWNER: Capability.PROJECT_MANAGE_ANY,
+    # Передача владения (spec 027 FR-7): участнику с ролью БА или «Пользователь».
+    RecipientPurpose.PROJECT_OWNER: Capability.BUSINESS_ACCESS,
 }
 _MEMBER_REQUIRED = frozenset({RecipientPurpose.TASK_ASSIGNEE, RecipientPurpose.PROJECT_OWNER})
 

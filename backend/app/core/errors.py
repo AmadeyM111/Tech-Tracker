@@ -93,6 +93,9 @@ class ErrorCode(StrEnum):
     attachment_empty = "attachment_empty"
     # [025]
     export_too_large = "export_too_large"
+    # [027]
+    recipient_not_found = "recipient_not_found"
+    member_already_added = "member_already_added"
 
 
 class AppError(Exception):

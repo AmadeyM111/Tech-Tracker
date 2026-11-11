@@ -589,7 +589,12 @@ def test_commit_durably_used_only_by_auth_service() -> None:
     ``commit_durably``; определён в core/db.py, вызывается только из domain/auth/service.py
     и (T16a) api/deps.py (``get_actor`` фиксирует активность сессии до обработчика)."""
     required_users = {"domain/auth/service.py"}
-    allowed_users = required_users | {"api/deps.py", "domain/auth/registration.py"}
+    # spec 027 Q-7: неудачные добавления участников фиксируются до ответа 422 (счётчик попыток)
+    allowed_users = required_users | {
+        "api/deps.py",
+        "domain/auth/registration.py",
+        "domain/projects/members.py",
+    }
     definition = "core/db.py"
     users: set[str] = set()
     defined_in: set[str] = set()

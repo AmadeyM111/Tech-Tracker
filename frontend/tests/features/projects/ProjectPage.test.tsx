@@ -291,7 +291,7 @@ const OWN_MEMBERS = [M_OWNER, M_ME, M_PETROV, M_SIDOROV, M_KUZNETSOV, M_BLOCKED_
 const ID_BLOCKED = "99999999-9999-4999-8999-999999999999";
 
 describe("transfer ownership from members (FR-14a, AC-52, AC-72, review T81 p.1)", () => {
-  it("ac17_candidates_are_unblocked_business_admin_members_not_users", async () => {
+  it("ac17_candidates_are_unblocked_business_admin_and_user_members", async () => {
     const { container } = await open(BUSINESS, {}, { members: OWN_MEMBERS });
     await waitFor(() => expect(candidate(container, ID_KUZNETSOV)).toBeTruthy());
     const sec = ownerSection(container)!;
@@ -301,16 +301,16 @@ describe("transfer ownership from members (FR-14a, AC-52, AC-72, review T81 p.1)
     expect(candidate(sec, ID_SIDOROV)).toBeNull(); // без роли
     expect(candidate(sec, ID_BLOCKED)).toBeNull(); // БА, но заблокирован
     expect(candidate(sec, ID_TA_MEMBER)).toBeNull(); // ТА, не заблокирован (FR-11, FR-16)
-    expect(candidate(sec, ID_USER_MEMBER)).toBeNull(); // user, не заблокирован
+    expect(candidate(sec, ID_USER_MEMBER)).toBeTruthy(); // user, не заблокирован (027 FR-7)
     expect(f.count(MEMBERS)).toBeGreaterThanOrEqual(1);
     expect(f.count(USERS)).toBe(0);
   });
 
-  it("ac52_user_role_member_is_not_a_candidate", async () => {
+  it("027_fr7_user_role_member_is_a_candidate", async () => {
     const plainUser = member({ id: ID_PETROV, login: "petrov" }, { role: "user" });
     const { container } = await open(BUSINESS, {}, { members: [M_OWNER, M_KUZNETSOV, plainUser] });
     await waitFor(() => expect(candidate(container, ID_KUZNETSOV)).toBeTruthy());
-    expect(candidate(container, ID_PETROV)).toBeNull();
+    expect(candidate(container, ID_PETROV)).toBeTruthy();
   });
 
   it("ac52_search_filters_candidates_on_client_without_requests", async () => {
@@ -482,20 +482,20 @@ describe("members tab (AC-53, AC-73, FR-15, FR-15a)", () => {
     await waitFor(() => expect(memberRow(container, ID_PETROV)).toBeTruthy());
     const before = f.count(MEMBERS);
     fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    // 027 Q-10: удаление участника — с подтверждением в диалоге
+    expect(f.count(REMOVE(ID_PETROV))).toBe(0);
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await waitFor(() => expect(f.count(REMOVE(ID_PETROV))).toBe(1));
     await waitFor(() => expect(f.count(MEMBERS)).toBeGreaterThan(before));
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("ac53_owner_cannot_be_removed_code_is_shown", async () => {
-    const { container } = await open(BUSINESS, {
-      [REMOVE(ID_IVANOV)]: () => err(422, "owner_cannot_be_removed"),
-    });
+  it("ac53_owner_row_has_no_remove_button", async () => {
+    const { container } = await open(BUSINESS, {});
     await openMembersTab();
     await waitFor(() => expect(memberRow(container, ID_IVANOV)).toBeTruthy());
-    fireEvent.click(action(memberRow(container, ID_IVANOV)!, "remove-member"));
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe(errorMessage("owner_cannot_be_removed"));
+    // 027 макет: владельца удалить нельзя (сервер всё равно отвечает owner_cannot_be_removed)
+    expect(q(memberRow(container, ID_IVANOV)!, 'button[data-action="remove-member"]')).toBeNull();
   });
 
   it("fr15a_leave_project_requires_confirmation_then_deletes_self", async () => {
@@ -541,8 +541,10 @@ describe("members tab (AC-53, AC-73, FR-15, FR-15a)", () => {
       expect((b.textContent ?? "").trim() !== "" || b.hasAttribute("aria-label"), b.outerHTML).toBe(true);
     }
     fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await screen.findByRole("alert");
     fireEvent.click(action(memberRow(container, ID_SIDOROV)!, "remove-member"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await waitFor(() => expect(f.count(REMOVE(ID_SIDOROV))).toBe(1));
     await new Promise((r) => setTimeout(r, 30));
     expect(screen.getAllByRole("alert").length).toBe(1);
@@ -570,15 +572,21 @@ describe("review T82 attempt 2", () => {
     expect(document.activeElement).not.toBe(document.body);
   });
 
-  it("fr15a_remove_button_in_foreign_row_has_no_dialog", async () => {
+  it("027_q10_remove_button_in_foreign_row_asks_for_confirmation", async () => {
     const { container } = await open(BUSINESS, { [REMOVE(ID_PETROV)]: NO_CONTENT }, {
       detail: { permissions: PERM_BA_MEMBER },
     });
     await openMembersTab();
     await waitFor(() => expect(memberRow(container, ID_PETROV)).toBeTruthy());
     fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(f.count(REMOVE(ID_PETROV))).toBe(0);
+    fireEvent.click(action(dialog, "cancel"));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(f.count(REMOVE(ID_PETROV))).toBe(0);
+    fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await waitFor(() => expect(f.count(REMOVE(ID_PETROV))).toBe(1));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
   it("fr15a_adding_self_shows_leave_button_without_reload_and_removal_refreshes_card", async () => {
@@ -606,6 +614,7 @@ describe("review T82 attempt 2", () => {
     const before = f.count(ONE);
     await waitFor(() => expect(memberRow(container, ID_PETROV)).toBeTruthy());
     fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await waitFor(() => expect(f.count(ONE)).toBeGreaterThan(before));
   });
 
@@ -650,6 +659,7 @@ describe("review T82 attempt 2", () => {
     await openMembersTab();
     await waitFor(() => expect(memberRow(container, ID_PETROV)).toBeTruthy());
     fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await screen.findByRole("alert");
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "pet" } });
     await waitFor(() => expect(container.textContent).toContain(errorMessage("internal_error")));

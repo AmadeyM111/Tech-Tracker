@@ -34,6 +34,8 @@ USER_ACTIONS = {
     "user.name_changed",
     # 025 (ADR-0023): выгрузка CSV «Сводки» — аудит автора выгрузки
     "user.overview_exported",
+    # 027 (Q-7): неудачное добавление участника по логину/email — аудит автора
+    "user.member_add_failed",
 }
 
 F = frozenset

@@ -16,6 +16,7 @@ from app.core.pagination import PageParams
 from app.domain.access.recipients import RecipientFacts
 from app.domain.access.roles import ROLE_CAPABILITIES, Actor, Capability, Role
 from app.domain.projects.models import Project, ProjectMember
+from app.domain.users.email import normalize_email
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import WorkspaceMember
 
@@ -105,6 +106,38 @@ async def list_directory(
     rows = (await db.execute(stmt)).all()
     items = [DirectoryUser(id=r.id, login=r.login_display, role=Role(r.role)) for r in rows]
     return items[: params.page_size], len(items) > params.page_size
+
+
+async def find_member_candidate(
+    db: AsyncSession, workspace_id: UUID, *, login: str | None, email: str | None
+) -> UUID | None:
+    """Точный поиск добавляемого участника по логину или email (spec 027 FR-4).
+
+    Логин сравнивается по ключу (нижний регистр, 001/FR-73a), email — в нижнем регистре.
+    Подходит только зарегистрированный незаблокированный пользователь пространства с ролью
+    БА или «Пользователь»: во всех остальных случаях (нет, ТА, без роли, заблокирован) ответ
+    один — ``None``, чтобы перебор не различал причины.
+    """
+    if (login is None) == (email is None):
+        raise ValueError("нужен ровно один из login и email")
+    if login is not None:
+        key = AppUser.login == login.strip().lower()
+    else:
+        normalized = normalize_email(email or "")
+        if normalized is None:
+            return None
+        key = AppUser.email == normalized
+    stmt = (
+        select(AppUser.id)
+        .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
+        .where(
+            key,
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.role.in_(_DIRECTORY_ROLES),
+            AppUser.is_blocked.is_(False),
+        )
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
 
 
 async def load_recipient(

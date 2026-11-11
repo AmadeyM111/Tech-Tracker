@@ -877,7 +877,10 @@ export interface paths {
         put?: never;
         /**
          * Add Member
-         * @description Добавляет участника; уже участник — 204 без изменений (D-46).
+         * @description Добавляет участника по ``user_id`` (БА) или точному логину/email (027 FR-4).
+         *
+         *     По ``user_id`` повтор — 204 (D-46); по логину/email — 422 ``member_already_added``;
+         *     не найден — 422 ``recipient_not_found``; «Пользователь» — не больше 20 попыток в час (429).
          */
         post: operations["add_member"];
         delete?: never;
@@ -916,7 +919,7 @@ export interface paths {
         get?: never;
         /**
          * Change Owner
-         * @description Передаёт владение участнику-БА (FR-14a); пишет событие аудита.
+         * @description Передаёт владение участнику с ролью БА или «Пользователь» (027 FR-7); пишет аудит.
          */
         put: operations["change_owner"];
         post?: never;
@@ -1550,13 +1553,17 @@ export interface components {
             must_change_password: boolean;
             role: components["schemas"]["Role"];
         };
-        /** MemberAdd */
+        /**
+         * MemberAdd
+         * @description Ровно одно из: ``user_id`` (БА) или точные ``login``/``email`` (spec 027 FR-4).
+         */
         MemberAdd: {
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
+            /** Email */
+            email?: string | null;
+            /** Login */
+            login?: string | null;
+            /** User Id */
+            user_id?: string | null;
         };
         /**
          * NotificationKind

@@ -21,7 +21,9 @@ import {
 import { BoardView } from "../boards/BoardView";
 import { ProjectTaskList } from "../tasks/TaskList";
 import { ActivityFeed } from "./ActivityFeed";
+import { MemberAdd } from "./MemberAdd";
 import { ProjectFields } from "./ProjectsPage";
+import "./members.css";
 
 type TabId = "board" | "tasks" | "members" | "activity";
 const TABS: readonly TabId[] = ["board", "tasks", "members", "activity"];
@@ -38,8 +40,8 @@ const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : "unknow
 /** An id that is not a uuid is answered with 422: for the user it is "no such project". */
 const loadCodeOf = (e: unknown): string => (e instanceof ApiError && e.status === 422 ? "not_found" : codeOf(e));
 
-/** Roles that may own a project (FR-14a). */
-const OWNER_ROLES: ReadonlyArray<ProjectMember["role"]> = ["business_admin"];
+/** Roles that may own a project (spec 027 FR-7): a business admin or a user. */
+const OWNER_ROLES: ReadonlyArray<ProjectMember["role"]> = ["business_admin", "user"];
 
 function roleText(role: ProjectMember["role"]): string {
   return t(role === null ? "admin.role.none" : (`admin.role.${role}` as MessageKey));
@@ -107,6 +109,8 @@ function ProjectCard({
   const [pending, setPending] = useState(false);
   const [tab, setTab] = useState<TabId>("board");
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  // Removing a participant asks first (spec 027 Q-10): it takes the project away from them.
+  const [removing, setRemoving] = useState<ProjectMember["user"] | null>(null);
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description);
   const [search, setSearch] = useState("");
@@ -137,6 +141,7 @@ function ProjectCard({
       alert.show(errorMessage(codeOf(e)));
     }
     setConfirmation(null);
+    setRemoving(null);
     busy.current = false;
     setPending(false);
   }
@@ -182,6 +187,13 @@ function ProjectCard({
       setConfirmation("leave");
       return;
     }
+    const target = (members.data ?? []).find((m) => m.user.id === userId);
+    if (target !== undefined) setRemoving(target.user);
+  }
+
+  function onConfirmRemove(): void {
+    if (removing === null) return;
+    const userId = removing.id;
     void run(async () => {
       await removeMember(project.id, userId);
       await reload();
@@ -335,7 +347,10 @@ function ProjectCard({
         ) : null}
         {tab === "members" ? (
           <>
-            {permissions.manage_members ? (
+            {permissions.manage_members && currentRole === "user" ? (
+              <MemberAdd projectId={project.id} onAdded={reload} />
+            ) : null}
+            {permissions.manage_members && currentRole !== "user" ? (
               <UserPicker
                 label={t("projects.member_add_label")}
                 busy={pending}
@@ -353,7 +368,7 @@ function ProjectCard({
             ) : all.length === 0 ? (
               <p>{t("projects.members_empty")}</p>
             ) : (
-              <table className="ui-table" aria-label={t("projects.members_list_label")}>
+              <table className="ui-table member-table" aria-label={t("projects.members_list_label")}>
                 <thead>
                   <tr>
                     <th scope="col">{t("projects.col_login")}</th>
@@ -366,12 +381,13 @@ function ProjectCard({
                 <tbody>
                   {all.map((m) => (
                     <tr key={m.user.id} data-user-id={m.user.id}>
-                      <td data-field="login">{m.user.login}</td>
-                      <td data-field="role">{roleText(m.role)}</td>
+                      <td data-field="login" data-label={t("projects.col_login")}>{m.user.login}</td>
+                      <td data-field="role" data-label={t("projects.col_role")}>{roleText(m.role)}</td>
                       <td data-field="owner">{m.is_owner ? t("projects.member_owner") : null}</td>
                       <td data-field="blocked">{m.is_blocked ? t("projects.member_blocked") : null}</td>
                       {permissions.manage_members ? (
-                        <td>
+                        <td data-field="actions">
+                          {m.is_owner ? null : (
                           <button
                             type="button"
                             data-action="remove-member"
@@ -380,6 +396,7 @@ function ProjectCard({
                           >
                             {t("projects.member_remove")}
                           </button>
+                          )}
                         </td>
                       ) : null}
                     </tr>
@@ -398,6 +415,17 @@ function ProjectCard({
         ) : null}
         {tab === "activity" ? <ActivityFeed projectId={project.id} /> : null}
       </div>
+
+      {removing === null ? null : (
+        <ConfirmDialog
+          title={t("projects.member_remove_title")}
+          message={t("projects.member_remove_message", { login: removing.login, name: project.name })}
+          confirmLabel={t("projects.member_remove")}
+          pending={pending}
+          onConfirm={onConfirmRemove}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
 
       {confirmation === null ? null : (
         <ConfirmDialog
