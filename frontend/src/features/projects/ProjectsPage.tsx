@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
-import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
+import { ErrorAlert, FieldError, useAlertState } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
 import { createProject, listProjects } from "./api";
 
@@ -15,24 +15,42 @@ export interface ProjectFieldsProps {
   description: string;
   onName: (value: string) => void;
   onDescription: (value: string) => void;
+  /** Текст ошибки под полем «Название» (пустое название при создании). */
+  nameError?: string | null;
 }
 
 /** Name and description inputs shared by the create and the edit forms. */
-export function ProjectFields({ name, description, onName, onDescription }: ProjectFieldsProps) {
+export function ProjectFields({
+  name,
+  description,
+  onName,
+  onDescription,
+  nameError = null,
+}: ProjectFieldsProps) {
   const id = useId();
+  const nameErrorId = `${id}-name-error`;
   return (
     <>
       <div className="ui-field">
-        <label htmlFor={`${id}-name`}>{t("projects.name_label")}</label>
+        <label htmlFor={`${id}-name`}>
+          {t("projects.name_label")}
+          <span className="ui-required" aria-hidden="true">
+            {t("tasks.required_mark")}
+          </span>
+        </label>
         <input
           id={`${id}-name`}
           name="name"
           type="text"
           maxLength={PROJECT_NAME_MAX}
           autoComplete="off"
+          aria-required={true}
+          aria-invalid={nameError === null ? undefined : "true"}
+          aria-describedby={nameError === null ? undefined : nameErrorId}
           value={name}
           onChange={(e) => onName(e.target.value)}
         />
+        <FieldError id={nameErrorId} message={nameError} />
       </div>
       <div className="ui-field">
         <label htmlFor={`${id}-description`}>{t("projects.description_label")}</label>
@@ -58,6 +76,8 @@ export function ProjectsPage({ canCreate }: { canCreate: boolean }) {
   const [page, setPage] = useState(1);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const headingBase = useId();
 
   // Entering the screen (also after leaving a project) puts the focus on the heading.
   useEffect(() => {
@@ -76,7 +96,7 @@ export function ProjectsPage({ canCreate }: { canCreate: boolean }) {
     if (busy.current) return;
     const title = name.trim();
     if (title === "") {
-      alert.show(errorMessage("validation_error"));
+      setNameError(t("projects.error_name_required"));
       return;
     }
     busy.current = true;
@@ -105,11 +125,25 @@ export function ProjectsPage({ canCreate }: { canCreate: boolean }) {
       <ErrorAlert message={alert.message ?? listError} seq={alert.seq} />
 
       {canCreate ? (
-        <form data-form="create-project" onSubmit={(e) => void onCreate(e)} noValidate aria-label={t("projects.create_title")}>
-          <ProjectFields name={name} description={description} onName={setName} onDescription={setDescription} />
-          <button type="submit">{t("projects.create_submit")}</button>
-        </form>
+        <section aria-labelledby={`${headingBase}-create`}>
+          <h2 id={`${headingBase}-create`}>{t("projects.create_heading")}</h2>
+          <form data-form="create-project" onSubmit={(e) => void onCreate(e)} noValidate aria-label={t("projects.create_heading")}>
+            <ProjectFields
+              name={name}
+              description={description}
+              onName={(value) => {
+                setName(value);
+                setNameError(null);
+              }}
+              onDescription={setDescription}
+              nameError={nameError}
+            />
+            <button type="submit">{t("projects.create_submit")}</button>
+          </form>
+        </section>
       ) : null}
+
+      <h2 id={`${headingBase}-list`}>{t("projects.list_heading")}</h2>
 
       {data === undefined ? (
         projects.isPending ? (
