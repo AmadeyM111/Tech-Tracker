@@ -184,7 +184,7 @@ export const ru = {
   "projects.title": "Список проектов",
   "projects.project_title": "Карточка проекта",
   "projects.list_label": "Проекты пространства",
-  "projects.empty": "Проектов пока нет",
+  "projects.empty": "У вас пока нет проектов — создайте первый.",  // спека 027, макет projects-empty
   "projects.col_name": "Название",
   "projects.col_owner": "Владелец",
   "projects.col_tasks": "Задач",
@@ -327,6 +327,7 @@ export const ru = {
   "tasks.project_label": "Проект",
   "tasks.project_placeholder": "Выберите проект",
   "tasks.no_creatable_projects": "Нет проектов, в которых вы можете создавать задачи",
+  "tasks.create_project_link": "Создать проект",  // спека 027: ссылка на /projects из диалога
   "tasks.dialog_close": "Закрыть",
   "tasks.status_label": "Сменить статус",
   "tasks.close_open_subtasks": "У задачи есть незакрытые подзадачи. Закрыть задачу, не закрывая их?",

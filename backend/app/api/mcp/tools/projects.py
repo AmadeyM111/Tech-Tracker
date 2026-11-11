@@ -10,10 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.mcp.registry import ToolSpec
 from app.api.mcp.tools.base import make_tool
-from app.api.v1.schemas.projects import ProjectDetail, ProjectListItem
+from app.api.v1.schemas.projects import ProjectCreate, ProjectDetail, ProjectListItem
 from app.core.pagination import Page, PageParams
 from app.domain.access.roles import Actor, Capability
 from app.domain.projects import queries
+from app.domain.projects import service as projects_service
 
 
 class ProjectIdArgs(BaseModel):
@@ -31,6 +32,13 @@ async def _list(db: AsyncSession, actor: Actor, args: PageParams) -> dict[str, A
     return page.model_dump(mode="json")
 
 
+async def _create(db: AsyncSession, actor: Actor, args: ProjectCreate) -> dict[str, Any]:
+    view = await projects_service.create_project(
+        db, actor, name=args.name, description=args.description
+    )
+    return ProjectDetail.model_validate(view).model_dump(mode="json")
+
+
 async def _get(db: AsyncSession, actor: Actor, args: ProjectIdArgs) -> dict[str, Any]:
     view = await queries.get_project(db, actor, args.project_id)
     return ProjectDetail.model_validate(view).model_dump(mode="json")
@@ -44,6 +52,13 @@ def project_tools() -> list[ToolSpec]:
             PageParams,
             Capability.BUSINESS_ACCESS,
             _list,
+        ),
+        make_tool(
+            "create_project",
+            "Создать проект: владельцем становится вызывающий (спека 027, лимит 30).",
+            ProjectCreate,
+            Capability.PROJECT_CREATE,
+            _create,
         ),
         make_tool(
             "get_project",
