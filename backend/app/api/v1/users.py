@@ -31,7 +31,10 @@ CurrentActor = Annotated[Actor, Depends(get_active_actor)]
 async def list_directory(
     db: DbSession, actor: CurrentActor, params: Annotated[DirectoryQuery, Query()]
 ) -> Page[DirectoryUser]:
-    """Незаблокированные пользователи пространства с ролью БА/П; ``q`` — подстрока логина."""
+    """Незаблокированные пользователи с ролью БА/П; ``q`` — подстрока логина.
+
+    БА видит всех в пространстве; «Пользователь» — только людей из общих проектов и себя (027 FR-5).
+    """
     users, has_next = await directory.list_directory(db, actor, params, q=params.q)
     return Page[DirectoryUser](
         items=[DirectoryUser.model_validate(user) for user in users],

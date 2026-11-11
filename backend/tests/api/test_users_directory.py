@@ -20,6 +20,7 @@ from tests.admin_support import PW, new_workspace, seed
 from tests.api.test_route_guards import _api_operations
 from tests.conftest import ApiEnv
 from tests.db_support import BACKEND_DIR
+from tests.factories import make_project, make_project_member
 
 URL = "/api/v1/users"
 ITEM_FIELDS = {"id", "login", "role"}
@@ -36,6 +37,25 @@ async def _get(env: ApiEnv, token: str | None, **params: Any) -> httpx.Response:
     return await env.client.get(URL, params=params, headers=headers)
 
 
+async def _share_project(
+    env: ApiEnv, ws: Any, owner: Any, *members: Any, deleted: bool = False
+) -> None:
+    """Проект ``owner`` с участниками ``members`` (spec 027: «Пользователь» видит общие проекты)."""
+    async with env.sessionmaker() as session:
+        project = await make_project(session, workspace_id=ws.id, owner_id=owner.id, name="Общий")
+        for member in members:
+            await make_project_member(
+                session, project_id=project.id, user_id=member.id, workspace_id=ws.id
+            )
+        await session.commit()
+    if deleted:
+        from sqlalchemy import text
+
+        await env.execute(
+            text("UPDATE project SET deleted_at = now() WHERE id = :p").bindparams(p=project.id)
+        )
+
+
 def _code(r: httpx.Response) -> str:
     return str(r.json()["code"])
 
@@ -46,6 +66,7 @@ async def test_fr13_business_roles_get_directory_page(api_env: ApiEnv, role: str
     ws = await new_workspace(env)
     me, (token,) = await seed(env, ws, role, login="dir.me")
     other, _ = await seed(env, ws, "user", login="dir.other")
+    await _share_project(env, ws, me, other)  # «Пользователь» видит только общие проекты (027)
 
     r = await _get(env, token)
 
@@ -119,7 +140,7 @@ async def test_ac21_other_workspace_users_are_invisible(api_env: ApiEnv) -> None
 async def test_t35_q_filters_by_substring_case_insensitive(api_env: ApiEnv) -> None:
     env = api_env
     ws = await new_workspace(env)
-    _, (token,) = await seed(env, ws, "user", login="me.self")
+    _, (token,) = await seed(env, ws, "business_admin", login="me.self")
     await seed(env, ws, "user", login="ivan.petrov")
     await seed(env, ws, "user", login="olga")
     r = await _get(env, token, q="IVAN")
@@ -130,7 +151,7 @@ async def test_t35_q_filters_by_substring_case_insensitive(api_env: ApiEnv) -> N
 async def test_d24_special_chars_in_q_are_safe_and_literal(api_env: ApiEnv, q: str) -> None:
     env = api_env
     ws = await new_workspace(env)
-    _, (token,) = await seed(env, ws, "user", login="me.self")
+    _, (token,) = await seed(env, ws, "business_admin", login="me.self")
     await seed(env, ws, "user", login="axb")
     await seed(env, ws, "user", login="a_b")
 
@@ -150,7 +171,7 @@ async def test_d24_special_chars_in_q_are_safe_and_literal(api_env: ApiEnv, q: s
 async def test_t35_pagination_has_next_and_page_echo(api_env: ApiEnv) -> None:
     env = api_env
     ws = await new_workspace(env)
-    _, (token,) = await seed(env, ws, "user", login="p.0")
+    _, (token,) = await seed(env, ws, "business_admin", login="p.0")
     for i in range(1, 5):
         await seed(env, ws, "user", login=f"p.{i}", sessions=0)
 
@@ -266,9 +287,10 @@ async def test_ac130_search_ignores_case_and_returns_login_as_created(
 ) -> None:
     env = api_env
     ws = await new_workspace(env)
-    _, (token,) = await seed(env, ws, role, login="Searcher.One")
-    await seed(env, ws, "business_admin", login="Ivanov.Petr")
-    await seed(env, ws, "user", login="Sidorova.Anna")
+    me, (token,) = await seed(env, ws, role, login="Searcher.One")
+    petr, _ = await seed(env, ws, "business_admin", login="Ivanov.Petr")
+    anna, _ = await seed(env, ws, "user", login="Sidorova.Anna")
+    await _share_project(env, ws, me, petr, anna)
 
     r = await _get(env, token, q=q)
 
@@ -298,10 +320,97 @@ async def test_oi129_directory_is_ordered_by_normalized_login_ignoring_case(
     """OI-129 а): ``anna, Boris, ivan, Kirill`` (без пунктуации: порядок не зависит от БД)."""
     env = api_env
     ws = await new_workspace(env)
-    _, (token,) = await seed(env, ws, "user", login="zed")
+    _, (token,) = await seed(env, ws, "business_admin", login="zed")
     for login in ("Kirill", "ivan", "Boris", "anna"):
         await seed(env, ws, "user", login=login, sessions=0)
 
     r = await _get(env, token)
 
     assert [i["login"] for i in r.json()["items"]] == ["anna", "Boris", "ivan", "Kirill", "zed"]
+
+
+# --- 027 FR-5: «Пользователь» видит только людей из общих проектов ----------------------------
+
+
+async def test_027_user_sees_only_people_from_shared_projects_and_self(api_env: ApiEnv) -> None:
+    env = api_env
+    ws = await new_workspace(env)
+    me, (token,) = await seed(env, ws, "user", login="u.me")
+    mate, _ = await seed(env, ws, "user", login="u.mate")  # участник общего проекта
+    boss, _ = await seed(env, ws, "business_admin", login="u.boss")  # владелец общего проекта
+    await seed(env, ws, "user", login="u.stranger")  # общего проекта нет
+    await seed(env, ws, "business_admin", login="u.other.ba")
+    await _share_project(env, ws, boss, me, mate)
+
+    r = await _get(env, token)
+
+    assert r.status_code == 200, r.text
+    assert [i["login"] for i in r.json()["items"]] == ["u.boss", "u.mate", "u.me"]
+
+
+async def test_027_owner_counts_as_member_of_own_project(api_env: ApiEnv) -> None:
+    env = api_env
+    ws = await new_workspace(env)
+    me, (token,) = await seed(env, ws, "user", login="o.me")
+    mate, _ = await seed(env, ws, "user", login="o.mate")
+    await _share_project(env, ws, me, mate)  # я владелец, mate — участник
+
+    logins = [i["login"] for i in (await _get(env, token)).json()["items"]]
+    assert logins == ["o.mate", "o.me"]
+
+
+async def test_027_no_shared_project_means_only_self_and_blocked_stay_hidden(
+    api_env: ApiEnv,
+) -> None:
+    env = api_env
+    ws = await new_workspace(env)
+    me, (token,) = await seed(env, ws, "user", login="n.me")
+    blocked, _ = await seed(env, ws, "user", login="n.blocked", blocked=True)
+    await _share_project(env, ws, me, blocked)
+    assert [i["login"] for i in (await _get(env, token)).json()["items"]] == ["n.me"]
+    # без общих проектов — только он сам
+    alone, (token2,) = await seed(env, ws, "user", login="n.alone")
+    assert [i["login"] for i in (await _get(env, token2)).json()["items"]] == ["n.alone"]
+
+
+async def test_027_deleted_project_does_not_make_people_visible(api_env: ApiEnv) -> None:
+    env = api_env
+    ws = await new_workspace(env)
+    me, (token,) = await seed(env, ws, "user", login="d.me")
+    mate, _ = await seed(env, ws, "user", login="d.mate")
+    await _share_project(env, ws, me, mate, deleted=True)
+    assert [i["login"] for i in (await _get(env, token)).json()["items"]] == ["d.me"]
+
+
+async def test_027_other_workspace_projects_do_not_leak(api_env: ApiEnv) -> None:
+    env = api_env
+    ws = await new_workspace(env)
+    other_ws = await new_workspace(env)
+    me, (token,) = await seed(env, ws, "user", login="w.me")
+    foreign, _ = await seed(env, other_ws, "user", login="w.foreign")
+    await _share_project(env, other_ws, foreign)
+    assert [i["login"] for i in (await _get(env, token)).json()["items"]] == ["w.me"]
+    assert me.id
+
+
+async def test_027_search_and_paging_apply_inside_the_shared_set(api_env: ApiEnv) -> None:
+    env = api_env
+    ws = await new_workspace(env)
+    me, (token,) = await seed(env, ws, "user", login="s.me")
+    a, _ = await seed(env, ws, "user", login="s.anna")
+    b, _ = await seed(env, ws, "user", login="s.boris")
+    await seed(env, ws, "user", login="s.anna.hidden")  # не в общем проекте
+    await _share_project(env, ws, me, a, b)
+    assert [i["login"] for i in (await _get(env, token, q="anna")).json()["items"]] == ["s.anna"]
+    page = (await _get(env, token, page_size=2)).json()
+    assert [i["login"] for i in page["items"]] == ["s.anna", "s.boris"]
+    assert page["has_next"] is True
+
+
+async def test_027_business_admin_directory_is_unchanged(api_env: ApiEnv) -> None:
+    env = api_env
+    ws = await new_workspace(env)
+    _, (token,) = await seed(env, ws, "business_admin", login="b.me")
+    await seed(env, ws, "user", login="b.a")
+    await seed(env, ws, "user", login="b.b")
+    assert [i["login"] for i in (await _get(env, token)).json()["items"]] == ["b.a", "b.b", "b.me"]
