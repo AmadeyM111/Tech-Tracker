@@ -201,7 +201,7 @@ async def _run_scenario(env: ApiEnv, ws: WorkspaceRow) -> Scenario:
         scenario.responses.append(response)
         return response
 
-    ba, (ba_token,) = await seed(env, ws, "business_admin", login="leak.ba")
+    _ba, (ba_token,) = await seed(env, ws, "business_admin", login="leak.ba")
 
     # 1. заявка: единый ответ, письмо уходит на адрес из заявки
     accepted = keep(await env.client.post(REQUEST, json=_body()))
@@ -243,40 +243,33 @@ async def _run_scenario(env: ApiEnv, ws: WorkspaceRow) -> Scenario:
     scenario.user_id = user_id
     hash_before = await _password_hash(env, user_id)
 
-    # 5. вход: неверный пароль отклоняется, верный — учётная запись без роли
+    # 5. вход: неверный пароль отклоняется, верный — учётная запись с ролью «Пользователь»
+    #    (решение владельца 2026-11-11: роль назначается при подтверждении)
     wrong = keep(await env.login(LOGIN, WRONG_PW))
     assert (wrong.status_code, code_of(wrong)) == (401, "invalid_credentials")
     entered = keep(await env.login(LOGIN, PW))
     assert entered.status_code == 200, entered.text
-    assert entered.json()["user"]["role"] is None
+    assert entered.json()["user"]["role"] == "user"
     session = env.token_from(entered)
     assert session
 
-    # 6. без роли: /me и /projects отвечают 403 no_role (AC-25)
+    # 6. сразу можно работать: /me и /projects отвечают 200 (AC-25)
     for url in (ME, PROJECTS):
-        denied = keep(await env.client.get(url, headers=env.auth(session)))
-        assert (denied.status_code, code_of(denied)) == (403, "no_role"), url
+        allowed = keep(await env.client.get(url, headers=env.auth(session)))
+        assert allowed.status_code == 200, (url, allowed.text)
 
-    # 7. БА видит учётную запись без роли (без email) и назначает «Пользователь» (AC-26)
+    # 7. в списке БА «без роли» новой учётной записи нет (AC-26)
     listed = keep(await env.client.get(UNASSIGNED, headers=env.auth(ba_token)))
     assert listed.status_code == 200, listed.text
-    assert LOGIN in [item["login"] for item in listed.json()["items"]]
-    assigned = keep(
-        await env.client.put(
-            f"{UNASSIGNED}/{user_id}/role", json={"role": "user"}, headers=env.auth(ba_token)
-        )
-    )
-    assert assigned.status_code == 204, assigned.text
-    # AC-26: в журнале назначение роли с автором — этим БА
+    assert LOGIN not in [item["login"] for item in listed.json()["items"]]
+
+    # 8. в журнале назначение роли с автором «система» (AC-26)
     granted = [
         row for row in await events(env, entity_id=user_id) if row[3] == "user.role_assigned"
     ]
     assert len(granted) == 1
-    assert granted[0][1] == ba.id
-
-    # 8. та же сессия без повторного входа: /projects 200 (роль читается из БД, FR-67)
-    projects = keep(await env.client.get(PROJECTS, headers=env.auth(session)))
-    assert projects.status_code == 200, projects.text
+    assert granted[0][1] is None
+    assert granted[0][4] == {"role_from": None, "role_to": "user"}
 
     # 9. сброс пароля по email новой учётной записи (AC-13)
     reset = keep(await env.client.post(RESET_REQUEST, json={"email": EMAIL}))
@@ -322,7 +315,7 @@ async def _run_scenario(env: ApiEnv, ws: WorkspaceRow) -> Scenario:
 async def test_019_e2e_registration_to_business_access_and_password_reset(
     reset_api_env: ApiEnv, reg_ws: WorkspaceRow
 ) -> None:
-    """AC-12, AC-13, AC-25, AC-26: заявка -> подтверждение -> вход -> no_role -> роль -> 200.
+    """AC-12, AC-13, AC-25, AC-26: заявка -> подтверждение (роль «Пользователь») -> вход -> 200.
 
     Утверждения шагов находятся в ``_run_scenario``; здесь фиксируем итог: учётная запись
     создана, и после сброса пароля вход новым паролем проходит (проверено внутри сценария).

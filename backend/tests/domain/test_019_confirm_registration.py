@@ -172,7 +172,7 @@ async def test_019_ac13_confirm_creates_self_registered_account(
     assert row["failed_login_count"] == 0
     assert row["created_by"] is None
     assert row["workspace_id"] == ws.id
-    assert row["role"] is None  # «без роли» (ADR-0013)
+    assert row["role"] == "user"  # роль «Пользователь» сразу (решение владельца 2026-11-11)
     assert row["member_created_by"] is None
     assert hasher.verify(row["password_hash"], PASSWORD)
     assert await count_requests(db) == 0  # заявка поглощена
@@ -195,7 +195,7 @@ async def test_019_ac16_confirm_creates_no_session_and_token_is_single_use(
     assert await count_users(db) == 1
 
 
-async def test_019_ac19_success_writes_exactly_one_self_registered_event(
+async def test_019_ac19_success_writes_self_registered_and_system_role_assigned_events(
     db: AsyncSession,
     policy: reg.RegistrationPolicy,
     hasher: PasswordHasher,
@@ -224,7 +224,26 @@ async def test_019_ac19_success_writes_exactly_one_self_registered_event(
     assert event["actor_id"] == row["id"] == event["entity_id"]
     assert event["entity_type"] == "user"
     assert list(event["changed_fields"]) == []
-    assert await count_all_events(db) == 1
+    # и ровно одно событие назначения роли: автор — «система», в той же транзакции
+    granted = (
+        (
+            await db.execute(
+                text(
+                    "SELECT workspace_id, actor_id, entity_id, in_audit, details "
+                    "FROM domain_event WHERE action = 'user.role_assigned'"
+                )
+            )
+        )
+        .mappings()
+        .all()
+    )
+    assert len(granted) == 1
+    assert granted[0]["workspace_id"] == ws.id
+    assert granted[0]["actor_id"] is None
+    assert granted[0]["entity_id"] == row["id"]
+    assert granted[0]["in_audit"] is True
+    assert granted[0]["details"] == {"role_from": None, "role_to": "user"}
+    assert await count_all_events(db) == 2
 
 
 # --- срок токена (AC-10) и повторные заявки (AC-9) ---------------------------------------------

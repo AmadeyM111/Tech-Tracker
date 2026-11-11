@@ -642,7 +642,7 @@ describe("LoginPage registration link and help (spec 019)", () => {
   const forgot = () => screen.queryByRole("link", { name: t("auth.forgot_password") });
   const register = () => screen.queryByRole("link", { name: t("auth.register_link") });
   const HELP_P2_REGISTRATION =
-    "Учётную запись выдаёт технический администратор, или её можно создать самостоятельно через «Зарегистрироваться». Роль после регистрации назначает технический или бизнес-администратор.";
+    "Учётную запись выдаёт технический администратор, или её можно создать самостоятельно через «Зарегистрироваться». После подтверждения адреса по письму можно сразу войти: вам назначается роль «Пользователь», и вы видите проекты, в которые вас добавят.";
   const helpTexts = () => Array.from(helpBlock().querySelectorAll("p")).map((p) => p.textContent);
 
   it("019_ac21_help_registration_text_is_the_owner_approved_fr12_text", () => {
