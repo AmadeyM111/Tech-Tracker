@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.clock import utcnow
 from app.core.errors import ErrorCode, Forbidden, Unprocessable
@@ -160,6 +161,17 @@ async def transfer_ownership(
         update(Project)
         .where(Project.id == project_id)
         .values(owner_id=new_owner_id, updated_at=utcnow())
+    )
+    # прежний владелец остаётся участником (спека 027, Q-9: выйти он может только после передачи)
+    await db.execute(
+        pg_insert(ProjectMember)
+        .values(
+            project_id=project_id,
+            user_id=facts.owner_id,
+            workspace_id=actor.workspace_id,
+            created_by=actor.user_id,
+        )
+        .on_conflict_do_nothing(index_elements=["project_id", "user_id"])
     )
     refs = await user_refs(db, actor.workspace_id, [facts.owner_id, new_owner_id])
     old, new = refs[facts.owner_id], refs[new_owner_id]

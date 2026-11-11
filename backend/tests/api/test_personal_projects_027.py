@@ -1,7 +1,7 @@
 """Спека 027, этап 1: «Пользователь» создаёт проекты и управляет задачами в своём проекте.
 
-FR-1 (создание, владелец), FR-2 (задачи в своём проекте), лимит 30 (Q-4), граница этапа 2:
-состав проекта и параметры проекта по-прежнему только у БА. Отказ для не-владельца — на каждом пути.
+FR-1 (создание, владелец), FR-2 (задачи в своём проекте), лимит 30 (Q-4). Состав и параметры
+проекта (этап 2) — в test_027_members_stage2.py. Отказ для не-владельца — на каждом пути.
 """
 
 from __future__ import annotations
@@ -53,9 +53,10 @@ async def test_027_user_creates_project_and_becomes_owner(api_env: ApiEnv) -> No
     assert body["owner"]["id"] == str(w.uid("usr2"))
     assert body["is_member"] is True
     assert body["permissions"]["create_task"] is True
-    # Этап 1: состав и параметры проекта — по-прежнему только у БА.
-    assert body["permissions"]["manage"] is False
-    assert body["permissions"]["manage_members"] is False
+    # Этап 2: владелец-«Пользователь» управляет составом и параметрами своего проекта.
+    assert body["permissions"]["manage"] is True
+    assert body["permissions"]["manage_members"] is True
+    assert body["permissions"]["remove_self"] is False
 
 
 async def test_027_otp_and_blocked_and_norole_cannot_create(api_env: ApiEnv) -> None:
@@ -172,25 +173,6 @@ async def test_027_non_member_user_sees_no_task_of_user_project(api_env: ApiEnv)
     tid = created.json()["id"]
     assert error(await send(env, w.tok("usr"), "GET", pj(pid))) == (403, "forbidden")
     assert error(await send(env, w.tok("usr"), "GET", task_url(tid))) == (403, "forbidden")
-
-
-# --- граница этапа 2: состав проекта по-прежнему у БА -------------------------------------------
-
-
-async def test_027_owner_user_cannot_add_members_in_stage_1(api_env: ApiEnv) -> None:
-    env = api_env
-    w = await make_api_world(env)
-    pid = await _new_project(env, w, "usr2")
-    r = await send(env, w.tok("usr2"), "POST", members_url(pid), {"user_id": str(w.uid("usr"))})
-    assert error(r) == (403, "forbidden")
-
-
-async def test_027_owner_user_cannot_rename_project_in_stage_1(api_env: ApiEnv) -> None:
-    env = api_env
-    w = await make_api_world(env)
-    pid = await _new_project(env, w, "usr2")
-    r = await send(env, w.tok("usr2"), "PATCH", pj(pid), {"name": "Другое"})
-    assert error(r) == (403, "forbidden")
 
 
 # --- FR-11: MCP ---------------------------------------------------------------------------------

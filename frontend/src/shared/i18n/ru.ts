@@ -36,6 +36,9 @@ export const ru = {
   "error.http_error": "Сервер отклонил запрос",
   "error.service_busy": "Сервис занят, повторите действие через несколько секунд",
   "error.owner_cannot_be_removed": "Владельца проекта нельзя исключить: сначала передайте владение",
+  "error.limit_reached": "Достигнут предел: больше добавить нельзя",
+  "error.recipient_not_found": "Пользователь с таким логином или email не зарегистрирован.",
+  "error.member_already_added": "Этот пользователь уже в проекте.",
   "error.not_project_member": "Этот пользователь не участвует в проекте",
   "error.recipient_wrong_role": "Пользователю с такой ролью нельзя назначить это действие",
   "error.user_blocked": "Пользователь заблокирован и недоступен для выбора",
@@ -250,6 +253,22 @@ export const ru = {
   "projects.member_remove": "Исключить",
   "projects.member_remove_aria": "Исключить {login}",
   "projects.member_add_label": "Добавить участника (поиск по логину)",
+  "projects.member_add_key_label": "Логин или email",
+  "projects.member_add_key_hint": "Пользователь должен быть зарегистрирован в GTrack.",
+  "projects.member_add_submit": "Добавить",
+  "projects.member_add_rate_limited":
+    "Вы добавили слишком много участников за последний час. Попробуйте через {minutes} мин.",
+  "projects.member_add_rate_limited_hour":
+    "Вы добавили слишком много участников за последний час. Попробуйте через час.",
+  "projects.member_role_owner": "Владелец",
+  "projects.member_role_member": "Участник",
+  "projects.owner_transfer_title": "Передать проект {login}?",
+  "projects.owner_transfer_message":
+    "Проект «{name}» перейдёт к пользователю {login}. Вы станете участником и потеряете управление проектом.",
+  "projects.member_added": "Участник добавлен в проект.",
+  "projects.member_remove_title": "Исключить участника?",
+  "projects.member_remove_message":
+    "«{login}» потеряет доступ к проекту «{name}». Назначенные ему задачи останутся без исполнителя.",
   "projects.leave": "Покинуть проект",
   "projects.leave_title": "Покинуть проект?",
   "projects.leave_message": "Вы перестанете быть участником проекта «{name}» и потеряете к нему доступ.",

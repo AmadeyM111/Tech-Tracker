@@ -412,7 +412,8 @@ def test_ac103_can_delete_comment(pol, roles, role, is_owner, member, author_me,
 MANAGE = [
     ("TECH_ADMIN", True, True, False),
     (None, True, True, False),
-    ("USER", True, True, False),
+    # 027 FR-2: владелец-«Пользователь» управляет своим проектом, участник-«Пользователь» — нет
+    ("USER", True, True, True),
     ("USER", False, True, False),
     ("BUSINESS_ADMIN", True, True, True),
     # 002/AC-11, AC-12 (FR-8): БА управляет любым проектом, участие и владение не нужны
@@ -590,11 +591,15 @@ def test_027_non_owner_user_cannot_change_assignee_or_edit_foreign(pol, roles) -
     assert pol.can_edit_task_fully(member, proj, foreign) is False
 
 
-def test_027_owner_user_project_management_stays_ba_only_in_stage_1(pol, roles) -> None:
-    """Этап 1 не меняет управление составом и параметрами проекта: это этап 2 (spec 027, §8а)."""
+def test_027_owner_user_manages_own_project_but_participant_does_not(pol, roles) -> None:
+    """Этап 2 (027 FR-2, FR-3): состав и параметры — владельцу-«Пользователю»."""
     owner = _actor(roles, "USER")
-    proj = _proj(pol, owner=ME)
-    assert pol.can_manage_project(owner, proj) is False
-    assert pol.can_add_member(owner, proj, OTHER) is False
+    own = _proj(pol, owner=ME)
+    assert pol.can_manage_project(owner, own) is True
+    assert pol.can_manage_members(owner, own) is True
+    assert pol.can_add_member(owner, own, OTHER) is True
+    foreign = _proj(pol, owner=OWNER, member=True)
+    assert pol.can_manage_project(owner, foreign) is False
+    assert pol.can_add_member(owner, foreign, OTHER) is False
     ba = _actor(roles, "BUSINESS_ADMIN")
     assert pol.can_manage_project(ba, _proj(pol, owner=OWNER, member=False)) is True

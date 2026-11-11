@@ -563,29 +563,30 @@ async def test_p11_5_forbidden_precedes_recipient_check(db: AsyncSession, svc: A
     )
 
 
-async def test_002_ac17_ba_non_owner_gets_recipient_error_not_403(
+async def test_027_ba_transfers_to_user_role_participant_and_old_owner_stays_member(
     db: AsyncSession, svc: Any
 ) -> None:
-    """002/AC-17 (FR-11): БА передаёт владение П - 422 (не 403), владелец не изменился."""
+    """027 FR-7 (было 002/AC-17): владение передаётся участнику-«Пользователю»; прежний остаётся."""
     w = await _transfer_world(db)
-    await fails(
-        db,
-        svc.transfer_ownership(db, actor_of(w.ba2), w.project_id, new_owner_id=w.usr.id),
-        "recipient_wrong_role",
+    await svc.transfer_ownership(db, actor_of(w.ba2), w.project_id, new_owner_id=w.usr.id)
+    assert (await project_row(db, w.project_id)).owner_id == w.usr.id
+    rows = await db.execute(
+        text("SELECT user_id FROM project_member WHERE project_id = :p").bindparams(p=w.project_id)
     )
-    assert (await project_row(db, w.project_id)).owner_id == w.ba.id
-    assert await events(db, w.ws.id) == []
+    assert w.ba.id in {r[0] for r in rows}
 
 
-async def test_ac52_transfer_to_user_role_is_422(db: AsyncSession, svc: Any) -> None:
+async def test_027_transfer_to_user_role_not_a_member_is_still_422(
+    db: AsyncSession, svc: Any
+) -> None:
     w = await _transfer_world(db)
+    stranger = await make_user(db, workspace=w.ws, role="user", login="w.stranger")
     await fails(
         db,
-        svc.transfer_ownership(db, actor_of(w.ba), w.project_id, new_owner_id=w.usr.id),
-        "recipient_wrong_role",
+        svc.transfer_ownership(db, actor_of(w.ba), w.project_id, new_owner_id=stranger.id),
+        "not_project_member",
     )
     assert (await project_row(db, w.project_id)).owner_id == w.ba.id
-    assert await events(db, w.ws.id) == []
 
 
 async def test_ac74_transfer_recipient_codes(db: AsyncSession, svc: Any) -> None:

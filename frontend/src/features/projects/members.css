@@ -1,0 +1,77 @@
+.member-add {
+  max-width: 28rem;
+  margin: 8px 0 16px;
+}
+.member-add input {
+  width: 100%;
+  min-height: 44px;
+}
+.member-add button {
+  min-height: 44px;
+}
+.member-hint {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+}
+/* The participant list becomes cards on narrow screens: label from data-label, no horizontal scroll. */
+@media (max-width: 719px) {
+  .member-add button {
+    width: 100%;
+  }
+  .member-table,
+  .member-table tbody,
+  .member-table tr,
+  .member-table td {
+    display: block;
+    width: 100%;
+  }
+  .member-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .member-table tr {
+    margin-bottom: 8px;
+    padding: 8px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .member-table td {
+    padding: 4px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .member-table td[data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--text-muted);
+  }
+  .member-table td[data-field="login"] {
+    font-weight: 600;
+  }
+  .member-table td[data-field="owner"]:empty,
+  .member-table td[data-field="blocked"]:empty,
+  .member-table td[data-field="actions"]:empty {
+    display: none;
+  }
+  .member-table td[data-field="actions"] button {
+    min-height: 44px;
+    margin-top: 4px;
+  }
+}
+
+/* Names in the ownership block wrap after dots (<wbr>), not in the middle of a word. */
+.ui-list li[data-owner-candidate] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.ui-list li[data-owner-candidate] .owner-login {
+  overflow-wrap: normal;
+  word-break: normal;
+  min-width: 0;
+}

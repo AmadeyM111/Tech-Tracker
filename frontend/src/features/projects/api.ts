@@ -98,6 +98,14 @@ export async function addMember(id: string, userId: string): Promise<void> {
   });
 }
 
+/** Adds a participant by the exact login or e-mail (spec 027 FR-4); the server never reveals why a lookup failed. */
+export async function addMemberByKey(id: string, key: { login: string } | { email: string }): Promise<void> {
+  await getAppClient().POST("/api/v1/projects/{project_id}/members", {
+    params: { path: { project_id: id } },
+    body: key,
+  });
+}
+
 export async function removeMember(id: string, userId: string): Promise<void> {
   await getAppClient().DELETE("/api/v1/projects/{project_id}/members/{user_id}", {
     params: { path: { project_id: id, user_id: userId } },

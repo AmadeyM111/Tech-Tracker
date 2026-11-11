@@ -1126,16 +1126,47 @@
       },
       "MemberAdd": {
         "additionalProperties": false,
+        "description": "Ровно одно из: ``user_id`` (БА) или точные ``login``/``email`` (spec 027 FR-4).",
         "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "login": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login"
+          },
           "user_id": {
-            "format": "uuid",
-            "title": "User Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
           }
         },
-        "required": [
-          "user_id"
-        ],
         "title": "MemberAdd",
         "type": "object"
       },
@@ -6466,7 +6497,7 @@
         ]
       },
       "post": {
-        "description": "Добавляет участника; уже участник — 204 без изменений (D-46).",
+        "description": "Добавляет участника по ``user_id`` (БА) или точному логину/email (027 FR-4).\n\nПо ``user_id`` повтор — 204 (D-46); по логину/email — 422 ``member_already_added``;\nне найден — 422 ``recipient_not_found``; «Пользователь» — не больше 20 попыток в час (429).",
         "operationId": "add_member",
         "parameters": [
           {
@@ -6630,7 +6661,7 @@
     },
     "/api/v1/projects/{project_id}/owner": {
       "put": {
-        "description": "Передаёт владение участнику-БА (FR-14a); пишет событие аудита.",
+        "description": "Передаёт владение участнику с ролью БА или «Пользователь» (027 FR-7); пишет аудит.",
         "operationId": "change_owner",
         "parameters": [
           {

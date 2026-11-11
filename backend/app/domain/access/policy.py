@@ -123,12 +123,9 @@ def can_delete_comment(a: Actor, p: ProjectFacts, author_id: UUID) -> bool:
 
 
 def can_manage_project(a: Actor, p: ProjectFacts) -> bool:
-    """Правка, передача владения, удаление, архив: БА в любом проекте (002/FR-8, D-1).
-
-    Участие и владение не требуются; ``p`` в правиле не участвует.
-    """
-    del p  # сигнатура по plan §4.2
-    return a.can(Capability.PROJECT_MANAGE_ANY)
+    """Правка, передача владения, удаление, участники: БА в любом проекте (002/FR-8, D-1) и
+    владелец-«Пользователь» своего проекта (spec 027 FR-2, ``is_project_admin``)."""
+    return a.can(Capability.PROJECT_MANAGE_ANY) or is_project_admin(a, p)
 
 
 def can_manage_members(a: Actor, p: ProjectFacts) -> bool:

@@ -23,7 +23,7 @@ async def test_ac76_role_change_applies_to_next_request_in_same_session(
     ws = await new_workspace(env)
     changer, (changer_token,) = await seed(env, ws, changer_role, login="rc.changer")
     ba, (ba_token,) = await seed(env, ws, "business_admin", login="rc.ba")
-    other, _ = await seed(env, ws, "user", login="rc.other")
+    other, (other_token,) = await seed(env, ws, "user", login="rc.other")
 
     first = await send(env, ba_token, "POST", PROJECTS, {"name": "До смены роли"})
     assert first.status_code == 201, first.text
@@ -43,22 +43,27 @@ async def test_ac76_role_change_applies_to_next_request_in_same_session(
     assert card.json()["owner"]["id"] == str(ba.id)
     assert card.json()["is_member"] is True
     assert card.json()["permissions"] == {
-        "manage": False,
-        "manage_members": False,
+        "manage": True,  # 027 FR-2: владелец-«Пользователь» управляет своим проектом
+        "manage_members": True,
         "create_task": True,
         "remove_self": False,  # владелец не выходит
     }
-    assert error(await send(env, ba_token, "PATCH", pj(project_id), {"name": "Нельзя"})) == (
+    # 027: владелец-«Пользователь» правит свой проект; участников — только по логину/email
+    own_rename = await send(env, ba_token, "PATCH", pj(project_id), {"name": "Своё имя"})
+    assert own_rename.status_code == 200, own_rename.text
+    assert error(
+        await send(env, ba_token, "POST", members_url(project_id), {"user_id": str(other.id)})
+    ) == (422, "validation_error")
+    # чужие проекты (где БА, ставший «Пользователем», не владелец) остаются без управления
+    foreign = await send(env, other_token, "POST", PROJECTS, {"name": "Чужой"})
+    assert foreign.status_code == 201, foreign.text
+    foreign_id = foreign.json()["id"]
+    await send(env, other_token, "POST", members_url(foreign_id), {"login": "rc.ba"})
+    assert error(await send(env, ba_token, "PATCH", pj(foreign_id), {"name": "Нельзя"})) == (
         403,
         "forbidden",
     )
-    assert error(await send(env, ba_token, "DELETE", pj(project_id))) == (403, "forbidden")
-    assert error(
-        await send(env, ba_token, "POST", members_url(project_id), {"user_id": str(other.id)})
-    ) == (403, "forbidden")
-    assert error(
-        await send(env, ba_token, "PUT", f"{pj(project_id)}/owner", {"user_id": str(ba.id)})
-    ) == (403, "forbidden")
+    assert error(await send(env, ba_token, "DELETE", pj(foreign_id))) == (403, "forbidden")
     listed = await send(env, ba_token, "GET", PROJECTS)  # как участник проект в списке
     # в списке — оба проекта, где он владелец-участник (созданный после смены роли тоже)
     assert project_id in [i["id"] for i in listed.json()["items"]]

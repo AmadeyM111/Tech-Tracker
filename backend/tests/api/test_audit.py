@@ -1001,8 +1001,9 @@ async def test_t72_ac65_repeat_and_failed_transfers_write_nothing(api_env: ApiEn
     url = f"{pj(w.project_id)}/owner"
 
     same = await send(env, w.tok("ba"), "PUT", url, {"user_id": str(w.uid("ba"))})  # D-46
-    wrong_role = await send(env, w.tok("ba"), "PUT", url, {"user_id": str(w.uid("usr"))})
-    # актор ba2 (БА) заменён на usr (П): 002/AC-12, AC-16 - у БА 403 на передачу больше нет
+    # ТА — недопустимый получатель владения (027 FR-7: «Пользователь»-участник допустим, ТА — нет)
+    wrong_role = await send(env, w.tok("ba"), "PUT", url, {"user_id": str(w.uid("ta"))})
+    # «Пользователь»-участник, не владелец, передать владение не может (027 FR-3)
     denied = await send(env, w.tok("usr"), "PUT", url, {"user_id": str(w.uid("ba2"))})
 
     assert (same.status_code, wrong_role.status_code, denied.status_code) == (200, 422, 403)

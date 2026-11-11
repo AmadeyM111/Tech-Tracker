@@ -15,14 +15,17 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly detail: string | ErrorDetail[];
+  /** Seconds from the Retry-After header, when the server sent one (rate limits). */
+  readonly retryAfter: number | null;
 
-  constructor(status: number, code: string, detail: string | ErrorDetail[]) {
+  constructor(status: number, code: string, detail: string | ErrorDetail[], retryAfter: number | null = null) {
     // Server text is kept in `detail` only; the message stays machine-readable.
     super(`API error ${status} ${code}`);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.detail = detail;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -144,7 +147,8 @@ export function createApiClient(options: ApiClientOptions = {}): Client<paths> {
       } else if (response.status === 403 && code === "no_role") {
         redirectOnce("noRole", onNoRole);
       }
-      throw new ApiError(response.status, code, detail);
+      const retry = Number(response.headers.get("Retry-After"));
+      throw new ApiError(response.status, code, detail, Number.isFinite(retry) && retry > 0 ? retry : null);
     },
 
     onError({ error }) {
