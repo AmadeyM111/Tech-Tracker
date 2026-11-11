@@ -86,7 +86,9 @@ def can_create_task(a: Actor, p: ProjectFacts, assignee_id: UUID | None) -> bool
     """Создание задачи (BR-1): себе — любой участник, другому/без исполнителя — БА."""
     if not (a.can(Capability.BUSINESS_ACCESS) and p.actor_is_member):
         return False
-    return assignee_id == a.user_id or a.can(Capability.TASK_ASSIGN_OTHERS) or is_project_admin(a, p)
+    return (
+        assignee_id == a.user_id or a.can(Capability.TASK_ASSIGN_OTHERS) or is_project_admin(a, p)
+    )
 
 
 def can_create_subtask(
