@@ -269,3 +269,33 @@ describe("пагинация проектов при пустом списке (
     expect(container.querySelector(".ui-pagination")).not.toBeNull();
   });
 });
+
+describe("спека 027: «Пользователь» создаёт проекты (этап 1)", () => {
+  const USER_CAN_CREATE = ["business_access", "project_create"];
+
+  it("027_user_with_project_create_sees_form_and_new_empty_text", async () => {
+    setup(
+      {
+        [ME]: () => j(200, meWith(USER_CAN_CREATE, "user")),
+        [LIST]: () => j(200, page([])),
+      },
+      USER_CAN_CREATE,
+    );
+    const v = renderApp("/projects");
+    expect(await screen.findByText(ru["projects.empty"])).toBeTruthy();
+    expect(form(v.container)).not.toBeNull();
+  });
+
+  it("027_user_without_project_create_has_no_form", async () => {
+    setup(
+      {
+        [ME]: () => j(200, meWith(["business_access"], "user")),
+        [LIST]: () => j(200, page([])),
+      },
+      ["business_access"],
+    );
+    const v = renderApp("/projects");
+    expect(await screen.findByText(ru["projects.empty"])).toBeTruthy();
+    expect(form(v.container)).toBeNull();
+  });
+});

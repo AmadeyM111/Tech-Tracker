@@ -91,6 +91,7 @@ codex mcp add gtrack --env GTRACK_TOKEN=$GTRACK_TOKEN --env GTRACK_URL=https://l
 | `update_task` | изменить поля задачи; передавайте только меняемые поля |
 | `list_projects` | проекты: БА видит все, остальные — где они участники |
 | `get_project` | карточка проекта |
+| `create_project` | создать проект: владельцем становится вызывающий (лимит 30 на пользователя) |
 | `list_comments` | комментарии задачи |
 | `add_comment` | добавить комментарий к задаче |
 

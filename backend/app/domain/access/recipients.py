@@ -32,7 +32,8 @@ class RecipientFacts:
 _REQUIRED_CAPABILITY = {
     RecipientPurpose.PROJECT_MEMBER: Capability.BUSINESS_ACCESS,
     RecipientPurpose.TASK_ASSIGNEE: Capability.BUSINESS_ACCESS,
-    RecipientPurpose.PROJECT_OWNER: Capability.PROJECT_CREATE,
+    # Передача владения — только БА (002/FR-8); владелец-«Пользователь» — этап 2 (спека 027).
+    RecipientPurpose.PROJECT_OWNER: Capability.PROJECT_MANAGE_ANY,
 }
 _MEMBER_REQUIRED = frozenset({RecipientPurpose.TASK_ASSIGNEE, RecipientPurpose.PROJECT_OWNER})
 

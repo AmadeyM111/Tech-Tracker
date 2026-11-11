@@ -209,7 +209,6 @@ async def test_ac51_ba_creates_project_with_description_as_owner_and_member(
 @pytest.mark.parametrize(
     ("who", "expected"),
     [
-        ("usr", (403, "forbidden")),
         ("ta", (403, "forbidden")),
         ("norole", (403, "no_role")),
         ("otp", (403, "password_change_required")),

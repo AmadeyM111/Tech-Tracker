@@ -262,7 +262,7 @@ async def test_ac51_create_project_owner_and_member_are_actor(
     assert await events(db, ws.id) == []  # D-55: событий ленты нет, передачи владения нет
 
 
-@pytest.mark.parametrize("role", ["user", "tech_admin", None])
+@pytest.mark.parametrize("role", ["tech_admin", None])
 async def test_ac75_create_project_requires_project_create_capability(
     db: AsyncSession, svc: Any, role: str | None
 ) -> None:
@@ -271,6 +271,17 @@ async def test_ac75_create_project_requires_project_create_capability(
     await db.commit()
     await forbidden(db, svc.create_project(db, actor_of(user), name="Нельзя"))
     assert await _count_projects(db, ws.id) == 0
+
+
+async def test_027_user_creates_project_and_owns_it(db: AsyncSession, svc: Any) -> None:
+    """Спека 027, FR-1: «Пользователь» создаёт проект; владелец — он же."""
+    ws = await make_workspace(db)
+    user = await make_user(db, workspace=ws, role="user", login="owner.user")
+    await db.commit()
+    view = await svc.create_project(db, actor_of(user), name="Личный")
+    assert view.owner.id == user.id
+    assert view.is_member is True
+    assert await _count_projects(db, ws.id) == 1
 
 
 async def test_ac108_create_project_boundaries_ok(db: AsyncSession, svc: Any) -> None:

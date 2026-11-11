@@ -63,7 +63,7 @@ ROLE_CAPABILITIES: Final[Mapping[Role, frozenset[Capability]]] = MappingProxyTyp
     {
         Role.TECH_ADMIN: _TECH_ADMIN_CAPS,
         Role.BUSINESS_ADMIN: _BUSINESS_ADMIN_CAPS,
-        Role.USER: frozenset({Capability.BUSINESS_ACCESS}),
+        Role.USER: frozenset({Capability.BUSINESS_ACCESS, Capability.PROJECT_CREATE}),
     }
 )
 

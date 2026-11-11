@@ -122,7 +122,7 @@ def test_fr17_ac55_can_read_project_content(pol, roles, role, member, expected) 
         ("TECH_ADMIN", False),
         (None, False),
         ("BUSINESS_ADMIN", True),
-        ("USER", False),
+        ("USER", True),  # спека 027, FR-1: «Пользователь» создаёт проекты
     ],
     ids=lambda v: str(v),
 )
@@ -549,3 +549,52 @@ def test_pure_module_has_no_infra_imports(rel: str) -> None:
             if any(n == f or n.startswith(f + ".") for f in _FORBIDDEN):
                 bad.append(n)
     assert bad == []
+
+
+# --- спека 027, этап 1: владелец-«Пользователь» управляет задачами в своём проекте (FR-2)
+def test_027_owner_user_can_create_task_for_member(pol, roles) -> None:
+    owner = _actor(roles, "USER")  # ME — владелец
+    assert pol.can_create_task(owner, _proj(pol, owner=ME), OTHER) is True
+
+
+def test_027_non_owner_user_cannot_assign_others(pol, roles) -> None:
+    member = _actor(roles, "USER")
+    assert pol.can_create_task(member, _proj(pol, owner=OWNER), OTHER) is False
+
+
+def test_027_owner_of_other_project_gets_no_rights(pol, roles) -> None:
+    user = _actor(roles, "USER")  # ME — владелец проекта OTHER, но не PID
+    other_owned = pol.ProjectFacts(project_id=PID, owner_id=OTHER, actor_is_member=True)
+    assert pol.can_create_task(user, other_owned, OTHER) is False
+    assert pol.can_edit_task_fully(user, other_owned, _task(pol)) is False
+
+
+def test_027_owner_user_edits_and_deletes_any_task(pol, roles) -> None:
+    owner = _actor(roles, "USER")
+    proj = _proj(pol, owner=ME)
+    foreign = _task(pol, created_by=OTHER, assignee=OTHER)
+    assert pol.can_edit_task_fully(owner, proj, foreign) is True
+    assert pol.can_delete_task(owner, proj, foreign) is True
+
+
+def test_027_owner_user_changes_assignee(pol, roles) -> None:
+    owner = _actor(roles, "USER")
+    assert pol.can_change_assignee(owner, _proj(pol, owner=ME), _task(pol)) is True
+
+
+def test_027_non_owner_user_cannot_change_assignee_or_edit_foreign(pol, roles) -> None:
+    member = _actor(roles, "USER")
+    proj = _proj(pol, owner=OWNER)
+    foreign = _task(pol, created_by=OTHER, assignee=OTHER)
+    assert pol.can_change_assignee(member, proj, foreign) is False
+    assert pol.can_edit_task_fully(member, proj, foreign) is False
+
+
+def test_027_owner_user_project_management_stays_ba_only_in_stage_1(pol, roles) -> None:
+    """Этап 1 не меняет управление составом и параметрами проекта: это этап 2 (spec 027, §8а)."""
+    owner = _actor(roles, "USER")
+    proj = _proj(pol, owner=ME)
+    assert pol.can_manage_project(owner, proj) is False
+    assert pol.can_add_member(owner, proj, OTHER) is False
+    ba = _actor(roles, "BUSINESS_ADMIN")
+    assert pol.can_manage_project(ba, _proj(pol, owner=OWNER, member=False)) is True

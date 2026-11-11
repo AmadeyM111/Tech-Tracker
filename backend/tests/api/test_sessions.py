@@ -38,7 +38,7 @@ EXPECTED_CAPABILITIES: dict[str, list[str]] = {
         "project_manage_any",  # 002/FR-8, D-1
         "task_assign_others",
     ],
-    "user": ["business_access"],
+    "user": ["business_access", "project_create"],  # спека 027, FR-1
 }
 
 
@@ -123,7 +123,7 @@ async def test_fr67_me_reflects_role_change_without_relogin(api_env: ApiEnv) -> 
     """001/FR-67, обращён по 002/FR-19: смена П -> БА (прежде -> `mixed`) видна без перелогина."""
     user = await api_env.new_user(role="user", password=PW)
     token = await api_env.login_ok(user)
-    assert (await api_env.me(token)).json()["capabilities"] == ["business_access"]
+    assert (await api_env.me(token)).json()["capabilities"] == ["business_access", "project_create"]
 
     member = get_table("workspace_member")
     await api_env.execute(

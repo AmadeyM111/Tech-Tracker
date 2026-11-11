@@ -1,5 +1,6 @@
 // Create-task form of the project's "Tasks" tab (T83; UF-3, FR-20, FR-26, NFR-5..7).
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { ApiError } from "../../shared/api/client";
@@ -562,6 +563,11 @@ export function CreateTaskDialog({
     body = (
       <>
         <p>{t("tasks.no_creatable_projects")}</p>
+        <p>
+          <Link to="/projects" onClick={onClose}>
+            {t("tasks.create_project_link")}
+          </Link>
+        </p>
         <button type="button" data-action="close" ref={closeRef} onClick={onClose}>
           {t("tasks.dialog_close")}
         </button>

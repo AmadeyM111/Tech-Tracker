@@ -36,6 +36,16 @@ def _is_owner(a: Actor, p: ProjectFacts) -> bool:
     return p.owner_id == a.user_id
 
 
+def is_project_admin(a: Actor, p: ProjectFacts) -> bool:
+    """Общий хелпер прав владельца проекта (спека 027, plan §2): БА-участник проекта или
+    владелец-«Пользователь» своего проекта. Глобальная роль не меняется; для БА правила задач
+    и так выводятся из TASK_ASSIGN_OTHERS и is_own_project, поэтому подключение не меняет их.
+    """
+    if a.role is Role.BUSINESS_ADMIN:
+        return p.actor_is_member
+    return a.role is Role.USER and _is_owner(a, p)
+
+
 def is_own_project(a: Actor, p: ProjectFacts) -> bool:
     """БА — участник проекта (002/FR-9, D-2); остальные — нет."""
     if a.role is Role.BUSINESS_ADMIN:
@@ -56,6 +66,8 @@ def can_read_project_content(a: Actor, p: ProjectFacts) -> bool:
 
 def can_edit_task_fully(a: Actor, p: ProjectFacts, t: TaskFacts) -> bool:
     """Полная правка (FR-19): П — только свою задачу, БА-участник — любую (002/FR-9)."""
+    if is_project_admin(a, p):
+        return p.actor_is_member
     if a.role == Role.USER:
         return p.actor_is_member and t.created_by == a.user_id and t.assignee_id == a.user_id
     if a.role is Role.BUSINESS_ADMIN:
@@ -74,7 +86,9 @@ def can_create_task(a: Actor, p: ProjectFacts, assignee_id: UUID | None) -> bool
     """Создание задачи (BR-1): себе — любой участник, другому/без исполнителя — БА."""
     if not (a.can(Capability.BUSINESS_ACCESS) and p.actor_is_member):
         return False
-    return assignee_id == a.user_id or a.can(Capability.TASK_ASSIGN_OTHERS)
+    return (
+        assignee_id == a.user_id or a.can(Capability.TASK_ASSIGN_OTHERS) or is_project_admin(a, p)
+    )
 
 
 def can_create_subtask(
@@ -89,7 +103,7 @@ def can_create_subtask(
 def can_change_assignee(a: Actor, p: ProjectFacts, t: TaskFacts) -> bool:
     """FR-19a: БА — участник проекта; ``t`` в правиле не участвует."""
     del t  # сигнатура по plan §11.5
-    return a.can(Capability.TASK_ASSIGN_OTHERS) and is_own_project(a, p)
+    return (a.can(Capability.TASK_ASSIGN_OTHERS) and is_own_project(a, p)) or is_project_admin(a, p)
 
 
 def can_delete_task(a: Actor, p: ProjectFacts, t: TaskFacts) -> bool:

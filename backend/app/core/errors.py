@@ -64,6 +64,8 @@ class ErrorCode(StrEnum):
     parent_task_deleted = "parent_task_deleted"
     project_deleted = "project_deleted"
     invalid_neighbors = "invalid_neighbors"
+    # [027]
+    limit_reached = "limit_reached"
     # [3]
     inn_taken = "inn_taken"
     contacts_attached = "contacts_attached"

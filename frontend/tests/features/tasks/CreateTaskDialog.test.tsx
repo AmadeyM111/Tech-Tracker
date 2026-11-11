@@ -336,6 +336,14 @@ describe("no creatable projects (AC-19, FR-11)", () => {
     await expectEmptyState(f, onClose);
   });
 
+  it("027_empty_state_links_to_projects_page", async () => {
+    installFetch(routesU({ [LIST]: emptyList }));
+    renderDialog();
+    await screen.findByText(ru["tasks.no_creatable_projects"]);
+    const link = within(dialog()).getByRole("link", { name: ru["tasks.create_project_link"] });
+    expect(link.getAttribute("href")).toBe("/projects");
+  });
+
   it("004_ac19_business_admin_with_all_create_task_false", async () => {
     const f = installFetch(
       dialogRoutes(LIST_BA, { [P1]: false, [P2]: false, [P3]: false }),
