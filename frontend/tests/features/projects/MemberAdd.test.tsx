@@ -68,7 +68,6 @@ describe("MemberAdd (027)", () => {
   it.each([
     ["recipient_not_found", 422],
     ["member_already_added", 422],
-    ["rate_limited", 429],
   ])("shows %s under the field with aria-invalid", async (code, status) => {
     setup(() => err(status, code));
     const input = await openForm();
@@ -80,6 +79,31 @@ describe("MemberAdd (027)", () => {
     expect(input.getAttribute("aria-describedby")).toBe(alert.id);
     fireEvent.change(input, { target: { value: "other" } });
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("rate limit says what happened and when to retry (minutes from Retry-After, else an hour)", async () => {
+    let retry: string | null = "1500";
+    setup(
+      () =>
+        new Response(JSON.stringify({ detail: "x", code: "rate_limited" }), {
+          status: 429,
+          headers: { "Content-Type": "application/json", ...(retry === null ? {} : { "Retry-After": retry }) },
+        }),
+    );
+    const input = await openForm();
+    fireEvent.change(input, { target: { value: "someone" } });
+    fireEvent.click(screen.getByRole("button", { name: ru["projects.member_add_submit"] }));
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Вы добавили слишком много участников за последний час. Попробуйте через 25 мин.",
+    );
+    retry = null;
+    fireEvent.change(input, { target: { value: "again" } });
+    fireEvent.click(screen.getByRole("button", { name: ru["projects.member_add_submit"] }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toBe(
+        "Вы добавили слишком много участников за последний час. Попробуйте через час.",
+      ),
+    );
   });
 
   it("an empty value is not sent", async () => {

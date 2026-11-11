@@ -103,21 +103,24 @@ async def _resolve_candidate(
     до ответа 422. Для любой причины отказа (нет, ТА, без роли, заблокирован) ответ один.
     """
     if actor.role is Role.USER:
-        since = utcnow() - timedelta(hours=1)
-        attempts = await db.scalar(
-            select(func.count())
-            .select_from(DomainEvent)
-            .where(
-                DomainEvent.workspace_id == actor.workspace_id,
-                DomainEvent.actor_id == actor.user_id,
-                DomainEvent.action.in_(
-                    [EventAction.MEMBER_ADDED.value, EventAction.USER_MEMBER_ADD_FAILED.value]
-                ),
-                DomainEvent.occurred_at >= since,
+        now = utcnow()
+        since = now - timedelta(hours=1)
+        count, oldest = (
+            await db.execute(
+                select(func.count(), func.min(DomainEvent.occurred_at)).where(
+                    DomainEvent.workspace_id == actor.workspace_id,
+                    DomainEvent.actor_id == actor.user_id,
+                    DomainEvent.action.in_(
+                        [EventAction.MEMBER_ADDED.value, EventAction.USER_MEMBER_ADD_FAILED.value]
+                    ),
+                    DomainEvent.occurred_at >= since,
+                )
             )
-        )
-        if (attempts or 0) >= ADD_ATTEMPTS_PER_HOUR:
-            raise RateLimited()
+        ).one()
+        if count >= ADD_ATTEMPTS_PER_HOUR:
+            # Retry-After: когда самая старая из учтённых попыток выйдет из часового окна
+            wait = int((oldest + timedelta(hours=1) - now).total_seconds()) + 1
+            raise RateLimited(retry_after=wait)
     found = await find_member_candidate(db, actor.workspace_id, login=login, email=email)
     if found is None:
         await record_event(

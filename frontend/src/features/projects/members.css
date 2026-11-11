@@ -62,3 +62,16 @@
     margin-top: 4px;
   }
 }
+
+/* Names in the ownership block wrap after dots (<wbr>), not in the middle of a word. */
+.ui-list li[data-owner-candidate] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.ui-list li[data-owner-candidate] .owner-login {
+  overflow-wrap: normal;
+  word-break: normal;
+  min-width: 0;
+}

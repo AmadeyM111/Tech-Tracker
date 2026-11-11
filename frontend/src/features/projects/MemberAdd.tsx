@@ -6,6 +6,16 @@ import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { addMemberByKey } from "./api";
 
+/** The hour limit says what happened and when to try again (minutes from Retry-After; "in an hour" without it). */
+function failureText(e: unknown): string {
+  if (e instanceof ApiError && e.code === "rate_limited") {
+    return e.retryAfter === null
+      ? t("projects.member_add_rate_limited_hour")
+      : t("projects.member_add_rate_limited", { minutes: Math.max(1, Math.ceil(e.retryAfter / 60)) });
+  }
+  return errorMessage(e instanceof ApiError ? e.code : "unknown");
+}
+
 export function MemberAdd({ projectId, onAdded }: { projectId: string; onAdded: () => Promise<unknown> }) {
   const id = useId();
   const [value, setValue] = useState("");
@@ -29,7 +39,7 @@ export function MemberAdd({ projectId, onAdded }: { projectId: string; onAdded: 
       setDone(true);
       await onAdded();
     } catch (e) {
-      setError(errorMessage(e instanceof ApiError ? e.code : "unknown"));
+      setError(failureText(e));
     }
     setPending(false);
   }

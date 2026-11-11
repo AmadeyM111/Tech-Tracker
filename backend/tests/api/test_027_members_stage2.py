@@ -318,6 +318,7 @@ async def test_027_twenty_attempts_per_hour_for_user_not_for_ba(api_env: ApiEnv)
     limited = await send(env, w.tok("usr2"), "POST", members_url(pid), {"login": "ghost-next"})
     assert limited.status_code == 429, limited.text
     assert limited.json()["code"] == "rate_limited"
+    assert 3500 <= int(limited.headers["retry-after"]) <= 3601  # окно — час с первой попытки
     assert len(await _events(env, "user.member_add_failed")) == 20  # 21-я попытка не записана
     # БА лимитом не ограничен
     for i in range(22):

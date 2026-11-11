@@ -358,6 +358,15 @@ describe("transfer ownership from members (FR-14a, AC-52, AC-72, review T81 p.1)
     const btn = action(candidate(container, ID_KUZNETSOV)!, "transfer-owner");
     btn.focus();
     fireEvent.click(btn);
+    // design review #43: передача владения — с подтверждением
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("kuznetsov");
+    expect(f.count(OWNER)).toBe(0);
+    fireEvent.click(action(dialog, "cancel"));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(f.count(OWNER)).toBe(0);
+    fireEvent.click(btn);
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await waitFor(() => expect(field(container, "project-owner")!.textContent).toBe("kuznetsov"));
     expect(await body(f.last(OWNER))).toEqual({ user_id: ID_KUZNETSOV });
     expect(f.count(OWNER)).toBe(1);
@@ -373,6 +382,7 @@ describe("transfer ownership from members (FR-14a, AC-52, AC-72, review T81 p.1)
     const { container } = await open(BUSINESS, { [OWNER]: () => err(403, "forbidden") }, { members: OWN_MEMBERS });
     await waitFor(() => expect(candidate(container, ID_KUZNETSOV)).toBeTruthy());
     fireEvent.click(action(candidate(container, ID_KUZNETSOV)!, "transfer-owner"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe(errorMessage("forbidden"));
     expect(field(container, "project-owner")!.textContent).toBe("ivanov");
@@ -394,7 +404,7 @@ describe("transfer ownership from members (FR-14a, AC-52, AC-72, review T81 p.1)
 });
 
 describe("members tab (AC-53, AC-73, FR-15, FR-15a)", () => {
-  it("ac73_lists_members_with_role_owner_and_blocked_flags", async () => {
+  it("ac73_lists_members_with_project_role_and_blocked_flag_only_when_present", async () => {
     const { container } = await open();
     await openMembersTab();
     await waitFor(() => expect(memberRow(container, ID_PETROV)).toBeTruthy());
@@ -402,17 +412,22 @@ describe("members tab (AC-53, AC-73, FR-15, FR-15a)", () => {
     expect(rows.length).toBe(4);
     const owner = memberRow(container, ID_IVANOV)!;
     const blocked = memberRow(container, ID_PETROV)!;
-    const norole = memberRow(container, ID_SIDOROV)!;
     expect(field(owner, "login")!.textContent).toBe("ivanov");
-    for (const r of [owner, blocked, norole]) expect(DICT).toContain(field(r, "role")!.textContent);
-    expect(field(owner, "role")!.textContent).not.toBe(field(blocked, "role")!.textContent);
-    expect(field(blocked, "role")!.textContent).not.toBe(field(norole, "role")!.textContent);
-    expect(DICT).toContain(field(owner, "owner")!.textContent);
-    expect(field(blocked, "owner")!.textContent).toBe("");
+    // колонка «Роль» — роль в проекте (дизайн-проверка #43), не системная
+    expect(field(owner, "role")!.textContent).toBe(ru["projects.member_role_owner"]);
+    expect(field(blocked, "role")!.textContent).toBe(ru["projects.member_role_member"]);
     expect(DICT).toContain(field(blocked, "blocked")!.textContent);
     expect(field(owner, "blocked")!.textContent).toBe("");
     const h2 = within(screen.getByRole("tabpanel")).getByRole("heading", { level: 2 });
     expect(DICT).toContain(h2.textContent);
+  });
+
+  it("p3_blocked_column_is_hidden_when_nobody_is_blocked", async () => {
+    const { container } = await open(BUSINESS, {}, { members: [M_OWNER, M_ME, M_KUZNETSOV] });
+    await openMembersTab();
+    await waitFor(() => expect(memberRow(container, ID_KUZNETSOV)).toBeTruthy());
+    expect(q(container, '[data-field="blocked"]')).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: ru["projects.col_blocked"] })).toBeNull();
   });
 
   it("ac73_add_via_directory_picker_posts_user_id_and_reloads_members", async () => {

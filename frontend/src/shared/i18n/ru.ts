@@ -252,6 +252,15 @@ export const ru = {
   "projects.member_add_key_label": "Логин или email",
   "projects.member_add_key_hint": "Пользователь должен быть зарегистрирован в GTrack.",
   "projects.member_add_submit": "Добавить",
+  "projects.member_add_rate_limited":
+    "Вы добавили слишком много участников за последний час. Попробуйте через {minutes} мин.",
+  "projects.member_add_rate_limited_hour":
+    "Вы добавили слишком много участников за последний час. Попробуйте через час.",
+  "projects.member_role_owner": "Владелец",
+  "projects.member_role_member": "Участник",
+  "projects.owner_transfer_title": "Передать проект {login}?",
+  "projects.owner_transfer_message":
+    "Проект «{name}» перейдёт к пользователю {login}. Вы станете участником и потеряете управление проектом.",
   "projects.member_added": "Участник добавлен в проект.",
   "projects.member_remove_title": "Исключить участника?",
   "projects.member_remove_message":
