@@ -47,7 +47,7 @@
 - **Готово, когда:** счётчики в выводе `gtrack maintenance`, `Retry-After` на 429.
 
 ## M28-T09 — Экран согласия, возврат после входа
-- **Статус:** TODO · **AC:** AC-5, AC-12 · **Оценка:** 1,25 дня · **Зависит от:** M28-T04 (макет Design Agent до старта)
+- **Статус:** TODO · **AC:** AC-5, AC-12 · **Оценка:** 1,25 дня · **Зависит от:** M28-T04 (макеты `Shared/Design/gtrack-oauth/` готовы)
 - **Файлы:** `frontend/src/features/oauth/ConsentPage.tsx`, `frontend/src/features/oauth/api.ts`, `frontend/src/features/oauth/oauth.css`, `frontend/src/app/router.tsx`, `frontend/src/features/auth/LoginPage.tsx`, `frontend/src/shared/i18n/ru.ts`, `frontend/tests/features/oauth/ConsentPage.test.tsx`, `backend/tests/infra/test_frontend_scaffold.py`
 - **Готово, когда:** vitest, lint, typecheck зелёные; возврат только на `/oauth/authorize`.
 
