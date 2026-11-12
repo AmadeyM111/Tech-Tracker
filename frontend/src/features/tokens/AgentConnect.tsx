@@ -61,6 +61,11 @@ export function AgentConnect({ token, onDismiss }: { token: CreatedAgentToken | 
               </button>
             ))}
           </div>
+          {client === "other" ? (
+            <p className="agent-hint" data-role="other-client-hint">
+              {t("agent_connect.other_hint")}
+            </p>
+          ) : null}
         </>
       )}
       <label htmlFor={`${id}-text`} className="agent-label">
@@ -81,6 +86,11 @@ export function AgentConnect({ token, onDismiss }: { token: CreatedAgentToken | 
       <p className={token === null ? "agent-hint" : "agent-warn"}>
         {token === null ? t("agent_connect.hint_before") : t("agent_connect.warn_after")}
       </p>
+      {token === null ? null : (
+        <p className="agent-warn" data-role="no-chat-warning">
+          {t("agent_connect.no_chat_warning")}
+        </p>
+      )}
       <div className="agent-copy-row">
         <button type="button" data-action="copy-token" disabled={token === null} onClick={() => void copy()}>
           {t("agent_tokens.copy")}
