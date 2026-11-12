@@ -1606,11 +1606,6 @@ export interface components {
          * @enum {string}
          */
         FileKind: "pdf" | "docx" | "xlsx" | "pptx" | "txt" | "csv" | "png" | "jpeg" | "gif" | "webp";
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
         JsonValue: unknown;
         /**
          * LoginRequest
@@ -2433,19 +2428,6 @@ export interface components {
             id: string;
             /** Login */
             login: string;
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Context */
-            ctx?: Record<string, never>;
-            /** Input */
-            input?: unknown;
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
         };
     };
     responses: never;
@@ -4737,15 +4719,6 @@ export interface operations {
                     "application/json": components["schemas"]["ConsentContext"];
                 };
             };
-            /** @description Некорректный JSON в теле запроса (code: bad_request) */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
             401: {
                 headers: {
@@ -4764,13 +4737,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

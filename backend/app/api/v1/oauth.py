@@ -168,7 +168,7 @@ class ConsentContext(BaseModel):
 @router.get(
     "/authorize/context",
     response_model=ConsentContext,
-    responses=error_responses(400, 401, 403),
+    responses=error_responses(401, 403, 422),
 )
 async def authorize_context(
     request: Request, db: DbSession, actor: ConsentActor, query: Annotated[AuthorizeQuery, Query()]

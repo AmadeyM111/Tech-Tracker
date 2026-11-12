@@ -42,6 +42,10 @@ PUBLIC: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/v1/auth/password-reset/confirm"),  # R7-T12
         ("POST", "/api/v1/auth/registration/request"),  # R8-T11
         ("POST", "/api/v1/auth/registration/confirm"),  # R8-T11
+        # 028: машинные endpoint OAuth без сессии (клиент авторизуется кодом/PKCE, лимиты по IP)
+        ("POST", "/api/v1/oauth/register"),
+        ("POST", "/api/v1/oauth/token"),
+        ("POST", "/api/v1/oauth/revoke"),
     }
 )
 SOME_ID = "6f9619ff-8b86-4d11-b42d-00c04fc964ff"
