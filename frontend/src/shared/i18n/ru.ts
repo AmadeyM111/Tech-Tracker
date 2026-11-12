@@ -531,6 +531,8 @@ export const ru = {
   "agent_connect.hint_before": "Подсказка: токен показывается один раз, после выпуска.",
   "agent_connect.warn_after": "Токен виден только сейчас. Закроете страницу — понадобится новый токен.",
   "agent_connect.copied": "Скопировано в буфер обмена",
+  "agent_connect.other_hint": "Для клиентов, где можно задать заголовок Authorization (Codex CLI, Cursor, VS Code и др.). ChatGPT и Claude.ai (веб) пока не поддерживаются — подключение появится позже.",
+  "agent_connect.no_chat_warning": "Не отправляйте токен в чаты и на скриншоты.",
   "agent_connect.more_title": "Подробнее",
   "agent_connect.more_1": "Агент подключается по адресу сайта с путём /mcp.",
   "agent_connect.more_2": "Токен передаётся в заголовке Authorization; в репозиторий и общие конфиги его не вставляйте.",

@@ -194,6 +194,14 @@ describe("create token (AC-1)", () => {
     expect(document.activeElement).toBe(screen.getByLabelText(ru["agent_tokens.name_label"]));
   });
 
+  it("shows the no-chat warning as soon as the token is visible", async () => {
+    await open(() => j(200, []), { [CREATE]: () => j(201, { ...CREATED_ITEM, token: TOKEN_VALUE }) });
+    fireEvent.click(screen.getByRole("button", { name: ru["agent_tokens.create_submit"] }));
+    await screen.findByText(ru["agent_connect.created_title"]);
+    expect(screen.getByText(ru["agent_connect.no_chat_warning"])).toBeTruthy();
+    expect(screen.queryByText(ru["agent_connect.other_hint"])).toBeNull();
+  });
+
   it("switches the text to the JSON of another client, with the same token and address", async () => {
     await open(() => j(200, []), { [CREATE]: () => j(201, { ...CREATED_ITEM, token: TOKEN_VALUE }) });
     fireEvent.click(screen.getByRole("button", { name: ru["agent_tokens.create_submit"] }));
@@ -202,8 +210,12 @@ describe("create token (AC-1)", () => {
     const claude = screen.getByRole("button", { name: ru["agent_connect.client_claude"] });
     const other = screen.getByRole("button", { name: ru["agent_connect.client_other"] });
     expect(claude.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByText(ru["agent_connect.other_hint"])).toBeNull();
     fireEvent.click(other);
     expect(other.getAttribute("aria-pressed")).toBe("true");
+    // Подсказка про заголовок Authorization и ChatGPT/Claude.ai (веб) — на вкладке «Другой клиент».
+    expect(screen.getByText(ru["agent_connect.other_hint"])).toBeTruthy();
+    expect(screen.getByText(ru["agent_connect.no_chat_warning"])).toBeTruthy();
     expect(JSON.parse(field.value)).toEqual({
       mcpServers: {
         gtrack: {
