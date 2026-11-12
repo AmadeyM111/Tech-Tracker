@@ -377,6 +377,21 @@ Codex CLI и другие) работают с ними на той же маш�
 подключения — в [docs/ai-integration.md](docs/ai-integration.md). Облачные чат-сервисы (например
 ChatGPT) в R1 не поддерживаются, см. ADR-0018.
 
+### Облачные клиенты (ChatGPT, Claude.ai): OAuth на `/mcp`
+
+Облачный клиент подключается без персонального токена: OAuth 2.1 (authorization code + PKCE S256), динамическая регистрация клиентов,
+экран согласия «Разрешить «<клиент>» доступ к GTrack?». Права клиента — права пользователя, выдавшего согласие; отключить клиента
+можно в «Доступе для агентов» (все его токены перестают действовать сразу). Access-токен живёт 1 час, refresh-токен 90 суток с ротацией.
+Спека - `specs/028-mcp-oauth/`, ADR-0025.
+
+- **Требуется `PUBLIC_BASE_URL`** (https): адрес издателя и ресурса (`<адрес>/mcp`) берутся только из него, не из `Host`. Без него OAuth
+  выключен, `/mcp` работает по `gtrk_` как раньше. Необязательный `OAUTH_REDIRECT_HOSTS` - список хостов redirect_uri через запятую.
+- **nginx.** Кроме `/mcp` в api должны идти `/.well-known/oauth-protected-resource*`, `/.well-known/oauth-authorization-server` и
+  `/.well-known/openid-configuration` (блоки в `deploy/web/default.conf.template`; в серверный nginx их добавляет оператор). `/oauth/authorize`
+  - страница SPA, `/api/v1/oauth/*` уже идёт в api. Проверка: `curl -s https://<адрес>/.well-known/oauth-authorization-server` возвращает JSON
+  с `issuer`, а не HTML; `curl -si -X POST https://<адрес>/mcp` отвечает 401 с `WWW-Authenticate: Bearer resource_metadata=...`.
+- Миграция `0014` (пять таблиц `oauth_*`) применяется при обычном обновлении; `gtrack maintenance` очищает неиспользуемых клиентов и просроченные токены (строка `oauth_purged`).
+
 ## Разработка
 
 Dev-конфигурация `deploy/compose.dev.yml` подключается только явно и публикует порт БД
@@ -853,6 +868,19 @@ Codex CLI and others) can work with them on the same machine. A user creates a t
 "Доступ для агентов" section; the agent acts with that user's rights. Setup commands are in
 [docs/ai-integration.md](docs/ai-integration.md) (Russian). Cloud chat services such as ChatGPT
 are not supported in R1, see ADR-0018.
+
+### Cloud clients (ChatGPT, Claude.ai): OAuth on `/mcp`
+
+A cloud client connects without a personal token: OAuth 2.1 (authorization code + PKCE S256), dynamic client registration and a consent screen.
+The client gets the rights of the user who consented; the user can disconnect it on the agent access page (all its tokens stop at once).
+Access tokens live 1 hour, refresh tokens 90 days with rotation. See `specs/028-mcp-oauth/` and ADR-0025.
+
+- **`PUBLIC_BASE_URL` (https) is required**: the issuer and the resource (`<url>/mcp`) come only from it. Without it OAuth is off and `/mcp`
+  works with `gtrk_` as before. Optional `OAUTH_REDIRECT_HOSTS` - comma separated hosts allowed in `redirect_uri`.
+- **nginx.** Besides `/mcp`, the api must receive `/.well-known/oauth-protected-resource*`, `/.well-known/oauth-authorization-server` and
+  `/.well-known/openid-configuration` (see `deploy/web/default.conf.template`; the operator adds them to the server nginx). `/oauth/authorize` is an SPA
+  page, `/api/v1/oauth/*` already goes to the api. Check: `curl -s https://<url>/.well-known/oauth-authorization-server` returns JSON, not HTML.
+- Migration `0014` (five `oauth_*` tables) is applied by a normal upgrade; `gtrack maintenance` removes unused clients and expired tokens (`oauth_purged`).
 
 ## Development
 

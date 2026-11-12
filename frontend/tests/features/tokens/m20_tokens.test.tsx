@@ -63,6 +63,7 @@ function setup(list: Handler, extra: Record<string, Handler> = {}) {
   f = installFetch({
     [ME]: () => j(200, meWith(["business_access"])),
     [LIST]: list,
+    "GET /api/v1/me/oauth-grants": () => j(200, []),
     ...extra,
   });
 }
@@ -129,7 +130,7 @@ describe("navigation and list (PN-15, FR-1)", () => {
 
   it("shows the empty state", async () => {
     await open(() => j(200, []));
-    expect(screen.getByRole("status").textContent).toBe(ru["agent_tokens.empty"]);
+    expect(screen.getByText(ru["agent_tokens.empty"])).toBeTruthy();
   });
 
   it("shows a list error as a dictionary text, not a raw code", async () => {
@@ -327,7 +328,7 @@ describe("revoke token (AC-3)", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(rowOf(container, T_ACTIVE).querySelector('button[data-action="revoke-token"]')).toBeNull();
     // Focus does not fall to the page body after the row loses its button.
-    expect(document.activeElement).toBe(screen.getByRole("heading", { name: ru["agent_tokens.list_title"] }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: ru["agent_tokens.own_title"] }));
   });
 
   it("shows a readable error when the revoke fails and still refreshes the list", async () => {

@@ -36,6 +36,9 @@ USER_ACTIONS = {
     "user.overview_exported",
     # 027 (Q-7): неудачное добавление участника по логину/email — аудит автора
     "user.member_add_failed",
+    # 028 (ADR-0025): выдача и отзыв доступа облачному OAuth-клиенту — аудит пользователя
+    "user.oauth_granted",
+    "user.oauth_revoked",
 }
 
 F = frozenset

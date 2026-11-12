@@ -250,6 +250,8 @@ def test_t21_src_files_only_expected() -> None:
         "shared/ui/ErrorAlert.tsx", "shared/ui/ui.css",
         # T24
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
+        "features/oauth/ConsentPage.tsx", "features/oauth/api.ts", "features/oauth/oauth.css",
+        "features/tokens/CloudClients.tsx",
         "features/projects/MemberAdd.tsx", "features/projects/members.css",
         "features/tokens/AgentConnect.tsx", "features/tokens/agent-connect.css",
         "features/tasks/tasks.css",  # P2: карточки «Мои задачи» на 360 px

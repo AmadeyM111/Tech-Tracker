@@ -17,6 +17,7 @@ import { RegisterConfirmPage } from "../features/auth/RegisterConfirmPage";
 import { RegisterPage } from "../features/auth/RegisterPage";
 import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
 import { MyTasksPage } from "../features/tasks/TaskList";
+import { ConsentPage } from "../features/oauth/ConsentPage";
 import { SummaryPage } from "../features/overview/SummaryPage";
 import { NotificationsMenuItem } from "../features/notifications/Badge";
 import { NotificationsPage } from "../features/notifications/NotificationsPage";
@@ -399,7 +400,8 @@ function useClientHandlers(): void {
       setNavigationHandlers({
         onUnauthenticated: () => {
           // On the login and register pages there is no session data to drop and nothing to leave (RG-14).
-          if (pathRef.current === "/login" || pathRef.current === "/register") return;
+          // The consent page handles the missing session itself: it sends the user to /login and back.
+          if (["/login", "/register", "/oauth/authorize"].includes(pathRef.current)) return;
           queryClient.clear();
           navigate("/login", { replace: true, state: focusHeadingState(stateRef.current) });
         },
@@ -455,6 +457,7 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
       />
       {/* RG-14: no GuestOnly here, the link from the e-mail works for any session state. */}
       <Route path="/register/confirm" element={<RegisterConfirmPage />} />
+      <Route path="/oauth/authorize" element={<ConsentPage />} />
       <Route path="/password-reset" element={<PasswordResetRequestPage />} />
       <Route path="/password-reset/confirm" element={<PasswordResetConfirmPage />} />
       <Route path="/" element={<StartRedirect insideMain={insideMain} />} />

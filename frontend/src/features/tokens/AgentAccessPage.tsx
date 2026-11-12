@@ -18,6 +18,7 @@ import {
   type CreatedAgentToken,
 } from "./api";
 import { AgentConnect, AgentMore } from "./AgentConnect";
+import { CloudClients } from "./CloudClients";
 import { TokenList } from "./TokenList";
 import { failureMessage, nameProblem } from "./model";
 
@@ -131,9 +132,14 @@ export function AgentAccessPage() {
         <AgentMore />
       </section>
 
+      <CloudClients />
+
       <h2 ref={listTitleRef} tabIndex={-1}>
-        {t("agent_tokens.list_title")}
+        {t("agent_tokens.own_title")}
       </h2>
+      {data === undefined ? null : (
+        <p className="agent-counter">{t("agent_tokens.active_counter", { n: data.filter((x) => x.active).length })}</p>
+      )}
       {data === undefined ? (
         tokens.isPending ? (
           <p role="status">{t("agent_tokens.loading")}</p>

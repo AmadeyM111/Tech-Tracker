@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
@@ -24,6 +24,10 @@ const HELP_ITEM_KEYS = [
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Back to an OAuth consent request after the login (spec 028 FR-6): only this path, never an arbitrary address.
+  const next = searchParams.get("next");
+  const consentNext = next !== null && next.startsWith("/oauth/authorize?") ? next : null;
   const queryClient = useQueryClient();
   const alert = useAlertState();
   const loginRef = useRef<HTMLInputElement>(null);
@@ -72,6 +76,8 @@ export function LoginPage() {
         navigate("/change-password", { replace: true });
       } else if (user.role === null) {
         navigate("/no-role", { replace: true });
+      } else if (consentNext !== null) {
+        navigate(consentNext, { replace: true });
       } else {
         navigate("/", { replace: true, state: FOCUS_HEADING_STATE });
       }
@@ -88,6 +94,7 @@ export function LoginPage() {
         <GTrackLogo />
         <h1>{t("auth.login_title")}</h1>
       </div>
+      {consentNext !== null ? <p className="login-context">{t("oauth.login_context")}</p> : null}
       <form onSubmit={(e) => void onSubmit(e)} noValidate>
         <TextField
           label={t("auth.login_label")}

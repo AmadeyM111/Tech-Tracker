@@ -136,7 +136,7 @@ def test_019_migration_0010_file_chain_and_no_app_imports() -> None:
             assert all(not a.name.startswith("app") for a in node.names)
     assert "019" in (ast.get_docstring(tree) or ""), "docstring без ссылки на spec 019"
     script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
-    assert script.get_heads() == ["0013"]  # 009: голова 0013 (цепочка 0012 -> 0013)
+    assert script.get_heads() == ["0014"]  # 009: голова 0014 (цепочка 0012 -> 0013)
 
 
 # --- схема на head ------------------------------------------------------------------------
@@ -407,7 +407,7 @@ async def test_019_upgrade_downgrade_upgrade_cycle_and_alembic_check(
     """AC-36: head(0010) -> downgrade 0009 (колонки и таблицы исчезли, пользователь цел) ->
     upgrade head: имена NULL, ``self_registered=false``, прочие колонки прежние, пароль
     проверяется; ``alembic check`` чист."""
-    assert await _version(committed) == ["0013"]
+    assert await _version(committed) == ["0014"]
     async with committed() as s, s.begin():
         user = await make_user(
             s, role="tech_admin", login="Keeper", email="keep@example.test", first_name="Имя"
@@ -432,7 +432,7 @@ async def test_019_upgrade_downgrade_upgrade_cycle_and_alembic_check(
 
     await _alembic_ok(test_database_url, "upgrade", "head")
     await db_engine.dispose()
-    assert await _version(committed) == ["0013"]
+    assert await _version(committed) == ["0014"]
     async with committed() as s:
         row = (
             await s.execute(
