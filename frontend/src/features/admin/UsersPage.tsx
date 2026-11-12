@@ -27,6 +27,8 @@ import { NameDialog } from "./NameDialog";
 
 const USERS_KEY = ["admin", "users"] as const;
 const ROLES: readonly Role[] = ["tech_admin", "business_admin", "user"];
+// Поиск применяется через 300 мс после последнего символа; Enter и «Сбросить» - сразу.
+const SEARCH_DEBOUNCE_MS = 300;
 
 type Confirmation =
   | { kind: "block" | "reset" | "revoke" | "remove_role"; user: AdminUser };
@@ -71,80 +73,53 @@ function UserRow(props: RowProps) {
   const current = user.role ?? "";
   const selected = draft ?? current;
   const params = { login: user.login };
+  // UX-audit P1: три колонки. Логин, email и источник - в первой; имя, роль и состояние - во второй;
+  // основное действие - в третьей, остальные - в <details> «Ещё». Все кнопки остаются в DOM.
   return (
     <tr data-user-id={user.id}>
-      <td data-field="login">{user.login}</td>
-      <td data-field="first_name">{user.first_name || t("admin.users.name_missing")}</td>
-      <td data-field="last_name">{user.last_name || t("admin.users.name_missing")}</td>
-      <td data-field="origin">{user.self_registered ? t("admin.users.self_registered") : ""}</td>
-      <td data-field="email">{user.email ?? t("admin.users.email_missing")}</td>
-      <td data-field="role">{roleText(user.role)}</td>
-      <td data-field="status">
-        {t(user.is_blocked ? "admin.users.status_blocked" : "admin.users.status_active")}
+      <td className="ui-users-table__account">
+        <span className="ui-users-login" data-field="login">
+          {user.login}
+        </span>
+        <span
+          className="ui-users-email"
+          data-field="email"
+          // A missing e-mail already reads "email не указан": no label, so the card does not repeat it (P3).
+          data-label={user.email ? t("admin.users.email_column") : undefined}
+        >
+          {user.email ?? t("admin.users.email_missing")}
+        </span>
+        <span className="ui-users-origin" data-field="origin" data-label={t("admin.users.origin_column")}>
+          {user.self_registered ? t("admin.users.self_registered") : ""}
+        </span>
       </td>
-      <td>
-        <div className="ui-actions">
-          {user.is_blocked ? (
-            <button
-              type="button"
-              data-action="unblock"
-              aria-label={t("admin.users.unblock_aria", params)}
-              disabled={disabled}
-              onClick={props.onUnblock}
-            >
-              {t("admin.users.unblock")}
-            </button>
-          ) : (
-            <button
-              type="button"
-              data-action="block"
-              aria-label={t("admin.users.block_aria", params)}
-              disabled={disabled}
-              onClick={props.onBlock}
-            >
-              {t("admin.users.block")}
-            </button>
-          )}
-          <button
-            type="button"
-            data-action="reset-password"
-            aria-label={t("admin.users.reset_password_aria", params)}
-            disabled={disabled}
-            onClick={props.onReset}
-          >
-            {t("admin.users.reset_password")}
-          </button>
-          <button
-            type="button"
-            data-action="revoke-sessions"
-            aria-label={t("admin.users.revoke_sessions_aria", params)}
-            disabled={disabled}
-            onClick={props.onRevoke}
-          >
-            {t("admin.users.revoke_sessions")}
-          </button>
-          <button
-            type="button"
-            data-action="edit-email"
-            aria-label={t("admin.users.edit_email_aria", params)}
-            disabled={disabled}
-            onClick={props.onEditEmail}
-          >
-            {t("admin.users.edit_email")}
-          </button>
-          <button
-            type="button"
-            data-action="edit-name"
-            aria-label={t("admin.users.edit_name_aria", params)}
-            disabled={disabled}
-            onClick={props.onEditName}
-          >
-            {t("admin.users.edit_name")}
-          </button>
+      <td className="ui-users-table__person">
+        {user.first_name || user.last_name ? (
+          <>
+            {user.first_name && (
+              <span data-field="first_name" data-label={t("admin.users.first_name_column")}>
+                {user.first_name}
+              </span>
+            )}
+            {user.first_name && user.last_name && " "}
+            {user.last_name && (
+              <span data-field="last_name" data-label={t("admin.users.last_name_column")}>
+                {user.last_name}
+              </span>
+            )}
+          </>
+        ) : (
+          // Both names are empty: one placeholder, not "не указано не указано" (UX-audit PR #26 check, P2).
+          <span data-field="first_name" data-label={t("admin.users.first_name_column")}>
+            {t("admin.users.name_missing")}
+          </span>
+        )}
+        <div className="ui-users-table__role" data-label={t("admin.users.col_role")}>
           {canAssignRoles ? (
             <>
               <select
                 name="role"
+                data-field="role"
                 aria-label={t("admin.users.role_select_aria", params)}
                 value={selected}
                 disabled={disabled}
@@ -170,7 +145,78 @@ function UserRow(props: RowProps) {
                 {t("admin.users.set_role")}
               </button>
             </>
-          ) : null}
+          ) : (
+            <span data-field="role">{roleText(user.role)}</span>
+          )}
+        </div>
+        <span className="ui-users-status" data-field="status" data-label={t("admin.users.col_status")}>
+          {t(user.is_blocked ? "admin.users.status_blocked" : "admin.users.status_active")}
+        </span>
+      </td>
+      <td className="ui-users-table__actions">
+        <div className="ui-actions">
+          {user.is_blocked ? (
+            <button
+              type="button"
+              data-action="unblock"
+              aria-label={t("admin.users.unblock_aria", params)}
+              disabled={disabled}
+              onClick={props.onUnblock}
+            >
+              {t("admin.users.unblock")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              data-action="block"
+              aria-label={t("admin.users.block_aria", params)}
+              disabled={disabled}
+              onClick={props.onBlock}
+            >
+              {t("admin.users.block")}
+            </button>
+          )}
+          <details className="ui-users-more">
+            <summary>{t("admin.users.more")}</summary>
+            <div className="ui-actions">
+              <button
+                type="button"
+                data-action="reset-password"
+                aria-label={t("admin.users.reset_password_aria", params)}
+                disabled={disabled}
+                onClick={props.onReset}
+              >
+                {t("admin.users.reset_password")}
+              </button>
+              <button
+                type="button"
+                data-action="revoke-sessions"
+                aria-label={t("admin.users.revoke_sessions_aria", params)}
+                disabled={disabled}
+                onClick={props.onRevoke}
+              >
+                {t("admin.users.revoke_sessions")}
+              </button>
+              <button
+                type="button"
+                data-action="edit-email"
+                aria-label={t("admin.users.edit_email_aria", params)}
+                disabled={disabled}
+                onClick={props.onEditEmail}
+              >
+                {t("admin.users.edit_email")}
+              </button>
+              <button
+                type="button"
+                data-action="edit-name"
+                aria-label={t("admin.users.edit_name_aria", params)}
+                disabled={disabled}
+                onClick={props.onEditName}
+              >
+                {t("admin.users.edit_name")}
+              </button>
+            </div>
+          </details>
         </div>
       </td>
     </tr>
@@ -182,6 +228,9 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
   const alert = useAlertState();
   const busy = useRef(false);
   const [page, setPage] = useState(1);
+  // `search` - что введено в поле; `query` - что применено к списку (обрезано по краям).
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
   const [login, setLogin] = useState("");
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -199,8 +248,8 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
   const restoreRow = useRef<string | null>(null);
 
   const users = useQuery({
-    queryKey: [...USERS_KEY, page],
-    queryFn: () => listUsers({ page }),
+    queryKey: [...USERS_KEY, page, query],
+    queryFn: () => listUsers({ page, q: query }),
     placeholderData: keepPreviousData,
     retry: false,
   });
@@ -208,6 +257,17 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
   useEffect(() => {
     if (shown !== null) shownRef.current?.focus();
   }, [shown]);
+
+  // Отложенное применение ввода: новый символ отменяет предыдущий таймер.
+  useEffect(() => {
+    const next = search.trim();
+    if (next === query) return;
+    const timer = setTimeout(() => {
+      setQuery(next);
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [search, query]);
 
   // The controls are disabled while an action runs, which drops the focus to
   // <body>; when they come back, the focus returns to the same row (or the table).
@@ -311,6 +371,21 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
     setPage(next);
   }
 
+  // Enter в поле поиска применяет запрос сразу, без задержки.
+  function onSearchSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    alert.clear();
+    setQuery(search.trim());
+    setPage(1);
+  }
+
+  function resetSearch(): void {
+    alert.clear();
+    setSearch("");
+    setQuery("");
+    setPage(1);
+  }
+
   const listError =
     users.isError && alert.message === null
       ? errorMessage(users.error instanceof ApiError ? users.error.code : "unknown")
@@ -377,23 +452,65 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
         </button>
       </form>
 
+      <form
+        className="ui-accounts-search"
+        role="search"
+        aria-label={t("admin.users.search_form_aria")}
+        onSubmit={onSearchSubmit}
+      >
+        <TextField
+          type="search"
+          label={t("admin.users.search_label")}
+          name="q"
+          value={search}
+          onChange={setSearch}
+          autoComplete="off"
+        />
+        <button type="button" onClick={resetSearch}>
+          {t("admin.users.search_reset")}
+        </button>
+      </form>
+      {query !== "" && data !== undefined && data.items.length > 0 ? (
+        <p role="status" className="ui-search-count" data-field="search-count">
+          {t("admin.users.search_count", { count: data.total })}
+        </p>
+      ) : null}
+
       {data === undefined ? (
         users.isPending ? (
           <p role="status">{t("admin.loading")}</p>
         ) : null
       ) : data.items.length === 0 ? (
-        <p role="status">{t("admin.users.empty")}</p>
+        query === "" ? (
+          <p role="status">{t("admin.users.empty")}</p>
+        ) : (
+          <div data-field="search-none">
+            <p role="status" className="ui-search-count">
+              {t("admin.users.search_none")}
+            </p>
+            <p className="ui-hint">{t("admin.users.search_none_hint")}</p>
+          </div>
+        )
       ) : (
-        <table className="ui-table" aria-label={t("admin.users.list_label")} ref={tableRef} tabIndex={-1}>
+        <table
+          className="ui-table ui-users-table"
+          aria-label={t("admin.users.list_label")}
+          ref={tableRef}
+          tabIndex={-1}
+        >
           <thead>
             <tr>
-              <th scope="col">{t("admin.users.col_login")}</th>
-              <th scope="col">{t("admin.users.first_name_column")}</th>
-              <th scope="col">{t("admin.users.last_name_column")}</th>
-              <th scope="col">{t("admin.users.origin_column")}</th>
-              <th scope="col">{t("admin.users.email_column")}</th>
-              <th scope="col">{t("admin.users.col_role")}</th>
-              <th scope="col">{t("admin.users.col_status")}</th>
+              <th scope="col">
+                {[t("admin.users.col_login"), t("admin.users.email_column"), t("admin.users.origin_column")].join(" · ")}
+              </th>
+              <th scope="col">
+                {[
+                  t("admin.users.first_name_column"),
+                  t("admin.users.last_name_column"),
+                  t("admin.users.col_role"),
+                  t("admin.users.col_status"),
+                ].join(" · ")}
+              </th>
               <th scope="col">{t("admin.users.col_actions")}</th>
             </tr>
           </thead>
@@ -425,12 +542,15 @@ export function UsersPage({ canAssignRoles = false }: { canAssignRoles?: boolean
         </table>
       )}
 
-      <Pagination
-        page={page}
-        hasNext={data?.has_next ?? false}
-        busy={users.isPlaceholderData || pending}
-        onPage={changePage}
-      />
+      {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
+      {page > 1 || ((data?.items.length ?? 0) > 0 && (data?.has_next ?? false)) ? (
+        <Pagination
+          page={page}
+          hasNext={data?.has_next ?? false}
+          busy={users.isPlaceholderData || pending}
+          onPage={changePage}
+        />
+      ) : null}
 
       {emailUser === null ? null : (
         <EmailDialog

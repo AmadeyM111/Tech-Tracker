@@ -23,7 +23,7 @@ async def test_ac76_role_change_applies_to_next_request_in_same_session(
     ws = await new_workspace(env)
     changer, (changer_token,) = await seed(env, ws, changer_role, login="rc.changer")
     ba, (ba_token,) = await seed(env, ws, "business_admin", login="rc.ba")
-    other, _ = await seed(env, ws, "user", login="rc.other")
+    other, (other_token,) = await seed(env, ws, "user", login="rc.other")
 
     first = await send(env, ba_token, "POST", PROJECTS, {"name": "До смены роли"})
     assert first.status_code == 201, first.text
@@ -32,10 +32,10 @@ async def test_ac76_role_change_applies_to_next_request_in_same_session(
     down = await admin_call(env, changer_token, "role_user", ba.id)
     assert down.status_code in (200, 204), down.text
 
-    # та же сессия, без повторного входа
+    # та же сессия, без повторного входа; спека 027, FR-1: «Пользователь» создаёт проекты
     assert (await env.me(ba_token)).status_code == 200
-    denied = await send(env, ba_token, "POST", PROJECTS, {"name": "После смены роли"})
-    assert error(denied) == (403, "forbidden")
+    created_as_user = await send(env, ba_token, "POST", PROJECTS, {"name": "После смены роли"})
+    assert created_as_user.status_code == 201, created_as_user.text
 
     # права на уже созданный проект — по новой роли «Пользователь»; владелец и членство целы
     card = await send(env, ba_token, "GET", pj(project_id))
@@ -43,24 +43,30 @@ async def test_ac76_role_change_applies_to_next_request_in_same_session(
     assert card.json()["owner"]["id"] == str(ba.id)
     assert card.json()["is_member"] is True
     assert card.json()["permissions"] == {
-        "manage": False,
-        "manage_members": False,
+        "manage": True,  # 027 FR-2: владелец-«Пользователь» управляет своим проектом
+        "manage_members": True,
         "create_task": True,
         "remove_self": False,  # владелец не выходит
     }
-    assert error(await send(env, ba_token, "PATCH", pj(project_id), {"name": "Нельзя"})) == (
+    # 027: владелец-«Пользователь» правит свой проект; участников — только по логину/email
+    own_rename = await send(env, ba_token, "PATCH", pj(project_id), {"name": "Своё имя"})
+    assert own_rename.status_code == 200, own_rename.text
+    assert error(
+        await send(env, ba_token, "POST", members_url(project_id), {"user_id": str(other.id)})
+    ) == (422, "validation_error")
+    # чужие проекты (где БА, ставший «Пользователем», не владелец) остаются без управления
+    foreign = await send(env, other_token, "POST", PROJECTS, {"name": "Чужой"})
+    assert foreign.status_code == 201, foreign.text
+    foreign_id = foreign.json()["id"]
+    await send(env, other_token, "POST", members_url(foreign_id), {"login": "rc.ba"})
+    assert error(await send(env, ba_token, "PATCH", pj(foreign_id), {"name": "Нельзя"})) == (
         403,
         "forbidden",
     )
-    assert error(await send(env, ba_token, "DELETE", pj(project_id))) == (403, "forbidden")
-    assert error(
-        await send(env, ba_token, "POST", members_url(project_id), {"user_id": str(other.id)})
-    ) == (403, "forbidden")
-    assert error(
-        await send(env, ba_token, "PUT", f"{pj(project_id)}/owner", {"user_id": str(ba.id)})
-    ) == (403, "forbidden")
+    assert error(await send(env, ba_token, "DELETE", pj(foreign_id))) == (403, "forbidden")
     listed = await send(env, ba_token, "GET", PROJECTS)  # как участник проект в списке
-    assert [i["id"] for i in listed.json()["items"]] == [project_id]
+    # в списке — оба проекта, где он владелец-участник (созданный после смены роли тоже)
+    assert project_id in [i["id"] for i in listed.json()["items"]]
 
     up = await admin_call(env, changer_token, "role_ba", ba.id)
     assert up.status_code in (200, 204), up.text
@@ -116,12 +122,15 @@ async def test_t77_ac77_role_change_keeps_owner_member_assignee_and_ba_member_re
     card = await send(env, w.tok("ba"), "GET", task_url(t))
     assert card.status_code == 200, card.text
     assert card.json()["assignee"]["id"] == str(w.uid("ba"))
-    # права по новой роли: «Пользователь» не меняет исполнителя; своя задача — правится
-    assert card.json()["permissions"]["change_assignee"] is False
+    # спека 027, FR-2: ba — владелец проекта; как «Пользователь»-владелец он меняет исполнителя
+    # и правит задачи своего проекта (глобальная роль — «Пользователь», БА-права не возвращаются)
+    assert card.json()["permissions"]["change_assignee"] is True
     assert card.json()["permissions"]["edit"] is True
-    assert error(
-        await send(env, w.tok("ba"), "PATCH", task_url(t), {"assignee_id": str(w.uid("usr"))})
-    ) == (403, "forbidden")
+    reassigned = await send(
+        env, w.tok("ba"), "PATCH", task_url(t), {"assignee_id": str(w.uid("usr"))}
+    )
+    assert reassigned.status_code == 200, reassigned.text
+    await send(env, w.tok("ba"), "PATCH", task_url(t), {"assignee_id": str(w.uid("ba"))})
     # БА-участник (ba2) находит задачу фильтром по исполнителю и переназначает (SC-14)
     found = await send(
         env, w.tok("ba2"), "GET", project_tasks_url(w.project_id, f"?assignee_id={w.uid('ba')}")
@@ -142,8 +151,14 @@ async def test_t77_ac76_role_effect_on_task_operations_without_relogin(api_env: 
     assert ok.status_code == 200
 
     assert (await admin_call(env, w.tok("ta"), "role_user", w.uid("ba"))).status_code in (200, 204)
-    denied = await send(env, w.tok("ba"), "PATCH", task_url(t), {"title": "Пользователь"})
-    assert error(denied) == (403, "forbidden")  # не автор-исполнитель
+    # спека 027, FR-2: владелец-«Пользователь» правит задачи своего проекта и после смены роли
+    owner_user = await send(env, w.tok("ba"), "PATCH", task_url(t), {"title": "Пользователь"})
+    assert owner_user.status_code == 200, owner_user.text
+    # не владелец (usr2 — участник без владения) по-прежнему не правит чужую задачу
+    assert error(await send(env, w.tok("usr2"), "PATCH", task_url(t), {"title": "Чужая"})) == (
+        403,
+        "forbidden",
+    )
 
     assert (await admin_call(env, w.tok("ta"), "role_ba", w.uid("ba"))).status_code in (200, 204)
     again = await send(env, w.tok("ba"), "PATCH", task_url(t), {"title": "Снова владелец"})

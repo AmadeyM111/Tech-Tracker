@@ -56,7 +56,7 @@ HOLDERS: dict[str, frozenset[str]] = {
     "ASSIGN_ROLES": frozenset({"tech_admin"}),
     "VIEW_AUDIT": frozenset({"tech_admin"}),
     "BUSINESS_ACCESS": frozenset({"business_admin", "user"}),
-    "PROJECT_CREATE": frozenset({"business_admin"}),
+    "PROJECT_CREATE": frozenset({"business_admin", "user"}),  # спека 027, FR-1
     "PROJECT_MANAGE_ANY": frozenset({"business_admin"}),  # 002/FR-8, D-1
     "TASK_ASSIGN_OTHERS": frozenset({"business_admin"}),
     "LABELS_MANAGE": frozenset({"business_admin"}),
@@ -64,6 +64,7 @@ HOLDERS: dict[str, frozenset[str]] = {
     "CRM_WRITE": frozenset({"business_admin"}),
     "PIPELINE_MANAGE": frozenset({"business_admin"}),
     "ONBOARD_ACCOUNTS": frozenset({"business_admin"}),  # 019 (plan RG-11)
+    "EXPORT_OVERVIEW": frozenset({"business_admin"}),  # 025
 }
 GATE_CELLS = [(r, c) for c in HOLDERS for r in ALL_ROLES]
 

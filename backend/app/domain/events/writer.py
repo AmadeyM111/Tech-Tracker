@@ -34,6 +34,7 @@ class UserEventDetails(TypedDict, total=False):
 
     role_from: str | None
     role_to: str | None
+    rows: str | None  # 025: число строк выгрузки CSV строкой; значения фильтров не пишутся
 
 
 _ALLOWED_DETAILS_KEYS = frozenset(UserEventDetails.__annotations__)

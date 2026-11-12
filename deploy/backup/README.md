@@ -25,6 +25,13 @@ sudo systemctl start gtrack-backup.service && journalctl -u gtrack-backup -n 20
 
 Cron вместо systemd: `30 23 * * * docker exec <проект>-api-1 gtrack backup` (23:30 UTC = 02:30 МСК).
 
+## Откат релиза и пути юнитов
+
+Пути юнитов: `/etc/systemd/system/` (NixOS — `/usr/local/lib/systemd/system/` или
+`configuration.nix`); окружение — `/etc/gtrack/backup.env`. Откат кода и схемы (миграции
+`0011`–`0013` только добавляют таблицы) описан в корневом `README.md`, раздел «R2: вложения,
+копии, напоминания, откат».
+
 ## Состояние
 
 - ТА видит плашку на экранах администрирования, если копий нет, последняя старше 26 ч
@@ -41,7 +48,16 @@ docker compose -p <новый> up -d --wait            # bootstrap примен�
 ```
 
 `gtrack restore` работает только с пустой БД и пустым каталогом данных (иначе код 2) и сначала
-проверяет sha256. Восстановление поверх работающей системы — `scripts/restore.sh`.
+проверяет sha256. Порядок: данные распаковываются во временный каталог внутри `DATA_DIR`,
+затем `pg_restore` (одна транзакция), затем данные переносятся на место; сбой до переноса
+оставляет обе цели пустыми, и команду можно повторить.
+
+Восстановление поверх работающей системы — `scripts/restore.sh -p <проект> -b <файл.tar>`: скрипт
+принимает файл `gtrack-backup-<UTC>.tar` (проверяет состав и сверяет sha256 с `manifest.json`)
+или каталог старого формата (`db.dump`, `appdata.tar`, `SHA256SUMS`). Без скрипта вручную:
+`tar -xf gtrack-backup-<UTC>.tar`, сверить `sha256sum db.dump appdata.tar` с `manifest.json`,
+остановить api, пересоздать БД, `pg_restore --no-owner --no-privileges --exit-on-error -d <БД> db.dump`,
+распаковать `appdata.tar` в пустой каталог данных, запустить api (миграции применятся при старте).
 
 ## Временный вариант без CLI (`host/`)
 

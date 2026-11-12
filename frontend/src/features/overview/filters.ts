@@ -1,5 +1,6 @@
 // Summary filters (008/FR-4, FR-6, FR-7): status and due preset are single choice, priority is
-// multi-select (Q-7). Pure helpers, no requests.
+// multi-select (Q-7). Due range «с / по» (024): excludes the preset (Q-1), either bound alone is
+// allowed (Q-2). Pure helpers, no requests.
 import type { components } from "../../shared/api/schema";
 
 export type TaskStatus = components["schemas"]["TaskStatus"];
@@ -15,6 +16,9 @@ export interface SummaryFilters {
   status: TaskStatus | null;
   priorities: readonly TaskPriority[];
   due: DuePreset | null;
+  /** Calendar dates YYYY-MM-DD (Moscow), inclusive; null = bound not set (024). */
+  dateFrom: string | null;
+  dateTo: string | null;
   needsReview: boolean;
 }
 
@@ -23,6 +27,8 @@ export const NO_FILTERS: SummaryFilters = {
   status: null,
   priorities: [],
   due: null,
+  dateFrom: null,
+  dateTo: null,
   needsReview: false,
 };
 
@@ -49,7 +55,25 @@ export function togglePriority(filters: SummaryFilters, p: TaskPriority): Summar
   return { ...filters, priorities: next };
 }
 
-/** A pressed preset is released by the second click (single choice, FR-7). */
+/**
+ * A pressed preset is released by the second click (single choice, FR-7). Choosing a preset
+ * clears both range fields (024 FR-5, Q-1).
+ */
 export function toggleDue(filters: SummaryFilters, d: DuePreset): SummaryFilters {
-  return { ...filters, due: filters.due === d ? null : d };
+  return { ...filters, due: filters.due === d ? null : d, dateFrom: null, dateTo: null };
+}
+
+export type RangeBound = "from" | "to";
+
+/** Editing a range field releases the preset (024 FR-5, Q-1); an empty value clears the bound. */
+export function setRangeBound(filters: SummaryFilters, bound: RangeBound, value: string): SummaryFilters {
+  const next = value === "" ? null : value;
+  return bound === "from"
+    ? { ...filters, due: null, dateFrom: next }
+    : { ...filters, due: null, dateTo: next };
+}
+
+/** «с» позже «по» (024 FR-6, Q-4): the request is not sent, the list keeps its previous state. */
+export function rangeInvalid(filters: SummaryFilters): boolean {
+  return filters.dateFrom !== null && filters.dateTo !== null && filters.dateFrom > filters.dateTo;
 }

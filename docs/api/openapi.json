@@ -254,6 +254,43 @@
         "title": "AdminUser",
         "type": "object"
       },
+      "AdminUserPage": {
+        "description": "Страница ``GET /admin/users``; ``total`` — все записи под ``q``, не размер страницы.",
+        "properties": {
+          "has_next": {
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "has_next",
+          "total"
+        ],
+        "title": "AdminUserPage",
+        "type": "object"
+      },
       "AttachmentOut": {
         "description": "Вложение задачи: метаданные и права; путь хранения не отдаётся.",
         "properties": {
@@ -637,7 +674,8 @@
           "crm_read",
           "crm_write",
           "pipeline_manage",
-          "onboard_accounts"
+          "onboard_accounts",
+          "export_overview"
         ],
         "title": "Capability",
         "type": "string"
@@ -1088,16 +1126,47 @@
       },
       "MemberAdd": {
         "additionalProperties": false,
+        "description": "Ровно одно из: ``user_id`` (БА) или точные ``login``/``email`` (spec 027 FR-4).",
         "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "login": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login"
+          },
           "user_id": {
-            "format": "uuid",
-            "title": "User Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
           }
         },
-        "required": [
-          "user_id"
-        ],
         "title": "MemberAdd",
         "type": "object"
       },
@@ -1256,6 +1325,23 @@
         "title": "OverviewCountsOut",
         "type": "object"
       },
+      "OverviewProjectList": {
+        "description": "Мои проекты для фильтра «Сводки» (без постраничности, по имени).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectRef"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "OverviewProjectList",
+        "type": "object"
+      },
       "OverviewTaskItem": {
         "properties": {
           "assignee": {
@@ -1410,37 +1496,6 @@
           "has_next"
         ],
         "title": "Page[ActivityItem]",
-        "type": "object"
-      },
-      "Page_AdminUser_": {
-        "properties": {
-          "has_next": {
-            "title": "Has Next",
-            "type": "boolean"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/AdminUser"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "page": {
-            "title": "Page",
-            "type": "integer"
-          },
-          "page_size": {
-            "title": "Page Size",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "items",
-          "page",
-          "page_size",
-          "has_next"
-        ],
-        "title": "Page[AdminUser]",
         "type": "object"
       },
       "Page_AttachmentOut_": {
@@ -1998,6 +2053,20 @@
         "title": "RegistrationConfirm",
         "type": "object"
       },
+      "RegistrationConfirmed": {
+        "description": "Ответ подтверждения (200, v0.5): логин учётной записи. Сессии и cookie нет (AC-16).",
+        "properties": {
+          "login": {
+            "title": "Login",
+            "type": "string"
+          }
+        },
+        "required": [
+          "login"
+        ],
+        "title": "RegistrationConfirmed",
+        "type": "object"
+      },
       "RegistrationRequest": {
         "additionalProperties": false,
         "description": "``POST /auth/registration/request``: заявка на регистрацию (FR-3).",
@@ -2018,9 +2087,17 @@
             "type": "string"
           },
           "login": {
-            "maxLength": 1024,
-            "title": "Login",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "deprecated": true,
+            "title": "Login"
           },
           "password": {
             "format": "password",
@@ -2034,7 +2111,6 @@
           "email",
           "first_name",
           "last_name",
-          "login",
           "password"
         ],
         "title": "RegistrationRequest",
@@ -2851,7 +2927,7 @@
   "paths": {
     "/api/v1/admin/audit": {
       "get": {
-        "description": "Страница журнала пространства: ``id DESC``, фильтры ``entity_type`` и ``actor_id``.",
+        "description": "Страница журнала: ``id DESC``, фильтры ``entity_type``, ``actor_id``, ``actor_login``.",
         "operationId": "list_audit",
         "parameters": [
           {
@@ -2909,6 +2985,23 @@
                 }
               ],
               "title": "Actor Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_login",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Login"
             }
           }
         ],
@@ -3077,7 +3170,7 @@
     },
     "/api/v1/admin/users": {
       "get": {
-        "description": "Страница учётных записей пространства: ``login ASC, id ASC`` (D-34).",
+        "description": "Страница учётных записей пространства: ``login ASC, id ASC`` (D-34).\n\n``q`` — поиск по логину, имени, фамилии и email; ``total`` — всего найдено (все страницы).\n\nИсключение из D-34 только для этого списка (решение 2026-11-10,\n``specs/001-pilot-r1/plan.md``, D-34a): учётных записей в пространстве десятки,\nпоэтому ``total`` считается отдельным COUNT.",
         "operationId": "list_users",
         "parameters": [
           {
@@ -3103,6 +3196,24 @@
               "title": "Page Size",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "pattern": "^[^\\x00]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
           }
         ],
         "responses": {
@@ -3110,7 +3221,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_AdminUser_"
+                  "$ref": "#/components/schemas/AdminUserPage"
                 }
               }
             },
@@ -4357,7 +4468,7 @@
     },
     "/api/v1/auth/registration/confirm": {
       "post": {
-        "description": "Подтверждение регистрации по ссылке; успех — 204 без тела и без cookie (AC-16).\n\nНеверная, просроченная или использованная ссылка и занятый адрес — 400\n``registration_token_invalid``. Занятый логин — 409 ``login_taken``. Сессия не создаётся:\nвход отдельным действием.",
+        "description": "Подтверждение по ссылке; успех — 200 с логином учётной записи, без cookie (AC-16).\n\nНеверная, просроченная или использованная ссылка и занятый адрес — 400\n``registration_token_invalid``. Логин выбирает сервер (v0.5): занятый логин заявки заменяется\nследующим свободным, поэтому 409 ``login_taken`` возможен только если заняты все попытки.\nСессия не создаётся: вход отдельным действием.",
         "operationId": "confirm_registration",
         "requestBody": {
           "content": {
@@ -4370,7 +4481,14 @@
           "required": true
         },
         "responses": {
-          "204": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationConfirmed"
+                }
+              }
+            },
             "description": "Successful Response"
           },
           "400": {
@@ -4411,7 +4529,7 @@
                 }
               }
             },
-            "description": "Логин занят учётной записью (code: login_taken)"
+            "description": "Все логины заняты, учётная запись не создана (code: login_taken)"
           },
           "422": {
             "content": {
@@ -5055,6 +5173,48 @@
         ]
       }
     },
+    "/api/v1/me/overview/projects": {
+      "get": {
+        "description": "Мои проекты (владелец или участник) для фильтра по проекту, по имени.",
+        "operationId": "list_overview_projects",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewProjectList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          }
+        },
+        "summary": "List Overview Projects",
+        "tags": [
+          "overview"
+        ]
+      }
+    },
     "/api/v1/me/overview/tasks": {
       "get": {
         "description": "Задачи сводки с фильтрами: срок по возрастанию, без срока в конце (FR-5…FR-9).",
@@ -5147,6 +5307,42 @@
           },
           {
             "in": "query",
+            "name": "due_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Due From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Due To"
+            }
+          },
+          {
+            "in": "query",
             "name": "needs_review",
             "required": false,
             "schema": {
@@ -5209,6 +5405,173 @@
           }
         },
         "summary": "List Overview Tasks",
+        "tags": [
+          "overview"
+        ]
+      }
+    },
+    "/api/v1/me/overview/tasks.csv": {
+      "get": {
+        "description": "Выборка «Сводки» с фильтрами целиком в CSV; только БА (ADR-0023, FR-1…FR-8).",
+        "operationId": "export_overview_tasks",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TaskStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "priority",
+            "required": false,
+            "schema": {
+              "items": {
+                "$ref": "#/components/schemas/TaskPriority"
+              },
+              "title": "Priority",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DuePreset"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Due"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Due From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Due To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "needs_review",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Needs Review",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {}
+            },
+            "description": "CSV выборки «Сводки» (spec 025)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Export Overview Tasks",
         "tags": [
           "overview"
         ]
@@ -6134,7 +6497,7 @@
         ]
       },
       "post": {
-        "description": "Добавляет участника; уже участник — 204 без изменений (D-46).",
+        "description": "Добавляет участника по ``user_id`` (БА) или точному логину/email (027 FR-4).\n\nПо ``user_id`` повтор — 204 (D-46); по логину/email — 422 ``member_already_added``;\nне найден — 422 ``recipient_not_found``; «Пользователь» — не больше 20 попыток в час (429).",
         "operationId": "add_member",
         "parameters": [
           {
@@ -6298,7 +6661,7 @@
     },
     "/api/v1/projects/{project_id}/owner": {
       "put": {
-        "description": "Передаёт владение участнику-БА (FR-14a); пишет событие аудита.",
+        "description": "Передаёт владение участнику с ролью БА или «Пользователь» (027 FR-7); пишет аудит.",
         "operationId": "change_owner",
         "parameters": [
           {
@@ -7606,7 +7969,7 @@
     },
     "/api/v1/users": {
       "get": {
-        "description": "Незаблокированные пользователи пространства с ролью БА/П; ``q`` — подстрока логина.",
+        "description": "Незаблокированные пользователи с ролью БА/П; ``q`` — подстрока логина.\n\nБА видит всех в пространстве; «Пользователь» — только людей из общих проектов и себя (027 FR-5).",
         "operationId": "list_directory",
         "parameters": [
           {

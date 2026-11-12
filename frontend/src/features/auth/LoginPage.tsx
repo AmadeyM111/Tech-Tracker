@@ -12,6 +12,8 @@ import { login, passwordResetStatus } from "./api";
 import { FOCUS_HEADING_STATE } from "./session";
 import "./auth-screens.css";
 
+type LoginField = "login" | "password";
+
 // Help block list (spec 005 v0.3, design brief section 3): the dictionary keys in document order.
 const HELP_ITEM_KEYS = [
   "auth.help_item_1",
@@ -25,11 +27,14 @@ export function LoginPage() {
   const queryClient = useQueryClient();
   const alert = useAlertState();
   const loginRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const busy = useRef(false);
   const [loginValue, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [shown, setShown] = useState(false);
+  // Fields that were empty on the last submit; each shows its text under it (cleared on the next submit).
+  const [emptyKeys, setEmptyKeys] = useState<LoginField[]>([]);
 
   const resetStatus = useQuery({
     queryKey: ["auth", "password-reset-status"],
@@ -46,8 +51,14 @@ export function LoginPage() {
     event.preventDefault();
     setShown(false);
     if (busy.current) return;
-    if (loginValue.trim() === "" || password === "") {
+    // Spaces at the ends of the login count as empty. The first empty field takes focus; the general alert does not.
+    const missing: LoginField[] = [];
+    if (loginValue.trim() === "") missing.push("login");
+    if (password === "") missing.push("password");
+    setEmptyKeys(missing);
+    if (missing.length > 0) {
       alert.show(errorMessage("validation_error"));
+      (missing[0] === "login" ? loginRef : passwordRef).current?.focus();
       return;
     }
     busy.current = true;
@@ -84,6 +95,7 @@ export function LoginPage() {
           onChange={setLogin}
           autoComplete="username"
           inputRef={loginRef}
+          error={emptyKeys.includes("login") ? t("auth.login_required_login") : null}
           disabled={pending}
         />
         <TextField
@@ -92,6 +104,8 @@ export function LoginPage() {
           value={password}
           onChange={setPassword}
           autoComplete="current-password"
+          inputRef={passwordRef}
+          error={emptyKeys.includes("password") ? t("auth.login_required_password") : null}
           disabled={pending}
           reveal={{
             label: shown ? t("auth.hide_password") : t("auth.show_password"),
@@ -100,7 +114,7 @@ export function LoginPage() {
           }}
         />
         {/* Error sits directly above the submit button (design, login-error state). */}
-        <ErrorAlert message={alert.message} seq={alert.seq} />
+        <ErrorAlert message={alert.message} seq={alert.seq} focus={emptyKeys.length === 0} />
         <button type="submit" className="login-submit" disabled={pending}>
           {pending && <Icon name="spinner" className="login-spin" />}
           {t("auth.login_submit")}

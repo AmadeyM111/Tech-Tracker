@@ -2,12 +2,12 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { CAPS_ALL, installFetch, j, meWith, page, renderApp } from "../admin/helpers";
+import { CAPS_ALL, deferred, installFetch, j, meWith, page, renderApp, type Handler } from "../admin/helpers";
 
 const ME = "GET /api/v1/me";
 const COUNTS = "GET /api/v1/me/overview";
 const TASKS = "GET /api/v1/me/overview/tasks";
-const PROJECTS = "GET /api/v1/projects";
+const PROJECTS = "GET /api/v1/me/overview/projects";
 const BA_CAPS = ["business_access", "project_create", "task_assign_others"];
 const P1 = "33333333-3333-4333-8333-333333333333";
 
@@ -128,5 +128,141 @@ describe("SummaryPage", () => {
     const { container } = renderApp("/admin/users");
     await waitFor(() => expect(container.querySelector('nav a[href="/admin/users"]')).not.toBeNull());
     expect(container.querySelector('a[href="/summary"]')).toBeNull();
+  });
+});
+
+
+describe("025 CSV export button", () => {
+  const CSV = "GET /api/v1/me/overview/tasks.csv";
+  const EXPORT_CAPS = [...BA_CAPS, "export_overview"];
+  const rows = [item("aaaa1111-1111-4111-8111-111111111111")];
+  const file = () =>
+    new Response("\ufeff\"Проект\"\r\n", {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="gtrack-summary-20261110-1200.csv"',
+      },
+    });
+
+  function setupExport(caps: string[], csv: Handler = file) {
+    return installFetch({
+      [ME]: () => j(200, meWith(caps, "business_admin")),
+      [COUNTS]: () => j(200, COUNTS_24),
+      [TASKS]: () => j(200, tasksPage(rows, 1)),
+      [PROJECTS]: () => j(200, page([])),
+      [CSV]: csv,
+    });
+  }
+
+  function stubDownload() {
+    const saved: string[] = [];
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:x", revokeObjectURL: () => undefined }));
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      saved.push(this.download);
+    });
+    return saved;
+  }
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("button_and_caption_only_with_export_overview", async () => {
+    setupExport(BA_CAPS);
+    const first = renderApp("/summary");
+    await screen.findByText("Показано 1 из 1");
+    expect(screen.queryByRole("button", { name: "Скачать CSV" })).toBeNull();
+    first.unmount();
+    setupExport(EXPORT_CAPS);
+    renderApp("/summary");
+    expect(await screen.findByRole("button", { name: "Скачать CSV" })).toBeTruthy();
+    expect(
+      screen.getByText("В файл попадают все задачи текущей выборки с фильтрами, а не только текущая страница"),
+    ).toBeTruthy();
+  });
+
+  it("click_sends_current_filters_and_saves_file_under_server_name", async () => {
+    const f = setupExport(EXPORT_CAPS);
+    const saved = stubDownload();
+    renderApp("/summary");
+    fireEvent.click(await screen.findByLabelText("Высокий"));
+    fireEvent.click(await screen.findByRole("button", { name: "Скачать CSV" }));
+    await waitFor(() => expect(saved).toEqual(["gtrack-summary-20261110-1200.csv"]));
+    const q = f.query(f.last(CSV));
+    expect(q.getAll("priority")).toEqual(["high"]);
+    expect(q.has("page")).toBe(false);
+  });
+
+  it("export_sends_the_date_range_and_the_applied_filters_only", async () => {
+    const f = setupExport(EXPORT_CAPS);
+    const saved = stubDownload();
+    renderApp("/summary");
+    const from = (await screen.findByLabelText("с")) as HTMLInputElement;
+    const to = screen.getByLabelText("по") as HTMLInputElement;
+    fireEvent.change(from, { target: { value: "2026-11-16" } });
+    fireEvent.change(to, { target: { value: "2026-11-20" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Скачать CSV" }));
+    await waitFor(() => expect(saved).toHaveLength(1));
+    const q = f.query(f.last(CSV));
+    expect(q.get("due_from")).toBe("2026-11-16");
+    expect(q.get("due_to")).toBe("2026-11-20");
+    expect(q.has("due")).toBe(false);
+    // «с» позже «по»: запрос списка не уходит, выгрузка идёт по последней действующей выборке
+    fireEvent.change(from, { target: { value: "2026-12-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "Скачать CSV" }));
+    await waitFor(() => expect(saved).toHaveLength(2));
+    const again = f.query(f.last(CSV));
+    expect(again.get("due_from")).toBe("2026-11-16");
+    expect(again.get("due_to")).toBe("2026-11-20");
+  });
+
+  it("button_is_disabled_with_status_text_while_preparing", async () => {
+    const gate = deferred<Response>();
+    setupExport(EXPORT_CAPS, () => gate.promise);
+    stubDownload();
+    renderApp("/summary");
+    fireEvent.click(await screen.findByRole("button", { name: "Скачать CSV" }));
+    const busy = (await screen.findByRole("button", { name: "Готовим файл…" })) as HTMLButtonElement;
+    expect(busy.disabled).toBe(true);
+    expect(screen.getAllByRole("status").some((el) => el.textContent === "Готовим файл…")).toBe(true);
+    gate.resolve(file());
+    expect(((await screen.findByRole("button", { name: "Скачать CSV" })) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("too_large_shows_message_and_button_is_enabled_again", async () => {
+    setupExport(EXPORT_CAPS, () =>
+      j(422, { detail: "В выборке 12000 задач, максимум 10000. Сузьте фильтры", code: "export_too_large" }),
+    );
+    renderApp("/summary");
+    fireEvent.click(await screen.findByRole("button", { name: "Скачать CSV" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Выборка слишком велика для выгрузки. Сузьте фильтры");
+    expect(((await screen.findByRole("button", { name: "Скачать CSV" })) as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+// Аудит #9: отфильтрованный пустой список на первой странице - без пагинации; непустой - с пагинацией.
+describe("пагинация сводки при пустом списке (аудит #9)", () => {
+  function withTasks(items: unknown[], hasNext: boolean) {
+    installFetch({
+      [ME]: () => j(200, meWith(BA_CAPS, "business_admin")),
+      [COUNTS]: () => j(200, COUNTS_24),
+      [TASKS]: () => j(200, { ...tasksPage(items, items.length), has_next: hasNext }),
+      [PROJECTS]: () => j(200, page([])),
+    });
+  }
+
+  it("empty_list_has_no_pagination_even_when_next_flag_is_set", async () => {
+    withTasks([], true);
+    const { container } = renderApp("/summary");
+    await waitFor(() => expect(container.querySelector(".sum-count-note")).toBeTruthy());
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+    expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
+  });
+
+  it("non_empty_list_with_next_page_keeps_pagination", async () => {
+    withTasks([item("aaaaaaaa-0000-4000-8000-000000000001")], true);
+    const { container } = renderApp("/summary");
+    await waitFor(() => expect(container.querySelector(".ui-pagination")).not.toBeNull());
   });
 });

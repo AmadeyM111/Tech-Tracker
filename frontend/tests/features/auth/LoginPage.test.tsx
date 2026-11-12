@@ -142,6 +142,71 @@ describe("LoginPage (T23)", () => {
     expect(api.login).not.toHaveBeenCalled();
   });
 
+  // P2 (PR #29 design review): an empty field shows its text under it, as on /register.
+  // The general block keeps the validation text; the field texts are not duplicated there.
+  it.each([[""], ["   "]])("field_error_empty_login_%j_is_under_login_and_sends_nothing", (login) => {
+    const { container } = renderAt("/login", <LoginPage />);
+    fill(container, login);
+    fireEvent.click(submitButton(container));
+    const input = field(container, "username");
+    const error = screen.getByText(ru["auth.login_required_login"]).closest<HTMLElement>(".ui-field-error");
+    expect(error).not.toBeNull();
+    expect(error?.getAttribute("role")).toBe("alert");
+    expect(input.closest(".ui-field")?.contains(error)).toBe(true);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")?.split(" ")).toContain(error?.id);
+    expect(field(container, "current-password").getAttribute("aria-invalid")).toBeNull();
+    expect(api.login).not.toHaveBeenCalled();
+  });
+
+  it("field_error_empty_password_is_under_password_and_sends_nothing", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    fill(container, "ivanov", "");
+    fireEvent.click(submitButton(container));
+    const input = field(container, "current-password");
+    const error = screen.getByText(ru["auth.login_required_password"]).closest<HTMLElement>(".ui-field-error");
+    expect(error).not.toBeNull();
+    expect(error?.getAttribute("role")).toBe("alert");
+    expect(input.closest(".ui-field")?.contains(error)).toBe(true);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")?.split(" ")).toContain(error?.id);
+    expect(field(container, "username").getAttribute("aria-invalid")).toBeNull();
+    expect(api.login).not.toHaveBeenCalled();
+  });
+
+  it("field_error_both_empty_shows_both_texts_and_keeps_the_general_block", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    fill(container, "", "");
+    fireEvent.click(submitButton(container));
+    expect(screen.getByText(ru["auth.login_required_login"])).toBeTruthy();
+    expect(screen.getByText(ru["auth.login_required_password"])).toBeTruthy();
+    expect(container.querySelector(".ui-error-alert")?.textContent).toBe(errorMessage("validation_error"));
+    expect(api.login).not.toHaveBeenCalled();
+  });
+
+  it("field_error_focus_goes_to_the_first_empty_field", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    fill(container, "", "");
+    fireEvent.click(submitButton(container));
+    expect(document.activeElement).toBe(field(container, "username"));
+    fill(container, "ivanov", "");
+    fireEvent.click(submitButton(container));
+    expect(document.activeElement).toBe(field(container, "current-password"));
+  });
+
+  it("field_error_is_cleared_on_the_next_submit_and_login_is_sent_trimmed", async () => {
+    vi.mocked(api.login).mockResolvedValue(user() as never);
+    const { container } = renderAt("/login", <LoginPage />);
+    fill(container, "", PASSWORD);
+    fireEvent.click(submitButton(container));
+    expect(screen.getByText(ru["auth.login_required_login"])).toBeTruthy();
+    fill(container, "  ivanov  ", PASSWORD);
+    fireEvent.click(submitButton(container));
+    await waitFor(() => expect(api.login).toHaveBeenCalledTimes(1));
+    expect(api.login).toHaveBeenCalledWith({ login: "ivanov", password: PASSWORD });
+    expect(screen.queryByText(ru["auth.login_required_login"])).toBeNull();
+  });
+
   it("fr57_password_never_in_url_or_console", async () => {
     const spies = (["log", "info", "warn", "error", "debug"] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => {}));
     vi.mocked(api.login).mockRejectedValue(new ApiError(401, "invalid_credentials", "x"));
@@ -577,7 +642,7 @@ describe("LoginPage registration link and help (spec 019)", () => {
   const forgot = () => screen.queryByRole("link", { name: t("auth.forgot_password") });
   const register = () => screen.queryByRole("link", { name: t("auth.register_link") });
   const HELP_P2_REGISTRATION =
-    "Учётную запись выдаёт технический администратор, или её можно создать самостоятельно через «Зарегистрироваться». Роль после регистрации назначает технический или бизнес-администратор.";
+    "Учётную запись выдаёт технический администратор, или её можно создать самостоятельно через «Зарегистрироваться». После подтверждения адреса по письму можно сразу войти: вам назначается роль «Пользователь», и вы видите проекты, в которые вас добавят.";
   const helpTexts = () => Array.from(helpBlock().querySelectorAll("p")).map((p) => p.textContent);
 
   it("019_ac21_help_registration_text_is_the_owner_approved_fr12_text", () => {

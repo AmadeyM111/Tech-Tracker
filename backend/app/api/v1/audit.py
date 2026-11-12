@@ -56,9 +56,14 @@ def _to_entry(record: AuditRecord) -> AuditEntry:
 async def list_audit(
     db: DbSession, actor: CurrentActor, params: Annotated[AuditListQuery, Query()]
 ) -> Page[AuditEntry]:
-    """Страница журнала пространства: ``id DESC``, фильтры ``entity_type`` и ``actor_id``."""
+    """Страница журнала: ``id DESC``, фильтры ``entity_type``, ``actor_id``, ``actor_login``."""
     records, has_next = await queries.list_audit(
-        db, actor, params, entity_type=params.entity_type, actor_id=params.actor_id
+        db,
+        actor,
+        params,
+        entity_type=params.entity_type,
+        actor_id=params.actor_id,
+        actor_login=params.actor_login or None,
     )
     return Page[AuditEntry](
         items=[_to_entry(record) for record in records],

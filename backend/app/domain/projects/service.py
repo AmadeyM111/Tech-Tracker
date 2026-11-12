@@ -13,13 +13,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.core.clock import utcnow
 from app.core.errors import ErrorCode, Forbidden, Unprocessable
 from app.domain.access.policy import can_manage_project
 from app.domain.access.recipients import RecipientPurpose, check_recipient
-from app.domain.access.roles import Actor, Capability
+from app.domain.access.roles import Actor, Capability, Role
 from app.domain.comments.models import Comment
 from app.domain.events.catalog import EventAction
 from app.domain.events.writer import FieldChange, record_event
@@ -27,6 +28,7 @@ from app.domain.projects.models import Project, ProjectMember
 from app.domain.projects.queries import ProjectView, load_project_facts, project_view
 from app.domain.tasks.models import Task
 from app.domain.users.directory import load_recipient, user_refs
+from app.domain.users.models import AppUser
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,6 +61,9 @@ def _validate_description(description: str) -> None:
         )
 
 
+MAX_OWNED_PROJECTS = 30  # спека 027, Q-4: лимит для «Пользователя»
+
+
 async def create_project(
     db: AsyncSession, actor: Actor, *, name: str, description: str = ""
 ) -> ProjectView:
@@ -66,6 +71,20 @@ async def create_project(
         raise Forbidden()
     _validate_name(name)
     _validate_description(description)
+    if actor.role is Role.USER:
+        # Блокировка строки пользователя сериализует параллельные создания (лимит не превышается).
+        await db.execute(select(AppUser.id).where(AppUser.id == actor.user_id).with_for_update())
+        owned = await db.scalar(
+            select(func.count())
+            .select_from(Project)
+            .where(
+                Project.workspace_id == actor.workspace_id,
+                Project.owner_id == actor.user_id,
+                Project.deleted_at.is_(None),
+            )
+        )
+        if (owned or 0) >= MAX_OWNED_PROJECTS:
+            raise Unprocessable(code=ErrorCode.limit_reached)
     project = Project(
         workspace_id=actor.workspace_id,
         name=name,
@@ -142,6 +161,17 @@ async def transfer_ownership(
         update(Project)
         .where(Project.id == project_id)
         .values(owner_id=new_owner_id, updated_at=utcnow())
+    )
+    # прежний владелец остаётся участником (спека 027, Q-9: выйти он может только после передачи)
+    await db.execute(
+        pg_insert(ProjectMember)
+        .values(
+            project_id=project_id,
+            user_id=facts.owner_id,
+            workspace_id=actor.workspace_id,
+            created_by=actor.user_id,
+        )
+        .on_conflict_do_nothing(index_elements=["project_id", "user_id"])
     )
     refs = await user_refs(db, actor.workspace_id, [facts.owner_id, new_owner_id])
     old, new = refs[facts.owner_id], refs[new_owner_id]

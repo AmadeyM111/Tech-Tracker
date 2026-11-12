@@ -114,6 +114,26 @@
   margin: 8px 0;
   color: var(--text-muted);
 }
+.sum-count-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.sum-csv {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.sum-csv-note {
+  color: var(--text-muted);
+}
+.sum-csv-btn {
+  min-height: 44px;
+  padding: 8px 16px;
+}
 .sum-table td[data-overdue="true"],
 .sum-cards [data-overdue="true"] {
   color: var(--danger);
@@ -149,7 +169,35 @@
   border: 1px dashed var(--border);
   border-radius: var(--radius);
 }
-.burn-tag {
+/* 024: диапазон срока «с / по» под пресетами (макет Shared/Design/gtrack-r3, range-*). */
+.sum-range {
+  margin: 4px 0 0;
+  padding: 12px 14px;
+  min-width: 0;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.sum-range legend {
+  padding: 0;
+  color: var(--text-muted);
+}
+.sum-range-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+.sum-range .ui-field {
+  margin-bottom: 0;
+  min-width: 0;
+}
+.sum-range input[type="date"] {
+  min-width: 180px;
+  min-height: 44px;
+}
+.sum-range input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.sum-burn-tag {
   display: inline-block;
   margin-left: 6px;
   padding: 0 6px;
@@ -176,4 +224,43 @@
   .sum-cards {
     display: block;
   }
+}
+
+/* 026 «Подключить ИИ-агента к GTrack»: card above the heading (mockup gtrack-r3, ai-card). */
+.ai-card {
+  position: relative;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 1.0625rem;
+}
+.ai-card h2 {
+  margin: 0 0 6px;
+  padding-right: 96px; /* room for the close button in the corner */
+  font-size: 1.25rem;
+}
+.ai-card p {
+  margin: 0 0 8px;
+  padding-right: 96px;
+  color: var(--text-muted);
+}
+.ai-card .ai-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+.ai-card .ai-links a {
+  color: var(--accent);
+}
+.ai-card .ai-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 1rem;
 }

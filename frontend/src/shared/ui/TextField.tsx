@@ -1,4 +1,5 @@
 import { useId, type Ref } from "react";
+import { FieldError } from "./ErrorAlert";
 import { Icon } from "./Icon";
 
 export interface TextFieldReveal {
@@ -12,20 +13,25 @@ export interface TextFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  type?: "text" | "password";
+  type?: "text" | "password" | "search";
   autoComplete: string;
   inputRef?: Ref<HTMLInputElement>;
   invalid?: boolean;
   disabled?: boolean;
   hint?: string;
+  /** Text under the field (FieldError); a non-null text also marks the field invalid. */
+  error?: string | null;
   name?: string;
   reveal?: TextFieldReveal;
 }
 
 export function TextField(props: TextFieldProps) {
-  const { label, value, onChange, type = "text", autoComplete, inputRef, invalid, disabled, hint, name, reveal } = props;
+  const { label, value, onChange, type = "text", autoComplete, inputRef, invalid, disabled, hint, error, name, reveal } = props;
   const id = useId();
   const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  const hasError = error !== undefined && error !== null;
+  const describedBy = [hint === undefined ? null : hintId, hasError ? errorId : null].filter(Boolean).join(" ");
   const withReveal = type === "password" && reveal !== undefined;
   const input = (
     <input
@@ -37,8 +43,8 @@ export function TextField(props: TextFieldProps) {
       autoComplete={autoComplete}
       autoCapitalize="off"
       spellCheck={false}
-      aria-invalid={invalid === true ? "true" : undefined}
-      aria-describedby={hint === undefined ? undefined : hintId}
+      aria-invalid={invalid === true || hasError ? "true" : undefined}
+      aria-describedby={describedBy === "" ? undefined : describedBy}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
     />
@@ -68,6 +74,7 @@ export function TextField(props: TextFieldProps) {
           {hint}
         </span>
       )}
+      <FieldError id={errorId} message={hasError ? error : null} />
     </div>
   );
 }

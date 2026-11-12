@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # [011] загрузка вложений запрещена, если свободно меньше (МБ) в DATA_DIR (R2-40, Q-2)
     attachments_min_free_mb: int = 500
     trash_retention: timedelta = timedelta(days=30)
+    # [025] предел строк выгрузки CSV «Сводки»; больше — отказ 422 export_too_large (ADR-0023)
+    csv_max_rows: int = Field(10_000, ge=1)
     # [007] отправка писем; без smtp_host функция сброса пароля выключена
     smtp_host: str | None = None
     smtp_port: int = 587

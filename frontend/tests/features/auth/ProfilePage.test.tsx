@@ -70,16 +70,42 @@ describe("AC-34 saving the own name", () => {
     expect(qc.getQueryData(["auth", "me"])).toMatchObject({ first_name: "Мария", last_name: "Смирнова" });
   });
 
+  // P2 (PR #29 design review): an empty name shows its text under its own field and sends nothing.
   it.each([
-    ["first_name_invalid", ru["error.first_name_invalid"]],
-    ["last_name_invalid", ru["error.last_name_invalid"]],
-  ] as const)("019_ac34_422_%s_shows_dictionary_text_and_no_status", async (code, text) => {
+    ["first", "   ", "Анна", "profile.first_name_label", "profile.first_name_required"],
+    ["last", "Анна", "", "profile.last_name_label", "profile.last_name_required"],
+  ] as const)(
+    "019_ac34_empty_%s_name_is_under_its_field_and_sends_nothing",
+    async (_n, first, last, labelKey, textKey) => {
+      const f = installFetch({ [ME]: () => j(200, profile()), [NAME]: () => j(200, profile()) });
+      await openProfile();
+      fireEvent.change(firstNameInput(), { target: { value: first } });
+      fireEvent.change(lastNameInput(), { target: { value: last } });
+      fireEvent.click(saveButton());
+      const input = screen.getByLabelText(ru[labelKey]) as HTMLInputElement;
+      const error = (await screen.findByText(ru[textKey])).closest<HTMLElement>(".ui-field-error");
+      expect(error?.getAttribute("role")).toBe("alert");
+      expect(input.closest(".ui-field")?.contains(error)).toBe(true);
+      expect(input.getAttribute("aria-invalid")).toBe("true");
+      expect(f.count(NAME)).toBe(0);
+      expect(screen.queryByRole("status")).toBeNull();
+    },
+  );
+
+  // Server codes of the name fields: the rule text goes under the field it refers to, not into a general block.
+  it.each([
+    ["first_name_invalid", "profile.first_name_label", "error.first_name_invalid"],
+    ["last_name_invalid", "profile.last_name_label", "error.last_name_invalid"],
+  ] as const)("019_ac34_422_%s_is_under_its_field_and_no_status", async (code, labelKey, textKey) => {
     installFetch({ [ME]: () => j(200, profile()), [NAME]: () => err(422, code) });
     await openProfile();
-    fireEvent.change(firstNameInput(), { target: { value: "   " } });
+    fireEvent.change(firstNameInput(), { target: { value: "Anna 2" } });
     fireEvent.click(saveButton());
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe(text);
+    const error = (await screen.findByText(ru[textKey])).closest<HTMLElement>(".ui-field-error");
+    const input = screen.getByLabelText(ru[labelKey]) as HTMLInputElement;
+    expect(input.closest(".ui-field")?.contains(error)).toBe(true);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByRole("alert")).toBe(error);
     expect(screen.queryByRole("status")).toBeNull();
     expect(where()).toBe("/profile");
   });

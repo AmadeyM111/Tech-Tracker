@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t, type MessageKey } from "../../shared/i18n";
@@ -21,7 +21,9 @@ import {
 import { BoardView } from "../boards/BoardView";
 import { ProjectTaskList } from "../tasks/TaskList";
 import { ActivityFeed } from "./ActivityFeed";
+import { MemberAdd } from "./MemberAdd";
 import { ProjectFields } from "./ProjectsPage";
+import "./members.css";
 
 type TabId = "board" | "tasks" | "members" | "activity";
 const TABS: readonly TabId[] = ["board", "tasks", "members", "activity"];
@@ -38,11 +40,12 @@ const codeOf = (e: unknown): string => (e instanceof ApiError ? e.code : "unknow
 /** An id that is not a uuid is answered with 422: for the user it is "no such project". */
 const loadCodeOf = (e: unknown): string => (e instanceof ApiError && e.status === 422 ? "not_found" : codeOf(e));
 
-/** Roles that may own a project (FR-14a). */
-const OWNER_ROLES: ReadonlyArray<ProjectMember["role"]> = ["business_admin"];
+/** Roles that may own a project (spec 027 FR-7): a business admin or a user. */
+const OWNER_ROLES: ReadonlyArray<ProjectMember["role"]> = ["business_admin", "user"];
 
-function roleText(role: ProjectMember["role"]): string {
-  return t(role === null ? "admin.role.none" : (`admin.role.${role}` as MessageKey));
+/** A login breaks after its dots, never in the middle of a word (360 px, design review #43). */
+function breakable(login: string): ReactNode[] {
+  return login.split(".").flatMap((part, i, all) => (i < all.length - 1 ? [part, ".", <wbr key={i} />] : [part]));
 }
 
 export function ProjectPage({
@@ -76,7 +79,14 @@ export function ProjectPage({
     <section className="ui-wide">
       <h1>{t("projects.project_title")}</h1>
       {project.isError ? (
-        <ErrorAlert message={errorMessage(loadCodeOf(project.error))} />
+        <>
+          <ErrorAlert message={errorMessage(loadCodeOf(project.error))} />
+          <p>
+            <Link className="ui-btn-secondary" to="/projects">
+              {t("projects.back_to_list")}
+            </Link>
+          </p>
+        </>
       ) : (
         <p role="status">{t("admin.loading")}</p>
       )}
@@ -107,6 +117,10 @@ function ProjectCard({
   const [pending, setPending] = useState(false);
   const [tab, setTab] = useState<TabId>("board");
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  // Removing a participant asks first (spec 027 Q-10): it takes the project away from them.
+  const [removing, setRemoving] = useState<ProjectMember["user"] | null>(null);
+  // Handing the project over also asks first: the former owner loses its management (design review #43).
+  const [transferring, setTransferring] = useState<ProjectMember["user"] | null>(null);
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description);
   const [search, setSearch] = useState("");
@@ -137,6 +151,8 @@ function ProjectCard({
       alert.show(errorMessage(codeOf(e)));
     }
     setConfirmation(null);
+    setRemoving(null);
+    setTransferring(null);
     busy.current = false;
     setPending(false);
   }
@@ -166,13 +182,18 @@ function ProjectCard({
     });
   }
 
-  function onTransfer(userId: string): void {
+  function onTransfer(): void {
+    if (transferring === null) return;
+    const userId = transferring.id;
     void run(async () => {
       // Rights and fields come from the answer, not from the old card.
       const updated = await changeOwner(project.id, userId);
       queryClient.setQueryData(projectKey, updated);
       await queryClient.invalidateQueries({ queryKey: membersKey });
       focusHeading();
+    }).then(() => {
+      // The dialog and the button that opened it are gone: put the focus on the heading afterwards.
+      setTimeout(focusHeading, 0);
     });
   }
 
@@ -182,6 +203,13 @@ function ProjectCard({
       setConfirmation("leave");
       return;
     }
+    const target = (members.data ?? []).find((m) => m.user.id === userId);
+    if (target !== undefined) setRemoving(target.user);
+  }
+
+  function onConfirmRemove(): void {
+    if (removing === null) return;
+    const userId = removing.id;
     void run(async () => {
       await removeMember(project.id, userId);
       await reload();
@@ -219,6 +247,7 @@ function ProjectCard({
   }
 
   const all = members.data ?? [];
+  const anyBlocked = all.some((m) => m.is_blocked);
   const needle = search.trim().toLowerCase();
   const candidates = all.filter(
     (m) =>
@@ -283,12 +312,12 @@ function ProjectCard({
             <ul className="ui-list">
               {candidates.map((m) => (
                 <li key={m.user.id} data-owner-candidate={m.user.id}>
-                  <span>{m.user.login}</span>
+                  <span className="owner-login">{breakable(m.user.login)}</span>
                   <button
                     type="button"
                     data-action="transfer-owner"
                     aria-label={t("projects.owner_transfer_aria", { login: m.user.login })}
-                    onClick={() => onTransfer(m.user.id)}
+                    onClick={() => setTransferring(m.user)}
                   >
                     {t("projects.owner_transfer")}
                   </button>
@@ -335,7 +364,10 @@ function ProjectCard({
         ) : null}
         {tab === "members" ? (
           <>
-            {permissions.manage_members ? (
+            {permissions.manage_members && currentRole === "user" ? (
+              <MemberAdd projectId={project.id} onAdded={reload} />
+            ) : null}
+            {permissions.manage_members && currentRole !== "user" ? (
               <UserPicker
                 label={t("projects.member_add_label")}
                 busy={pending}
@@ -353,25 +385,30 @@ function ProjectCard({
             ) : all.length === 0 ? (
               <p>{t("projects.members_empty")}</p>
             ) : (
-              <table className="ui-table" aria-label={t("projects.members_list_label")}>
+              <table className="ui-table member-table" aria-label={t("projects.members_list_label")}>
                 <thead>
                   <tr>
                     <th scope="col">{t("projects.col_login")}</th>
                     <th scope="col">{t("projects.col_role")}</th>
-                    <th scope="col">{t("projects.col_owner")}</th>
-                    <th scope="col">{t("projects.col_blocked")}</th>
+                    {anyBlocked ? <th scope="col">{t("projects.col_blocked")}</th> : null}
                     {permissions.manage_members ? <th scope="col">{t("projects.col_actions")}</th> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {all.map((m) => (
                     <tr key={m.user.id} data-user-id={m.user.id}>
-                      <td data-field="login">{m.user.login}</td>
-                      <td data-field="role">{roleText(m.role)}</td>
-                      <td data-field="owner">{m.is_owner ? t("projects.member_owner") : null}</td>
-                      <td data-field="blocked">{m.is_blocked ? t("projects.member_blocked") : null}</td>
+                      <td data-field="login" data-label={t("projects.col_login")}>{m.user.login}</td>
+                      <td data-field="role" data-label={t("projects.col_role")}>
+                        {t(m.is_owner ? "projects.member_role_owner" : "projects.member_role_member")}
+                      </td>
+                      {anyBlocked ? (
+                        <td data-field="blocked" data-label={t("projects.col_blocked")}>
+                          {m.is_blocked ? t("projects.member_blocked") : null}
+                        </td>
+                      ) : null}
                       {permissions.manage_members ? (
-                        <td>
+                        <td data-field="actions">
+                          {m.is_owner ? null : (
                           <button
                             type="button"
                             data-action="remove-member"
@@ -380,6 +417,7 @@ function ProjectCard({
                           >
                             {t("projects.member_remove")}
                           </button>
+                          )}
                         </td>
                       ) : null}
                     </tr>
@@ -398,6 +436,28 @@ function ProjectCard({
         ) : null}
         {tab === "activity" ? <ActivityFeed projectId={project.id} /> : null}
       </div>
+
+      {transferring === null ? null : (
+        <ConfirmDialog
+          title={t("projects.owner_transfer_title", { login: transferring.login })}
+          message={t("projects.owner_transfer_message", { name: project.name, login: transferring.login })}
+          confirmLabel={t("projects.owner_transfer")}
+          pending={pending}
+          onConfirm={onTransfer}
+          onCancel={() => setTransferring(null)}
+        />
+      )}
+
+      {removing === null ? null : (
+        <ConfirmDialog
+          title={t("projects.member_remove_title")}
+          message={t("projects.member_remove_message", { login: removing.login, name: project.name })}
+          confirmLabel={t("projects.member_remove")}
+          pending={pending}
+          onConfirm={onConfirmRemove}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
 
       {confirmation === null ? null : (
         <ConfirmDialog

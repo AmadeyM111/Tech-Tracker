@@ -323,12 +323,15 @@ export function Comments({ taskId, alert, suppressLoadError = false, projectId =
           ))}
         </ul>
       )}
-      <Pagination
-        page={page}
-        hasNext={shown?.has_next ?? false}
-        busy={query.data === undefined && query.isFetching}
-        onPage={setPage}
-      />
+      {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
+      {page > 1 || ((items?.length ?? 0) > 0 && (shown?.has_next ?? false)) ? (
+        <Pagination
+          page={page}
+          hasNext={shown?.has_next ?? false}
+          busy={query.data === undefined && query.isFetching}
+          onPage={setPage}
+        />
+      ) : null}
       <form data-form="create-comment" onSubmit={onCreate} noValidate aria-busy={pending ? "true" : undefined}>
         <div className="ui-field">
           <label htmlFor={`${baseId}-body`}>{t("comments.body_label")}</label>

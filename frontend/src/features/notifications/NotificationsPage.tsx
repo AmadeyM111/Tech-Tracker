@@ -105,7 +105,8 @@ export function NotificationsPage() {
           </ul>
         </>
       )}
-      {page > 1 || (query.data?.has_next ?? false) ? (
+      {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
+      {page > 1 || ((items?.length ?? 0) > 0 && (query.data?.has_next ?? false)) ? (
         <Pagination page={page} hasNext={query.data?.has_next ?? false} busy={query.isPending} onPage={setPage} />
       ) : null}
     </section>

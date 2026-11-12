@@ -171,14 +171,15 @@ async def test_ac6_tools_list_depends_on_role(api_env: ApiEnv) -> None:
     ba_token, _ = await _issue_token(api_env, role="business_admin")
     ta_token, _ = await _issue_token(api_env, role="tech_admin")
 
-    assert await _list_names(api_env, user_token) == ["boom", "missing", "whoami"]
+    # спека 027, этап 1: «Пользователь» получает PROJECT_CREATE, инструмент create_probe ему виден
+    assert await _list_names(api_env, user_token) == ["boom", "create_probe", "missing", "whoami"]
     assert await _list_names(api_env, ba_token) == ["boom", "create_probe", "missing", "whoami"]
     assert await _list_names(api_env, ta_token) == []
 
 
 async def test_forbidden_tool_call_returns_forbidden(api_env: ApiEnv) -> None:
     await _probe_registry(api_env)
-    token, _ = await _issue_token(api_env, role="user")
+    token, _ = await _issue_token(api_env, role="tech_admin")  # у ТА нет PROJECT_CREATE
     result = await _call(api_env, token, "create_probe")
     assert result["isError"] is True
     assert _payload(result)["code"] == "forbidden"

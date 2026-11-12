@@ -1,14 +1,14 @@
 // The /summary screen (008): tiles, filters, task list with the "hot" mark, empty state.
 // FR-1...FR-12; mockup Shared/Design/gtrack-summary (approved 2026-11-08). Polling every 15 s (FR-12).
 import { useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
-import { ErrorAlert } from "../../shared/ui/ErrorAlert";
+import { ErrorAlert, FieldError } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
-import { listProjects } from "../projects/api";
-import { getOverview, listOverviewTasks, type OverviewCounts, type OverviewTaskItem } from "./api";
+import { AiAgentHint } from "./AiAgentHint";
+import { downloadOverviewCsv, getOverview, listOverviewProjects, listOverviewTasks, type OverviewCounts, type OverviewTaskItem } from "./api";
 import {
   DUE_PRESETS,
   NO_FILTERS,
@@ -16,8 +16,11 @@ import {
   STATUSES,
   activeTile,
   applyTile,
+  rangeInvalid,
+  setRangeBound,
   toggleDue,
   togglePriority,
+  type RangeBound,
   type SummaryFilters,
   type Tile,
 } from "./filters";
@@ -74,12 +77,46 @@ function Tiles(props: { counts: OverviewCounts | undefined; filters: SummaryFilt
   );
 }
 
+/** Due range «с / по» (024 FR-5, FR-6): native date fields, caption «даты по Москве». */
+function DateRange(props: { filters: SummaryFilters; onChange: (f: SummaryFilters) => void }) {
+  const { filters, onChange } = props;
+  const baseId = useId();
+  const errorId = `${baseId}-range-error`;
+  const invalid = rangeInvalid(filters);
+  const field = (bound: RangeBound, value: string | null, label: string, invalidField: boolean) => (
+    <div className="ui-field sum-range-field">
+      <label htmlFor={`${baseId}-${bound}`}>{label}</label>
+      <input
+        id={`${baseId}-${bound}`}
+        type="date"
+        name={bound === "from" ? "due_from" : "due_to"}
+        value={value ?? ""}
+        aria-invalid={invalidField ? "true" : undefined}
+        aria-describedby={invalidField ? errorId : undefined}
+        onChange={(e) => onChange(setRangeBound(filters, bound, e.target.value))}
+      />
+    </div>
+  );
+  return (
+    <>
+      <fieldset className="sum-range">
+        <legend className="sum-flabel">{t("summary.range_caption")}</legend>
+        <div className="sum-range-fields">
+          {field("from", filters.dateFrom, t("summary.range_from"), invalid)}
+          {field("to", filters.dateTo, t("summary.range_to"), false)}
+        </div>
+      </fieldset>
+      <FieldError id={errorId} message={invalid ? t("summary.range_error") : null} />
+    </>
+  );
+}
+
 function Filters(props: { filters: SummaryFilters; onChange: (f: SummaryFilters) => void }) {
   const { filters, onChange } = props;
   const baseId = useId();
   const projects = useQuery({
-    queryKey: ["projects", "summary-filter"],
-    queryFn: () => listProjects({ page: 1, pageSize: 100 }),
+    queryKey: ["overview", "projects"],
+    queryFn: () => listOverviewProjects(),
     staleTime: 60_000,
   });
   return (
@@ -158,6 +195,7 @@ function Filters(props: { filters: SummaryFilters; onChange: (f: SummaryFilters)
             </button>
           ))}
         </div>
+        <DateRange filters={filters} onChange={onChange} />
       </fieldset>
     </form>
   );
@@ -174,7 +212,7 @@ function Due({ task, today }: { task: OverviewTaskItem; today: string }) {
 }
 
 function Hot({ task }: { task: OverviewTaskItem }) {
-  return task.hot ? <span className="burn-tag">{t("summary.hot")}</span> : null;
+  return task.hot ? <span className="sum-burn-tag">{t("summary.hot")}</span> : null;
 }
 
 function TaskRows({ items, today }: { items: OverviewTaskItem[]; today: string }) {
@@ -231,11 +269,31 @@ function TaskRows({ items, today }: { items: OverviewTaskItem[]; today: string }
   );
 }
 
-export function SummaryPage() {
+/** Saves a blob under a file name through a temporary link (no navigation, no new tab). */
+function saveFile(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function SummaryPage({ userId, canExport = false }: { userId: string; canExport?: boolean }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // filters: что показано в полях; applied: по чему запрошен список (024 Q-4: при ошибке диапазона
+  // запрос не уходит и список остаётся прежним, пока «с» не станет не позже «по»).
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [filters, setFilters] = useState<SummaryFilters>(NO_FILTERS);
+  const [applied, setApplied] = useState<SummaryFilters>(NO_FILTERS);
   const [page, setPage] = useState(1);
   const change = (next: SummaryFilters) => {
     setFilters(next);
+    if (rangeInvalid(next)) return;
+    setApplied(next);
     setPage(1);
   };
   const counts = usePolledQuery({
@@ -243,17 +301,35 @@ export function SummaryPage() {
     queryFn: ({ headers, signal }) => getOverview({ headers, signal }),
   });
   const list = usePolledQuery({
-    queryKey: ["overview", "tasks", { filters, page }],
-    queryFn: ({ headers, signal }) => listOverviewTasks(filters, page, { headers, signal }),
+    queryKey: ["overview", "tasks", { filters: applied, page }],
+    queryFn: ({ headers, signal }) => listOverviewTasks(applied, page, { headers, signal }),
   });
+  const onExport = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const file = await downloadOverviewCsv(applied);
+      saveFile(file.blob, file.filename);
+    } catch (e) {
+      setExportError(errorMessage(codeOf(e)));
+    } finally {
+      setExporting(false);
+    }
+  };
   const today = moscowToday();
   const empty = counts.data?.total === 0;
   const items = list.data?.items;
   return (
     <section className="ui-wide">
-      <h1>{t("summary.title")}</h1>
+      <AiAgentHint userId={userId} onDismiss={() => headingRef.current?.focus()} />
+      <h1 ref={headingRef} tabIndex={-1}>
+        {t("summary.title")}
+      </h1>
       <ErrorAlert
-        message={counts.isError ? errorMessage(codeOf(counts.error)) : list.isError ? errorMessage(codeOf(list.error)) : null}
+        message={
+          exportError ??
+          (counts.isError ? errorMessage(codeOf(counts.error)) : list.isError ? errorMessage(codeOf(list.error)) : null)
+        }
       />
       <Tiles counts={counts.data} filters={filters} onTile={(tile) => change(applyTile(filters, tile))} />
       {empty ? (
@@ -269,11 +345,36 @@ export function SummaryPage() {
             ) : null
           ) : (
             <>
-              <p className="sum-count-note" role="status">
-                {t("summary.shown", { shown: items.length, total: list.data?.total ?? 0 })}
-              </p>
+              <div className="sum-count-row">
+                <p className="sum-count-note" role="status">
+                  {t("summary.shown", { shown: items.length, total: list.data?.total ?? 0 })}
+                </p>
+                {canExport ? (
+                  <div className="sum-csv">
+                    <span id="sum-csv-note" className="sum-csv-note">
+                      {t("summary.csv.note")}
+                    </span>
+                    <button
+                      type="button"
+                      className="ui-btn-secondary sum-csv-btn"
+                      data-action="export-csv"
+                      aria-describedby="sum-csv-note"
+                      disabled={exporting}
+                      onClick={() => void onExport()}
+                    >
+                      {exporting ? t("summary.csv.preparing") : t("summary.csv.button")}
+                    </button>
+                    {exporting ? (
+                      <span role="status" className="sum-csv-note">
+                        {t("summary.csv.preparing")}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
               {items.length > 0 ? <TaskRows items={items} today={today} /> : null}
-              {page > 1 || (list.data?.has_next ?? false) ? (
+              {/* Аудит #9: пустая первая страница - без пагинации; со страницы > 1 остаётся, чтобы вернуться назад. */}
+              {page > 1 || (items.length > 0 && (list.data?.has_next ?? false)) ? (
                 <Pagination page={page} hasNext={list.data?.has_next ?? false} busy={list.isPending} onPage={setPage} />
               ) : null}
             </>

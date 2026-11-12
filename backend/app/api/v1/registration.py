@@ -7,12 +7,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Request
 
 from app.api.openapi import error_response, error_responses
 from app.api.v1.schemas.registration import (
     RegistrationAccepted,
     RegistrationConfirm,
+    RegistrationConfirmed,
     RegistrationRequest,
 )
 from app.core.clock import utcnow
@@ -51,7 +52,6 @@ async def request_registration(
         email=body.email,
         first_name=body.first_name,
         last_name=body.last_name,
-        login=body.login,
         password=body.password,
     )
     message = await registration_domain.request_registration(
@@ -69,11 +69,10 @@ async def request_registration(
 
 @router.post(
     "/confirm",
-    status_code=204,
-    response_class=Response,
+    response_model=RegistrationConfirmed,
     responses={
         **error_response(404, _FEATURE_DISABLED),
-        **error_response(409, "Логин занят учётной записью (code: login_taken)"),
+        **error_response(409, "Все логины заняты, учётная запись не создана (code: login_taken)"),
         **error_response(429, _RATE_LIMITED),
         **error_responses(400, 403, 422),
     },
@@ -82,19 +81,20 @@ async def confirm_registration(
     body: RegistrationConfirm,
     request: Request,
     db: DbSession,
-) -> Response:
-    """Подтверждение регистрации по ссылке; успех — 204 без тела и без cookie (AC-16).
+) -> RegistrationConfirmed:
+    """Подтверждение по ссылке; успех — 200 с логином учётной записи, без cookie (AC-16).
 
     Неверная, просроченная или использованная ссылка и занятый адрес — 400
-    ``registration_token_invalid``. Занятый логин — 409 ``login_taken``. Сессия не создаётся:
-    вход отдельным действием.
+    ``registration_token_invalid``. Логин выбирает сервер (v0.5): занятый логин заявки заменяется
+    следующим свободным, поэтому 409 ``login_taken`` возможен только если заняты все попытки.
+    Сессия не создаётся: вход отдельным действием.
     """
     state = request.app.state
-    await registration_domain.confirm_registration(
+    login = await registration_domain.confirm_registration(
         db,
         state.registration_policy,
         token=body.token,
         client_ip=request.client.host if request.client else None,
         now=utcnow(),
     )
-    return Response(status_code=204)
+    return RegistrationConfirmed(login=login)

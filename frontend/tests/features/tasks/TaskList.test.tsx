@@ -184,11 +184,11 @@ describe("project tasks tab", () => {
     await waitFor(() => expect(f.query(f.last(PROJ_TASKS)).get("page")).toBe("1"));
   });
 
-  it("uf3_pagination_prev_disabled_on_first_next_disabled_without_has_next", async () => {
+  it("uf3_single_page_hides_pagination", async () => {
+    // Audit #9 (P3, design check): a single page without has_next shows no pagination at all.
     const { container } = await openProject();
     await waitFor(() => expect(taskRow(container, TID1)).toBeTruthy());
-    expect(container.querySelector<HTMLButtonElement>('button[data-action="prev-page"]')!.disabled).toBe(true);
-    expect(container.querySelector<HTMLButtonElement>('button[data-action="next-page"]')!.disabled).toBe(true);
+    expect(container.querySelector(".ui-pagination")).toBeNull();
   });
 
   it("uf3_empty_list_shows_dictionary_text", async () => {
@@ -242,6 +242,17 @@ describe("my tasks page", () => {
     expect(taskRow(container, TID3)).toBeTruthy();
   });
 
+  it("p2_cards_for_360px_show_same_tasks_with_project_status_and_due", async () => {
+    const { container } = await open();
+    await waitFor(() => expect(taskRow(container, TID1)).toBeTruthy());
+    const card = container.querySelector<HTMLElement>(`.task-cards li[data-card-id="${TID1}"]`)!;
+    expect(card.querySelector("a")!.getAttribute("href")).toBe(`/tasks/${TID1}`);
+    expect(card.textContent).toContain("Альфа");
+    expect(container.querySelectorAll(".task-cards li")).toHaveLength(2);
+    const due = container.querySelector(`.task-cards li[data-card-id="${TID3}"]`)!;
+    expect(due.textContent).toContain("01.01.2026");
+  });
+
   it("ac6_has_no_filters_and_no_create_form", async () => {
     const { container } = await open();
     await waitFor(() => expect(taskRow(container, TID1)).toBeTruthy());
@@ -283,3 +294,28 @@ describe("my tasks page", () => {
   });
 });
 
+
+// Аудит #9: пустой список «Мои задачи» - без пагинации; непустой - с пагинацией.
+describe("пагинация списка задач при пустом списке (аудит #9)", () => {
+  it("my_tasks_empty_first_page_has_no_pagination", async () => {
+    installFetch({
+      [ME]: () => j(200, meWith(USER_CAPS, "user")),
+      [MY_TASKS]: () => j(200, page([])),
+    });
+    const { container } = renderApp("/my-tasks");
+    expect(await screen.findByText(ru["tasks.empty"])).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+    expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
+  });
+
+  it("my_tasks_non_empty_list_single_page_hides_pagination", async () => {
+    installFetch({
+      [ME]: () => j(200, meWith(USER_CAPS, "user")),
+      [MY_TASKS]: () => j(200, page([T1])),
+    });
+    const { container } = renderApp("/my-tasks");
+    await waitFor(() => expect(taskRow(container, TID1)).toBeTruthy());
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+  });
+});

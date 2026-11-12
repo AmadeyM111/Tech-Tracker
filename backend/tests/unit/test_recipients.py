@@ -78,8 +78,8 @@ TABLE = [
     ("TASK_ASSIGNEE", "TECH_ADMIN", False, "recipient_wrong_role"),  # роль проверяется раньше
     ("PROJECT_OWNER", "BUSINESS_ADMIN", True, None),
     ("PROJECT_OWNER", "BUSINESS_ADMIN", False, "not_project_member"),
-    ("PROJECT_OWNER", "USER", True, "recipient_wrong_role"),
-    ("PROJECT_OWNER", "USER", False, "recipient_wrong_role"),
+    ("PROJECT_OWNER", "USER", True, None),  # 027 FR-7: владение — участнику-«Пользователю»
+    ("PROJECT_OWNER", "USER", False, "not_project_member"),
     ("PROJECT_OWNER", "TECH_ADMIN", True, "recipient_wrong_role"),
     ("PROJECT_OWNER", None, True, "recipient_wrong_role"),
 ]
@@ -139,7 +139,7 @@ def test_order_blocked_before_wrong_role(rec, roles, errors) -> None:
 
 
 def test_order_wrong_role_before_not_member(rec, roles, errors) -> None:
-    target = _facts(rec, roles, "USER")
+    target = _facts(rec, roles, "TECH_ADMIN")
     with pytest.raises(errors.Unprocessable) as ei:
         rec.check_recipient(
             target, rec.RecipientPurpose.PROJECT_OWNER, project_member_ids=frozenset()

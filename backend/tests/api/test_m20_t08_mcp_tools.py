@@ -82,6 +82,7 @@ async def test_registry_lists_ten_tools_for_business_roles(api_env: ApiEnv) -> N
     assert names == sorted(
         [
             "add_comment",
+            "create_project",
             "create_subtask",
             "create_task",
             "get_project",

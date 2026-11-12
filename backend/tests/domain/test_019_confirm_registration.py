@@ -66,15 +66,13 @@ async def request_link(
     clock: FixedClock,
     *,
     email: str = EMAIL,
-    login: str = "Anna_P",
     ip: str | None = IP,
 ) -> str:
-    """Заявка через домен (R8-T09); возвращает токен из письма."""
+    """Заявка через домен (R8-T09); возвращает токен из письма. Логин выбирает сервер (v0.5)."""
     form = reg.RegistrationForm(
         email=email,
         first_name="Анна",
         last_name="Петрова-Иванова",
-        login=login,
         password=SecretStr(PASSWORD),
     )
     message = await reg.request_registration(
@@ -164,8 +162,8 @@ async def test_019_ac13_confirm_creates_self_registered_account(
     token = await request_link(db, policy, hasher, fixed_clock)
     await confirm(db, policy, fixed_clock, token)
 
-    row = await account(db, "anna_p")
-    assert row["login_display"] == "Anna_P"
+    row = await account(db, "petrova-ivanova.anna")
+    assert row["login_display"] == "petrova-ivanova.anna"
     assert row["email"] == EMAIL
     assert (row["first_name"], row["last_name"]) == ("Анна", "Петрова-Иванова")
     assert row["self_registered"] is True
@@ -174,7 +172,7 @@ async def test_019_ac13_confirm_creates_self_registered_account(
     assert row["failed_login_count"] == 0
     assert row["created_by"] is None
     assert row["workspace_id"] == ws.id
-    assert row["role"] is None  # «без роли» (ADR-0013)
+    assert row["role"] == "user"  # роль «Пользователь» сразу (решение владельца 2026-11-11)
     assert row["member_created_by"] is None
     assert hasher.verify(row["password_hash"], PASSWORD)
     assert await count_requests(db) == 0  # заявка поглощена
@@ -197,7 +195,7 @@ async def test_019_ac16_confirm_creates_no_session_and_token_is_single_use(
     assert await count_users(db) == 1
 
 
-async def test_019_ac19_success_writes_exactly_one_self_registered_event(
+async def test_019_ac19_success_writes_self_registered_and_system_role_assigned_events(
     db: AsyncSession,
     policy: reg.RegistrationPolicy,
     hasher: PasswordHasher,
@@ -207,7 +205,7 @@ async def test_019_ac19_success_writes_exactly_one_self_registered_event(
     token = await request_link(db, policy, hasher, fixed_clock)
     await confirm(db, policy, fixed_clock, token)
 
-    row = await account(db, "anna_p")
+    row = await account(db, "petrova-ivanova.anna")
     events = (
         (
             await db.execute(
@@ -226,7 +224,26 @@ async def test_019_ac19_success_writes_exactly_one_self_registered_event(
     assert event["actor_id"] == row["id"] == event["entity_id"]
     assert event["entity_type"] == "user"
     assert list(event["changed_fields"]) == []
-    assert await count_all_events(db) == 1
+    # и ровно одно событие назначения роли: автор — «система», в той же транзакции
+    granted = (
+        (
+            await db.execute(
+                text(
+                    "SELECT workspace_id, actor_id, entity_id, in_audit, details "
+                    "FROM domain_event WHERE action = 'user.role_assigned'"
+                )
+            )
+        )
+        .mappings()
+        .all()
+    )
+    assert len(granted) == 1
+    assert granted[0]["workspace_id"] == ws.id
+    assert granted[0]["actor_id"] is None
+    assert granted[0]["entity_id"] == row["id"]
+    assert granted[0]["in_audit"] is True
+    assert granted[0]["details"] == {"role_from": None, "role_to": "user"}
+    assert await count_all_events(db) == 2
 
 
 # --- срок токена (AC-10) и повторные заявки (AC-9) ---------------------------------------------
@@ -405,7 +422,7 @@ async def test_019_ac14_address_taken_at_confirm_is_400_and_request_removed(
 
 
 @pytest.mark.committed
-async def test_019_ac28_login_taken_at_confirm_is_409_request_removed_then_400(
+async def test_019_ac28_login_taken_after_request_gets_next_suffix(
     committed: async_sessionmaker[AsyncSession],
     policy: reg.RegistrationPolicy,
     hasher: PasswordHasher,
@@ -413,23 +430,44 @@ async def test_019_ac28_login_taken_at_confirm_is_409_request_removed_then_400(
 ) -> None:
     async with committed() as s:
         ws = await make_workspace(s)
-        token = await request_link(s, policy, hasher, fixed_clock, login="newuser")
+        token = await request_link(s, policy, hasher, fixed_clock)
         await s.commit()
     async with committed() as s:
-        await make_user(s, workspace=ws, login="newuser")
+        await make_user(s, workspace=ws, login="petrova-ivanova.anna", email="owner@example.ru")
         await s.commit()
     async with committed() as s:
-        with pytest.raises(LoginTakenConflict) as exc:
-            await confirm(s, policy, fixed_clock, token)
-        await s.rollback()  # так поступает get_db при исключении
-    assert exc.value.status_code == 409
-    assert exc.value.code == "login_taken"
+        login = await reg.confirm_registration(
+            s, policy, token=SecretStr(token), client_ip=IP, now=fixed_clock.now()
+        )
+        await s.commit()
+    assert login == "petrova-ivanova.anna.2"
     async with committed() as s:
         assert await count_requests(s) == 0
-        assert await count_users(s) == 1
-        with pytest.raises(RegistrationTokenInvalid) as again:
-            await confirm(s, policy, fixed_clock, token)
-    assert again.value.status_code == 400
+        assert await count_users(s) == 2
+        row = await account(s, "petrova-ivanova.anna.2")
+        assert row["email"] == EMAIL
+
+
+async def test_019_all_candidates_taken_is_409_request_removed_then_400(
+    db: AsyncSession,
+    policy: reg.RegistrationPolicy,
+    hasher: PasswordHasher,
+    fixed_clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ws = await make_workspace(db)
+    token = await request_link(db, policy, hasher, fixed_clock)
+    await make_user(db, workspace=ws, login="petrova-ivanova.anna", email="owner1@example.ru")
+    await make_user(db, workspace=ws, login="petrova-ivanova.anna.2", email="owner2@example.ru")
+    monkeypatch.setattr(reg, "CONFIRM_LOGIN_ATTEMPTS", 2)  # только два кандидата
+    with pytest.raises(LoginTakenConflict) as exc:
+        await confirm(db, policy, fixed_clock, token)
+    assert exc.value.code == "login_taken"
+    assert await count_requests(db) == 0
+    assert await count_users(db) == 2
+    assert await count_self_registered_events(db) == 0
+    with pytest.raises(RegistrationTokenInvalid):
+        await confirm(db, policy, fixed_clock, token)
 
 
 async def test_019_rg8_address_check_precedes_login_check(
@@ -439,8 +477,8 @@ async def test_019_rg8_address_check_precedes_login_check(
     fixed_clock: FixedClock,
 ) -> None:
     ws = await make_workspace(db)
-    token = await request_link(db, policy, hasher, fixed_clock, login="newuser")
-    await make_user(db, workspace=ws, login="newuser")
+    token = await request_link(db, policy, hasher, fixed_clock)
+    await make_user(db, workspace=ws, login="petrova-ivanova.anna", email="owner1@example.ru")
     await make_user(db, workspace=ws, login="owner_two", email=EMAIL)
     with pytest.raises(RegistrationTokenInvalid):
         await confirm(db, policy, fixed_clock, token)
@@ -469,7 +507,7 @@ async def test_019_race_address_taken_after_check_is_400(
     assert await count_self_registered_events(db) == 0
 
 
-async def test_019_race_login_conflict_on_insert_is_409(
+async def test_019_race_login_conflict_on_insert_moves_to_next_candidate(
     db: AsyncSession,
     policy: reg.RegistrationPolicy,
     hasher: PasswordHasher,
@@ -477,18 +515,20 @@ async def test_019_race_login_conflict_on_insert_is_409(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     ws = await make_workspace(db)
-    token = await request_link(db, policy, hasher, fixed_clock, login="newuser")
-    await make_user(db, workspace=ws, login="newuser")
+    token = await request_link(db, policy, hasher, fixed_clock)
+    await make_user(db, workspace=ws, login="petrova-ivanova.anna", email="owner1@example.ru")
 
     async def seen_as_free(_db: AsyncSession, _login: str) -> bool:
         return False  # проверка прошла, логин занял параллельный запрос
 
     monkeypatch.setattr(reg, "_login_taken", seen_as_free)
-    with pytest.raises(LoginTakenConflict):
-        await confirm(db, policy, fixed_clock, token)  # гонка: ON CONFLICT (login) DO NOTHING
+    login = await reg.confirm_registration(
+        db, policy, token=SecretStr(token), client_ip=IP, now=fixed_clock.now()
+    )  # гонка: ON CONFLICT (login) DO NOTHING -> следующий кандидат, без login_taken
+    assert login == "petrova-ivanova.anna.2"
     assert await count_requests(db) == 0
-    assert await count_users(db) == 1
-    assert await count_self_registered_events(db) == 0
+    assert await count_users(db) == 2
+    assert await count_self_registered_events(db) == 1
 
 
 async def test_019_ac19_failed_confirms_write_no_events(
@@ -508,15 +548,8 @@ async def test_019_ac19_failed_confirms_write_no_events(
     with pytest.raises(RegistrationTokenInvalid):
         await confirm(db, policy, fixed_clock, busy)
 
-    taken = await request_link(
-        db, policy, hasher, fixed_clock, email="taken@example.ru", login="taken_one"
-    )
-    await make_user(db, workspace=ws, login="taken_one")
-    with pytest.raises(LoginTakenConflict):
-        await confirm(db, policy, fixed_clock, taken)
-
     assert await count_all_events(db) == 0
-    assert await count_users(db) == 2
+    assert await count_users(db) == 1
 
 
 # --- лимиты подтверждения (AC-38, FR-10, RG-4, RG-6) -------------------------------------------
@@ -602,5 +635,5 @@ async def test_019_no_logs_with_personal_data_or_secrets_on_confirm(
     await confirm(db, policy, fixed_clock, token)
     with pytest.raises(RegistrationTokenInvalid):
         await confirm(db, policy, fixed_clock, token)
-    for secret in (EMAIL, "Анна", "Петрова-Иванова", "Anna_P", "anna_p", PASSWORD, token):
+    for secret in (EMAIL, "Анна", "Петрова-Иванова", "petrova-ivanova.anna", PASSWORD, token):
         assert secret not in caplog.text

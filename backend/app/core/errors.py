@@ -64,6 +64,8 @@ class ErrorCode(StrEnum):
     parent_task_deleted = "parent_task_deleted"
     project_deleted = "project_deleted"
     invalid_neighbors = "invalid_neighbors"
+    # [027]
+    limit_reached = "limit_reached"
     # [3]
     inn_taken = "inn_taken"
     contacts_attached = "contacts_attached"
@@ -89,6 +91,11 @@ class ErrorCode(StrEnum):
     last_name_invalid = "last_name_invalid"
     # [011]
     attachment_empty = "attachment_empty"
+    # [025]
+    export_too_large = "export_too_large"
+    # [027]
+    recipient_not_found = "recipient_not_found"
+    member_already_added = "member_already_added"
 
 
 class AppError(Exception):
@@ -176,6 +183,12 @@ class RateLimited(AppError):
     code = "rate_limited"
     default_detail = "Слишком много запросов. Попробуйте позже"
 
+    def __init__(
+        self, detail: str | None = None, *, code: str | None = None, retry_after: int | None = None
+    ) -> None:
+        super().__init__(detail, code=code)
+        self.retry_after = retry_after  # секунды до следующей попытки (заголовок Retry-After)
+
 
 class RegistrationTokenInvalid(AppError):
     status_code = 400
@@ -259,7 +272,11 @@ def _error_response(
 async def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:  # noqa: ARG001  # сигнатура задана фреймворком
     err = cast(AppError, exc)
     # D-40: временное состояние — клиент может повторить запрос (в том числе из домена).
-    headers = {"Retry-After": _RETRY_AFTER_SECONDS} if isinstance(err, ServiceBusy) else None
+    headers: dict[str, str] | None = (
+        {"Retry-After": _RETRY_AFTER_SECONDS} if isinstance(err, ServiceBusy) else None
+    )
+    if isinstance(err, RateLimited) and err.retry_after is not None:
+        headers = {"Retry-After": str(max(1, err.retry_after))}
     return _error_response(err.status_code, err.detail, err.code, headers=headers)
 
 

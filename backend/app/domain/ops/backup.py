@@ -434,10 +434,12 @@ async def public_tables(conn: Any) -> list[str]:
     return [str(r[0]) for r in rows]
 
 
-def _restore_appdata(data_dir: Path, archive: Path) -> None:
-    """Распаковка во временный каталог внутри ``data_dir`` и перенос записей (ревью 009, п. 2).
+def _stage_appdata(data_dir: Path, archive: Path) -> Path:
+    """Распаковка данных во временный каталог внутри ``data_dir`` (тот же том, перенос — rename).
 
-    Сбой распаковки оставляет ``data_dir`` пустым: повторный ``restore`` не упирается в отказ.
+    Это самая долгая и самая ненадёжная часть (диск, права, повреждённый tar), поэтому она идёт ДО
+    ``pg_restore``: сбой здесь оставляет и БД, и ``data_dir`` пустыми, повторный ``restore``
+    не упирается в отказ (ревью 009, п. 2).
     """
     data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     for leftover in data_dir.glob(f"{RESTORE_PREFIX}*"):  # прерванный прошлый restore
@@ -446,6 +448,15 @@ def _restore_appdata(data_dir: Path, archive: Path) -> None:
     try:
         with tarfile.open(archive, mode="r:") as inner:
             inner.extractall(stage, filter="data")
+    except BaseException:
+        shutil.rmtree(stage, ignore_errors=True)
+        raise
+    return stage
+
+
+def _commit_appdata(data_dir: Path, stage: Path) -> None:
+    """Перенос распакованного в ``data_dir`` (rename внутри одного тома) и удаление ``stage``."""
+    try:
         for entry in sorted(stage.iterdir()):
             os.replace(entry, data_dir / entry.name)
     finally:
@@ -470,23 +481,30 @@ def restore_backup(
         if _data_dir_entries(settings.data_dir):
             raise RestoreRefused("каталог данных не пуст")
         env = libpq_env(settings.database_url)
-        with (work / DB_MEMBER).open("rb") as dump:
-            runner(
-                [
-                    tool(settings, "pg_restore"),
-                    "--no-owner",
-                    "--no-privileges",
-                    "--exit-on-error",
-                    "--single-transaction",
-                    "--no-password",
-                    "--dbname",
-                    env["PGDATABASE"],
-                ],
-                env,
-                dump,
-                None,
-            )
-        _restore_appdata(settings.data_dir, work / APPDATA_MEMBER)
+        # Порядок: распаковка данных во временный каталог -> pg_restore (одна транзакция) ->
+        # перенос данных. Любой сбой до переноса оставляет обе цели пустыми.
+        stage = _stage_appdata(settings.data_dir, work / APPDATA_MEMBER)
+        try:
+            with (work / DB_MEMBER).open("rb") as dump:
+                runner(
+                    [
+                        tool(settings, "pg_restore"),
+                        "--no-owner",
+                        "--no-privileges",
+                        "--exit-on-error",
+                        "--single-transaction",
+                        "--no-password",
+                        "--dbname",
+                        env["PGDATABASE"],
+                    ],
+                    env,
+                    dump,
+                    None,
+                )
+        except BaseException:
+            shutil.rmtree(stage, ignore_errors=True)
+            raise
+        _commit_appdata(settings.data_dir, stage)
         return manifest
     finally:
         shutil.rmtree(work, ignore_errors=True)

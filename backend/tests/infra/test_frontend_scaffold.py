@@ -250,10 +250,16 @@ def test_t21_src_files_only_expected() -> None:
         "shared/ui/ErrorAlert.tsx", "shared/ui/ui.css",
         # T24
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
+        "features/projects/MemberAdd.tsx", "features/projects/members.css",
+        "features/tokens/AgentConnect.tsx", "features/tokens/agent-connect.css",
+        "features/tasks/tasks.css",  # P2: карточки «Мои задачи» на 360 px
         "features/admin/password.ts", "features/admin/EmailDialog.tsx",
+        "features/admin/audit.css",  # P2: журнал аудита, карточки на 360 px
         # 008 «Сводка»
         "features/overview/SummaryPage.tsx", "features/overview/api.ts",
         "features/overview/filters.ts", "features/overview/summary.css",
+        # 026: AI agent hint card on the summary screen and its browser-side closing state
+        "features/overview/AiAgentHint.tsx", "features/overview/hintStorage.ts",
         "features/admin/BackupBanner.tsx",  # 009/FR-7
         "features/attachments/Attachments.tsx", "features/attachments/api.ts",  # 011
         "features/notifications/api.ts", "features/notifications/Badge.tsx",  # 012
@@ -296,7 +302,7 @@ def test_t21_src_files_only_expected() -> None:
         "features/auth/ProfilePage.tsx",
         # PN-15 (MCP): «Доступ для агентов» (ADR-0018)
         "features/tokens/api.ts", "features/tokens/model.ts", "features/tokens/AgentAccessPage.tsx",
-        "features/tokens/TokenList.tsx", "features/tokens/IssuedToken.tsx",
+        "features/tokens/TokenList.tsx",
     }  # fmt: skip
     assert {"main.tsx", "app/App.tsx", "app/providers.tsx"} <= found
     assert found <= allowed, f"лишние файлы: {sorted(found - allowed)}"

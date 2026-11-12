@@ -165,13 +165,32 @@ describe("create form (FR-14, AC-51)", () => {
     expect(f.count(CREATE)).toBe(1);
   });
 
-  it("ac51_empty_name_sends_nothing_and_shows_validation_alert", async () => {
+  it("ac51_empty_name_sends_nothing_and_shows_error_under_name_field", async () => {
     const { container } = await open({ [CREATE]: () => j(201, detail()) });
     fill(container, "   ", "x");
     submit(container);
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe(errorMessage("validation_error"));
+    const message = await screen.findByText(ru["projects.error_name_required"]);
+    const input = container.querySelector<HTMLInputElement>('input[name="name"]')!;
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBe(message.closest('[role="alert"]')?.id);
+    expect(input.getAttribute("aria-required")).toBe("true");
     expect(f.count(CREATE)).toBe(0);
+  });
+
+  it("027_name_error_clears_when_name_is_typed", async () => {
+    const { container } = await open({ [CREATE]: () => j(201, detail()) });
+    fill(container, "   ", "x");
+    submit(container);
+    await screen.findByText(ru["projects.error_name_required"]);
+    fireEvent.change(container.querySelector('input[name="name"]')!, { target: { value: "Новое" } });
+    expect(screen.queryByText(ru["projects.error_name_required"])).toBeNull();
+  });
+
+  it("pr42_create_and_list_have_their_own_headings", async () => {
+    const { container } = await open();
+    expect(screen.getByRole("heading", { level: 2, name: ru["projects.create_heading"] })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: ru["projects.list_heading"] })).toBeTruthy();
+    expect(container.querySelector('form[data-form="create-project"]')).not.toBeNull();
   });
 
   it.each([
@@ -249,5 +268,53 @@ describe("review T82 attempt 2", () => {
     expect(wraps(screen.getByRole("heading", { level: 1 }))).toBe(true);
     const c = cell(container.querySelector("tr[data-project-id]")!, "name");
     expect(wraps(c)).toBe(true);
+  });
+});
+
+// Аудит #9: пустой список проектов - без пагинации (даже если сервер сообщил has_next);
+// непустой список со следующей страницей - с пагинацией.
+describe("пагинация проектов при пустом списке (аудит #9)", () => {
+  it("empty_list_has_no_pagination_even_when_next_flag_is_set", async () => {
+    setup({ [LIST]: () => j(200, page([], 1, true)) });
+    const { container } = renderApp("/projects");
+    expect(await screen.findByText(ru["projects.empty"])).toBeTruthy();
+    expect(container.querySelector(".ui-pagination")).toBeNull();
+    expect(container.querySelector('[data-action="next-page"]')).toBeNull();
+    expect(container.querySelector('[data-action="prev-page"]')).toBeNull();
+  });
+
+  it("non_empty_list_with_next_page_keeps_pagination", async () => {
+    const { container } = await open({ [LIST]: () => j(200, page(ITEMS, 1, true)) });
+    expect(container.querySelector(".ui-pagination")).not.toBeNull();
+  });
+});
+
+describe("спека 027: «Пользователь» создаёт проекты (этап 1)", () => {
+  const USER_CAN_CREATE = ["business_access", "project_create"];
+
+  it("027_user_with_project_create_sees_form_and_new_empty_text", async () => {
+    setup(
+      {
+        [ME]: () => j(200, meWith(USER_CAN_CREATE, "user")),
+        [LIST]: () => j(200, page([])),
+      },
+      USER_CAN_CREATE,
+    );
+    const v = renderApp("/projects");
+    expect(await screen.findByText(ru["projects.empty"])).toBeTruthy();
+    expect(form(v.container)).not.toBeNull();
+  });
+
+  it("027_user_without_project_create_has_no_form", async () => {
+    setup(
+      {
+        [ME]: () => j(200, meWith(["business_access"], "user")),
+        [LIST]: () => j(200, page([])),
+      },
+      ["business_access"],
+    );
+    const v = renderApp("/projects");
+    expect(await screen.findByText(ru["projects.empty"])).toBeTruthy();
+    expect(form(v.container)).toBeNull();
   });
 });

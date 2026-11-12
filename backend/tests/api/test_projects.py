@@ -209,7 +209,6 @@ async def test_ac51_ba_creates_project_with_description_as_owner_and_member(
 @pytest.mark.parametrize(
     ("who", "expected"),
     [
-        ("usr", (403, "forbidden")),
         ("ta", (403, "forbidden")),
         ("norole", (403, "no_role")),
         ("otp", (403, "password_change_required")),
@@ -592,7 +591,6 @@ async def _extra_user(env: ApiEnv, w: Any, role: str | None, login: str, **kw: A
 @pytest.mark.parametrize(
     ("target", "code"),
     [
-        ("usr", "recipient_wrong_role"),  # «Пользователь» — участник, но не владелец
         ("ta", "recipient_wrong_role"),
         ("norole_member", "recipient_wrong_role"),
         ("blocked_member", "user_blocked"),
@@ -627,6 +625,18 @@ async def test_ac52_ac74_transfer_recipient_errors_are_422_owner_unchanged(
     assert error(r) == (422, code), r.text
     assert (await project_db(env, w.project_id)).owner_id == w.uid("ba")
     assert await event_count(env, w.ws.id) == before_events
+
+
+async def test_027_transfer_to_participant_user_role_is_allowed_old_owner_stays_member(
+    api_env: ApiEnv,
+) -> None:
+    env = api_env
+    w = await make_api_world(env)
+    r = await send(env, w.tok("ba"), "PUT", _owner(w.project_id), {"user_id": str(w.uid("usr"))})
+    assert r.status_code == 200, r.text
+    assert (await project_db(env, w.project_id)).owner_id == w.uid("usr")
+    members = await send(env, w.tok("usr"), "GET", f"/api/v1/projects/{w.project_id}/members")
+    assert str(w.uid("ba")) in [m["user"]["id"] for m in members.json()["items"]]
 
 
 @pytest.mark.parametrize("payload", [{}, {"user_id": None}, {"user_id": "nope"}, {"user_id": 5}])

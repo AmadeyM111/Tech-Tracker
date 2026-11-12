@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * List Audit
-         * @description Страница журнала пространства: ``id DESC``, фильтры ``entity_type`` и ``actor_id``.
+         * @description Страница журнала: ``id DESC``, фильтры ``entity_type``, ``actor_id``, ``actor_login``.
          */
         get: operations["list_audit"];
         put?: never;
@@ -74,6 +74,12 @@ export interface paths {
         /**
          * List Users
          * @description Страница учётных записей пространства: ``login ASC, id ASC`` (D-34).
+         *
+         *     ``q`` — поиск по логину, имени, фамилии и email; ``total`` — всего найдено (все страницы).
+         *
+         *     Исключение из D-34 только для этого списка (решение 2026-11-10,
+         *     ``specs/001-pilot-r1/plan.md``, D-34a): учётных записей в пространстве десятки,
+         *     поэтому ``total`` считается отдельным COUNT.
          */
         get: operations["list_users"];
         put?: never;
@@ -436,11 +442,12 @@ export interface paths {
         put?: never;
         /**
          * Confirm Registration
-         * @description Подтверждение регистрации по ссылке; успех — 204 без тела и без cookie (AC-16).
+         * @description Подтверждение по ссылке; успех — 200 с логином учётной записи, без cookie (AC-16).
          *
          *     Неверная, просроченная или использованная ссылка и занятый адрес — 400
-         *     ``registration_token_invalid``. Занятый логин — 409 ``login_taken``. Сессия не создаётся:
-         *     вход отдельным действием.
+         *     ``registration_token_invalid``. Логин выбирает сервер (v0.5): занятый логин заявки заменяется
+         *     следующим свободным, поэтому 409 ``login_taken`` возможен только если заняты все попытки.
+         *     Сессия не создаётся: вход отдельным действием.
          */
         post: operations["confirm_registration"];
         delete?: never;
@@ -639,6 +646,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/overview/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Overview Projects
+         * @description Мои проекты (владелец или участник) для фильтра по проекту, по имени.
+         */
+        get: operations["list_overview_projects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/overview/tasks": {
         parameters: {
             query?: never;
@@ -651,6 +678,26 @@ export interface paths {
          * @description Задачи сводки с фильтрами: срок по возрастанию, без срока в конце (FR-5…FR-9).
          */
         get: operations["list_overview_tasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/overview/tasks.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Overview Tasks
+         * @description Выборка «Сводки» с фильтрами целиком в CSV; только БА (ADR-0023, FR-1…FR-8).
+         */
+        get: operations["export_overview_tasks"];
         put?: never;
         post?: never;
         delete?: never;
@@ -830,7 +877,10 @@ export interface paths {
         put?: never;
         /**
          * Add Member
-         * @description Добавляет участника; уже участник — 204 без изменений (D-46).
+         * @description Добавляет участника по ``user_id`` (БА) или точному логину/email (027 FR-4).
+         *
+         *     По ``user_id`` повтор — 204 (D-46); по логину/email — 422 ``member_already_added``;
+         *     не найден — 422 ``recipient_not_found``; «Пользователь» — не больше 20 попыток в час (429).
          */
         post: operations["add_member"];
         delete?: never;
@@ -869,7 +919,7 @@ export interface paths {
         get?: never;
         /**
          * Change Owner
-         * @description Передаёт владение участнику-БА (FR-14a); пишет событие аудита.
+         * @description Передаёт владение участнику с ролью БА или «Пользователь» (027 FR-7); пишет аудит.
          */
         put: operations["change_owner"];
         post?: never;
@@ -1070,7 +1120,9 @@ export interface paths {
         };
         /**
          * List Directory
-         * @description Незаблокированные пользователи пространства с ролью БА/П; ``q`` — подстрока логина.
+         * @description Незаблокированные пользователи с ролью БА/П; ``q`` — подстрока логина.
+         *
+         *     БА видит всех в пространстве; «Пользователь» — только людей из общих проектов и себя (027 FR-5).
          */
         get: operations["list_directory"];
         put?: never;
@@ -1170,6 +1222,22 @@ export interface components {
             role: components["schemas"]["Role"] | null;
             /** Self Registered */
             self_registered: boolean;
+        };
+        /**
+         * AdminUserPage
+         * @description Страница ``GET /admin/users``; ``total`` — все записи под ``q``, не размер страницы.
+         */
+        AdminUserPage: {
+            /** Has Next */
+            has_next: boolean;
+            /** Items */
+            items: components["schemas"]["AdminUser"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
         };
         /**
          * AttachmentOut
@@ -1302,7 +1370,7 @@ export interface components {
          * @description Возможность; значение — имя члена в нижнем регистре (``auto()`` у ``StrEnum``).
          * @enum {string}
          */
-        Capability: "manage_accounts" | "assign_roles" | "view_audit" | "business_access" | "project_create" | "project_manage_any" | "task_assign_others" | "labels_manage" | "crm_read" | "crm_write" | "pipeline_manage" | "onboard_accounts";
+        Capability: "manage_accounts" | "assign_roles" | "view_audit" | "business_access" | "project_create" | "project_manage_any" | "task_assign_others" | "labels_manage" | "crm_read" | "crm_write" | "pipeline_manage" | "onboard_accounts" | "export_overview";
         /**
          * ChangePasswordRequest
          * @description ``POST /auth/password`` (FR-56): ответ 204 без тела.
@@ -1485,13 +1553,17 @@ export interface components {
             must_change_password: boolean;
             role: components["schemas"]["Role"];
         };
-        /** MemberAdd */
+        /**
+         * MemberAdd
+         * @description Ровно одно из: ``user_id`` (БА) или точные ``login``/``email`` (spec 027 FR-4).
+         */
         MemberAdd: {
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
+            /** Email */
+            email?: string | null;
+            /** Login */
+            login?: string | null;
+            /** User Id */
+            user_id?: string | null;
         };
         /**
          * NotificationKind
@@ -1558,6 +1630,14 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * OverviewProjectList
+         * @description Мои проекты для фильтра «Сводки» (без постраничности, по имени).
+         */
+        OverviewProjectList: {
+            /** Items */
+            items: components["schemas"]["ProjectRef"][];
+        };
         /** OverviewTaskItem */
         OverviewTaskItem: {
             assignee: components["schemas"]["UserRef"] | null;
@@ -1608,17 +1688,6 @@ export interface components {
             has_next: boolean;
             /** Items */
             items: components["schemas"]["ActivityItem"][];
-            /** Page */
-            page: number;
-            /** Page Size */
-            page_size: number;
-        };
-        /** Page[AdminUser] */
-        Page_AdminUser_: {
-            /** Has Next */
-            has_next: boolean;
-            /** Items */
-            items: components["schemas"]["AdminUser"][];
             /** Page */
             page: number;
             /** Page Size */
@@ -1876,6 +1945,14 @@ export interface components {
             token: string;
         };
         /**
+         * RegistrationConfirmed
+         * @description Ответ подтверждения (200, v0.5): логин учётной записи. Сессии и cookie нет (AC-16).
+         */
+        RegistrationConfirmed: {
+            /** Login */
+            login: string;
+        };
+        /**
          * RegistrationRequest
          * @description ``POST /auth/registration/request``: заявка на регистрацию (FR-3).
          */
@@ -1886,8 +1963,11 @@ export interface components {
             first_name: string;
             /** Last Name */
             last_name: string;
-            /** Login */
-            login: string;
+            /**
+             * Login
+             * @deprecated
+             */
+            login?: string | null;
             /**
              * Password
              * Format: password
@@ -2238,6 +2318,7 @@ export interface operations {
                 page_size?: number;
                 entity_type?: components["schemas"]["EntityType"] | null;
                 actor_id?: string | null;
+                actor_login?: string | null;
             };
             header?: never;
             path?: never;
@@ -2384,6 +2465,7 @@ export interface operations {
             query?: {
                 page?: number;
                 page_size?: number;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -2397,7 +2479,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_AdminUser_"];
+                    "application/json": components["schemas"]["AdminUserPage"];
                 };
             };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
@@ -3435,11 +3517,13 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RegistrationConfirmed"];
+                };
             };
             /** @description Некорректный JSON в теле запроса (code: bad_request) */
             400: {
@@ -3468,7 +3552,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Логин занят учётной записью (code: login_taken) */
+            /** @description Все логины заняты, учётная запись не создана (code: login_taken) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -4006,6 +4090,44 @@ export interface operations {
             };
         };
     };
+    list_overview_projects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewProjectList"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_overview_tasks: {
         parameters: {
             query?: {
@@ -4015,6 +4137,8 @@ export interface operations {
                 status?: components["schemas"]["TaskStatus"] | null;
                 priority?: components["schemas"]["TaskPriority"][];
                 due?: components["schemas"]["DuePreset"] | null;
+                due_from?: string | null;
+                due_to?: string | null;
                 needs_review?: boolean;
             };
             header?: never;
@@ -4030,6 +4154,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OverviewTaskPage"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_overview_tasks: {
+        parameters: {
+            query?: {
+                project_id?: string | null;
+                status?: components["schemas"]["TaskStatus"] | null;
+                priority?: components["schemas"]["TaskPriority"][];
+                due?: components["schemas"]["DuePreset"] | null;
+                due_from?: string | null;
+                due_to?: string | null;
+                needs_review?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV выборки «Сводки» (spec 025) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
                 };
             };
             /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */

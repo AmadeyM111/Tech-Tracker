@@ -278,7 +278,6 @@ const KEYS_019 = [
   "auth.register_email_label",
   "auth.register_first_name_label",
   "auth.register_last_name_label",
-  "auth.register_login_label",
   "auth.register_password_label",
   "auth.register_submit",
   "auth.register_sent",
@@ -289,7 +288,11 @@ const KEYS_019 = [
   "auth.register_confirmed",
   "auth.register_login_link",
   "auth.register_link_invalid",
-  "auth.register_login_taken",
+  "auth.register_your_login",
+  "auth.register_copy",
+  "auth.register_copy_failed",
+  "auth.register_login_hint",
+  "auth.register_login_save",
   "auth.register_again",
   "auth.help_p2_registration",
   "profile.title",
@@ -336,6 +339,11 @@ describe("019 dictionary (plan §4.7, FR-4, FR-12, Q-1)", () => {
     expect(CYRILLIC.test(value) || LATIN_WORD_ALLOWED.has(value), key).toBe(true);
   });
 
+  it("v0.5: the login field and the login-taken text on the registration screens are gone", () => {
+    expect(dict["auth.register_login_label"]).toBeUndefined();
+    expect(dict["auth.register_login_taken"]).toBeUndefined();
+  });
+
   it("registration status text is the FR-4 wording verbatim", () => {
     expect(dict["auth.register_sent"]).toBe(
       "Если адрес можно использовать для регистрации, мы отправили на него письмо с подтверждением. Ссылка действует 30 минут.",
@@ -344,7 +352,7 @@ describe("019 dictionary (plan §4.7, FR-4, FR-12, Q-1)", () => {
 
   it("registration help paragraph is the FR-12 wording accepted by the owner (plan §9, Q-1)", () => {
     expect(dict["auth.help_p2_registration"]).toBe(
-      "Учётную запись выдаёт технический администратор, или её можно создать самостоятельно через «Зарегистрироваться». Роль после регистрации назначает технический или бизнес-администратор.",
+      "Учётную запись выдаёт технический администратор, или её можно создать самостоятельно через «Зарегистрироваться». После подтверждения адреса по письму можно сразу войти: вам назначается роль «Пользователь», и вы видите проекты, в которые вас добавят.",
     );
   });
 

@@ -61,6 +61,9 @@ async def seed(
     blocked: bool = False,
     must_change_password: bool = False,
     login: str | None = None,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    email: str | None = None,
 ) -> tuple[UserRow, list[str]]:
     """Пользователь в пространстве ``ws`` + ``sessions`` действующих сессий (токены).
 
@@ -88,6 +91,9 @@ async def seed(
             blocked=blocked,
             must_change_password=must_change_password,
             login=login,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
             **kwargs,
         )
         tokens = [

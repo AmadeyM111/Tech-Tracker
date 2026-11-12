@@ -52,7 +52,7 @@ const projectSelect = () =>
     ru["tasks.project_label"],
   ) as HTMLSelectElement;
 const titleInput = () =>
-  within(dialog()).getByLabelText(ru["tasks.title_label"]) as HTMLInputElement;
+  within(dialog()).getByLabelText(exactLabel(ru["tasks.title_label"])) as HTMLInputElement;
 const optionTexts = (s: HTMLSelectElement) =>
   Array.from(s.options).map((o) => o.textContent);
 const loaded = () => screen.findByLabelText(ru["tasks.project_label"]);
@@ -314,7 +314,7 @@ describe("no creatable projects (AC-19, FR-11)", () => {
   ) {
     const d = dialog();
     expect(within(d).getByText(ru["tasks.no_creatable_projects"])).toBeTruthy();
-    expect(within(d).queryByLabelText(ru["tasks.title_label"])).toBeNull();
+    expect(within(d).queryByLabelText(exactLabel(ru["tasks.title_label"]))).toBeNull();
     expect(
       within(d).queryByRole("button", { name: ru["tasks.create_submit"] }),
     ).toBeNull();
@@ -334,6 +334,14 @@ describe("no creatable projects (AC-19, FR-11)", () => {
     const { onClose } = renderDialog();
     await screen.findByText(ru["tasks.no_creatable_projects"]);
     await expectEmptyState(f, onClose);
+  });
+
+  it("027_empty_state_links_to_projects_page", async () => {
+    installFetch(routesU({ [LIST]: emptyList }));
+    renderDialog();
+    await screen.findByText(ru["tasks.no_creatable_projects"]);
+    const link = within(dialog()).getByRole("link", { name: ru["tasks.create_project_link"] });
+    expect(link.getAttribute("href")).toBe("/projects");
   });
 
   it("004_ac19_business_admin_with_all_create_task_false", async () => {
@@ -720,6 +728,21 @@ describe("006 AC-33: fields, defaults, required marks, no priority", () => {
     expect(dialog().querySelector(`label[for="${dueInput().id}"] .ui-required`)).toBeTruthy();
     expect(dialog().querySelector('[data-field="fixed-assignee"]')!.textContent).toBe("Исполнитель: ivanov");
     expect(selectedLine()).toBeNull();
+  });
+
+  it("p2_title_has_required_mark_like_other_required_fields", async () => {
+    installFetch(routesBA());
+    renderDialog({ currentProjectId: P1, session: BA });
+    await loaded();
+    const el = titleInput();
+    expect(el.getAttribute("aria-required")).toBe("true");
+    // звёздочка из словаря в подписи, скрыта от диктора (006/PD-12), как у остальных обязательных полей
+    const mark = dialog().querySelector(`label[for="${el.id}"] .ui-required`)!;
+    expect(mark).toBeTruthy();
+    expect(mark.textContent).toBe(ru["tasks.required_mark"]);
+    expect(mark.getAttribute("aria-hidden")).toBe("true");
+    // название, описание, срок и исполнитель помечены одинаково: четыре метки
+    expect(dialog().querySelectorAll(".ui-required")).toHaveLength(4);
   });
 
   it("006_ac33_default_due_is_msk_calendar_day_whatever_the_browser_time_zone", async () => {

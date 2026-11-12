@@ -162,29 +162,69 @@ describe("create token (AC-1)", () => {
     fireEvent.change(screen.getByLabelText(ru["agent_tokens.name_label"]), { target: { value: "  Ноутбук  " } });
     fireEvent.click(screen.getByRole("button", { name: ru["agent_tokens.create_submit"] }));
 
-    const field = (await screen.findByLabelText(ru["agent_tokens.token_label"])) as HTMLInputElement;
+    await screen.findByText(ru["agent_connect.created_title"]);
+    const field = screen.getByLabelText(ru["agent_connect.field_label"]) as HTMLTextAreaElement;
     expect(bodies).toEqual([{ name: "Ноутбук" }]);
     expect(field.readOnly).toBe(true);
-    expect(field.value).toBe(TOKEN_VALUE);
-    expect(screen.getByText(ru["agent_tokens.issued_warning"])).toBeTruthy();
+    // Claude Code by default: the ready command carries the address of this site (+ /mcp) and the token.
+    expect(field.value).toBe(
+      `claude mcp add --transport http gtrack ${window.location.origin}/mcp --header "Authorization: Bearer ${TOKEN_VALUE}"`,
+    );
+    expect(screen.getByText(ru["agent_connect.warn_after"])).toBeTruthy();
     // The list is refreshed after the create and shows the new token without its value.
     await waitFor(() => expect(view.container.querySelector(`tr[data-token-id="${T_NEW}"]`)).not.toBeNull());
     expect(f.count(LIST)).toBe(2);
-    expect(view.container.textContent).not.toContain(TOKEN_VALUE);
-    // The token is not in any cache, even while it is shown.
+    // The list never shows the value; the token is in the field only, and in no cache while it is shown.
+    expect(view.container.querySelector("table")?.textContent).not.toContain(TOKEN_VALUE);
     expect(cacheText(view.qc)).not.toContain(TOKEN_VALUE);
 
     fireEvent.click(screen.getByRole("button", { name: ru["agent_tokens.copy"] }));
-    await screen.findByText(ru["agent_tokens.copied"]);
-    expect(writeText).toHaveBeenCalledWith(TOKEN_VALUE);
+    await screen.findByText(ru["agent_connect.copied"]);
+    expect(writeText).toHaveBeenCalledWith(field.value);
+    expect(field.value).toContain(TOKEN_VALUE);
 
     fireEvent.click(screen.getByRole("button", { name: ru["agent_tokens.dismiss"] }));
-    await waitFor(() => expect(screen.queryByLabelText(ru["agent_tokens.token_label"])).toBeNull());
+    await waitFor(() => expect(screen.queryByText(ru["agent_connect.created_title"])).toBeNull());
+    expect(field.isConnected ? field.value : "").toBe("");  // the field goes back to the empty placeholder state
+    expect((screen.getByLabelText(ru["agent_connect.field_label"]) as HTMLTextAreaElement).value).toBe("");
     expect(view.container.textContent).not.toContain(TOKEN_VALUE);
     expect(document.body.innerHTML).not.toContain(TOKEN_VALUE);
     expect(cacheText(view.qc)).not.toContain(TOKEN_VALUE);
     // Focus goes back to the name field for the next token.
     expect(document.activeElement).toBe(screen.getByLabelText(ru["agent_tokens.name_label"]));
+  });
+
+  it("switches the text to the JSON of another client, with the same token and address", async () => {
+    await open(() => j(200, []), { [CREATE]: () => j(201, { ...CREATED_ITEM, token: TOKEN_VALUE }) });
+    fireEvent.click(screen.getByRole("button", { name: ru["agent_tokens.create_submit"] }));
+    await screen.findByText(ru["agent_connect.created_title"]);
+    const field = screen.getByLabelText(ru["agent_connect.field_label"]) as HTMLTextAreaElement;
+    const claude = screen.getByRole("button", { name: ru["agent_connect.client_claude"] });
+    const other = screen.getByRole("button", { name: ru["agent_connect.client_other"] });
+    expect(claude.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(other);
+    expect(other.getAttribute("aria-pressed")).toBe("true");
+    expect(JSON.parse(field.value)).toEqual({
+      mcpServers: {
+        gtrack: {
+          type: "http",
+          url: `${window.location.origin}/mcp`,
+          headers: { Authorization: `Bearer ${TOKEN_VALUE}` },
+        },
+      },
+    });
+  });
+
+  it("before issuing: the field is a disabled placeholder and the copy button is disabled", async () => {
+    await open(() => j(200, []));
+    const field = screen.getByLabelText(ru["agent_connect.field_label"]) as HTMLTextAreaElement;
+    expect(field.disabled).toBe(true);
+    expect(field.placeholder).toBe(ru["agent_connect.placeholder"]);
+    expect((screen.getByRole("button", { name: ru["agent_tokens.copy"] }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(ru["agent_connect.hint_before"])).toBeTruthy();
+    const more = document.querySelector("details.agent-more") as HTMLDetailsElement;
+    expect(more.open).toBe(false);
+    expect(more.querySelectorAll("li")).toHaveLength(4);
   });
 
   it("drops the token from memory when the page is left without dismissal", async () => {
@@ -193,7 +233,7 @@ describe("create token (AC-1)", () => {
     });
     fireEvent.change(screen.getByLabelText(ru["agent_tokens.name_label"]), { target: { value: "Ноутбук" } });
     fireEvent.click(screen.getByRole("button", { name: ru["agent_tokens.create_submit"] }));
-    await screen.findByLabelText(ru["agent_tokens.token_label"]);
+    await screen.findByText(ru["agent_connect.created_title"]);
     view.unmount();
     expect(cacheText(view.qc)).not.toContain(TOKEN_VALUE);
   });
@@ -205,7 +245,7 @@ describe("create token (AC-1)", () => {
     });
     fireEvent.change(screen.getByLabelText(ru["agent_tokens.name_label"]), { target: { value: "Ноутбук" } });
     fireEvent.click(screen.getByRole("button", { name: ru["agent_tokens.create_submit"] }));
-    await screen.findByLabelText(ru["agent_tokens.token_label"]);
+    await screen.findByText(ru["agent_connect.created_title"]);
     fireEvent.click(screen.getByRole("button", { name: ru["agent_tokens.copy"] }));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe(ru["agent_tokens.copy_failed"]);
@@ -250,7 +290,7 @@ describe("create token (AC-1)", () => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe(ru["error.token_limit_reached"]);
     expect(container.textContent).not.toContain("token_limit_reached");
-    expect(screen.queryByLabelText(ru["agent_tokens.token_label"])).toBeNull();
+    expect(screen.queryByText(ru["agent_connect.created_title"])).toBeNull();
   });
 });
 

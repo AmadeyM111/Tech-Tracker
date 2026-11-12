@@ -153,7 +153,7 @@ const menu = () => screen.findByRole("navigation", { name: MENU });
 const createBtn = () => screen.getByRole("button", { name: TASK });
 const dlg = () => screen.getByRole("dialog");
 const projectSelect = () => within(dlg()).getByLabelText(ru["tasks.project_label"]) as HTMLSelectElement;
-const titleInput = () => within(dlg()).getByLabelText(ru["tasks.title_label"]) as HTMLInputElement;
+const titleInput = () => within(dlg()).getByLabelText(exactLabel(ru["tasks.title_label"])) as HTMLInputElement;
 const submitBtn = () => within(dlg()).getByRole("button", { name: ru["tasks.create_submit"] });
 const cancelBtn = () => within(dlg()).getByRole("button", { name: ru["admin.cancel"] });
 const settle = (ms = 150) => new Promise((r) => setTimeout(r, ms));
@@ -327,7 +327,7 @@ describe("AC-12 order in the document and Tab sequence", () => {
 
   it("004_ac12_BA_projects_tab_sequence_links_task_logout_content", async () => {
     boot(dialogFor(ROLES[0]), "/projects");
-    await screen.findByRole("form", { name: ru["projects.create_title"] });
+    await screen.findByRole("form", { name: ru["projects.create_heading"] });
     const tabbable = Array.from(
       document.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
     ).filter((el) => el.getAttribute("tabindex") !== "-1" && !(el as HTMLButtonElement).disabled);
@@ -410,7 +410,7 @@ describe("AC-19 no creatable projects", () => {
     expect((b as HTMLButtonElement).disabled).toBe(false);
     await openDialog();
     expect(await within(dlg()).findByText(ru["tasks.no_creatable_projects"])).toBeTruthy();
-    expect(within(dlg()).queryByLabelText(ru["tasks.title_label"])).toBeNull();
+    expect(within(dlg()).queryByLabelText(exactLabel(ru["tasks.title_label"]))).toBeNull();
     expect(within(dlg()).queryByRole("button", { name: ru["tasks.create_submit"] })).toBeNull();
     const close = within(dlg()).getByRole("button", { name: ru["tasks.dialog_close"] });
     await waitFor(() => expect(document.activeElement).toBe(close));
@@ -648,7 +648,7 @@ describe("R5-T03-1 no onCreated after unmount", () => {
     installFetch(routesU({ [CREATE_IN(P1)]: () => d.promise }));
     const { unmount, onCreated, onClose } = renderDialog({ currentProjectId: P1 });
     await loaded();
-    fireEvent.change(screen.getByLabelText(ru["tasks.title_label"]), { target: { value: "Отчёт" } });
+    fireEvent.change(screen.getByLabelText(exactLabel(ru["tasks.title_label"])), { target: { value: "Отчёт" } });
     fireEvent.change(screen.getByLabelText(exactLabel(ru["tasks.description_label"])), { target: { value: DESC } });
     fireEvent.click(screen.getByRole("button", { name: ru["tasks.create_submit"] }));
     await settle(30);

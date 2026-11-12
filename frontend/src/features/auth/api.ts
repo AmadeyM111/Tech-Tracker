@@ -12,6 +12,7 @@ export type PasswordResetStatus = components["schemas"]["PasswordResetStatus"];
 export type MeResponse = components["schemas"]["MeResponse"];
 export type RegistrationRequest = components["schemas"]["RegistrationRequest"];
 export type RegistrationConfirm = components["schemas"]["RegistrationConfirm"];
+export type RegistrationConfirmed = components["schemas"]["RegistrationConfirmed"];
 export type SetNameRequest = components["schemas"]["SetNameRequest"];
 
 function invalidBody(status: number): ApiError {
@@ -53,9 +54,12 @@ export async function requestRegistration(body: RegistrationRequest): Promise<vo
 }
 
 // The token travels only in the request body; it is sent on the confirm button press only.
-export async function confirmRegistration(token: string): Promise<void> {
+// v0.5: the answer names the login the server created for this account (the token holder sees it once).
+export async function confirmRegistration(token: string): Promise<string> {
   const body: RegistrationConfirm = { token };
-  await getAppClient().POST("/api/v1/auth/registration/confirm", { body });
+  const { data } = await getAppClient().POST("/api/v1/auth/registration/confirm", { body });
+  if (data === undefined) throw invalidBody(200);
+  return data.login;
 }
 
 // AC-34: the user changes own first and last name; the answer is the refreshed profile (MeResponse).

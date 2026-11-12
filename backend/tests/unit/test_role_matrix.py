@@ -35,6 +35,7 @@ ALL_CAPS = (
     "CRM_WRITE",
     "PIPELINE_MANAGE",
     "ONBOARD_ACCOUNTS",  # 019 (plan RG-11): только БА
+    "EXPORT_OVERVIEW",  # 025: только БА
 )
 _TA = {"MANAGE_ACCOUNTS", "ASSIGN_ROLES", "VIEW_AUDIT"}
 _BA = {
@@ -50,10 +51,12 @@ _BA = {
 EXPECTED: dict[str, frozenset[str]] = {
     "TECH_ADMIN": frozenset(_TA),
     # 002/FR-8 (R3-T01): БА получает PROJECT_MANAGE_ANY
-    "BUSINESS_ADMIN": frozenset(_BA | {"PROJECT_MANAGE_ANY", "ONBOARD_ACCOUNTS"}),
-    "USER": frozenset({"BUSINESS_ACCESS"}),
+    "BUSINESS_ADMIN": frozenset(
+        _BA | {"PROJECT_MANAGE_ANY", "ONBOARD_ACCOUNTS", "EXPORT_OVERVIEW"}
+    ),
+    "USER": frozenset({"BUSINESS_ACCESS", "PROJECT_CREATE"}),  # спека 027, FR-1
 }
-BUSINESS_CAPS = frozenset(_BA | {"PROJECT_MANAGE_ANY", "ONBOARD_ACCOUNTS"})
+BUSINESS_CAPS = frozenset(_BA | {"PROJECT_MANAGE_ANY", "ONBOARD_ACCOUNTS", "EXPORT_OVERVIEW"})
 CELLS = [(r, c) for r in ALL_ROLES for c in ALL_CAPS]
 
 
@@ -136,9 +139,11 @@ def test_br2_tech_admin_has_only_administrative_capabilities(roles: ModuleType) 
 # ``test_002_fr8_only_business_roles_hold_project_manage_any`` (PROJECT_MANAGE_ANY у БА, не у ТА).
 
 
-def test_br1_user_only_business_access(roles: ModuleType) -> None:
-    """Пользователь: в матрице только доступ к разделу (свои задачи — policy R1.1)."""
-    assert roles.ROLE_CAPABILITIES[roles.Role.USER] == frozenset({roles.Capability.BUSINESS_ACCESS})
+def test_br1_user_business_access_and_project_create(roles: ModuleType) -> None:
+    """Пользователь: доступ к разделу и создание проектов (спека 027)."""
+    assert roles.ROLE_CAPABILITIES[roles.Role.USER] == frozenset(
+        {roles.Capability.BUSINESS_ACCESS, roles.Capability.PROJECT_CREATE}
+    )
 
 
 def test_br11_user_cannot_assign_others_manage_labels_or_crm(roles: ModuleType) -> None:
@@ -184,7 +189,9 @@ def test_role_capabilities_mapping_is_read_only(roles: ModuleType) -> None:
         del caps[roles.Role.USER]
     with pytest.raises((TypeError, AttributeError)):
         caps[roles.Role.USER] = frozenset()
-    assert roles.ROLE_CAPABILITIES[roles.Role.USER] == frozenset({roles.Capability.BUSINESS_ACCESS})
+    assert roles.ROLE_CAPABILITIES[roles.Role.USER] == frozenset(
+        {roles.Capability.BUSINESS_ACCESS, roles.Capability.PROJECT_CREATE}
+    )
 
 
 def test_role_capabilities_values_are_frozensets(roles: ModuleType) -> None:
@@ -264,3 +271,12 @@ def test_019_ac30_onboard_accounts_only_business_admin(roles: ModuleType) -> Non
     }
     assert holders == {"BUSINESS_ADMIN"}
     assert roles.Capability.ONBOARD_ACCOUNTS.value == "onboard_accounts"
+
+
+def test_025_export_overview_only_business_admin(roles: ModuleType) -> None:
+    """025/ADR-0023: EXPORT_OVERVIEW (CSV «Сводки») только у БА; у ТА и Пользователя её нет."""
+    holders = {
+        r.name for r in roles.Role if roles.Capability.EXPORT_OVERVIEW in roles.ROLE_CAPABILITIES[r]
+    }
+    assert holders == {"BUSINESS_ADMIN"}
+    assert roles.Capability.EXPORT_OVERVIEW.value == "export_overview"

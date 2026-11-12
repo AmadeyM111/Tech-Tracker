@@ -38,6 +38,7 @@ class Capability(StrEnum):
     CRM_WRITE = auto()  # включая удаление/восстановление CRM, связь с проектом
     PIPELINE_MANAGE = auto()  # FR-34
     ONBOARD_ACCOUNTS = auto()  # 019/RG-11: только БА
+    EXPORT_OVERVIEW = auto()  # 025: выгрузка выборки «Сводки» в CSV, только БА
 
 
 _TECH_ADMIN_CAPS: Final = frozenset(
@@ -54,6 +55,7 @@ _BUSINESS_ADMIN_CAPS: Final = frozenset(
         Capability.CRM_WRITE,
         Capability.PIPELINE_MANAGE,
         Capability.ONBOARD_ACCOUNTS,
+        Capability.EXPORT_OVERVIEW,
     }
 )
 
@@ -61,7 +63,7 @@ ROLE_CAPABILITIES: Final[Mapping[Role, frozenset[Capability]]] = MappingProxyTyp
     {
         Role.TECH_ADMIN: _TECH_ADMIN_CAPS,
         Role.BUSINESS_ADMIN: _BUSINESS_ADMIN_CAPS,
-        Role.USER: frozenset({Capability.BUSINESS_ACCESS}),
+        Role.USER: frozenset({Capability.BUSINESS_ACCESS, Capability.PROJECT_CREATE}),
     }
 )
 

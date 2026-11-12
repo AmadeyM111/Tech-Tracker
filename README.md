@@ -195,6 +195,9 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
   первом запуске.
 - `ARGON2_TIME_COST`, `ARGON2_MEMORY_COST_KIB`, `ARGON2_PARALLELISM` - параметры хеширования
   паролей (по умолчанию 3, 131072 КиБ, 2).
+- `CSV_MAX_ROWS` (необязательно, в `.env.example` нет) - предел строк выгрузки «Скачать CSV» на «Сводке»
+  (по умолчанию 10000; больше - отказ `export_too_large` без усечения). Колонка «Ссылка» файла строится
+  из `PUBLIC_BASE_URL`; без него в ней относительный путь `/tasks/<id>`.
 - `SECRET_KEY` в `.env.example` нет и из `.env` в `api` не пробрасывается: ключ создаётся один
   раз и хранится в `/data/secrets/secret_key` (том `appdata`, 32 байта, режим 0600). Если
   `SECRET_KEY` всё же задан в окружении `api` (например, в своём compose-файле), значение короче
@@ -206,6 +209,14 @@ Cookie сессии всегда с флагом `Secure` (в поставляе
 
 Удаления учётных записей в интерфейсе и API нет и не предусмотрено: пользователя можно
 заблокировать (и сбросить пароль, завершить сессии, сменить или снять роль), но не удалить.
+
+### Логин самостоятельно зарегистрировавшегося пользователя
+
+Логин создаёт сервер из фамилии и имени (`surikov.anton`, при совпадении `surikov.anton.2`) и один раз
+показывает его на экране после подтверждения ссылки; в письме логина нет. Если человек его не записал:
+технический администратор открывает «Учётные записи» (колонки «Логин» и «Email»; поиска на экране нет —
+найти строку по адресу можно поиском браузера Ctrl+F; у самостоятельно зарегистрированных пометка
+«самостоятельная регистрация») и сообщает логин; при необходимости выдаёт новый пароль («Сбросить пароль»).
 
 ### Логины и регистр
 
@@ -296,7 +307,7 @@ Compose). Веб-часть (frontend внутри образа `web`) при э
 - **Удаление томов.** `docker compose down -v` удаляет тома, в том числе БД (`pgdata`) и
   `appdata`: том содержит `secret_key`, файл пароля первого администратора
   (`initial-admin-password.txt`) и файл паролей демо-пользователей (`demo-passwords.txt`);
-  вложений пока нет. Используйте `-v` только для тестового проекта (см. ниже).
+  там же лежат вложения задач (R2). Используйте `-v` только для тестового проекта (см. ниже).
 
 ### Регулярное обслуживание
 
@@ -329,6 +340,34 @@ Docker:
   запросами пользователей, пропускаются; повторный запуск ничего не ломает.
 - Фонового планировщика в R1 нет: сервиса compose для обслуживания нет, `api` его сам не
   запускает. Запуск по расписанию остаётся за оператором.
+
+### R2: вложения, копии, напоминания, откат
+
+- **Вложения** (спека 011): файлы к задачам до 10 МБ (nginx пропускает тело до 12 МБ) лежат в
+  `appdata` (каталог вложений с правами 0700). Окончательно удалённые вложения и файлы-сироты
+  убирает ежедневный `gtrack maintenance` (счётчики `attachments_purged`, `files_removed`,
+  `orphan_files_removed`). Корзины задач в R2 нет: файлы задачи остаются, пока цела сама задача.
+  Вложения входят в копию `gtrack backup` (каталог данных без `exports/`) и в `gtrack export`.
+- **Копии и напоминания по расписанию** - systemd-юниты из `deploy/backup/`: `gtrack-backup`
+  (ежедневно 02:30 МСК) и `gtrack-notify-due` (ежедневно 09:00 МСК). Файлы
+  `gtrack-*.service` и `gtrack-*.timer` кладутся в `/etc/systemd/system/` (на NixOS - в
+  `/usr/local/lib/systemd/system/` или в `configuration.nix`), имя контейнера api - в
+  `/etc/gtrack/backup.env` (`GTRACK_API_CONTAINER=<проект>-api-1`), затем
+  `systemctl daemon-reload && systemctl enable --now gtrack-backup.timer gtrack-notify-due.timer`.
+  Подробно, включая cron вместо systemd и восстановление, - `deploy/backup/README.md`.
+- **Откат релиза R2.** Миграции `0011`-`0013` только добавляют таблицы (`backup_run`,
+  `attachment`, `notification`/`comment_mention`), поэтому откат кода без отката схемы возможен:
+  снимите копию (`gtrack backup`), верните предыдущую версию кода и пересоберите стек
+  (`docker compose up -d --build --wait`). Схему откатывайте, только если это нужно (она
+  остаётся совместимой): `docker compose run --rm --no-deps --entrypoint alembic api downgrade 0010`
+  удаляет вложения (строки), уведомления и историю копий; файлы вложений на диске при этом
+  остаются как сироты. Цепочка `0013 -> 0010 -> head` проверена на тестовой БД. Перед откатом
+  схемы обязательно снимите копию.
+- **Восстановление из копии** на чистом стенде - `gtrack restore <файл.tar> --yes`; на
+  работающем стеке - `scripts/restore.sh -p <проект> -b <файл.tar>` (скрипт принимает и файл
+  `gtrack-backup-<UTC>.tar`, и каталог со старой копией `scripts/backup.sh`). Порядок
+  `gtrack restore`: проверка sha256 -> распаковка данных во временный каталог -> `pg_restore`
+  в одной транзакции -> перенос данных; сбой до переноса оставляет БД и каталог данных пустыми.
 
 ## Работа с AI-агентами (MCP)
 
@@ -623,6 +662,9 @@ The session cookie always carries the `Secure` flag (the shipped configuration h
   first start only.
 - `ARGON2_TIME_COST`, `ARGON2_MEMORY_COST_KIB`, `ARGON2_PARALLELISM` - password hashing
   parameters (defaults 3, 131072 KiB, 2).
+- `CSV_MAX_ROWS` (optional, not in `.env.example`) - row limit of the "Скачать CSV" export on the summary
+  screen (default 10000; more means the `export_too_large` refusal, never a truncated file). The "Ссылка"
+  column of the file is built from `PUBLIC_BASE_URL`; without it the column holds the relative path `/tasks/<id>`.
 - `SECRET_KEY` is not in `.env.example` and is not passed from `.env` to `api`: the key is
   created once and stored in `/data/secrets/secret_key` (the `appdata` volume, 32 bytes, mode
   0600). If `SECRET_KEY` is set in the `api` environment anyway (for example in your own compose
@@ -636,6 +678,13 @@ The session cookie always carries the `Secure` flag (the shipped configuration h
 There is no UI and no API endpoint for deleting accounts, and none is planned: a user can be
 blocked (and have the password reset, sessions revoked, role changed or removed) but accounts
 cannot be deleted.
+
+### Login of a self-registered user
+
+The server builds the login from last and first name (`surikov.anton`, on a clash `surikov.anton.2`) and
+shows it once on the screen after the link is confirmed; the email has no login. If the person did not
+write it down: a tech admin opens "Accounts" (columns "Login" and "Email"; the screen has no search, use
+the browser's Ctrl+F on the address) and tells the login; reset the password if needed.
 
 ### Logins and case
 
@@ -733,7 +782,7 @@ before a downgrade.
 - **Removing volumes.** `docker compose down -v` removes the volumes, including the database
   (`pgdata`) and `appdata`: that volume contains `secret_key`, the first administrator password
   file (`initial-admin-password.txt`) and the demo users password file (`demo-passwords.txt`);
-  there are no attachments yet. Use `-v` for the test project only (see below).
+  task attachments (R2) live there as well. Use `-v` for the test project only (see below).
 
 ### Regular maintenance
 
@@ -766,6 +815,36 @@ to Docker:
   requests are skipped, and a repeated run breaks nothing.
 - There is no background scheduler in R1 and no compose service for maintenance; `api` does
   not start it by itself. Scheduled runs are up to the operator.
+
+### R2: attachments, backups, reminders, rollback
+
+- **Attachments** (spec 011): task files up to 10 MB (nginx accepts a body up to 12 MB) live in
+  `appdata` (the attachments directory is mode 0700). Permanently deleted attachments and orphan
+  files are removed by the daily `gtrack maintenance` (counters `attachments_purged`,
+  `files_removed`, `orphan_files_removed`). There is no task trash in R2: a task's files stay as
+  long as the task does. Attachments are part of the `gtrack backup` copy (data directory without
+  `exports/`) and of `gtrack export`.
+- **Scheduled backups and reminders** - systemd units from `deploy/backup/`: `gtrack-backup`
+  (daily 02:30 MSK) and `gtrack-notify-due` (daily 09:00 MSK). Put `gtrack-*.service` and
+  `gtrack-*.timer` into `/etc/systemd/system/` (on NixOS: `/usr/local/lib/systemd/system/` or
+  `configuration.nix`), set the api container name in `/etc/gtrack/backup.env`
+  (`GTRACK_API_CONTAINER=<project>-api-1`), then
+  `systemctl daemon-reload && systemctl enable --now gtrack-backup.timer gtrack-notify-due.timer`.
+  Details, including cron instead of systemd and restore, are in `deploy/backup/README.md`.
+- **Rolling R2 back.** Migrations `0011`-`0013` only add tables (`backup_run`, `attachment`,
+  `notification`/`comment_mention`), so the code can be rolled back without touching the schema:
+  take a copy (`gtrack backup`), restore the previous code version and rebuild the stack
+  (`docker compose up -d --build --wait`). Roll the schema back only if you must (it stays
+  compatible): `docker compose run --rm --no-deps --entrypoint alembic api downgrade 0010` drops
+  attachment rows, notifications and the backup history; attachment files stay on disk as
+  orphans. The chain `0013 -> 0010 -> head` was checked on a test database. Always take a copy
+  before rolling the schema back.
+- **Restore from a copy** on a clean stand - `gtrack restore <file.tar> --yes`; on a running
+  stack - `scripts/restore.sh -p <project> -b <file.tar>` (the script accepts both a
+  `gtrack-backup-<UTC>.tar` file and a directory with an old `scripts/backup.sh` copy). The
+  `gtrack restore` order: check sha256 -> unpack data into a temporary directory -> `pg_restore`
+  in one transaction -> move the data in; a failure before the move leaves the database and the
+  data directory empty.
 
 ## AI agents (MCP)
 

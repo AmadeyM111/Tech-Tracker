@@ -127,6 +127,14 @@ describe("card and tabs (UF-3, NFR-7)", () => {
     expect(second).not.toBe(first);
   });
 
+  it("pr42_foreign_project_error_offers_back_to_list", async () => {
+    f = installFetch(projectRoutes(BUSINESS, { [ONE]: () => err(403, "forbidden") }));
+    renderApp(`/projects/${PID}`);
+    await screen.findByRole("alert");
+    const back = screen.getByRole("link", { name: ru["projects.back_to_list"] });
+    expect(back.getAttribute("href")).toBe("/projects");
+  });
+
   it.each([
     [403, "forbidden"],
     [404, "not_found"],
@@ -291,7 +299,7 @@ const OWN_MEMBERS = [M_OWNER, M_ME, M_PETROV, M_SIDOROV, M_KUZNETSOV, M_BLOCKED_
 const ID_BLOCKED = "99999999-9999-4999-8999-999999999999";
 
 describe("transfer ownership from members (FR-14a, AC-52, AC-72, review T81 p.1)", () => {
-  it("ac17_candidates_are_unblocked_business_admin_members_not_users", async () => {
+  it("ac17_candidates_are_unblocked_business_admin_and_user_members", async () => {
     const { container } = await open(BUSINESS, {}, { members: OWN_MEMBERS });
     await waitFor(() => expect(candidate(container, ID_KUZNETSOV)).toBeTruthy());
     const sec = ownerSection(container)!;
@@ -301,16 +309,16 @@ describe("transfer ownership from members (FR-14a, AC-52, AC-72, review T81 p.1)
     expect(candidate(sec, ID_SIDOROV)).toBeNull(); // без роли
     expect(candidate(sec, ID_BLOCKED)).toBeNull(); // БА, но заблокирован
     expect(candidate(sec, ID_TA_MEMBER)).toBeNull(); // ТА, не заблокирован (FR-11, FR-16)
-    expect(candidate(sec, ID_USER_MEMBER)).toBeNull(); // user, не заблокирован
+    expect(candidate(sec, ID_USER_MEMBER)).toBeTruthy(); // user, не заблокирован (027 FR-7)
     expect(f.count(MEMBERS)).toBeGreaterThanOrEqual(1);
     expect(f.count(USERS)).toBe(0);
   });
 
-  it("ac52_user_role_member_is_not_a_candidate", async () => {
+  it("027_fr7_user_role_member_is_a_candidate", async () => {
     const plainUser = member({ id: ID_PETROV, login: "petrov" }, { role: "user" });
     const { container } = await open(BUSINESS, {}, { members: [M_OWNER, M_KUZNETSOV, plainUser] });
     await waitFor(() => expect(candidate(container, ID_KUZNETSOV)).toBeTruthy());
-    expect(candidate(container, ID_PETROV)).toBeNull();
+    expect(candidate(container, ID_PETROV)).toBeTruthy();
   });
 
   it("ac52_search_filters_candidates_on_client_without_requests", async () => {
@@ -358,6 +366,15 @@ describe("transfer ownership from members (FR-14a, AC-52, AC-72, review T81 p.1)
     const btn = action(candidate(container, ID_KUZNETSOV)!, "transfer-owner");
     btn.focus();
     fireEvent.click(btn);
+    // design review #43: передача владения — с подтверждением
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("kuznetsov");
+    expect(f.count(OWNER)).toBe(0);
+    fireEvent.click(action(dialog, "cancel"));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(f.count(OWNER)).toBe(0);
+    fireEvent.click(btn);
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await waitFor(() => expect(field(container, "project-owner")!.textContent).toBe("kuznetsov"));
     expect(await body(f.last(OWNER))).toEqual({ user_id: ID_KUZNETSOV });
     expect(f.count(OWNER)).toBe(1);
@@ -373,6 +390,7 @@ describe("transfer ownership from members (FR-14a, AC-52, AC-72, review T81 p.1)
     const { container } = await open(BUSINESS, { [OWNER]: () => err(403, "forbidden") }, { members: OWN_MEMBERS });
     await waitFor(() => expect(candidate(container, ID_KUZNETSOV)).toBeTruthy());
     fireEvent.click(action(candidate(container, ID_KUZNETSOV)!, "transfer-owner"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe(errorMessage("forbidden"));
     expect(field(container, "project-owner")!.textContent).toBe("ivanov");
@@ -394,7 +412,7 @@ describe("transfer ownership from members (FR-14a, AC-52, AC-72, review T81 p.1)
 });
 
 describe("members tab (AC-53, AC-73, FR-15, FR-15a)", () => {
-  it("ac73_lists_members_with_role_owner_and_blocked_flags", async () => {
+  it("ac73_lists_members_with_project_role_and_blocked_flag_only_when_present", async () => {
     const { container } = await open();
     await openMembersTab();
     await waitFor(() => expect(memberRow(container, ID_PETROV)).toBeTruthy());
@@ -402,17 +420,22 @@ describe("members tab (AC-53, AC-73, FR-15, FR-15a)", () => {
     expect(rows.length).toBe(4);
     const owner = memberRow(container, ID_IVANOV)!;
     const blocked = memberRow(container, ID_PETROV)!;
-    const norole = memberRow(container, ID_SIDOROV)!;
     expect(field(owner, "login")!.textContent).toBe("ivanov");
-    for (const r of [owner, blocked, norole]) expect(DICT).toContain(field(r, "role")!.textContent);
-    expect(field(owner, "role")!.textContent).not.toBe(field(blocked, "role")!.textContent);
-    expect(field(blocked, "role")!.textContent).not.toBe(field(norole, "role")!.textContent);
-    expect(DICT).toContain(field(owner, "owner")!.textContent);
-    expect(field(blocked, "owner")!.textContent).toBe("");
+    // колонка «Роль» — роль в проекте (дизайн-проверка #43), не системная
+    expect(field(owner, "role")!.textContent).toBe(ru["projects.member_role_owner"]);
+    expect(field(blocked, "role")!.textContent).toBe(ru["projects.member_role_member"]);
     expect(DICT).toContain(field(blocked, "blocked")!.textContent);
     expect(field(owner, "blocked")!.textContent).toBe("");
     const h2 = within(screen.getByRole("tabpanel")).getByRole("heading", { level: 2 });
     expect(DICT).toContain(h2.textContent);
+  });
+
+  it("p3_blocked_column_is_hidden_when_nobody_is_blocked", async () => {
+    const { container } = await open(BUSINESS, {}, { members: [M_OWNER, M_ME, M_KUZNETSOV] });
+    await openMembersTab();
+    await waitFor(() => expect(memberRow(container, ID_KUZNETSOV)).toBeTruthy());
+    expect(q(container, '[data-field="blocked"]')).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: ru["projects.col_blocked"] })).toBeNull();
   });
 
   it("ac73_add_via_directory_picker_posts_user_id_and_reloads_members", async () => {
@@ -482,20 +505,20 @@ describe("members tab (AC-53, AC-73, FR-15, FR-15a)", () => {
     await waitFor(() => expect(memberRow(container, ID_PETROV)).toBeTruthy());
     const before = f.count(MEMBERS);
     fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    // 027 Q-10: удаление участника — с подтверждением в диалоге
+    expect(f.count(REMOVE(ID_PETROV))).toBe(0);
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await waitFor(() => expect(f.count(REMOVE(ID_PETROV))).toBe(1));
     await waitFor(() => expect(f.count(MEMBERS)).toBeGreaterThan(before));
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("ac53_owner_cannot_be_removed_code_is_shown", async () => {
-    const { container } = await open(BUSINESS, {
-      [REMOVE(ID_IVANOV)]: () => err(422, "owner_cannot_be_removed"),
-    });
+  it("ac53_owner_row_has_no_remove_button", async () => {
+    const { container } = await open(BUSINESS, {});
     await openMembersTab();
     await waitFor(() => expect(memberRow(container, ID_IVANOV)).toBeTruthy());
-    fireEvent.click(action(memberRow(container, ID_IVANOV)!, "remove-member"));
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe(errorMessage("owner_cannot_be_removed"));
+    // 027 макет: владельца удалить нельзя (сервер всё равно отвечает owner_cannot_be_removed)
+    expect(q(memberRow(container, ID_IVANOV)!, 'button[data-action="remove-member"]')).toBeNull();
   });
 
   it("fr15a_leave_project_requires_confirmation_then_deletes_self", async () => {
@@ -541,8 +564,10 @@ describe("members tab (AC-53, AC-73, FR-15, FR-15a)", () => {
       expect((b.textContent ?? "").trim() !== "" || b.hasAttribute("aria-label"), b.outerHTML).toBe(true);
     }
     fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await screen.findByRole("alert");
     fireEvent.click(action(memberRow(container, ID_SIDOROV)!, "remove-member"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await waitFor(() => expect(f.count(REMOVE(ID_SIDOROV))).toBe(1));
     await new Promise((r) => setTimeout(r, 30));
     expect(screen.getAllByRole("alert").length).toBe(1);
@@ -570,15 +595,21 @@ describe("review T82 attempt 2", () => {
     expect(document.activeElement).not.toBe(document.body);
   });
 
-  it("fr15a_remove_button_in_foreign_row_has_no_dialog", async () => {
+  it("027_q10_remove_button_in_foreign_row_asks_for_confirmation", async () => {
     const { container } = await open(BUSINESS, { [REMOVE(ID_PETROV)]: NO_CONTENT }, {
       detail: { permissions: PERM_BA_MEMBER },
     });
     await openMembersTab();
     await waitFor(() => expect(memberRow(container, ID_PETROV)).toBeTruthy());
     fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(f.count(REMOVE(ID_PETROV))).toBe(0);
+    fireEvent.click(action(dialog, "cancel"));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(f.count(REMOVE(ID_PETROV))).toBe(0);
+    fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await waitFor(() => expect(f.count(REMOVE(ID_PETROV))).toBe(1));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
   it("fr15a_adding_self_shows_leave_button_without_reload_and_removal_refreshes_card", async () => {
@@ -606,6 +637,7 @@ describe("review T82 attempt 2", () => {
     const before = f.count(ONE);
     await waitFor(() => expect(memberRow(container, ID_PETROV)).toBeTruthy());
     fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await waitFor(() => expect(f.count(ONE)).toBeGreaterThan(before));
   });
 
@@ -650,6 +682,7 @@ describe("review T82 attempt 2", () => {
     await openMembersTab();
     await waitFor(() => expect(memberRow(container, ID_PETROV)).toBeTruthy());
     fireEvent.click(action(memberRow(container, ID_PETROV)!, "remove-member"));
+    fireEvent.click(action(await screen.findByRole("alertdialog"), "confirm"));
     await screen.findByRole("alert");
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "pet" } });
     await waitFor(() => expect(container.textContent).toContain(errorMessage("internal_error")));

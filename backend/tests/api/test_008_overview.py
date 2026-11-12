@@ -26,6 +26,7 @@ from tests.factories import (
 TODAY = date(2026, 10, 13)  # FIXED_NOW = 2026-10-13T09:00Z, вторник
 OVERVIEW = "/api/v1/me/overview"
 TASKS = "/api/v1/me/overview/tasks"
+PROJECTS = "/api/v1/me/overview/projects"
 
 
 @dataclass
@@ -202,7 +203,7 @@ async def test_008_project_filter(api_env: ApiEnv) -> None:
 async def test_008_ac10_tech_admin_gets_403(api_env: ApiEnv) -> None:
     user = await api_env.new_user(role="tech_admin")
     token = await api_env.login_ok(user)
-    for url in (OVERVIEW, TASKS):
+    for url in (OVERVIEW, TASKS, PROJECTS):
         response = await api_env.client.get(url, headers=api_env.auth(token))
         assert response.status_code == 403, url
 
@@ -241,3 +242,26 @@ async def test_008_ac15_tiles_ignore_list_filters(api_env: ApiEnv) -> None:
     plain = (await _get(w, OVERVIEW)).json()
     filtered = (await _get(w, OVERVIEW, project_id=str(w.mine.id), priority="high")).json()
     assert plain == filtered and plain["total"] == 2
+
+
+async def test_008_review_project_filter_lists_only_my_projects_by_name(api_env: ApiEnv) -> None:
+    """Ревью 008: фильтр по проекту — проекты по членству (владелец/участник), без лимита 100."""
+    w = await _world(api_env)
+    async with w.env.sessionmaker() as s:
+        for i in range(105):  # больше прежнего фиксированного page_size=100
+            await make_project(
+                s, workspace_id=w.me.workspace_id, owner_id=w.me.id, name=f"Проект {i:03d}"
+            )
+        gone = await make_project(
+            s, workspace_id=w.me.workspace_id, owner_id=w.me.id, name="Удалённый"
+        )
+        await s.commit()
+    await api_env.execute(
+        update(Project).where(Project.id == gone.id).values(deleted_at=api_env.clock.now())
+    )
+    body = (await _get(w, PROJECTS)).json()
+    names = [p["name"] for p in body["items"]]
+    assert len(names) == 107  # 105 + «Мой» + «Общий»; без «Чужой» и удалённого
+    assert "Чужой" not in names and "Удалённый" not in names
+    assert names == sorted(names, key=str.lower)
+    assert (await api_env.client.get(PROJECTS)).status_code == 401

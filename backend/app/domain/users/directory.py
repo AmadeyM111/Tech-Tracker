@@ -10,11 +10,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import BigInteger, literal, select
+from sqlalchemy import BigInteger, ColumnElement, exists, literal, or_, select
 
 from app.core.pagination import PageParams
 from app.domain.access.recipients import RecipientFacts
 from app.domain.access.roles import ROLE_CAPABILITIES, Actor, Capability, Role
+from app.domain.projects.models import Project, ProjectMember
+from app.domain.users.email import normalize_email
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import WorkspaceMember
 
@@ -42,16 +44,44 @@ class UserRef:
     login: str
 
 
-def _like_pattern(q: str) -> str:
+def like_contains_pattern(q: str) -> str:
     """Подстрока для ``ILIKE ... ESCAPE '\\'``: ``\\``, ``%`` и ``_`` — литералы (D-24)."""
     escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
+
+
+def _in_project(project_id_col: object, user_id_col: object) -> ColumnElement[bool]:
+    """Пользователь — владелец или участник проекта (владелец — всегда участник)."""
+    return or_(
+        Project.owner_id == user_id_col,
+        exists()
+        .where(ProjectMember.project_id == project_id_col, ProjectMember.user_id == user_id_col)
+        .correlate(Project, AppUser),
+    )
+
+
+def _shares_project_with(actor: Actor) -> ColumnElement[bool]:
+    """У актора и строки ``AppUser`` есть общий неудалённый проект пространства (spec 027 FR-5)."""
+    # correlate явно: вложенные подзапросы не коррелируются с ``AppUser`` внешнего запроса сами
+    return (
+        exists()
+        .where(
+            Project.workspace_id == actor.workspace_id,
+            Project.deleted_at.is_(None),
+            _in_project(Project.id, actor.user_id),
+            _in_project(Project.id, AppUser.id),
+        )
+        .correlate(AppUser)
+    )
 
 
 async def list_directory(
     db: AsyncSession, actor: Actor, params: PageParams, *, q: str | None
 ) -> tuple[list[DirectoryUser], bool]:
     """Страница незаблокированных пользователей пространства с ролью БА/П (``login, id``).
+
+    Роль «Пользователь» видит только тех, с кем у неё есть общий проект, и себя (spec 027 FR-5,
+    Q-8); БА — всех, как раньше.
 
     Список и роль читаются одним SELECT (JOIN ``workspace_member``): нет гонки между ними.
     ``paginate`` работает с одной сущностью, поэтому ``LIMIT page_size + 1`` применён здесь.
@@ -67,13 +97,47 @@ async def list_directory(
         )
         .order_by(AppUser.login, AppUser.id)
     )
+    if actor.role is Role.USER:
+        stmt = stmt.where(or_(AppUser.id == actor.user_id, _shares_project_with(actor)))
     if q:
-        stmt = stmt.where(AppUser.login.ilike(_like_pattern(q), escape="\\"))
+        stmt = stmt.where(AppUser.login.ilike(like_contains_pattern(q), escape="\\"))
     offset = (params.page - 1) * params.page_size
     stmt = stmt.limit(params.page_size + 1).offset(literal(offset, BigInteger()))
     rows = (await db.execute(stmt)).all()
     items = [DirectoryUser(id=r.id, login=r.login_display, role=Role(r.role)) for r in rows]
     return items[: params.page_size], len(items) > params.page_size
+
+
+async def find_member_candidate(
+    db: AsyncSession, workspace_id: UUID, *, login: str | None, email: str | None
+) -> UUID | None:
+    """Точный поиск добавляемого участника по логину или email (spec 027 FR-4).
+
+    Логин сравнивается по ключу (нижний регистр, 001/FR-73a), email — в нижнем регистре.
+    Подходит только зарегистрированный незаблокированный пользователь пространства с ролью
+    БА или «Пользователь»: во всех остальных случаях (нет, ТА, без роли, заблокирован) ответ
+    один — ``None``, чтобы перебор не различал причины.
+    """
+    if (login is None) == (email is None):
+        raise ValueError("нужен ровно один из login и email")
+    if login is not None:
+        key = AppUser.login == login.strip().lower()
+    else:
+        normalized = normalize_email(email or "")
+        if normalized is None:
+            return None
+        key = AppUser.email == normalized
+    stmt = (
+        select(AppUser.id)
+        .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
+        .where(
+            key,
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.role.in_(_DIRECTORY_ROLES),
+            AppUser.is_blocked.is_(False),
+        )
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
 
 
 async def load_recipient(

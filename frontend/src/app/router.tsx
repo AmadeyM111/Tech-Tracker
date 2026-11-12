@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 
 import { AgentAccessPage } from "../features/tokens/AgentAccessPage";
 import { AuditPage } from "../features/admin/AuditPage";
@@ -275,6 +275,27 @@ function showsBackupBanner(profile: MeResponse): boolean {
 }
 
 /**
+ * Refusal by a direct link to a screen without the capability (аудит #10). «Назад» leads to the start screen
+ * of the role; it is not shown when that start screen is the current path (it would be the same refusal).
+ */
+function Forbidden({ profile }: { profile: MeResponse }) {
+  const { pathname } = useLocation();
+  const start = startPath(profile);
+  return (
+    <>
+      <ErrorAlert message={errorMessage("forbidden")} />
+      {start === pathname ? null : (
+        <p>
+          <Link to={start} className="ui-btn-secondary">
+            {t("admin.prev_page")}
+          </Link>
+        </p>
+      )}
+    </>
+  );
+}
+
+/**
  * Screen with a role (003/FR-10, FR-11, FR-14): the session guard, the shell with the Sidebar,
  * then the content or a refusal. Without the capability no section data is requested.
  * No `capability`: any signed-in user with a role may open the screen (e.g. the agent access section).
@@ -299,7 +320,7 @@ function RoleScreen({
               {children(profile)}
             </>
           ) : (
-            <ErrorAlert message={errorMessage("forbidden")} />
+            <Forbidden profile={profile} />
           )}
         </Landmark>
       )}
@@ -503,7 +524,9 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/summary"
         element={
           <RoleScreen insideMain={insideMain} capability="business_access">
-            {() => <SummaryPage />}
+            {(profile) => (
+              <SummaryPage userId={profile.id} canExport={profile.capabilities.includes("export_overview")} />
+            )}
           </RoleScreen>
         }
       />
