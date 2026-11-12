@@ -1,6 +1,6 @@
 # Tasks: OAuth 2.1 на /mcp (028)
 
-Статусы: TODO | IN_PROGRESS | DONE | BLOCKED. Статусы ведёт оркестратор. Spec DRAFT: задачи не берутся до APPROVED; миграцию `0014` согласует оркестратор.
+Статусы: TODO | IN_PROGRESS | DONE | BLOCKED. Статусы ведёт оркестратор. Spec APPROVED 2026-11-12; миграция `0014` разрешена, выкатка — оркестратор.
 
 ## Общие условия
 - ID — `M28-Tnn`; рамки: `python scripts/task_scope.py M28-Tnn`. Не трогать `CLAUDE.md`, `AGENTS.md`, `docs/adr/**`, `spec.md`, применённые миграции, общий `ui.css`.

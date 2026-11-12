@@ -36,7 +36,7 @@
 | 024 | «Сводка»: диапазон дат срока «с / по» (R3) | `specs/` (R3), APPROVED 2026-11-10 |
 | 025 | «Сводка»: выгрузка CSV для БА (R3) | `specs/` (R3), APPROVED 2026-11-10 |
 | 026 | Карточка «Подключить ИИ-агента» на «Сводке» (R3, T-13) | `specs/` (R3), APPROVED 2026-11-10 |
-| 028 | OAuth 2.1 на /mcp для облачных клиентов (ChatGPT, Claude.ai), T-14 — DRAFT 2026-11-12 | `specs/028-mcp-oauth/` (ветка `docs/mcp-oauth-spec-028`) |
+| 028 | OAuth 2.1 на /mcp для облачных клиентов (ChatGPT, Claude.ai), T-14 — APPROVED 2026-11-12 | `specs/028-mcp-oauth/` (ветка `docs/mcp-oauth-spec-028`) |
 | 027 | Личные проекты «Пользователя» (APPROVED 2026-11-11, ветка `docs/personal-projects-spec`) | `specs/027-personal-projects/` |
 | 020 | MCP AI Native | main |
 | 021–023 | заняты (023 — удаление пользователей, черновик) | — |
@@ -48,4 +48,4 @@
 | 0008 | `0008_agent_api_keys` — конфликт с main | `feat/r1.0-foundation` |
 | 0010 | `0010_self_registration` | `feat/self-registration` |
 | 0011–0013 | R2: `backup_run`, `attachment`, `notification` | main (на проде, 2026-11-10) |
-| 0014 | `0014_mcp_oauth` (спека 028, DRAFT): клиенты, гранты, коды, токены, лимиты OAuth | резерв, не создан; согласует оркестратор |
+| 0014 | `0014_mcp_oauth` (спека 028, DRAFT): клиенты, гранты, коды, токены, лимиты OAuth | разрешена владельцем 2026-11-12; реализация — `feat/mcp-oauth` |
