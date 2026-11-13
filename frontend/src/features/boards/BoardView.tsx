@@ -32,6 +32,7 @@ import { Link } from "react-router-dom";
 import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
+import { HotMark } from "../../shared/ui/HotMark";
 import type { TaskStatus } from "../tasks/api";
 import { getBoard, moveTask, type Board, type BoardCard, type BoardColumn } from "./api";
 import { dropIndexInColumn, insertIndexFor, nearestCardIndex, neighborsInFullOrder, pickDropColumn } from "./dnd";
@@ -149,6 +150,7 @@ function Card({ card }: { card: BoardCard }) {
         <Link to={`/tasks/${card.id}`} style={isDragging ? { pointerEvents: "none" } : undefined}>
           {card.title}
         </Link>
+        <HotMark hot={card.hot} />
       </div>
       <div data-field="priority">{t(`tasks.priority.${card.priority}`)}</div>
       <div data-field="due_date">

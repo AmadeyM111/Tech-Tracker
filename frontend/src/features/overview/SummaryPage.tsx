@@ -6,6 +6,7 @@ import { useId, useRef, useState } from "react";
 import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, FieldError } from "../../shared/ui/ErrorAlert";
+import { HotMark } from "../../shared/ui/HotMark";
 import { Pagination } from "../../shared/ui/Pagination";
 import { AiAgentHint } from "./AiAgentHint";
 import { downloadOverviewCsv, getOverview, listOverviewProjects, listOverviewTasks, type OverviewCounts, type OverviewTaskItem } from "./api";
@@ -212,7 +213,7 @@ function Due({ task, today }: { task: OverviewTaskItem; today: string }) {
 }
 
 function Hot({ task }: { task: OverviewTaskItem }) {
-  return task.hot ? <span className="sum-burn-tag">{t("summary.hot")}</span> : null;
+  return <HotMark hot={task.hot} />;
 }
 
 function TaskRows({ items, today }: { items: OverviewTaskItem[]; today: string }) {

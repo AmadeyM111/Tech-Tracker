@@ -602,6 +602,10 @@
             ],
             "title": "Due Date"
           },
+          "hot": {
+            "title": "Hot",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -646,7 +650,8 @@
           "assignee",
           "position",
           "subtask_count",
-          "progress"
+          "progress",
+          "hot"
         ],
         "title": "BoardCard",
         "type": "object"
