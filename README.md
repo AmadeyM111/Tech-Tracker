@@ -392,6 +392,11 @@ ChatGPT) в R1 не поддерживаются, см. ADR-0018.
   с `issuer`, а не HTML; `curl -si -X POST https://<адрес>/mcp` отвечает 401 с `WWW-Authenticate: Bearer resource_metadata=...`.
 - Миграция `0014` (пять таблиц `oauth_*`) применяется при обычном обновлении; `gtrack maintenance` очищает неиспользуемых клиентов и просроченные токены (строка `oauth_purged`).
 
+### Метрики пилота
+
+`docker exec <проект>-api-1 gtrack pilot-report --from 2026-11-09 --to 2026-11-23` печатает метрики пилота в Markdown (пользователи, задачи, время до первой реакции,
+MCP и токены, вложения, упоминания). Только чтение: транзакция `READ ONLY`, персональных данных нет. Определения и шаблон отчёта - `docs/pilot/` (спека 031).
+
 ## Разработка
 
 Dev-конфигурация `deploy/compose.dev.yml` подключается только явно и публикует порт БД
@@ -881,6 +886,11 @@ Access tokens live 1 hour, refresh tokens 90 days with rotation. See `specs/028-
   `/.well-known/openid-configuration` (see `deploy/web/default.conf.template`; the operator adds them to the server nginx). `/oauth/authorize` is an SPA
   page, `/api/v1/oauth/*` already goes to the api. Check: `curl -s https://<url>/.well-known/oauth-authorization-server` returns JSON, not HTML.
 - Migration `0014` (five `oauth_*` tables) is applied by a normal upgrade; `gtrack maintenance` removes unused clients and expired tokens (`oauth_purged`).
+
+### Pilot metrics
+
+`docker exec <project>-api-1 gtrack pilot-report --from 2026-11-09 --to 2026-11-23` prints the pilot metrics as Markdown (users, tasks, time to first reaction, MCP and tokens,
+attachments, mentions). Read only: a `READ ONLY` transaction, no personal data. Definitions and the report template are in `docs/pilot/` (spec 031).
 
 ## Development
 
