@@ -36,6 +36,7 @@
 | 024 | «Сводка»: диапазон дат срока «с / по» (R3) | `specs/` (R3), APPROVED 2026-11-10 |
 | 025 | «Сводка»: выгрузка CSV для БА (R3) | `specs/` (R3), APPROVED 2026-11-10 |
 | 026 | Карточка «Подключить ИИ-агента» на «Сводке» (R3, T-13) | `specs/` (R3), APPROVED 2026-11-10 |
+| 030 | Усиление OAuth: allowlist redirect URI и потолок refresh (APPROVED 2026-11-13) | `specs/030-oauth-hardening/` (ветка `feat/oauth-hardening`) |
 | 028 | OAuth 2.1 на /mcp для облачных клиентов (ChatGPT, Claude.ai), T-14 — APPROVED 2026-11-12 | `specs/028-mcp-oauth/` (ветка `docs/mcp-oauth-spec-028`) |
 | 027 | Личные проекты «Пользователя» (APPROVED 2026-11-11, ветка `docs/personal-projects-spec`) | `specs/027-personal-projects/` |
 | 020 | MCP AI Native | main |

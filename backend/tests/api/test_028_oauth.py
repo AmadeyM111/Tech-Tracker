@@ -420,42 +420,118 @@ async def test_028_ac7_refresh_rotates_and_reuse_revokes_the_grant(api_env: ApiE
     assert r.status_code == 401
 
 
-async def test_028_ac7_refresh_lives_90_days_and_each_use_prolongs(api_env: ApiEnv) -> None:
+def _refresh(env: ApiEnv, cid: str, token: str) -> Any:
+    return env.client.post(
+        TOKEN, data={"grant_type": "refresh_token", "refresh_token": token, "client_id": cid}
+    )
+
+
+async def test_030_refresh_use_prolongs_within_the_absolute_ceiling(api_env: ApiEnv) -> None:
     env = api_env
     _setup(env)
+    env.app.state.settings.oauth_refresh_max_days = 120
+    w = await make_api_world(env)
+    tokens = await _connect(env, w)
+    cid = tokens["client"]["client_id"]
+    env.clock.advance(timedelta(days=89))  # refresh живёт 90 суток; использование продлевает
+    r = await _refresh(env, cid, tokens["refresh_token"])
+    assert r.status_code == 200, r.text
+    env.clock.advance(timedelta(days=29))  # день 118 из 120: ещё можно
+    r2 = await _refresh(env, cid, r.json()["refresh_token"])
+    assert r2.status_code == 200, r2.text
+    env.clock.advance(timedelta(days=3))  # день 121: потолок гранта прошёл
+    dead = await _refresh(env, cid, r2.json()["refresh_token"])
+    assert dead.status_code == 400 and dead.json()["error"] == "invalid_grant"
+
+
+async def test_030_new_refresh_never_outlives_the_ceiling(api_env: ApiEnv) -> None:
+    env = api_env
+    _setup(env)
+    env.app.state.settings.oauth_refresh_max_days = 100
+    w = await make_api_world(env)
+    tokens = await _connect(env, w)
+    env.clock.advance(timedelta(days=80))
+    r = await _refresh(env, tokens["client"]["client_id"], tokens["refresh_token"])
+    assert r.status_code == 200
+    rows = await env.execute(
+        text(
+            "SELECT t.expires_at - g.created_at AS age FROM oauth_token t "
+            "JOIN oauth_grant g ON g.id = t.grant_id WHERE t.kind = 'refresh' ORDER BY t.created_at"
+        )
+    )
+    assert rows is not None
+    assert [r_.age for r_ in rows] == [
+        timedelta(days=90),
+        timedelta(days=100),
+    ]  # второй обрезан потолком
+
+
+async def test_030_ceiling_revokes_the_grant_and_default_is_90_days(api_env: ApiEnv) -> None:
+    env = api_env
+    _setup(env)
+    assert env.app.state.settings.oauth_refresh_max_days == 90
     w = await make_api_world(env)
     tokens = await _connect(env, w)
     cid = tokens["client"]["client_id"]
     env.clock.advance(timedelta(days=89))
-    r = await env.client.post(
-        TOKEN,
-        data={
-            "grant_type": "refresh_token",
-            "refresh_token": tokens["refresh_token"],
-            "client_id": cid,
-        },
-    )
-    assert r.status_code == 200, r.text
-    env.clock.advance(timedelta(days=89))  # новый refresh снова на 90 суток от выдачи
-    r2 = await env.client.post(
-        TOKEN,
-        data={
-            "grant_type": "refresh_token",
-            "refresh_token": r.json()["refresh_token"],
-            "client_id": cid,
-        },
-    )
-    assert r2.status_code == 200, r2.text
-    env.clock.advance(timedelta(days=91))
-    dead = await env.client.post(
-        TOKEN,
-        data={
-            "grant_type": "refresh_token",
-            "refresh_token": r2.json()["refresh_token"],
-            "client_id": cid,
-        },
-    )
+    ok = await _refresh(env, cid, tokens["refresh_token"])
+    assert ok.status_code == 200
+    env.clock.advance(timedelta(days=2))  # день 91 > потолок 90: даже свежий refresh не работает
+    dead = await _refresh(env, cid, ok.json()["refresh_token"])
     assert dead.status_code == 400 and dead.json()["error"] == "invalid_grant"
+    rows = await env.execute(
+        text("SELECT revoked_at FROM oauth_grant")
+    )  # сессия за 91 день истекла
+    assert rows is not None and rows[0].revoked_at is not None
+
+
+async def test_030_redirect_allowlist_default_accepts_chatgpt_and_claude_only(
+    api_env: ApiEnv,
+) -> None:
+    env = api_env
+    _setup(env)
+    good = (
+        "https://chatgpt.com/connector_platform_oauth_redirect",
+        "https://chatgpt.com/connector/oauth/abc123",
+        "https://claude.ai/api/mcp/auth_callback",
+        "https://claude.com/api/mcp/auth_callback",
+        "https://CHATGPT.com/connector/oauth/x",  # хост без учёта регистра
+    )
+    for uri in good:
+        r = await env.client.post(REG, json={"redirect_uris": [uri]})
+        assert r.status_code == 201, (uri, r.text)
+    for uri in (
+        "https://example.com/cb",
+        "https://evil.chatgpt.com.attacker.example/cb",
+        "https://sub.chatgpt.com/cb",  # субдомены не разрешены
+        "https://chatgpt.com.evil.example/cb",
+        "https://notclaude.ai/cb",
+    ):
+        r = await env.client.post(REG, json={"redirect_uris": [uri]})
+        assert r.status_code == 400 and r.json()["error"] == "invalid_redirect_uri", uri
+    # хотя бы один чужой адрес в списке отклоняет всю регистрацию
+    mixed = await env.client.post(REG, json={"redirect_uris": [REDIRECT, "https://example.com/cb"]})
+    assert mixed.status_code == 400
+
+
+async def test_030_allowlist_is_configurable_and_star_opens_any_https_host(api_env: ApiEnv) -> None:
+    env = api_env
+    _setup(env)
+    settings = env.app.state.settings
+    settings.oauth_redirect_hosts = "example.com, Claude.AI"
+    assert (
+        await env.client.post(REG, json={"redirect_uris": ["https://example.com/cb"]})
+    ).status_code == 201
+    assert (
+        await env.client.post(REG, json={"redirect_uris": ["https://chatgpt.com/cb"]})
+    ).status_code == 400
+    settings.oauth_redirect_hosts = "*"
+    assert (
+        await env.client.post(REG, json={"redirect_uris": ["https://any.example/cb"]})
+    ).status_code == 201
+    # даже со звёздочкой http, localhost и IP остаются запрещены
+    for bad in ("http://any.example/cb", "https://localhost/cb", "https://10.0.0.1/cb"):
+        assert (await env.client.post(REG, json={"redirect_uris": [bad]})).status_code == 400, bad
 
 
 async def test_028_token_endpoint_rejects_unknown_grant_types_and_is_rate_limited(
