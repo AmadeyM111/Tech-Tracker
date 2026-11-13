@@ -38,6 +38,7 @@
 | 026 | Карточка «Подключить ИИ-агента» на «Сводке» (R3, T-13) | `specs/` (R3), APPROVED 2026-11-10 |
 | 028 | OAuth 2.1 на /mcp для облачных клиентов (ChatGPT, Claude.ai), T-14 — APPROVED 2026-11-12 | `specs/028-mcp-oauth/` (ветка `docs/mcp-oauth-spec-028`) |
 | 027 | Личные проекты «Пользователя» (APPROVED 2026-11-11, ветка `docs/personal-projects-spec`) | `specs/027-personal-projects/` |
+| 031 | Метрики пилота к контрольной точке 2026-11-23 (read-only, `docs/pilot/`) | `specs/031-pilot-metrics/` (ветка `feat/pilot-metrics`) |
 | 020 | MCP AI Native | main |
 | 021–023 | заняты (023 — удаление пользователей, черновик) | — |
 
