@@ -125,3 +125,15 @@
     display: none;
   }
 }
+
+.cloud-clients {
+  margin: 16px 0 24px;
+  max-width: 50rem;
+}
+.cloud-host {
+  color: var(--text-muted);
+}
+.agent-counter {
+  color: var(--accent);
+  margin: 0 0 8px;
+}

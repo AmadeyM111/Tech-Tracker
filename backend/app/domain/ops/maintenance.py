@@ -11,8 +11,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from app.core.db import transaction
 from app.domain.attachments.purge import purge_attachments
 from app.domain.notifications.due import purge_notifications
+from app.domain.oauth.service import purge as purge_oauth
 from app.domain.system.maintenance import (
     purge_expired_registration_requests,
     purge_expired_sessions,
@@ -39,6 +41,7 @@ class MaintenanceReport:
     orphan_files_removed: int = 0
     registration_requests_expired: int = 0
     notifications_purged: int = 0  # spec 012 FR-9: старше 90 дней
+    oauth_purged: int = 0  # spec 028 FR-13: неиспользуемые клиенты, просроченные коды и токены
 
 
 async def run_maintenance(
@@ -63,6 +66,8 @@ async def run_maintenance(
     )
     files = await purge_attachments(sessionmaker, settings, now=clock.now(), dry_run=dry_run)
     notes = await purge_notifications(sessionmaker, now=clock.now(), dry_run=dry_run)
+    async with transaction(sessionmaker) as db:
+        oauth = await purge_oauth(db, clock.now(), dry_run=dry_run)
     return MaintenanceReport(
         dry_run=dry_run,
         sessions_expired=sessions_expired,
@@ -71,4 +76,5 @@ async def run_maintenance(
         files_removed=files.files_removed,
         orphan_files_removed=files.orphan_files_removed,
         notifications_purged=notes,
+        oauth_purged=sum(oauth.values()),
     )

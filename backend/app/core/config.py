@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     smtp_starttls: bool = True
     public_base_url: str | None = None
+    # [028] хосты redirect_uri OAuth-клиентов через запятую (пусто — любой https-хост)
+    oauth_redirect_hosts: str = ""
     # [010] рабочая роль БД процесса API; пусто — API под DATABASE_URL (только не production)
     db_app_role: str | None = None
     # [009] резервные копии: каталог (том /backups), сколько хранить, порог «устарела», ч

@@ -124,7 +124,7 @@ def test_007_migration_0008_file_chain_and_no_app_imports() -> None:
             assert all(not a.name.startswith("app") for a in node.names)
     assert "007" in (ast.get_docstring(tree) or ""), "docstring без ссылки на spec 007"
     script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
-    assert script.get_heads() == ["0013"]  # 012: голова 0013
+    assert script.get_heads() == ["0014"]  # 012: голова 0014
 
 
 # --- схема на head ------------------------------------------------------------------------
@@ -374,7 +374,7 @@ async def test_007_upgrade_downgrade_upgrade_cycle_and_alembic_check(
 ) -> None:
     """NFR-4: head(0008) -> downgrade 0007 (email и таблицы исчезли, пользователь цел) ->
     upgrade head (всё вернулось, email NULL) -> ``alembic check`` чист."""
-    assert await _version(committed) == ["0013"]
+    assert await _version(committed) == ["0014"]
     async with committed() as s, s.begin():
         user = await make_user(s, role="tech_admin", email="keep@example.test")
 
@@ -391,7 +391,7 @@ async def test_007_upgrade_downgrade_upgrade_cycle_and_alembic_check(
 
     await _alembic_ok(test_database_url, "upgrade", "head")
     await db_engine.dispose()
-    assert await _version(committed) == ["0013"]
+    assert await _version(committed) == ["0014"]
     assert (await _columns(committed, "app_user")).get("email") == (
         "character varying",
         "YES",

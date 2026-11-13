@@ -15,6 +15,7 @@ from app.api.mcp.endpoint import McpEndpoint
 from app.api.mcp.server import McpRuntime, build_session_manager
 from app.api.mcp.tools import default_registry
 from app.api.v1 import router as api_v1_router
+from app.api.wellknown import router as wellknown_router
 from app.core.clock import Clock, SystemClock, use_clock
 from app.core.config import Settings, get_settings
 from app.core.db import create_engine
@@ -122,6 +123,7 @@ def create_app(settings: Settings | None = None, *, clock: Clock | None = None) 
     application.add_middleware(AccessLogMiddleware)
     install_error_handlers(application)
     application.include_router(api_v1_router)
+    application.include_router(wellknown_router)  # /.well-known/* (OAuth, спека 028)
     # MCP для AI-агентов (ADR-0018): реестр инструментов и протокольный слой на /mcp
     application.state.mcp_registry = default_registry()
     session_manager = build_session_manager()

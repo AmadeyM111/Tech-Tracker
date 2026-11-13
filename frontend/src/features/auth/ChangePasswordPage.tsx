@@ -1,16 +1,20 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { ApiError } from "../../shared/api/client";
 import { PASSWORD_MIN_LENGTH, errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { TextField } from "../../shared/ui/TextField";
+import { safeConsentNext } from "../oauth/next";
 import { changePassword } from "./api";
 import { useLogout } from "./useLogout";
 
 export function ChangePasswordPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Back to the OAuth consent request the user came from (spec 028 FR-6); only a consent path.
+  const consentNext = safeConsentNext(searchParams.get("next"));
   const queryClient = useQueryClient();
   const id = useId();
   const alert = useAlertState();
@@ -54,7 +58,8 @@ export function ChangePasswordPage() {
       await changePassword({ current_password: current, new_password: next });
       // The profile changed (flag, maybe role): "/" re-checks it through /me.
       queryClient.clear();
-      navigate("/", { replace: true, state: { focusHeading: true } });
+      if (consentNext !== null) navigate(consentNext, { replace: true });
+      else navigate("/", { replace: true, state: { focusHeading: true } });
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         queryClient.clear();
