@@ -144,8 +144,18 @@ async def hit_limit(
 # --- регистрация клиентов (RFC 7591) -------------------------------------------------------
 
 
+def parse_redirect_hosts(raw: str) -> frozenset[str]:
+    """Хосты из ``OAUTH_REDIRECT_HOSTS``; пустой набор — «любой https-хост» (``*``)."""
+    hosts = {h.strip().lower() for h in raw.split(",") if h.strip()}
+    return frozenset() if "*" in hosts else frozenset(hosts)
+
+
 def validate_redirect_uri(uri: str, allowed_hosts: frozenset[str] = frozenset()) -> str:
-    """Только ``https``, без userinfo и фрагмента, не IP и не ``localhost`` (решение владельца)."""
+    """Только ``https``, без userinfo и фрагмента, не IP и не ``localhost``; хост — из allowlist.
+
+    ``allowed_hosts`` пуст — любой https-хост (настройка ``*``). Неизвестный хост — отказ
+    ``invalid_redirect_uri`` (спека 030).
+    """
     if not isinstance(uri, str) or len(uri) > 512 or _CONTROL.search(uri):
         raise OauthError("invalid_redirect_uri", "Недопустимый redirect_uri")
     parts = urlsplit(uri)
@@ -384,7 +394,14 @@ async def grant_consent(db: AsyncSession, actor: Actor, base_url: str, ctx: dict
 # --- token endpoint -------------------------------------------------------------------------
 
 
-async def _issue(db: AsyncSession, grant: OauthGrant, now: datetime) -> dict[str, Any]:
+def refresh_ceiling(grant: OauthGrant, max_age: timedelta) -> datetime:
+    """Момент, после которого refresh-токены гранта не действуют: выдача гранта + потолок."""
+    return grant.created_at + max_age
+
+
+async def _issue(
+    db: AsyncSession, grant: OauthGrant, now: datetime, max_age: timedelta
+) -> dict[str, Any]:
     access, refresh = new_secret(ACCESS_PREFIX), new_secret(REFRESH_PREFIX)
     db.add(
         OauthToken(
@@ -401,7 +418,7 @@ async def _issue(db: AsyncSession, grant: OauthGrant, now: datetime) -> dict[str
             kind="refresh",
             token_hash=hash_secret(refresh),
             created_at=now,
-            expires_at=now + REFRESH_TTL,
+            expires_at=min(now + REFRESH_TTL, refresh_ceiling(grant, max_age)),
         )
     )
     await db.flush()
@@ -427,7 +444,9 @@ async def _revoke_grant_rows(db: AsyncSession, grant_id: UUID, now: datetime) ->
     )
 
 
-async def exchange_code(db: AsyncSession, form: dict[str, str], base_url: str) -> dict[str, Any]:
+async def exchange_code(
+    db: AsyncSession, form: dict[str, str], base_url: str, max_age: timedelta = REFRESH_TTL
+) -> dict[str, Any]:
     code = form.get("code", "")
     verifier = form.get("code_verifier", "")
     row = (
@@ -461,10 +480,12 @@ async def exchange_code(db: AsyncSession, form: dict[str, str], base_url: str) -
     resource = form.get("resource")
     if resource and resource.rstrip("/") != canonical_resource(base_url):
         raise OauthError("invalid_target", "resource не принадлежит этому серверу")
-    return await _issue(db, grant, now)
+    return await _issue(db, grant, now, max_age)
 
 
-async def exchange_refresh(db: AsyncSession, form: dict[str, str]) -> dict[str, Any]:
+async def exchange_refresh(
+    db: AsyncSession, form: dict[str, str], max_age: timedelta = REFRESH_TTL
+) -> dict[str, Any]:
     raw = form.get("refresh_token", "")
     invalid = OauthError("invalid_grant", "Refresh-токен недействителен")
     row = (
@@ -483,12 +504,17 @@ async def exchange_refresh(db: AsyncSession, form: dict[str, str]) -> dict[str, 
     if token.used_at is not None:  # повтор уже использованного refresh: вероятная кража
         await _revoke_grant_rows(db, grant.id, now)
         raise invalid
-    if token.revoked_at is not None or grant.revoked_at is not None or token.expires_at <= now:
+    if token.revoked_at is not None or grant.revoked_at is not None:
+        raise invalid
+    if now >= refresh_ceiling(grant, max_age):  # потолок: дальше только новая авторизация (030)
+        await _revoke_grant_rows(db, grant.id, now)
+        raise invalid
+    if token.expires_at <= now:
         raise invalid
     if form.get("client_id") not in (None, "", client.client_id):
         raise invalid
     token.used_at = now
-    return await _issue(db, grant, now)
+    return await _issue(db, grant, now, max_age)
 
 
 # --- проверка access-токена на /mcp ---------------------------------------------------------

@@ -52,8 +52,11 @@ def _too_many(retry_after: int, error: str) -> JSONResponse:
 
 
 def _allowed_hosts(request: Request) -> frozenset[str]:
-    raw: str = request.app.state.settings.oauth_redirect_hosts
-    return frozenset(h.strip().lower() for h in raw.split(",") if h.strip())
+    return service.parse_redirect_hosts(request.app.state.settings.oauth_redirect_hosts)
+
+
+def _refresh_max_age(request: Request) -> timedelta:
+    return timedelta(days=request.app.state.settings.oauth_refresh_max_days)
 
 
 @router.post("/register", include_in_schema=False)
@@ -122,9 +125,9 @@ async def token(request: Request, db: DbSession) -> JSONResponse:
     try:
         grant_type = form.get("grant_type")
         if grant_type == "authorization_code":
-            result = await service.exchange_code(db, form, base)
+            result = await service.exchange_code(db, form, base, _refresh_max_age(request))
         elif grant_type == "refresh_token":
-            result = await service.exchange_refresh(db, form)
+            result = await service.exchange_refresh(db, form, _refresh_max_age(request))
         else:
             raise service.OauthError("unsupported_grant_type", "Недопустимый grant_type")
     except service.OauthError as exc:

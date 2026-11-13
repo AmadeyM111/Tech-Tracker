@@ -385,7 +385,7 @@ ChatGPT) в R1 не поддерживаются, см. ADR-0018.
 Спека - `specs/028-mcp-oauth/`, ADR-0025.
 
 - **Требуется `PUBLIC_BASE_URL`** (https): адрес издателя и ресурса (`<адрес>/mcp`) берутся только из него, не из `Host`. Без него OAuth
-  выключен, `/mcp` работает по `gtrk_` как раньше. Необязательный `OAUTH_REDIRECT_HOSTS` - список хостов redirect_uri через запятую.
+  выключен, `/mcp` работает по `gtrk_` как раньше. `OAUTH_REDIRECT_HOSTS` - список хостов redirect_uri через запятую (по умолчанию `chatgpt.com,claude.ai,claude.com`; `*` - любой https-хост, осознанное ослабление; спека 030). `OAUTH_REFRESH_MAX_DAYS` - потолок жизни refresh-токена со дня выдачи (по умолчанию 90; после него клиент проходит согласие заново).
 - **nginx.** Кроме `/mcp` в api должны идти `/.well-known/oauth-protected-resource*`, `/.well-known/oauth-authorization-server` и
   `/.well-known/openid-configuration` (блоки в `deploy/web/default.conf.template`; в серверный nginx их добавляет оператор). `/oauth/authorize`
   - страница SPA, `/api/v1/oauth/*` уже идёт в api. Проверка: `curl -s https://<адрес>/.well-known/oauth-authorization-server` возвращает JSON
@@ -876,7 +876,7 @@ The client gets the rights of the user who consented; the user can disconnect it
 Access tokens live 1 hour, refresh tokens 90 days with rotation. See `specs/028-mcp-oauth/` and ADR-0025.
 
 - **`PUBLIC_BASE_URL` (https) is required**: the issuer and the resource (`<url>/mcp`) come only from it. Without it OAuth is off and `/mcp`
-  works with `gtrk_` as before. Optional `OAUTH_REDIRECT_HOSTS` - comma separated hosts allowed in `redirect_uri`.
+  works with `gtrk_` as before. `OAUTH_REDIRECT_HOSTS` - comma separated hosts allowed in `redirect_uri` (default `chatgpt.com,claude.ai,claude.com`; `*` allows any https host, a deliberate weakening; spec 030). `OAUTH_REFRESH_MAX_DAYS` - absolute lifetime of a refresh token since the grant (default 90; afterwards the client asks for consent again).
 - **nginx.** Besides `/mcp`, the api must receive `/.well-known/oauth-protected-resource*`, `/.well-known/oauth-authorization-server` and
   `/.well-known/openid-configuration` (see `deploy/web/default.conf.template`; the operator adds them to the server nginx). `/oauth/authorize` is an SPA
   page, `/api/v1/oauth/*` already goes to the api. Check: `curl -s https://<url>/.well-known/oauth-authorization-server` returns JSON, not HTML.
