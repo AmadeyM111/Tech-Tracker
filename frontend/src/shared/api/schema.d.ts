@@ -1405,6 +1405,8 @@ export interface components {
              * Format: uuid
              */
             entity_id: string;
+            /** Entity Login */
+            entity_login?: string | null;
             entity_type: components["schemas"]["EntityType"];
             /** Id */
             id: number;

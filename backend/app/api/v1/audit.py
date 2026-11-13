@@ -47,6 +47,7 @@ def _to_entry(record: AuditRecord) -> AuditEntry:
         entity_type=EntityType(record.entity_type),
         entity_id=record.entity_id,
         entity_deleted=record.entity_deleted,
+        entity_login=record.entity_login,
         changed_fields=record.changed_fields,
         details=record.details,
     )
