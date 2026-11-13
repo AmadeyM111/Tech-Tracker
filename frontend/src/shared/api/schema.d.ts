@@ -847,6 +847,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/oauth/client-info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Client Info
+         * @description Название клиента для экрана входа перед согласием (сессии ещё нет).
+         *
+         *     Публично, но без утечек: только если ``redirect_uri`` зарегистрирован у клиента; название
+         *     указал сам клиент при регистрации (RFC 7591), домен возврата показывает экран согласия.
+         */
+        get: operations["client_info"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects": {
         parameters: {
             query?: never;
@@ -1463,6 +1486,11 @@ export interface components {
              * Format: password
              */
             new_password: string;
+        };
+        /** ClientInfo */
+        ClientInfo: {
+            /** Client Name */
+            client_name: string;
         };
         /** Comment */
         Comment: {
@@ -4790,6 +4818,47 @@ export interface operations {
             };
             /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    client_info: {
+        parameters: {
+            query: {
+                client_id: string;
+                redirect_uri: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientInfo"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

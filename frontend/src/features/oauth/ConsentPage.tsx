@@ -12,7 +12,8 @@ import { GTrackLogo } from "../../shared/ui/GTrackLogo";
 import { decide, getConsentContext } from "./api";
 import "./oauth.css";
 
-export const CONSENT_PATH = "/oauth/authorize";
+export { CONSENT_PATH } from "./next";
+import { CONSENT_PATH, withNext } from "./next";
 
 /** Navigates the browser away (to the client); a function so that tests can replace it. */
 export const redirects = {
@@ -46,7 +47,7 @@ export function ConsentPage() {
 
   // No session: log in first and come back to the same request.
   useEffect(() => {
-    if (failure?.status === 401) navigate(`/login?next=${encodeURIComponent(CONSENT_PATH + search)}`, { replace: true });
+    if (failure?.status === 401) navigate(withNext("/login", CONSENT_PATH + search), { replace: true });
   }, [failure, navigate, search]);
 
   // A protocol error that is answered to the client with a redirect (the user sees nothing).

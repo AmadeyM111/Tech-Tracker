@@ -715,3 +715,29 @@ async def test_028_ac11_maintenance_purges_unused_clients_and_expired_rows(api_e
         await session.commit()
     rows = await env.execute(text("SELECT client_id FROM oauth_client"))
     assert rows is not None and [r.client_id for r in rows] == [used["client"]["client_id"]]
+
+
+async def test_028_client_info_is_public_and_only_for_a_registered_redirect_uri(
+    api_env: ApiEnv,
+) -> None:
+    env = api_env
+    _setup(env)
+    client = await _register(env)
+    path = "/api/v1/oauth/client-info"
+    ok = await env.client.get(
+        path, params={"client_id": client["client_id"], "redirect_uri": REDIRECT}
+    )
+    assert ok.status_code == 200 and ok.json() == {"client_name": "ChatGPT"}
+    other = await env.client.get(
+        path, params={"client_id": client["client_id"], "redirect_uri": "https://evil.example/cb"}
+    )
+    assert other.status_code == 404
+    assert (
+        await env.client.get(path, params={"client_id": "nope", "redirect_uri": REDIRECT})
+    ).status_code == 404
+    assert (await env.client.get(path)).status_code == 422
+    env.app.state.settings.public_base_url = None
+    gone = await env.client.get(
+        path, params={"client_id": client["client_id"], "redirect_uri": REDIRECT}
+    )
+    assert gone.status_code == 404

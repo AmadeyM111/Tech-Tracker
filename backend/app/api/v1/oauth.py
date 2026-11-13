@@ -21,7 +21,7 @@ from app.api.openapi import error_responses
 from app.api.wellknown import require_base_url
 from app.core.clock import utcnow
 from app.core.db import DbSession
-from app.core.errors import Unprocessable
+from app.core.errors import NotFound, Unprocessable
 from app.core.secrets import ensure_secret_key
 from app.domain.access.roles import Actor, Capability
 from app.domain.oauth import service
@@ -153,6 +153,29 @@ class AuthorizeQuery(BaseModel):
     state: str | None = None
     scope: str | None = None
     resource: str | None = None
+
+
+class ClientInfo(BaseModel):
+    client_name: str
+
+
+@router.get("/client-info", response_model=ClientInfo, responses=error_responses(404, 422))
+async def client_info(
+    request: Request,
+    db: DbSession,
+    client_id: Annotated[str, Query(min_length=1, max_length=64)],
+    redirect_uri: Annotated[str, Query(min_length=1, max_length=512)],
+) -> ClientInfo:
+    """Название клиента для экрана входа перед согласием (сессии ещё нет).
+
+    Публично, но без утечек: только если ``redirect_uri`` зарегистрирован у клиента; название
+    указал сам клиент при регистрации (RFC 7591), домен возврата показывает экран согласия.
+    """
+    require_base_url(request)
+    label = await service.public_client_label(db, client_id, redirect_uri)
+    if label is None:
+        raise NotFound()
+    return ClientInfo(client_name=label)
 
 
 class ConsentContext(BaseModel):

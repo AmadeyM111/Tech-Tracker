@@ -18,6 +18,7 @@ import { RegisterPage } from "../features/auth/RegisterPage";
 import { CreateTaskDialog } from "../features/tasks/CreateTaskForm";
 import { MyTasksPage } from "../features/tasks/TaskList";
 import { ConsentPage } from "../features/oauth/ConsentPage";
+import { safeConsentNext, withNext } from "../features/oauth/next";
 import { SummaryPage } from "../features/overview/SummaryPage";
 import { NotificationsMenuItem } from "../features/notifications/Badge";
 import { NotificationsPage } from "../features/notifications/NotificationsPage";
@@ -387,13 +388,15 @@ function GuestOnly({ children }: { children: ReactNode }) {
 function useClientHandlers(): void {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { pathname, state } = useLocation();
+  const { pathname, search, state } = useLocation();
   const pathRef = useRef(pathname);
+  const searchRef = useRef(search);
   const stateRef = useRef<unknown>(state);
   useEffect(() => {
     pathRef.current = pathname;
+    searchRef.current = search;
     stateRef.current = state;
-  }, [pathname, state]);
+  }, [pathname, search, state]);
 
   useEffect(
     () =>
@@ -408,7 +411,9 @@ function useClientHandlers(): void {
         onPasswordChangeRequired: () => {
           // Already in the modal: a repeated 403 must not add a history step.
           if (pathRef.current === "/change-password") return;
-          navigate("/change-password", { replace: true });
+          // A consent request that meets the forced change comes back to itself afterwards (spec 028 FR-6).
+          const back = pathRef.current === "/oauth/authorize" ? "/oauth/authorize" + searchRef.current : null;
+          navigate(withNext("/change-password", safeConsentNext(back)), { replace: true });
         },
         onNoRole: () => {
           // A 403 no_role inside the password modal (a forced user without a role) keeps the modal on screen.

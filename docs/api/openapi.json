@@ -706,6 +706,19 @@
         "title": "ChangePasswordRequest",
         "type": "object"
       },
+      "ClientInfo": {
+        "properties": {
+          "client_name": {
+            "title": "Client Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_name"
+        ],
+        "title": "ClientInfo",
+        "type": "object"
+      },
       "Comment": {
         "properties": {
           "author": {
@@ -6376,6 +6389,72 @@
           }
         },
         "summary": "Authorize Decision",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/v1/oauth/client-info": {
+      "get": {
+        "description": "Название клиента для экрана входа перед согласием (сессии ещё нет).\n\nПублично, но без утечек: только если ``redirect_uri`` зарегистрирован у клиента; название\nуказал сам клиент при регистрации (RFC 7591), домен возврата показывает экран согласия.",
+        "operationId": "client_info",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "client_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Client Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "redirect_uri",
+            "required": true,
+            "schema": {
+              "maxLength": 512,
+              "minLength": 1,
+              "title": "Redirect Uri",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Client Info",
         "tags": [
           "oauth"
         ]

@@ -6,6 +6,7 @@ export type ConsentContext = components["schemas"]["ConsentContext"];
 export type OauthGrant = components["schemas"]["OauthGrantItem"];
 
 export const OAUTH_GRANTS_KEY = ["me", "oauth-grants"] as const;
+export type ClientInfo = components["schemas"]["ClientInfo"];
 const FIELDS = [
   "response_type",
   "client_id",
@@ -50,4 +51,12 @@ export async function listOauthGrants(): Promise<OauthGrant[]> {
 
 export async function revokeOauthGrant(id: string): Promise<void> {
   await getAppClient().DELETE("/api/v1/me/oauth-grants/{grant_id}", { params: { path: { grant_id: id } } });
+}
+
+/** Public: the name of the client of an authorization request, for the login screen (no session yet). */
+export async function getClientInfo(search: URLSearchParams): Promise<ClientInfo> {
+  const query = { client_id: search.get("client_id") ?? "", redirect_uri: search.get("redirect_uri") ?? "" };
+  const { data } = await getAppClient().GET("/api/v1/oauth/client-info", { params: { query } });
+  if (data === undefined) throw invalidBody(200);
+  return data;
 }

@@ -281,6 +281,18 @@ async def check_authorize_request(
     )
 
 
+async def public_client_label(db: AsyncSession, client_id: str, redirect_uri: str) -> str | None:
+    """Название клиента для публичного экрана входа; ``None``, если адрес возврата не его."""
+    client = (
+        (await db.execute(select(OauthClient).where(OauthClient.client_id == client_id)))
+        .scalars()
+        .one_or_none()
+    )
+    if client is None or redirect_uri not in client.redirect_uris:
+        return None
+    return client_label(client.client_name, redirect_uri)
+
+
 def sign_context(key: bytes, req: AuthRequest, user_id: UUID, now: datetime) -> str:
     """Подписанный контекст запроса: решение нельзя применить к подменённым параметрам."""
     payload = {

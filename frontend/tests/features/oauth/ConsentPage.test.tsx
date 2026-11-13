@@ -141,6 +141,21 @@ describe("ConsentPage", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "ChatGPT просит доступ к вашему GTrack" })).toBeTruthy();
   });
 
+  it("the login screen names the client of the request (public client-info), not a generic one", async () => {
+    const f = installFetch({
+      [ME]: () => err(401, "not_authenticated"),
+      [CTX]: () => err(401, "not_authenticated"),
+      "GET /api/v1/oauth/client-info": () => j(200, { client_name: "ChatGPT" }),
+    });
+    renderApp(QUERY);
+    expect(
+      await screen.findByText("Чтобы разрешить доступ ChatGPT, войдите в GTrack. После входа вы увидите запрос на доступ."),
+    ).toBeTruthy();
+    const q = f.query(f.last("GET /api/v1/oauth/client-info"));
+    expect(q.get("client_id")).toBe("cid1");
+    expect(q.get("redirect_uri")).toBe("https://chatgpt.com/cb");
+  });
+
   it("the login page returns only to the consent path, never to an arbitrary address", async () => {
     installFetch({
       [ME]: () => err(401, "not_authenticated"),
