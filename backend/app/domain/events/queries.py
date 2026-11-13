@@ -60,6 +60,8 @@ class AuditRecord:
     entity_deleted: bool
     changed_fields: list[str]
     details: dict[str, str | None] | None
+    # Логин объекта-пользователя — подсказка в журнале (правило «Логин как подсказка»); иначе None
+    entity_login: str | None = None
 
 
 def _audit_select() -> Select[DomainEvent]:
@@ -149,6 +151,7 @@ async def _to_records(
                 entity_deleted=is_user and event.entity_id not in logins,
                 changed_fields=list(event.changed_fields),
                 details=_user_details(event.details) if is_user else None,
+                entity_login=logins.get(event.entity_id) if is_user else None,
             )
         )
     return records

@@ -37,6 +37,8 @@ class AuditEntry(BaseModel):
     entity_deleted: bool
     changed_fields: list[str]
     details: dict[str, str | None] | None
+    # Логин пользователя, если объект записи — пользователь и он в пространстве (иначе null)
+    entity_login: str | None = None
 
 
 class AuditListQuery(PageParams):

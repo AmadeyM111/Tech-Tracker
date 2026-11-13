@@ -447,6 +447,17 @@
             "title": "Entity Id",
             "type": "string"
           },
+          "entity_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Login"
+          },
           "entity_type": {
             "$ref": "#/components/schemas/EntityType"
           },

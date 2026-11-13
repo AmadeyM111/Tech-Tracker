@@ -610,3 +610,24 @@ describe("пагинация журнала при пустом списке (а
     expect(container.querySelector(".ui-pagination")).toBeNull();
   });
 });
+
+describe("логин цели как подсказка (правило журнала)", () => {
+  it("login_hint_is_shown_under_the_target_user_and_not_otherwise", async () => {
+    const withLogin = { ...E_USER, entity_login: "ivanov" };
+    const { container } = await open({ [AUDIT]: () => j(200, page([withLogin, E_DEAL])) });
+    const row = container.querySelector<HTMLElement>(`tr[data-entry-id="${E_USER.id}"]`)!;
+    const hint = row.querySelector<HTMLElement>('[data-field="entity_login"]');
+    expect(hint?.textContent).toBe("ivanov");
+    expect(hint?.className).toBe("audit-login-hint");
+    // Узкий экран: та же подсказка в карточке (правило журнала, 360 px).
+    const card = container.querySelector<HTMLElement>(`li[data-card-id="${E_USER.id}"]`);
+    expect(card?.querySelector('[data-field="entity_login"]')?.textContent).toBe("ivanov");
+    const dealRow = container.querySelector<HTMLElement>(`tr[data-entry-id="${E_DEAL.id}"]`)!;
+    expect(dealRow.querySelector('[data-field="entity_login"]')).toBeNull();
+  });
+
+  it("entry_without_login_field_renders_no_empty_hint", async () => {
+    const { container } = await open();
+    expect(container.querySelector('[data-field="entity_login"]')).toBeNull();
+  });
+});

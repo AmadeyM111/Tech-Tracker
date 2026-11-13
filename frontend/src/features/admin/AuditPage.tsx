@@ -114,6 +114,11 @@ function Details({ entry }: { entry: AuditEntry }) {
     <>
       <span data-field="changed_fields">{entry.changed_fields.map(fieldText).join(", ")}</span>
       <span data-field="details">{detailsText(entry)}</span>
+      {entry.entity_login ? (
+        <span data-field="entity_login" className="audit-login-hint">
+          {entry.entity_login}
+        </span>
+      ) : null}
       <details data-field="entity_id" className="audit-id">
         <summary>{t("admin.audit.col_details")}</summary>
         <span className="audit-uuid">{entry.entity_id}</span>
@@ -152,6 +157,11 @@ function EntryCard({ entry }: { entry: AuditEntry }) {
         {entityText(entry.entity_type)}
         {extra === "" ? "" : `: ${extra}`}
       </span>
+      {entry.entity_login ? (
+        <span data-field="entity_login" className="audit-login-hint">
+          {entry.entity_login}
+        </span>
+      ) : null}
       <details className="audit-id">
         <summary>{t("admin.audit.col_details")}</summary>
         <span className="audit-uuid">{entry.entity_id}</span>
