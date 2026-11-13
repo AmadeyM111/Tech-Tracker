@@ -37,6 +37,8 @@ class BoardCard(BaseModel):
     position: int
     subtask_count: int
     progress: int | None
+    # «Горит» (spec 008 FR-8): высокий приоритет, срок сегодня или раньше, задача не завершена
+    hot: bool
 
 
 class BoardColumn(BaseModel):

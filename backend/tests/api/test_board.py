@@ -33,6 +33,7 @@ CARD_FIELDS = {
     "position",
     "subtask_count",
     "progress",
+    "hot",  # «Горит» — тот же критерий, что на «Сводке» (spec 008 FR-8)
 }
 
 

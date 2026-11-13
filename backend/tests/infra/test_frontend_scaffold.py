@@ -269,6 +269,8 @@ def test_t21_src_files_only_expected() -> None:
         "features/notifications/NotificationsPage.tsx", "features/comments/MentionSuggest.tsx",
         "features/attachments/attachments.css",
         "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
+        # «Горит» на доске и в «Сводке» (spec 008 FR-8): один компонент и правило
+        "shared/ui/HotMark.tsx", "shared/ui/hot-mark.css",
         # 019/R8-T20: dialog for changing first and last name
         "features/admin/NameDialog.tsx",
         # 019/R8-T21: accounts without a role, /unassigned-accounts (AC-30)

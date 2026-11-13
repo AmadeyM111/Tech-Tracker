@@ -1443,6 +1443,8 @@ export interface components {
             assignee: components["schemas"]["UserRef"] | null;
             /** Due Date */
             due_date: string | null;
+            /** Hot */
+            hot: boolean;
             /**
              * Id
              * Format: uuid
