@@ -21,6 +21,13 @@ describe("«Горит» на карточке доски", () => {
     expect(hot[0]!.textContent).toBe(ru["summary.hot"]);
   });
 
+  it("hot_mark_is_right_of_the_due_date_in_every_card", async () => {
+    const { container } = await openBoard({}, HOT_CARDS as never);
+    const due = cardEl(container, TA)!.querySelector<HTMLElement>('[data-field="due_date"]')!;
+    expect(due.querySelector('[data-role="hot-mark"]')).not.toBeNull();
+    expect(cardEl(container, TA)!.querySelector('[data-field="title"] [data-role="hot-mark"]')).toBeNull();
+  });
+
   it("card_without_hot_has_no_mark", async () => {
     const { container } = await openBoard({}, HOT_CARDS as never);
     expect(cardEl(container, TB)!.querySelector('[data-role="hot-mark"]')).toBeNull();

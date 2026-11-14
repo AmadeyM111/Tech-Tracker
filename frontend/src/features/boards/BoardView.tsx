@@ -150,15 +150,16 @@ function Card({ card }: { card: BoardCard }) {
         <Link to={`/tasks/${card.id}`} style={isDragging ? { pointerEvents: "none" } : undefined}>
           {card.title}
         </Link>
-        <HotMark hot={card.hot} />
       </div>
       <div data-field="priority">{t(`tasks.priority.${card.priority}`)}</div>
+      {/* One place for every card and width: the mark sits right of the due date (правило «Горит»). */}
       <div data-field="due_date">
         {card.due_date === null ? (
           t("tasks.due_none")
         ) : (
           <time dateTime={card.due_date}>{formatDate(card.due_date)}</time>
         )}
+        <HotMark hot={card.hot} />
       </div>
       <div data-field="assignee">{card.assignee === null ? t("tasks.assignee_none") : card.assignee.login}</div>
       <div data-field="progress">
