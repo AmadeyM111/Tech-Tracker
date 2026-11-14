@@ -43,6 +43,21 @@ describe("login screen providers", () => {
     );
   });
 
+  it("shows the same buttons on /register while registration is on (Q-3)", async () => {
+    installFetch({
+      ...base,
+      "GET /api/v1/auth/password-reset/status": () => j(200, { enabled: true }),
+      [PROVIDERS]: () => j(200, [{ name: "yandex" }, { name: "google" }]),
+    });
+    renderApp("/register");
+    expect(
+      await screen.findByRole("link", { name: ru["auth.external_yandex"] }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: ru["auth.external_google"] }),
+    ).toBeTruthy();
+  });
+
   it("shows no block when no provider is enabled", async () => {
     installFetch({ ...base, [PROVIDERS]: () => j(200, []) });
     renderApp("/login");
@@ -52,9 +67,16 @@ describe("login screen providers", () => {
 
   it("shows one neutral text for a refusal and ignores unknown codes", async () => {
     installFetch({ ...base, [PROVIDERS]: () => j(200, []) });
-    const { unmount } = renderApp("/login?external_error=login_failed");
+    const { unmount } = renderApp(
+      "/login?external_error=login_failed&provider=yandex",
+    );
     expect(
-      await screen.findByText(ru["auth.external_error.login_failed"]),
+      await screen.findByText(
+        ru["auth.external_error.login_failed"].replace(
+          "{provider}",
+          ru["profile.methods_provider.yandex"],
+        ),
+      ),
     ).toBeTruthy();
     unmount();
     installFetch({ ...base, [PROVIDERS]: () => j(200, []) });

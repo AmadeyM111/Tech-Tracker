@@ -85,7 +85,7 @@ async def start_login(
     base = oauth_base_url(settings)
     cfg = enabled_providers(settings).get(provider)
     if base is None or cfg is None or await _throttled(request, db):
-        return _redirect("/login", external_error="provider_unavailable")
+        return _redirect("/login", external_error="provider_unavailable", provider=provider)
     url = await external.start(
         db, cfg, base_url=base, purpose="login", user_id=None, remember=remember, now=utcnow()
     )
@@ -113,7 +113,7 @@ async def callback(
     sessions: SessionStore = app_state.session_store
     base = oauth_base_url(settings)
     if base is None or await _throttled(request, db):
-        return _redirect("/login", external_error="provider_unavailable")
+        return _redirect("/login", external_error="provider_unavailable", provider=provider)
     now = utcnow()
     cookie = request.cookies.get(settings.cookie_name)
     record = await sessions.resolve(db, cookie, now=now, background=True) if cookie else None
@@ -136,7 +136,7 @@ async def callback(
     )
     page = "/profile" if outcome.purpose == "link" else "/login"
     if outcome.error is not None:
-        return _redirect(page, external_error=outcome.error)
+        return _redirect(page, external_error=outcome.error, provider=provider)
     if outcome.purpose == "link":
         return _redirect("/profile", external="linked")
     assert outcome.token is not None

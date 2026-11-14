@@ -59,7 +59,7 @@ export function LoginPage() {
   });
 
   // A refusal of the external login comes back as ?external_error=<code> (spec 029): one neutral text.
-  const externalError = externalErrorText(searchParams.get("external_error"));
+  const externalError = externalErrorText(searchParams.get("external_error"), searchParams.get("provider"));
 
   useEffect(() => {
     loginRef.current?.focus();

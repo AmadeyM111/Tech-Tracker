@@ -12,12 +12,26 @@ const LABELS: Record<ProviderName, MessageKey> = {
   google: "auth.external_google",
 };
 
-const ERROR_CODES = ["login_failed", "cancelled", "provider_unavailable", "state_invalid"] as const;
+const ERROR_CODES = [
+  "login_failed",
+  "cancelled",
+  "provider_unavailable",
+  "state_invalid",
+] as const;
 
 /** Text for ?external_error=<code> on /login; an unknown code gives nothing (the value is never printed). */
-export function externalErrorText(code: string | null): string | null {
-  if (code === null || !(ERROR_CODES as readonly string[]).includes(code)) return null;
-  return t(`auth.external_error.${code}` as MessageKey);
+export function externalErrorText(
+  code: string | null,
+  provider: string | null = null,
+): string | null {
+  if (code === null || !(ERROR_CODES as readonly string[]).includes(code))
+    return null;
+  // The provider name comes from a fixed list, never from the address text.
+  const name =
+    provider !== null && provider in LABELS
+      ? t(`profile.methods_provider.${provider}` as MessageKey)
+      : t("auth.external_generic_name");
+  return t(`auth.external_error.${code}` as MessageKey, { provider: name });
 }
 
 export function ExternalLogin({ remember }: { remember: boolean }) {
@@ -35,7 +49,11 @@ export function ExternalLogin({ remember }: { remember: boolean }) {
       <p className="ext-hint">{t("auth.external_with")}</p>
       <div className="ext-list">
         {names.map((name) => (
-          <a key={name} className={`ext-btn ext-btn-${name}`} href={loginStartUrl(name, remember)}>
+          <a
+            key={name}
+            className={`ext-btn ext-btn-${name}`}
+            href={loginStartUrl(name, remember)}
+          >
             {t(LABELS[name])}
           </a>
         ))}

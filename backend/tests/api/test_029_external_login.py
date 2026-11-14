@@ -178,7 +178,7 @@ async def test_029_start_uses_pkce_state_and_exact_redirect(ext_env: ApiEnv) -> 
 async def test_029_disabled_provider_is_unavailable(ext_env: ApiEnv) -> None:
     response = await ext_env.client.get(f"{CB}/vk/start")
     assert response.status_code == 302
-    assert response.headers["location"] == "/login?external_error=provider_unavailable"
+    assert response.headers["location"] == "/login?external_error=provider_unavailable&provider=vk"
 
 
 async def test_029_first_login_creates_user_without_password(

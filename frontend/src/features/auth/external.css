@@ -61,6 +61,7 @@
   max-width: 44rem;
 }
 .methods-row {
+  min-width: 0;
   display: flex;
   gap: 12px;
   align-items: center;
@@ -70,6 +71,7 @@
   border-bottom: 1px solid var(--border);
 }
 .methods-meta {
+  overflow-wrap: anywhere; /* 360 px: no horizontal scroll */
   margin: 2px 0 0;
   color: var(--text-muted);
   font-size: 1.0625rem;

@@ -644,12 +644,13 @@ export const ru = {
   "auth.external_yandex": "Войти с Яндекс ID",
   "auth.external_vk": "Войти с VK ID",
   "auth.external_google": "Войти с Google",
+  "auth.external_generic_name": "внешний аккаунт",
   "auth.external_error.login_failed":
-    "Не удалось войти через внешний аккаунт. Войдите по паролю или попробуйте позже.",
+    "Не удалось войти через {provider}. Войдите по паролю или попробуйте позже.",
   "auth.external_error.cancelled":
-    "Вход не выполнен: доступ не разрешён. Попробуйте ещё раз или войдите по паролю.",
+    "Вход через {provider} не выполнен: доступ не разрешён. Попробуйте ещё раз или войдите по паролю.",
   "auth.external_error.provider_unavailable":
-    "Сервис входа сейчас недоступен. Попробуйте позже или войдите по паролю.",
+    "Вход через {provider} сейчас недоступен. Попробуйте позже или войдите по паролю.",
   "auth.external_error.state_invalid": "Не удалось завершить вход: запрос устарел. Попробуйте ещё раз.",
   "profile.methods_title": "Способы входа",
   "profile.methods_password": "Пароль",
