@@ -144,7 +144,9 @@ describe("ExternalLogin consent (021)", () => {
     const button = screen.getByRole("link", { name: t("auth.external_yandex") });
     expect(button.getAttribute("aria-disabled")).toBe("true");
     expect(button.getAttribute("href")).toBeNull();
+    expect(screen.getByText(t("legal.providers_need_consent"))).toBeTruthy();
     fireEvent.click(box);
+    expect(screen.queryByText(t("legal.providers_need_consent"))).toBeNull();
     const ready = screen.getByRole("link", { name: t("auth.external_yandex") });
     expect(ready.getAttribute("href")).toBe(
       `/api/v1/auth/external/yandex/start?consent=true&consent_version=${VERSION}`,

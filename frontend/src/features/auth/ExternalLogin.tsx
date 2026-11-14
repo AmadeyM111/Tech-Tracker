@@ -80,6 +80,7 @@ export function ExternalLogin({ remember, consent }: { remember: boolean; consen
           ),
         )}
       </div>
+      {consentOn && !agreed ? <p className="ext-hint">{t("legal.providers_need_consent")}</p> : null}
     </div>
   );
 }

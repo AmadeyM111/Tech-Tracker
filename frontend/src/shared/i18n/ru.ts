@@ -701,6 +701,7 @@ export const ru = {
   "legal.consent_required": "Отметьте согласие, чтобы продолжить",
   "legal.version": "Версия от {date}",
   "legal.to_login": "Войти",
+  "legal.providers_need_consent": "Чтобы войти через внешний аккаунт, сначала дайте согласие выше.",
   "legal.confirm_title": "Подтвердите согласие",
   "legal.confirm_hint": "Чтобы продолжить работу, подтвердите согласие на обработку персональных данных.",
   "legal.confirm_submit": "Продолжить",
