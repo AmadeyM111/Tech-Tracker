@@ -21,11 +21,13 @@ describe("«Горит» на карточке доски", () => {
     expect(hot[0]!.textContent).toBe(ru["summary.hot"]);
   });
 
-  it("hot_mark_is_right_of_the_due_date_in_every_card", async () => {
+  it("hot_mark_is_inside_the_title_link_on_its_own_line_in_every_card", async () => {
     const { container } = await openBoard({}, HOT_CARDS as never);
-    const due = cardEl(container, TA)!.querySelector<HTMLElement>('[data-field="due_date"]')!;
-    expect(due.querySelector('[data-role="hot-mark"]')).not.toBeNull();
-    expect(cardEl(container, TA)!.querySelector('[data-field="title"] [data-role="hot-mark"]')).toBeNull();
+    const link = cardEl(container, TA)!.querySelector<HTMLElement>('[data-field="title"] a')!;
+    const mark = link.querySelector<HTMLElement>('[data-role="hot-mark"]');
+    expect(mark).not.toBeNull();
+    expect(mark!.className).toContain("ui-hot-mark--block");
+    expect(cardEl(container, TA)!.querySelector('[data-field="due_date"] [data-role="hot-mark"]')).toBeNull();
   });
 
   it("card_without_hot_has_no_mark", async () => {

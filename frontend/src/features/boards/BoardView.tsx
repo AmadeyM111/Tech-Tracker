@@ -149,6 +149,8 @@ function Card({ card }: { card: BoardCard }) {
         {/* No pointer events while dragging: the click after pointerup must not navigate. */}
         <Link to={`/tasks/${card.id}`} style={isDragging ? { pointerEvents: "none" } : undefined}>
           {card.title}
+          {/* One place for every card and width: its own line under the title, inside the card link (правило «Горит»). */}
+          <HotMark hot={card.hot} block />
         </Link>
       </div>
       <div data-field="priority">{t(`tasks.priority.${card.priority}`)}</div>
@@ -159,7 +161,6 @@ function Card({ card }: { card: BoardCard }) {
         ) : (
           <time dateTime={card.due_date}>{formatDate(card.due_date)}</time>
         )}
-        <HotMark hot={card.hot} />
       </div>
       <div data-field="assignee">{card.assignee === null ? t("tasks.assignee_none") : card.assignee.login}</div>
       <div data-field="progress">

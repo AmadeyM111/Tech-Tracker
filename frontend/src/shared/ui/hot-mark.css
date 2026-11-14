@@ -1,3 +1,7 @@
+.ui-hot-mark--block {
+  display: table;
+  margin: 4px 0 0;
+}
 .ui-hot-mark {
   display: inline-block;
   margin-left: 6px;
