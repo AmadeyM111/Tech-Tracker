@@ -91,8 +91,11 @@ def test_fr1_contact_email_and_provider_transfer_are_in_the_texts() -> None:
 def test_fr9_placeholders_are_only_in_requisites_until_filled() -> None:
     left = documents.unfilled_placeholders()
     assert all(item.startswith("requisites.") or item.endswith(".json") for item in left)
-    for key in ("operator_name", "operator_ogrn", "operator_inn", "operator_address"):
-        assert documents.requisites()[key] == documents.PLACEHOLDER
+    req = documents.requisites()
+    # реквизиты ИП получены от владельца 2026-11-15; адрес ещё не прислан
+    assert req["operator_name"].startswith("Индивидуальный предприниматель")
+    assert (req["operator_ogrn"], req["operator_inn"]) == ("324774600650295", "771975146252")
+    assert req["operator_address"] == documents.PLACEHOLDER
 
 
 # --- FR-9, AC-6: гейт реквизитов -------------------------------------------------------
