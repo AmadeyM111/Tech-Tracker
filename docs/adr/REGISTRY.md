@@ -20,7 +20,8 @@
 | 0025 | Пересмотр ADR-0018 в части OAuth: облачные клиенты через OAuth 2.1 на /mcp (спека 028) | `docs/adr/0025-oauth-revises-adr-0018.md` | принято 2026-11-12 |
 | 0024 | Личные проекты «Пользователя» (спека 027) | `docs/adr/0024-personal-projects.md` (ветка `docs/personal-projects-spec`) | принято 2026-11-11 |
 | 0026 | Внешние провайдеры входа и правила привязки (спека 029) | `docs/adr/0026-external-login-and-linking.md` (ветка `docs/login-simplify-spec`) | принято |
-| 0027+ | ADR — с 0027 (0025 занят OAuth, 0026 — входом) | — | свободно |
+| 0027 | Согласие на обработку ПДн (спека 021) | `docs/adr/0027-pdn-consent.md` (ветка `feat/021-pdn-consent`) | принято 2026-11-15 |
+| 0028+ | ADR — с 0028 | — | свободно |
 
 ## Спеки
 | № | Тема | Где |
@@ -42,7 +43,8 @@
 | 027 | Личные проекты «Пользователя» (APPROVED 2026-11-11, ветка `docs/personal-projects-spec`) | `specs/027-personal-projects/` |
 | 029 | Упрощённый вход: email или логин, «Запомнить меня», magic link, Яндекс ID / VK ID / Google (DRAFT, ветка `docs/login-simplify-spec`) | `specs/029-login-simplify/` |
 | 020 | MCP AI Native | main |
-| 021–023 | заняты (023 — удаление пользователей, черновик) | — |
+| 021 | Согласие на обработку ПДн (возобновлена владельцем 2026-11-15) | `specs/021-pdn-consent-form/` (ветка `feat/021-pdn-consent`) |
+| 022–023 | заняты (023 — удаление пользователей, черновик) | — |
 
 ## Миграции alembic
 | № | Тема | Где |
@@ -53,3 +55,5 @@
 | 0011–0013 | R2: `backup_run`, `attachment`, `notification` | main (на проде, 2026-11-10) |
 | 0014 | свободен (резерв под 026 снят: состояние в браузере) | — |
 | 0015 | Упрощённый вход: внешние идентичности, токены входа, `password_hash` nullable (спека 029, предварительно — номер подтвердить после `0014` из `feat/mcp-oauth`) | предложено, ветка `docs/login-simplify-spec` |
+| 0016 | Внешний вход: `external_identity`, `oauth_login_state`, … (спека 029, этап б) | `feat/029-providers`, PR #55 |
+| 0017 | Согласие на ПДн: колонки `pdn_consent_*` в `app_user`, `registration_request`, `oauth_login_state` (спека 021) | `feat/021-pdn-consent`; цепляется после 0016 |
