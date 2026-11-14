@@ -62,6 +62,8 @@ async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
         ensure_secret_key(settings),
         idle_timeout=settings.session_idle_timeout,
         absolute_timeout=settings.session_absolute_timeout,
+        remember_idle_timeout=settings.session_remember_timeout,
+        remember_absolute_timeout=settings.session_remember_timeout,
     )
     state.password_hasher = PasswordHasher(
         time_cost=settings.argon2_time_cost,

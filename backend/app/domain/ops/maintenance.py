@@ -57,6 +57,7 @@ async def run_maintenance(
         sessionmaker,
         now=now,
         idle_timeout=settings.session_idle_timeout,
+        remember_idle_timeout=settings.session_remember_timeout,
         dry_run=dry_run,
     )
     registration_requests_expired = await purge_expired_registration_requests(

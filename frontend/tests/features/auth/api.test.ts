@@ -31,7 +31,8 @@ describe("auth api (T23)", () => {
     const req = calls[0]!;
     expect(new URL(req.url).pathname).toBe("/api/v1/auth/login");
     expect(req.method).toBe("POST");
-    expect(await req.json()).toEqual({ login: "a", password: "pw-pw-pw-pw-pw" });
+    // «Запомнить меня» по умолчанию выключено: тело всегда содержит remember (spec 029 FR-5).
+    expect(await req.json()).toEqual({ login: "a", password: "pw-pw-pw-pw-pw", remember: false });
     expect(req.url).not.toContain("pw-pw");
   });
 

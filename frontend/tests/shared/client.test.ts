@@ -89,11 +89,11 @@ describe("request shape (FR-44, D-33, D-14)", () => {
 
   it("POST with a body sends Content-Type: application/json and the JSON body", async () => {
     const { client, calls } = setup(() => json(200, {}));
-    await client.POST("/api/v1/auth/login", { body: { login: "ivan", password: SECRET } });
+    await client.POST("/api/v1/auth/login", { body: { login: "ivan", password: SECRET, remember: false } });
     const req = calls[0]!;
     expect(req.method).toBe("POST");
     expect(req.headers.get("content-type")).toMatch(/^application\/json/);
-    expect(await req.clone().json()).toEqual({ login: "ivan", password: SECRET });
+    expect(await req.clone().json()).toEqual({ login: "ivan", password: SECRET, remember: false });
   });
 
   it("POST without a body (logout) still sends Content-Type: application/json", async () => {
@@ -106,7 +106,7 @@ describe("request shape (FR-44, D-33, D-14)", () => {
     const { client, calls } = setup(() => json(200, {}));
     await client.GET("/api/v1/me");
     await client.GET("/api/v1/health");
-    await client.POST("/api/v1/auth/login", { body: { login: "a", password: "b" } });
+    await client.POST("/api/v1/auth/login", { body: { login: "a", password: "b", remember: false } });
     await client.POST("/api/v1/admin/users/{user_id}/block", {
       params: { path: { user_id: "00000000-0000-0000-0000-000000000001" } },
     });
@@ -276,7 +276,7 @@ describe("navigation callbacks (FR-55, FR-59, FR-66, T17 note)", () => {
     await client.GET("/api/v1/me").catch(() => undefined);
     expect(h.onUnauthenticated).toHaveBeenCalledTimes(1);
     mode = "200";
-    await client.POST("/api/v1/auth/login", { body: { login: "a", password: "b" } });
+    await client.POST("/api/v1/auth/login", { body: { login: "a", password: "b", remember: false } });
     mode = "401";
     await client.GET("/api/v1/me").catch(() => undefined);
     expect(h.onUnauthenticated).toHaveBeenCalledTimes(2);
@@ -290,7 +290,7 @@ describe("navigation callbacks (FR-55, FR-59, FR-66, T17 note)", () => {
     const { client } = setup(() => err(401, "not_authenticated"), h);
     const call =
       path === "/api/v1/auth/login"
-        ? client.POST(path, { body: { login: "a", password: "b" } })
+        ? client.POST(path, { body: { login: "a", password: "b", remember: false } })
         : client.POST(path);
     await expect(call).rejects.toMatchObject({ status: 401, code: "not_authenticated" });
     noRedirects(h);
@@ -300,7 +300,7 @@ describe("navigation callbacks (FR-55, FR-59, FR-66, T17 note)", () => {
     const h = handlers();
     const { client } = setup(() => err(401, "invalid_credentials"), h);
     await expect(
-      client.POST("/api/v1/auth/login", { body: { login: "a", password: SECRET } }),
+      client.POST("/api/v1/auth/login", { body: { login: "a", password: SECRET, remember: false } }),
     ).rejects.toMatchObject({ status: 401, code: "invalid_credentials" });
     noRedirects(h);
   });
@@ -391,7 +391,7 @@ describe("secrets never leak (NFR-4, FR-57)", () => {
     const spies = spyConsole();
     const { client } = setup(responder as Responder);
     const e = await client
-      .POST("/api/v1/auth/login", { body: { login: "ivan", password: SECRET } })
+      .POST("/api/v1/auth/login", { body: { login: "ivan", password: SECRET, remember: false } })
       .then(
         () => null,
         (x: unknown) => x,

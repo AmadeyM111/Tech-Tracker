@@ -19,8 +19,13 @@ function invalidBody(status: number): ApiError {
   return new ApiError(status, INVALID_RESPONSE, "invalid response body");
 }
 
-export async function login(body: LoginRequest): Promise<LoginResponse> {
-  const { data } = await getAppClient().POST("/api/v1/auth/login", { body });
+// «Запомнить меня» (spec 029 FR-5) по умолчанию выключено: тело всегда содержит remember.
+export async function login(
+  body: Omit<LoginRequest, "remember"> & { remember?: boolean },
+): Promise<LoginResponse> {
+  const { data } = await getAppClient().POST("/api/v1/auth/login", {
+    body: { ...body, remember: body.remember ?? false },
+  });
   if (data === undefined) throw invalidBody(200);
   return data;
 }

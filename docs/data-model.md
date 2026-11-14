@@ -108,7 +108,7 @@
 
 ### user_session
 
-Серверные сессии (миграции 0001 и 0003).
+Серверные сессии (миграции 0001, 0003, 0015).
 
 | Столбец | Тип | NULL | Описание |
 |---|---|---|---|
@@ -118,6 +118,8 @@
 | `created_at` | timestamptz | нет | момент входа |
 | `last_activity_at` | timestamptz | нет | последняя активность (простой — 8 часов) |
 | `absolute_expires_at` | timestamptz | нет | абсолютный срок жизни (7 суток) |
+| `remember` | boolean | нет | «Запомнить меня» (spec 029, миграция 0015): `false` по умолчанию; `true` — простой и абсолютный срок 30 суток |
+| `auth_method` | text | нет | способ входа (spec 029, миграция 0015): `password` для всех входов сейчас; `CHECK` `ck_user_session_auth_method_valid` допускает `magic_link`, `yandex`, `vk`, `google` |
 
 Индекс: `ix_user_session_user_id` на `(user_id)`. Истёкшие сессии удаляет команда
 `gtrack maintenance`.
@@ -543,6 +545,7 @@ Access (1 час) и refresh (90 суток, ротация) токены гра
 | `0010` | самостоятельная регистрация (spec 019): `app_user.first_name`, `last_name`, `self_registered`, таблицы `registration_request`, `registration_attempt` |
 | `0011` | журнал резервного копирования `backup_run` (spec 009; `down_revision` `0010`); откат удаляет таблицу |
 | `0012` | вложения `attachment` (spec 011): файл в `DATA_DIR/attachments/<ключ[:2]>/<ключ>`, метаданные в БД; откат удаляет таблицу, файлы остаются |
+| `0015` | упрощённый вход (spec 029, этап а): `user_session.remember` (`false`) и `user_session.auth_method` (`password`), `CHECK` `ck_user_session_auth_method_valid`; откат снимает `CHECK` и столбцы |
 | `0013` | упоминания и уведомления: `comment_mention`, `notification` (spec 012); откат удаляет обе таблицы |
 | `0014` | OAuth для облачных MCP-клиентов (spec 028): `oauth_client`, `oauth_grant`, `oauth_code`, `oauth_token`, `oauth_attempt`; откат удаляет пять таблиц |
 

@@ -43,6 +43,8 @@ export function LoginPage() {
   const busy = useRef(false);
   const [loginValue, setLogin] = useState("");
   const [password, setPassword] = useState("");
+  // «Запомнить меня» (spec 029 FR-5): выключено по умолчанию; длинная сессия только по выбору.
+  const [remember, setRemember] = useState(false);
   const [pending, setPending] = useState(false);
   const [shown, setShown] = useState(false);
   // Fields that were empty on the last submit; each shows its text under it (cleared on the next submit).
@@ -77,7 +79,7 @@ export function LoginPage() {
     setPending(true);
     alert.clear();
     try {
-      const { user } = await login({ login: loginValue.trim(), password });
+      const { user } = await login({ login: loginValue.trim(), password, remember });
       // Nothing of the previous user may stay in the cache.
       queryClient.clear();
       if (user.must_change_password) {
@@ -134,6 +136,15 @@ export function LoginPage() {
             onToggle: () => setShown((v) => !v),
           }}
         />
+        <label className="login-remember">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            disabled={pending}
+          />
+          {t("auth.remember_me")}
+        </label>
         {/* Error sits directly above the submit button (design, login-error state). */}
         <ErrorAlert message={alert.message} seq={alert.seq} focus={emptyKeys.length === 0} />
         <button type="submit" className="login-submit" disabled={pending}>

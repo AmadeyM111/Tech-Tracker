@@ -204,3 +204,12 @@
     margin-right: 12px;
   }
 }
+
+/* «Запомнить меня» (spec 029 FR-5): флажок под паролем, поле 44 px не требуется — подпись кликабельна. */
+.login-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  cursor: pointer;
+}

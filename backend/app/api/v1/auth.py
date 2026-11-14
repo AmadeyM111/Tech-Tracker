@@ -55,11 +55,18 @@ async def login(
         login=body.login,
         password=body.password,
         now=utcnow(),
+        remember=body.remember,
     )
     response.set_cookie(
         key=settings.cookie_name,
         value=result.token,
-        max_age=int(settings.session_absolute_timeout.total_seconds()),
+        max_age=int(
+            (
+                settings.session_remember_timeout
+                if body.remember
+                else settings.session_absolute_timeout
+            ).total_seconds()
+        ),
         path="/",
         secure=settings.cookie_secure,
         httponly=True,
