@@ -205,11 +205,18 @@
   }
 }
 
-/* «Запомнить меня» (spec 029 FR-5): флажок под паролем, поле 44 px не требуется — подпись кликабельна. */
+/* «Запомнить меня» (spec 029 FR-5): флажок под паролем; вся строка — цель касания. */
 .login-remember {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 44px; /* UI-кит: цель касания не меньше 44 px */
   margin: 8px 0;
   cursor: pointer;
+}
+.login-remember input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex: none;
 }
