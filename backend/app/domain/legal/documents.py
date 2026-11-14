@@ -2,8 +2,9 @@
 
 Тексты лежат в ``documents/{privacy,consent}.json``, реквизиты — в ``documents/requisites.json``
 (единственное место). В текстах подстановки ``{operator_name}``, ``{operator_ogrn}``,
-``{operator_inn}``, ``{operator_address}``, ``{contact_email}``, ``{site_url}``. Версия — дата
-``ГГГГ-ММ-ДД``; у обоих документов она одна (``CURRENT_VERSION``). Модуль читает файлы один раз.
+``{operator_inn}``, ``{contact_email}``, ``{site_url}``; почтовый адрес необязателен (ИП работает
+онлайн): ``operator_postal_address`` пусто — ``{postal_part}`` и ``{postal_part_dot}`` пустые.
+Версия — дата ``ГГГГ-ММ-ДД``; у обоих документов она одна (``CURRENT_VERSION``). Модуль читает файлы один раз.
 """
 
 from __future__ import annotations
@@ -26,7 +27,6 @@ _REQUISITE_KEYS: Final = (
     "operator_name",
     "operator_ogrn",
     "operator_inn",
-    "operator_address",
     "contact_email",
     "site_url",
 )
@@ -59,7 +59,13 @@ def requisites() -> dict[str, str]:
     missing = [key for key in _REQUISITE_KEYS if not isinstance(raw.get(key), str)]
     if missing:
         raise ValueError(f"requisites.json: нет полей {missing}")
-    return {key: str(raw[key]) for key in _REQUISITE_KEYS}
+    values = {key: str(raw[key]) for key in _REQUISITE_KEYS}
+    postal = str(raw.get("operator_postal_address", "")).strip()
+    values["operator_postal_address"] = postal
+    # необязательный почтовый адрес: в тексте только если задан
+    values["postal_part"] = f", почтовый адрес: {postal}" if postal else ""
+    values["postal_part_dot"] = f" Почтовый адрес: {postal}." if postal else ""
+    return values
 
 
 def _fill(text: str, values: dict[str, str]) -> str:

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import re
-from collections.abc import AsyncIterator
+import shutil
+from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -88,25 +91,66 @@ def test_fr1_contact_email_and_provider_transfer_are_in_the_texts() -> None:
     assert "Вход через провайдера — это передача данных провайдеру" in privacy
 
 
-def test_fr9_placeholders_are_only_in_requisites_until_filled() -> None:
-    left = documents.unfilled_placeholders()
-    assert all(item.startswith("requisites.") or item.endswith(".json") for item in left)
+def test_fr9_requisites_are_filled_and_the_postal_address_is_optional() -> None:
     req = documents.requisites()
-    # реквизиты ИП получены от владельца 2026-11-15; адрес ещё не прислан
     assert req["operator_name"].startswith("Индивидуальный предприниматель")
     assert (req["operator_ogrn"], req["operator_inn"]) == ("324774600650295", "771975146252")
-    assert req["operator_address"] == documents.PLACEHOLDER
+    assert "operator_address" not in req  # ИП работает онлайн: почтового адреса нет
+    assert documents.unfilled_placeholders() == []
+    assert req["postal_part"] == "" and req["postal_part_dot"] == ""
+    joined = " ".join(
+        p for k in documents.KINDS for s in documents.load(k).sections for p in s.paragraphs
+    )
+    assert "ЕГРИП по ИНН 771975146252" in joined
+    assert "Адрес для обращений: электронная почта support@leggent.ru" in joined
+    assert "почтовый адрес" not in joined.lower()
+
+
+def _patched_documents(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **requisites: str) -> None:
+    """Копия документов с изменёнными реквизитами; кэши загрузчика сбрасываются до и после."""
+    target = tmp_path / "documents"
+    shutil.copytree(documents.DOCUMENTS_DIR, target)
+    raw = json.loads((target / "requisites.json").read_text(encoding="utf-8"))
+    raw.update(requisites)
+    (target / "requisites.json").write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(documents, "DOCUMENTS_DIR", target)
+    documents.requisites.cache_clear()
+    documents.load.cache_clear()
+    documents.current_version.cache_clear()
+
+
+@pytest.fixture
+def clean_legal_caches() -> Iterator[None]:
+    yield
+    documents.requisites.cache_clear()
+    documents.load.cache_clear()
+    documents.current_version.cache_clear()
+
+
+def test_fr9_postal_address_is_shown_when_given(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, clean_legal_caches: None
+) -> None:
+    _patched_documents(
+        tmp_path, monkeypatch, operator_postal_address="г. Москва, ул. Примерная, д. 1"
+    )
+    joined = " ".join(p for sec in documents.load("privacy").sections for p in sec.paragraphs)
+    assert "почтовый адрес: г. Москва, ул. Примерная, д. 1" in joined
+    assert "Почтовый адрес: г. Москва, ул. Примерная, д. 1." in joined
 
 
 # --- FR-9, AC-6: гейт реквизитов -------------------------------------------------------
 
 
-def test_ac6_production_with_placeholders_refuses_to_start(settings: Settings) -> None:
+def test_ac6_production_with_placeholders_refuses_to_start(
+    settings: Settings,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    clean_legal_caches: None,
+) -> None:
     prod = settings.model_copy(update={"env": "production", "pdn_consent_enabled": True})
-    if documents.unfilled_placeholders():
-        with pytest.raises(RuntimeError, match=r"\[ЗАПОЛНИТЬ\]"):
-            _check_legal_ready(prod)
-    else:  # реквизиты заполнены: запуск разрешён
+    _check_legal_ready(prod)  # реквизиты заполнены: запуск разрешён
+    _patched_documents(tmp_path, monkeypatch, operator_ogrn=documents.PLACEHOLDER)
+    with pytest.raises(RuntimeError, match=r"\[ЗАПОЛНИТЬ\]"):
         _check_legal_ready(prod)
 
 
