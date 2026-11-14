@@ -18,6 +18,13 @@ vi.mock("../../../src/features/auth/api", () => ({
   confirmPasswordReset: vi.fn(),
 }));
 
+// 029: provider buttons are covered by ExternalLogin.test.tsx; here the list is empty, so the screen's own
+// request counts stay as they were.
+vi.mock("../../../src/features/auth/externalApi", () => ({
+  listProviders: vi.fn(async () => []),
+  loginStartUrl: vi.fn(() => "/"),
+}));
+
 const PASSWORD = "Correct-Horse-Battery-9";
 const user = (over: Record<string, unknown> = {}) => ({
   user: { id: "11111111-1111-4111-8111-111111111111", login: "ivanov", role: "user", must_change_password: false, ...over },

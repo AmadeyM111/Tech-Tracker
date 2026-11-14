@@ -128,7 +128,7 @@ class AttemptReservation:
     """Занятый слот попытки: строка пользователя после ``reserve_attempt``."""
 
     user_id: UUID
-    password_hash: str
+    password_hash: str | None  # NULL: учётная запись без пароля (вход через провайдера, 029)
     # срок блокировки, поставленной ЭТОЙ попыткой (пятой в серии); иначе ``None``
     own_lock: datetime | None
 
@@ -250,6 +250,9 @@ class LocalPasswordProvider:
             await checkpoint()
 
         safe_password = _encodable(password)
+        if reservation.password_hash is None:
+            await self._equalize_time(password)  # пароля нет: вход по паролю невозможен
+            return None
         if safe_password is None:
             # Одиночный суррогат не совпадёт ни с одним хешем: обычная неудача.
             await self._equalize_time(password)

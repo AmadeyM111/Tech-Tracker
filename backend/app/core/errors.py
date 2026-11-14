@@ -96,6 +96,9 @@ class ErrorCode(StrEnum):
     # [027]
     recipient_not_found = "recipient_not_found"
     member_already_added = "member_already_added"
+    # [029]
+    last_login_method = "last_login_method"
+    password_already_set = "password_already_set"
 
 
 class AppError(Exception):

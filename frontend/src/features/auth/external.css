@@ -1,0 +1,109 @@
+/* External login (spec 029): provider buttons on /login and «Способы входа» in the profile. */
+.ext-login {
+  margin-top: 8px;
+}
+.ext-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 8px;
+  color: var(--text-muted);
+  font-size: 1.0625rem;
+}
+.ext-or::before,
+.ext-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.ext-hint {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 1.0625rem;
+}
+.ext-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ext-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px; /* UI kit: touch target not below 44 px */
+  box-sizing: border-box;
+  width: 100%;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+/* Colours follow the brand rules as far as checked (design file): Yandex light, VK white #FFFFFF, no shadows. */
+.ext-btn-yandex {
+  background: #f1f1f5;
+  color: #000000;
+  border-color: #f1f1f5;
+}
+.ext-btn-vk {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+}
+.ext-btn-google {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.methods {
+  margin: 24px 0;
+  max-width: 44rem;
+}
+.methods-row {
+  min-width: 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.methods-meta {
+  overflow-wrap: anywhere; /* 360 px: no horizontal scroll */
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 1.0625rem;
+}
+.methods-row button {
+  min-height: 44px;
+  padding: 8px 14px;
+}
+.methods-hint {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 1.0625rem;
+}
+.methods-dialog {
+  max-width: 28rem;
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.methods-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 1.375rem;
+}
+.methods-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.methods-actions button {
+  min-height: 44px;
+  padding: 8px 16px;
+}

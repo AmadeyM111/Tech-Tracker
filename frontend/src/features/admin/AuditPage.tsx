@@ -64,6 +64,8 @@ const ACTION_CODES: readonly string[] = [
   "user.overview_exported",
   "user.oauth_granted",
   "user.oauth_revoked",
+  "user.external_linked",
+  "user.external_unlinked",
   "project.ownership_transferred",
 ];
 // Field names with a readable text; any other name is shown as it is.
@@ -97,6 +99,9 @@ function detailsText(entry: AuditEntry): string {
       return roleName(from);
     case "user.oauth_granted":
     case "user.oauth_revoked":
+      return t("admin.audit.client", { client: entry.details?.["client"] ?? "" });
+    case "user.external_linked":
+    case "user.external_unlinked":
       return t("admin.audit.client", { client: entry.details?.["client"] ?? "" });
     case "user.overview_exported":
       return t("admin.audit.rows", { n: entry.details?.["rows"] ?? "" });

@@ -39,6 +39,9 @@ USER_ACTIONS = {
     # 028 (ADR-0025): выдача и отзыв доступа облачному OAuth-клиенту — аудит пользователя
     "user.oauth_granted",
     "user.oauth_revoked",
+    # 029 (ADR-0026): привязка и отвязка внешнего аккаунта входа — аудит пользователя
+    "user.external_linked",
+    "user.external_unlinked",
 }
 
 F = frozenset

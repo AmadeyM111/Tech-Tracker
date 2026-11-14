@@ -137,7 +137,7 @@ class OauthAttempt(Base):
 
     __tablename__ = "oauth_attempt"
     __table_args__ = (
-        CheckConstraint("scope IN ('register_ip','token_ip')", name="scope_valid"),
+        CheckConstraint("scope IN ('register_ip','token_ip','external_ip')", name="scope_valid"),
         CheckConstraint("octet_length(key_hash) = 32", name="key_hash_length"),
         Index("ix_oauth_attempt_scope_key_hash_created_at", "scope", "key_hash", "created_at"),
     )

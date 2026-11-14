@@ -201,6 +201,10 @@ async def change_own_password(
     # слот попытки виден параллельным запросам до медленной проверки пароля (FR-61)
     await commit_durably(db)
 
+    if reservation.password_hash is None:
+        # пароля нет (учётная запись провайдера, 029): задаётся отдельным путём из профиля
+        await asyncio.to_thread(hasher.dummy_verify, "")
+        raise Unprocessable(code=ErrorCode.invalid_current_password)
     if not await _current_password_matches(hasher, reservation.password_hash, current_value):
         if reservation.own_lock is not None:
             # порог достигнут: блокировка уже зафиксирована, текущая сессия завершается

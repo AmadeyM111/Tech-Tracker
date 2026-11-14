@@ -10,6 +10,7 @@ from app.api.v1 import (
     auth,
     boards,
     comments,
+    external_login,
     health,
     me,
     me_oauth,
@@ -29,6 +30,8 @@ router = APIRouter(prefix="/api/v1")
 router.include_router(health.router)
 router.include_router(auth.router)
 router.include_router(me.router)
+router.include_router(external_login.router)
+router.include_router(external_login.me_router)
 router.include_router(me_oauth.router)
 router.include_router(oauth.router)
 router.include_router(notifications.router)

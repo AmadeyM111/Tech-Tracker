@@ -12,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BASE_URL_RE = re.compile(r"https?://[^/\s]+")
@@ -68,6 +68,30 @@ class Settings(BaseSettings):
     oauth_redirect_hosts: str = "chatgpt.com,claude.ai,claude.com"
     # [030] абсолютный потолок жизни refresh-токена со дня выдачи гранта, суток
     oauth_refresh_max_days: int = Field(90, ge=1, le=365)
+    # [029] внешний вход (ADR-0026): флаг провайдера И его Client ID должны быть заданы; секреты
+    # приходят только из окружения сервера. Имена с префиксом GTRACK_ (решение оркестратора).
+    yandex_login: bool = Field(
+        False, validation_alias=AliasChoices("GTRACK_YANDEX_ENABLED", "yandex_login")
+    )
+    yandex_client_id: str | None = Field(
+        None, validation_alias=AliasChoices("GTRACK_YANDEX_CLIENT_ID", "yandex_client_id")
+    )
+    yandex_client_secret: SecretStr | None = Field(
+        None, validation_alias=AliasChoices("GTRACK_YANDEX_CLIENT_SECRET", "yandex_client_secret")
+    )
+    vk_login: bool = Field(False, validation_alias=AliasChoices("GTRACK_VK_ENABLED", "vk_login"))
+    vk_client_id: str | None = Field(
+        None, validation_alias=AliasChoices("GTRACK_VK_CLIENT_ID", "vk_client_id")
+    )
+    google_login: bool = Field(
+        False, validation_alias=AliasChoices("GTRACK_GOOGLE_ENABLED", "google_login")
+    )
+    google_client_id: str | None = Field(
+        None, validation_alias=AliasChoices("GTRACK_GOOGLE_CLIENT_ID", "google_client_id")
+    )
+    google_client_secret: SecretStr | None = Field(
+        None, validation_alias=AliasChoices("GTRACK_GOOGLE_CLIENT_SECRET", "google_client_secret")
+    )
     # [010] рабочая роль БД процесса API; пусто — API под DATABASE_URL (только не production)
     db_app_role: str | None = None
     # [009] резервные копии: каталог (том /backups), сколько хранить, порог «устарела», ч
@@ -102,6 +126,11 @@ class Settings(BaseSettings):
         "smtp_from",
         "public_base_url",
         "db_app_role",
+        "yandex_client_id",
+        "yandex_client_secret",
+        "vk_client_id",
+        "google_client_id",
+        "google_client_secret",
         mode="before",
     )
     @classmethod

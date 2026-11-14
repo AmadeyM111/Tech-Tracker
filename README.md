@@ -390,6 +390,12 @@ ChatGPT) в R1 не поддерживаются, см. ADR-0018.
   `/.well-known/openid-configuration` (блоки в `deploy/web/default.conf.template`; в серверный nginx их добавляет оператор). `/oauth/authorize`
   - страница SPA, `/api/v1/oauth/*` уже идёт в api. Проверка: `curl -s https://<адрес>/.well-known/oauth-authorization-server` возвращает JSON
   с `issuer`, а не HTML; `curl -si -X POST https://<адрес>/mcp` отвечает 401 с `WWW-Authenticate: Bearer resource_metadata=...`.
+
+### Вход через Яндекс ID, VK ID и Google (spec 029, ADR-0026)
+- Провайдер включается флагом **и** Client ID: `GTRACK_YANDEX_ENABLED`/`GTRACK_YANDEX_CLIENT_ID`/`GTRACK_YANDEX_CLIENT_SECRET`, `GTRACK_VK_ENABLED`/`GTRACK_VK_CLIENT_ID`, `GTRACK_GOOGLE_ENABLED`/`GTRACK_GOOGLE_CLIENT_ID`/`GTRACK_GOOGLE_CLIENT_SECRET` (в `.env`, секреты не коммитить; по умолчанию всё выключено). Нужен `PUBLIC_BASE_URL` (https).
+- Redirect URI в консоли провайдера: `<PUBLIC_BASE_URL>/api/v1/auth/external/<yandex|vk|google>/callback`. Пошаговая инструкция для владельца - `GTrack-handover/029-provider-registration.md`.
+- Схема: OAuth 2.0 + PKCE S256, одноразовый `state` (10 минут). Ключ идентичности - идентификатор провайдера, не email. Провайдерские токены не хранятся. Автопривязка по email только у Google при `email_verified`; у Яндекса и VK ID - нет. Новая учётка создаётся (роль «Пользователь», без пароля) только при включённой самостоятельной регистрации (019). Любой отказ входа выглядит одинаково и не раскрывает, есть ли учётка.
+- Профиль: «Способы входа» - привязка и отвязка (последний способ входа отвязать нельзя), пароль можно задать позже. Миграция `0016`: `external_identity`, `oauth_login_state`, `app_user.password_hash` допускает NULL.
 - Миграция `0014` (пять таблиц `oauth_*`) применяется при обычном обновлении; `gtrack maintenance` очищает неиспользуемых клиентов и просроченные токены (строка `oauth_purged`).
 
 ### Метрики пилота
@@ -885,6 +891,11 @@ Access tokens live 1 hour, refresh tokens 90 days with rotation. See `specs/028-
 - **nginx.** Besides `/mcp`, the api must receive `/.well-known/oauth-protected-resource*`, `/.well-known/oauth-authorization-server` and
   `/.well-known/openid-configuration` (see `deploy/web/default.conf.template`; the operator adds them to the server nginx). `/oauth/authorize` is an SPA
   page, `/api/v1/oauth/*` already goes to the api. Check: `curl -s https://<url>/.well-known/oauth-authorization-server` returns JSON, not HTML.
+### Sign-in with Yandex ID, VK ID and Google (spec 029, ADR-0026)
+- A provider is on only when its flag **and** Client ID are set: `GTRACK_YANDEX_ENABLED`/`GTRACK_YANDEX_CLIENT_ID`/`GTRACK_YANDEX_CLIENT_SECRET`, `GTRACK_VK_ENABLED`/`GTRACK_VK_CLIENT_ID`, `GTRACK_GOOGLE_ENABLED`/`GTRACK_GOOGLE_CLIENT_ID`/`GTRACK_GOOGLE_CLIENT_SECRET` (in `.env`, never commit secrets; everything is off by default). `PUBLIC_BASE_URL` (https) is required.
+- Redirect URI in the provider console: `<PUBLIC_BASE_URL>/api/v1/auth/external/<yandex|vk|google>/callback`.
+- OAuth 2.0 + PKCE S256, one-time `state` (10 minutes). The identity key is the provider id, not the email. Provider tokens are not stored. Auto-linking by email only for Google with `email_verified`; never for Yandex or VK ID. A new account (role «User», no password) is created only while self-registration (019) is enabled. Every refusal looks the same and never reveals whether an account exists.
+- Profile: «Способы входа» links and unlinks providers (the last sign-in method cannot be removed); a password can be set later. Migration `0016`: `external_identity`, `oauth_login_state`, nullable `app_user.password_hash`.
 - Migration `0014` (five `oauth_*` tables) is applied by a normal upgrade; `gtrack maintenance` removes unused clients and expired tokens (`oauth_purged`).
 
 ### Pilot metrics

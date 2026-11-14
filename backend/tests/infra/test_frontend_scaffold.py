@@ -252,6 +252,9 @@ def test_t21_src_files_only_expected() -> None:
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
         "features/oauth/ConsentPage.tsx", "features/oauth/next.ts",
         "features/oauth/api.ts", "features/oauth/oauth.css",
+        # 029: внешний вход и «Способы входа» в профиле
+        "features/auth/externalApi.ts", "features/auth/ExternalLogin.tsx",
+        "features/auth/LoginMethods.tsx", "features/auth/external.css",
         "features/tokens/CloudClients.tsx",
         "features/projects/MemberAdd.tsx", "features/projects/members.css",
         "features/tokens/AgentConnect.tsx", "features/tokens/agent-connect.css",

@@ -65,7 +65,7 @@ __all__ = [
 
 PREFIX = "u002."
 HEAD_REVISION = (
-    "0015"  # голова цепочки миграций (spec 029 этап а: 0015 login_remember; 0014 — oauth)
+    "0016"  # голова цепочки миграций (spec 029: 0016 external_login; 0015 login_remember)
 )
 FAILURE_MARK = "gt_test_injected_failure"
 _FAIL_FUNCTION = "gt_test_fail_0006"

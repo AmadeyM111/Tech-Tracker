@@ -1,14 +1,30 @@
 // 019/R8-T16: self-registration request screen /register (FR-2, FR-3, FR-4, AC-1, AC-2).
 import { GTrackLogo } from "../../shared/ui/GTrackLogo";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type RefObject,
+} from "react";
 import { Link } from "react-router-dom";
 
 import { ApiError } from "../../shared/api/client";
-import { PASSWORD_MIN_LENGTH, errorMessage, t, type MessageKey } from "../../shared/i18n";
+import {
+  PASSWORD_MIN_LENGTH,
+  errorMessage,
+  t,
+  type MessageKey,
+} from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { TextField } from "../../shared/ui/TextField";
-import { passwordResetStatus, requestRegistration, type RegistrationRequest } from "./api";
+import { ExternalLogin } from "./ExternalLogin";
+import {
+  passwordResetStatus,
+  requestRegistration,
+  type RegistrationRequest,
+} from "./api";
 import "./auth-screens.css";
 
 type FieldKey = "email" | "firstName" | "lastName" | "password";
@@ -61,13 +77,18 @@ export function RegisterPage() {
     emailRef.current?.focus();
   }, []);
 
-  const emptyError = (key: FieldKey): string | null => (emptyKeys.includes(key) ? t(EMPTY_TEXT[key]) : null);
+  const emptyError = (key: FieldKey): string | null =>
+    emptyKeys.includes(key) ? t(EMPTY_TEXT[key]) : null;
 
   async function onSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (busy.current) return;
     // Spaces at the ends count as empty. The first empty field takes focus; the general alert above the button does not.
-    const fields: { key: FieldKey; value: string; ref: RefObject<HTMLInputElement> }[] = [
+    const fields: {
+      key: FieldKey;
+      value: string;
+      ref: RefObject<HTMLInputElement>;
+    }[] = [
       { key: "email", value: email, ref: emailRef },
       { key: "firstName", value: firstName, ref: firstNameRef },
       { key: "lastName", value: lastName, ref: lastNameRef },
@@ -120,57 +141,73 @@ export function RegisterPage() {
           {t("auth.register_sent")}
         </p>
       ) : (
-        <form className="reg-form" onSubmit={(e) => void onSubmit(e)} noValidate>
-          <TextField
-            label={t("auth.register_email_label")}
-            value={email}
-            onChange={setEmail}
-            autoComplete="email"
-            inputRef={emailRef}
-            invalid={badField === "email"}
-            error={emptyError("email")}
-            disabled={pending}
-          />
-          <TextField
-            label={t("auth.register_first_name_label")}
-            value={firstName}
-            onChange={setFirstName}
-            autoComplete="given-name"
-            inputRef={firstNameRef}
-            error={emptyError("firstName")}
-            disabled={pending}
-          />
-          <TextField
-            label={t("auth.register_last_name_label")}
-            value={lastName}
-            onChange={setLastName}
-            autoComplete="family-name"
-            inputRef={lastNameRef}
-            error={emptyError("lastName")}
-            disabled={pending}
-          />
-          <TextField
-            label={t("auth.register_password_label")}
-            type="password"
-            value={password}
-            onChange={setPassword}
-            autoComplete="new-password"
-            inputRef={passwordRef}
-            hint={t("auth.password_min_length_hint", { min: PASSWORD_MIN_LENGTH })}
-            error={emptyError("password")}
-            disabled={pending}
-            reveal={{
-              label: shown ? t("auth.hide_password") : t("auth.show_password"),
-              shown,
-              onToggle: () => setShown((v) => !v),
-            }}
-          />
-          {/* Focus stays on the first empty field: the alert takes focus only for server errors. */}
-          <ErrorAlert message={alert.message} seq={alert.seq} focus={emptyKeys.length === 0} />
-          <button type="submit" className="login-submit" disabled={pending}>
-            {t("auth.register_submit")}
-          </button>
-        </form>
+        <>
+          <form
+            className="reg-form"
+            onSubmit={(e) => void onSubmit(e)}
+            noValidate
+          >
+            <TextField
+              label={t("auth.register_email_label")}
+              value={email}
+              onChange={setEmail}
+              autoComplete="email"
+              inputRef={emailRef}
+              invalid={badField === "email"}
+              error={emptyError("email")}
+              disabled={pending}
+            />
+            <TextField
+              label={t("auth.register_first_name_label")}
+              value={firstName}
+              onChange={setFirstName}
+              autoComplete="given-name"
+              inputRef={firstNameRef}
+              error={emptyError("firstName")}
+              disabled={pending}
+            />
+            <TextField
+              label={t("auth.register_last_name_label")}
+              value={lastName}
+              onChange={setLastName}
+              autoComplete="family-name"
+              inputRef={lastNameRef}
+              error={emptyError("lastName")}
+              disabled={pending}
+            />
+            <TextField
+              label={t("auth.register_password_label")}
+              type="password"
+              value={password}
+              onChange={setPassword}
+              autoComplete="new-password"
+              inputRef={passwordRef}
+              hint={t("auth.password_min_length_hint", {
+                min: PASSWORD_MIN_LENGTH,
+              })}
+              error={emptyError("password")}
+              disabled={pending}
+              reveal={{
+                label: shown
+                  ? t("auth.hide_password")
+                  : t("auth.show_password"),
+                shown,
+                onToggle: () => setShown((v) => !v),
+              }}
+            />
+            {/* Focus stays on the first empty field: the alert takes focus only for server errors. */}
+            <ErrorAlert
+              message={alert.message}
+              seq={alert.seq}
+              focus={emptyKeys.length === 0}
+            />
+            <button type="submit" className="login-submit" disabled={pending}>
+              {t("auth.register_submit")}
+            </button>
+          </form>
+          {/* Spec 029: the same provider buttons as on /login; an account is created only while registration is open. */}
+          <ExternalLogin remember={false} />
+        </>
       )}
       <div className="login-links">
         <Link to="/login">{t("auth.register_back_to_login")}</Link>

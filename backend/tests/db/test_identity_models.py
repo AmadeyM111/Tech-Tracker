@@ -224,7 +224,6 @@ async def test_t06_app_user_columns_types_nullability(db: AsyncSession) -> None:
     expected_not_null = {
         "id": "uuid",
         "login": "character varying",
-        "password_hash": "text",
         "must_change_password": "boolean",
         "is_blocked": "boolean",
         "failed_login_count": "integer",
@@ -236,6 +235,9 @@ async def test_t06_app_user_columns_types_nullability(db: AsyncSession) -> None:
         assert cols[name]["type"] == typ, f"app_user.{name}: {cols[name]['type']} != {typ}"
         assert cols[name]["nullable"] is False, f"app_user.{name} должен быть NOT NULL"
     assert cols["login"]["length"] == 64
+    # 029 (миграция 0016): NULL — учётная запись без пароля (создана входом через провайдера)
+    assert cols["password_hash"]["type"] == "text"
+    assert cols["password_hash"]["nullable"] is True
     for name in ("blocked_at", "login_locked_until"):
         assert cols[name]["type"] == "timestamp with time zone"
         assert cols[name]["nullable"] is True
@@ -592,9 +594,7 @@ async def test_fr58_session_with_unknown_user_is_rejected(db: AsyncSession) -> N
     )
 
 
-@pytest.mark.parametrize(
-    "column", ["login", "password_hash", "must_change_password", "is_blocked", "created_at"]
-)
+@pytest.mark.parametrize("column", ["login", "must_change_password", "is_blocked", "created_at"])
 async def test_t06_app_user_not_null_columns(db: AsyncSession, column: str) -> None:
     await assert_rejected(
         db,

@@ -20,6 +20,7 @@ BACKEND_RUNTIME = {
     "tzdata",
     "greenlet",
     "mcp",  # 020/PN-9: официальный SDK MCP (ADR-0018)
+    "httpx",  # 029 (ADR-0026): обмен кода у провайдеров входа; уже ставится вместе с mcp
 }
 BACKEND_DEV = {
     "pytest",

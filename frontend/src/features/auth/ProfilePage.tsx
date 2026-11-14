@@ -8,6 +8,7 @@ import { errorMessage, t, type MessageKey } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { TextField } from "../../shared/ui/TextField";
 import { updateMyName, type SetNameRequest } from "./api";
+import { LoginMethods } from "./LoginMethods";
 import type { MeResponse } from "./session";
 
 // The session guards of router.tsx read this key; the saved answer replaces the cached profile.
@@ -123,6 +124,7 @@ export function ProfilePage({ profile }: { profile: MeResponse }) {
         </button>
         {saved ? <p role="status">{t("profile.saved")}</p> : null}
       </form>
+      <LoginMethods />
     </section>
   );
 }
