@@ -21,6 +21,15 @@ describe("«Горит» на карточке доски", () => {
     expect(hot[0]!.textContent).toBe(ru["summary.hot"]);
   });
 
+  it("hot_mark_is_inside_the_title_link_on_its_own_line_in_every_card", async () => {
+    const { container } = await openBoard({}, HOT_CARDS as never);
+    const link = cardEl(container, TA)!.querySelector<HTMLElement>('[data-field="title"] a')!;
+    const mark = link.querySelector<HTMLElement>('[data-role="hot-mark"]');
+    expect(mark).not.toBeNull();
+    expect(mark!.className).toContain("ui-hot-mark--block");
+    expect(cardEl(container, TA)!.querySelector('[data-field="due_date"] [data-role="hot-mark"]')).toBeNull();
+  });
+
   it("card_without_hot_has_no_mark", async () => {
     const { container } = await openBoard({}, HOT_CARDS as never);
     expect(cardEl(container, TB)!.querySelector('[data-role="hot-mark"]')).toBeNull();

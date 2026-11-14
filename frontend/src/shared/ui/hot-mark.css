@@ -9,3 +9,8 @@
   font-weight: 600;
   white-space: nowrap;
 }
+/* Board card: own line under the title. Selector is more specific than the base rule, so the order does not matter. */
+.ui-hot-mark.ui-hot-mark--block {
+  display: table;
+  margin: 4px 0 0;
+}

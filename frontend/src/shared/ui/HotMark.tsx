@@ -3,6 +3,12 @@
 import { t } from "../i18n";
 import "./hot-mark.css";
 
-export function HotMark({ hot }: { hot: boolean }) {
-  return hot ? <span className="ui-hot-mark" data-role="hot-mark">{t("summary.hot")}</span> : null;
+// `block`: the mark takes its own line (the board card, every width). Default is inline (the summary row).
+export function HotMark({ hot, block = false }: { hot: boolean; block?: boolean }) {
+  if (!hot) return null;
+  return (
+    <span className={block ? "ui-hot-mark ui-hot-mark--block" : "ui-hot-mark"} data-role="hot-mark">
+      {t("summary.hot")}
+    </span>
+  );
 }
