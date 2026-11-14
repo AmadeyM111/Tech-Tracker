@@ -99,6 +99,7 @@ async def start(
     user_id: UUID | None,
     remember: bool,
     now: datetime,
+    consent_version: str | None = None,
 ) -> str:
     """Создаёт состояние и возвращает адрес авторизации у провайдера (FR-13)."""
     await db.execute(delete(OauthLoginState).where(OauthLoginState.expires_at <= now))
@@ -112,6 +113,7 @@ async def start(
             verifier=verifier,
             user_id=user_id if purpose == "link" else None,
             remember=remember and purpose == "login",
+            pdn_consent_version=consent_version if purpose == "login" else None,
             created_at=now,
             expires_at=now + STATE_TTL,
         )
@@ -149,6 +151,7 @@ async def complete(
                     OauthLoginState.verifier,
                     OauthLoginState.user_id,
                     OauthLoginState.remember,
+                    OauthLoginState.pdn_consent_version,
                     OauthLoginState.expires_at,
                 )
             )
@@ -188,6 +191,7 @@ async def complete(
         profile,
         remember=row.remember,
         registration_open=registration_open,
+        consent_version=row.pdn_consent_version,
         now=now,
     )
     if token is None:
@@ -299,6 +303,7 @@ async def _login(
     *,
     remember: bool,
     registration_open: bool,
+    consent_version: str | None,
     now: datetime,
 ) -> str | None:
     identity = await _active_identity(db, cfg.name, profile.subject)
@@ -323,7 +328,7 @@ async def _login(
 
     if not registration_open:  # Q-3: учётки создаются только при открытой регистрации 019
         return None
-    user_id = await _create_account(db, cfg, profile, now)
+    user_id = await _create_account(db, cfg, profile, consent_version, now)
     if user_id is None:
         return None
     return await _open_session(db, sessions, user_id, cfg, remember=remember, now=now)
@@ -338,7 +343,11 @@ def _login_base(email: str | None) -> str:
 
 
 async def _create_account(
-    db: AsyncSession, cfg: ProviderConfig, profile: ExternalProfile, now: datetime
+    db: AsyncSession,
+    cfg: ProviderConfig,
+    profile: ExternalProfile,
+    consent_version: str | None,
+    now: datetime,
 ) -> UUID | None:
     ids = (await db.scalars(select(Workspace.id).limit(2))).all()
     if len(ids) != 1:
@@ -358,6 +367,9 @@ async def _create_account(
                 login_display=login,
                 email=stored_email,
                 self_registered=True,
+                # 021: согласие, отмеченное до перехода к провайдеру
+                pdn_consent_version=consent_version,
+                pdn_consented_at=None if consent_version is None else now,
                 password_hash=None,
                 must_change_password=False,
                 is_blocked=False,
@@ -407,6 +419,15 @@ async def _create_account(
         entity_id=user_id,
         details=UserEventDetails(role_from=None, role_to=Role.USER.value),
     )
+    if consent_version is not None:
+        await record_event(
+            db,
+            workspace_id=workspace_id,
+            actor_id=user_id,
+            action=EventAction.USER_PDN_CONSENT_GIVEN,
+            entity_id=user_id,
+            details=UserEventDetails(version=consent_version),
+        )
     return user_id
 
 

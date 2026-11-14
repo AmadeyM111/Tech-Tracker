@@ -30,6 +30,7 @@ from app.domain.auth.password_reset import ResetPolicy
 from app.domain.auth.provider import LocalPasswordProvider
 from app.domain.auth.registration import RegistrationPolicy
 from app.domain.auth.sessions import SessionStore
+from app.domain.legal import documents as legal_documents
 
 
 class ClockMiddleware:
@@ -48,6 +49,19 @@ class ClockMiddleware:
 
 def _operation_id(route: APIRoute) -> str:
     return route.name
+
+
+def _check_legal_ready(settings: Settings) -> None:
+    """Спека 021, FR-9: в production согласие не включается при заглушках ``[ЗАПОЛНИТЬ]``."""
+    if not settings.pdn_consent_enabled:
+        return
+    legal_documents.current_version()  # Fail Fast: тексты читаются, версии совпадают
+    left = legal_documents.unfilled_placeholders()
+    if left and settings.env == "production":
+        raise RuntimeError(
+            "PDN_CONSENT_ENABLED включён, но в реквизитах оператора остался [ЗАПОЛНИТЬ]: "
+            + ", ".join(left)
+        )
 
 
 @asynccontextmanager
@@ -71,6 +85,7 @@ async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
         memory_cost_kib=settings.argon2_memory_cost_kib,
         parallelism=settings.argon2_parallelism,
     )
+    _check_legal_ready(settings)
     state.auth_provider = LocalPasswordProvider(
         state.password_hasher,
         max_failures=settings.login_max_failures,
@@ -86,7 +101,9 @@ async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
             base_url=settings.public_base_url, limit_key=ensure_secret_key(settings)
         )
         state.registration_policy = RegistrationPolicy(
-            base_url=settings.public_base_url, limit_key=ensure_secret_key(settings)
+            base_url=settings.public_base_url,
+            limit_key=ensure_secret_key(settings),
+            pdn_consent_required=settings.pdn_consent_enabled,
         )
     else:
         state.mailer = None

@@ -81,6 +81,8 @@ class Actor:
     role: Role | None
     must_change_password: bool
     session_id: bytes
+    # 021: согласие на обработку ПДн текущей версии не дано (при включённой функции)
+    pdn_consent_pending: bool = False
 
     def can(self, cap: Capability) -> bool:
         """Есть ли у роли возможность; без роли (FR-66) — нет ни одной."""

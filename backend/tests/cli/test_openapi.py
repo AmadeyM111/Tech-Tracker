@@ -300,6 +300,8 @@ def test_d33_error_responses_declared(spec: dict[str, Any]) -> None:
         ("GET", "/api/v1/auth/external/providers"),  # 029: кнопки провайдеров на экране входа
         ("GET", "/api/v1/auth/external/{provider}/start"),  # 029: редирект к провайдеру
         ("GET", "/api/v1/auth/external/{provider}/callback"),  # 029: возврат от провайдера
+        ("GET", "/api/v1/legal"),  # 021: публичные тексты
+        ("GET", "/api/v1/legal/{kind}"),  # 021
     }
     for method, path, op in _operations(spec):
         responses = op["responses"]
@@ -427,6 +429,7 @@ BODY_ROUTES_400 = {
     ("POST", "/api/v1/me/notifications/read"),  # 012/N12-T03
     ("POST", "/api/v1/oauth/authorize/decision"),  # 028
     ("POST", "/api/v1/me/login-methods/password"),  # 029: пароль учётной записи без пароля
+    ("POST", "/api/v1/me/pdn-consent"),  # 021
 }
 BAD_JSON_DESCRIPTION = "Некорректный JSON в теле запроса (code: bad_request)"
 

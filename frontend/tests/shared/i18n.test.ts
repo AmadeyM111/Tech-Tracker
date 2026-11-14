@@ -56,6 +56,10 @@ const API_CODES = [
   "registration_token_invalid",
   "first_name_invalid",
   "last_name_invalid",
+  // 021: согласие на обработку ПДн
+  "pdn_consent_required",
+  "pdn_consent_version_mismatch",
+  "pdn_consent_pending",
 ];
 const CLIENT_CODES = ["network_error", "invalid_response"];
 // Коды из общего обработчика HTTP-ошибок backend (core/errors.py, _HTTP_STATUS_MAP).

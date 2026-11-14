@@ -24,6 +24,7 @@ const ME_OK = () => j(200, USER);
 const ME_401 = () => err(401, "not_authenticated");
 const ME_PWD = () => err(403, "password_change_required");
 const ME_NOROLE = () => err(403, "no_role");
+const ME_PDN = () => err(403, "pdn_consent_pending");
 const OK204 = () => new Response(null, { status: 204 });
 
 type Handler = (req: Request) => Response | Promise<Response>;
@@ -88,6 +89,7 @@ describe("session gate on / (T23)", () => {
     ["401_to_login", ME_401, "/login"],
     ["password_change_required_to_change_password", ME_PWD, "/change-password"],
     ["no_role_to_no_role", ME_NOROLE, "/no-role"],
+    ["pdn_consent_pending_to_pdn_consent", ME_PDN, "/pdn-consent"], // spec 021 FR-5
   ])("me_%s", async (_n, me, target) => {
     routes["GET /api/v1/me"] = me;
     renderApp("/");

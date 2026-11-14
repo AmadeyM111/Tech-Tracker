@@ -85,6 +85,8 @@ class OauthLoginState(Base):
     remember: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    # 021: версия текста согласия на ПДн, отмеченного до перехода к провайдеру (NULL — нет)
+    pdn_consent_version: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

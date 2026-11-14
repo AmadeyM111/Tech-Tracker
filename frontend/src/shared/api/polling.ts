@@ -24,6 +24,7 @@ export const BACKGROUND_HEADER = "X-GT-Background";
 const STOP_CODES: ReadonlySet<string> = new Set([
   "not_authenticated",
   "password_change_required",
+  "pdn_consent_pending",
   "no_role",
 ]);
 

@@ -227,6 +227,7 @@ def test_actor_is_frozen_dataclass_with_plan_fields(roles: ModuleType) -> None:
         "role",
         "must_change_password",
         "session_id",
+        "pdn_consent_pending",  # 021
     ]
     actor = _actor(roles)
     with pytest.raises(dataclasses.FrozenInstanceError):

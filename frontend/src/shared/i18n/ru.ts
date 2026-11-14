@@ -651,6 +651,8 @@ export const ru = {
     "Вход через {provider} не выполнен: доступ не разрешён. Попробуйте ещё раз или войдите по паролю.",
   "auth.external_error.provider_unavailable":
     "Вход через {provider} сейчас недоступен. Попробуйте позже или войдите по паролю.",
+  "auth.external_error.pdn_consent_required":
+    "Отметьте согласие на обработку персональных данных, чтобы войти через {provider}.",
   "auth.external_error.state_invalid": "Не удалось завершить вход: запрос устарел. Попробуйте ещё раз.",
   "profile.methods_title": "Способы входа",
   "profile.methods_password": "Пароль",
@@ -688,4 +690,20 @@ export const ru = {
   "admin.audit.rows": "Строк: {n}",
   "admin.audit.field.first_name": "Имя",
   "admin.audit.field.last_name": "Фамилия",
+  // 021: согласие на обработку ПДн
+  "error.pdn_consent_required": "Отметьте согласие на обработку персональных данных.",
+  "error.pdn_consent_version_mismatch": "Текст согласия обновился. Прочитайте его и отметьте согласие ещё раз.",
+  "error.pdn_consent_pending": "Подтвердите согласие на обработку персональных данных",
+  "legal.consent_prefix": "Я согласен на ",
+  "legal.consent_link": "обработку персональных данных",
+  "legal.consent_middle": " и принимаю ",
+  "legal.privacy_link": "Политику конфиденциальности",
+  "legal.consent_required": "Отметьте согласие, чтобы продолжить",
+  "legal.version": "Версия от {date}",
+  "legal.to_login": "Войти",
+  "legal.confirm_title": "Подтвердите согласие",
+  "legal.confirm_hint": "Чтобы продолжить работу, подтвердите согласие на обработку персональных данных.",
+  "legal.confirm_submit": "Продолжить",
+  "admin.audit.action.user.pdn_consent_given": "Согласие на обработку персональных данных",
+  "admin.audit.version": "Версия текста: {version}",
 } as const;

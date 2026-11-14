@@ -34,6 +34,8 @@ export interface NavigationHandlers {
   onUnauthenticated?: () => void;
   /** 403 password_change_required: only change-password and logout are allowed. */
   onPasswordChangeRequired?: () => void;
+  /** 403 pdn_consent_pending: only the consent screen, change-password and logout are allowed (spec 021). */
+  onPdnConsentPending?: () => void;
   /** 403 no_role: show the "no role" screen. */
   onNoRole?: () => void;
 }
@@ -46,7 +48,7 @@ export interface ApiClientOptions extends NavigationHandlers {
   firedRedirects?: Set<Redirect>;
 }
 
-type Redirect = "unauthenticated" | "passwordChangeRequired" | "noRole";
+type Redirect = "unauthenticated" | "passwordChangeRequired" | "pdnConsentPending" | "noRole";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -97,6 +99,7 @@ export function createApiClient(options: ApiClientOptions = {}): Client<paths> {
     fetch: fetchImpl,
     onUnauthenticated,
     onPasswordChangeRequired,
+    onPdnConsentPending,
     onNoRole,
     firedRedirects = new Set<Redirect>(),
   } = options;
@@ -144,6 +147,8 @@ export function createApiClient(options: ApiClientOptions = {}): Client<paths> {
         }
       } else if (response.status === 403 && code === "password_change_required") {
         redirectOnce("passwordChangeRequired", onPasswordChangeRequired);
+      } else if (response.status === 403 && code === "pdn_consent_pending") {
+        redirectOnce("pdnConsentPending", onPdnConsentPending);
       } else if (response.status === 403 && code === "no_role") {
         redirectOnce("noRole", onNoRole);
       }
@@ -196,6 +201,7 @@ export function getAppClient(): Client<paths> {
     firedRedirects: appFired,
     onUnauthenticated: () => appHandlers.onUnauthenticated?.(),
     onPasswordChangeRequired: () => appHandlers.onPasswordChangeRequired?.(),
+    onPdnConsentPending: () => appHandlers.onPdnConsentPending?.(),
     onNoRole: () => appHandlers.onNoRole?.(),
   });
   return appClient;

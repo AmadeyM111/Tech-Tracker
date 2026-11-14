@@ -42,6 +42,8 @@ PUBLIC: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/v1/auth/password-reset/confirm"),  # R7-T12
         ("POST", "/api/v1/auth/registration/request"),  # R8-T11
         ("POST", "/api/v1/auth/registration/confirm"),  # R8-T11
+        ("GET", "/api/v1/legal"),  # 021: публичные тексты согласия и политики
+        ("GET", "/api/v1/legal/{kind}"),
         # 028: машинные endpoint OAuth без сессии (клиент авторизуется кодом/PKCE, лимиты по IP)
         ("POST", "/api/v1/oauth/register"),
         ("POST", "/api/v1/oauth/token"),
@@ -379,7 +381,12 @@ async def test_fr55_fr66_every_guarded_route_gives_403_for_one_time_password_and
     env = api_env
     operations = _api_operations(env)
     assert ("POST", PASSWORD_URL) in operations
-    exempt = PUBLIC | {("POST", LOGOUT_URL), ("POST", PASSWORD_URL)}
+    # 021: принятие согласия доступно именно тому, кого гейт согласия не пускает дальше
+    exempt = PUBLIC | {
+        ("POST", LOGOUT_URL),
+        ("POST", PASSWORD_URL),
+        ("POST", "/api/v1/me/pdn-consent"),
+    }
     guarded = sorted(operations - exempt)
     assert ("GET", "/api/v1/me") in guarded
 

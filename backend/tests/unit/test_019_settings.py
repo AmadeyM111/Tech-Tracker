@@ -28,7 +28,9 @@ def test_019_ac32_no_separate_feature_flag_field() -> None:
     flags = sorted(
         name
         for name in Settings.model_fields
-        if "enable" in name.lower() or name.lower().startswith("feature")
+        # 021: согласие на ПДн — отдельная функция со своим флагом (в прод только с реквизитами)
+        if ("enable" in name.lower() or name.lower().startswith("feature"))
+        and name != "pdn_consent_enabled"
     )
     assert flags == []
     assert isinstance(Settings.__dict__.get("password_reset_enabled"), property)

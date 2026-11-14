@@ -54,7 +54,12 @@ export async function confirmPasswordReset(body: PasswordResetConfirm): Promise<
 }
 
 // The answer is the same for a free and a taken address (FR-4), so the form shows one text in both cases.
-export async function requestRegistration(body: RegistrationRequest): Promise<void> {
+// Spec 021: the consent fields are optional here; the body always carries `pdn_consent` (false when the feature is off).
+export type RegistrationForm = Omit<RegistrationRequest, "pdn_consent" | "pdn_consent_version"> &
+  Partial<Pick<RegistrationRequest, "pdn_consent" | "pdn_consent_version">>;
+
+export async function requestRegistration(form: RegistrationForm): Promise<void> {
+  const body: RegistrationRequest = { ...form, pdn_consent: form.pdn_consent ?? false };
   await getAppClient().POST("/api/v1/auth/registration/request", { body });
 }
 

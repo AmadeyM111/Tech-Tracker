@@ -35,6 +35,9 @@ class RegistrationRequest(BaseModel):
         ),
     ] = None
     password: Password
+    # 021: согласие на обработку ПДн; при включённой функции обязательно (422 pdn_consent_required)
+    pdn_consent: bool = False
+    pdn_consent_version: Annotated[str | None, Field(max_length=32)] = None
 
     _password_encodable = field_validator("password")(_require_encodable)
 

@@ -93,6 +93,9 @@ class ErrorCode(StrEnum):
     attachment_empty = "attachment_empty"
     # [025]
     export_too_large = "export_too_large"
+    # [021]
+    pdn_consent_required = "pdn_consent_required"
+    pdn_consent_version_mismatch = "pdn_consent_version_mismatch"
     # [027]
     recipient_not_found = "recipient_not_found"
     member_already_added = "member_already_added"
@@ -139,6 +142,13 @@ class Forbidden(AppError):
 class PasswordChangeRequired(Forbidden):
     code = "password_change_required"
     default_detail = "Необходимо сменить пароль"
+
+
+class PdnConsentPending(Forbidden):
+    """Нет согласия на обработку ПДн текущей версии (спека 021, FR-5)."""
+
+    code = "pdn_consent_pending"
+    default_detail = "Подтвердите согласие на обработку персональных данных"
 
 
 class NoRole(Forbidden):

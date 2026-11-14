@@ -66,6 +66,8 @@ services:
       GTRACK_GOOGLE_ENABLED: ${GTRACK_GOOGLE_ENABLED:-false}
       GTRACK_GOOGLE_CLIENT_ID: ${GTRACK_GOOGLE_CLIENT_ID:-}
       GTRACK_GOOGLE_CLIENT_SECRET: ${GTRACK_GOOGLE_CLIENT_SECRET:-}
+      # Согласие на обработку ПДн (021): в production не стартует, пока в реквизитах оператора [ЗАПОЛНИТЬ].
+      PDN_CONSENT_ENABLED: ${PDN_CONSENT_ENABLED:-false}
     volumes:
       - appdata:/data
     depends_on:

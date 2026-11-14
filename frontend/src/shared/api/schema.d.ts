@@ -344,6 +344,10 @@ export interface paths {
         /**
          * Start Login
          * @description Начало входа: редирект к провайдеру (PKCE S256, одноразовый ``state``).
+         *
+         *     Спека 021 (FR-4): при включённом согласии нужны ``consent=true`` и актуальная
+         *     ``consent_version``, иначе возврат на ``/login?external_error=pdn_consent_required``; версия
+         *     уходит в состояние входа и попадает в учётную запись, если вход создаёт её.
          */
         get: operations["start_login"];
         put?: never;
@@ -575,6 +579,46 @@ export interface paths {
          * @description Проверка живости сервиса.
          */
         get: operations["health"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/legal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Legal Status
+         * @description Публично: включена ли функция согласия и версия текстов (для флажка и экрана).
+         */
+        get: operations["legal_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/legal/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Legal Document
+         * @description Публично, без входа: Политика (``privacy``) или Согласие (``consent``).
+         */
+        get: operations["legal_document"];
         put?: never;
         post?: never;
         delete?: never;
@@ -874,6 +918,29 @@ export interface paths {
         get: operations["export_overview_tasks"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/pdn-consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Pdn Consent
+         * @description Принятие согласия текущей версии (204).
+         *
+         *     ``get_actor``, а не ``get_active_actor``: маршрут доступен именно тому, кого гейт
+         *     ``pdn_consent_pending`` не пускает дальше (как выход и смена пароля).
+         */
+        post: operations["accept_pdn_consent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1776,6 +1843,39 @@ export interface components {
          */
         FileKind: "pdf" | "docx" | "xlsx" | "pptx" | "txt" | "csv" | "png" | "jpeg" | "gif" | "webp";
         JsonValue: unknown;
+        /**
+         * LegalDocument
+         * @description ``GET /legal/{kind}``: текст с подставленными реквизитами оператора.
+         */
+        LegalDocument: {
+            /** Effective Date */
+            effective_date: string;
+            /** Kind */
+            kind: string;
+            /** Sections */
+            sections: components["schemas"]["LegalSection"][];
+            /** Title */
+            title: string;
+            /** Version */
+            version: string;
+        };
+        /** LegalSection */
+        LegalSection: {
+            /** Heading */
+            heading: string | null;
+            /** Paragraphs */
+            paragraphs: string[];
+        };
+        /**
+         * LegalStatus
+         * @description ``GET /legal``: включена ли функция и текущая версия текстов.
+         */
+        LegalStatus: {
+            /** Enabled */
+            enabled: boolean;
+            /** Version */
+            version: string;
+        };
         /** LinkStart */
         LinkStart: {
             /** Url */
@@ -2164,6 +2264,16 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /**
+         * PdnConsentAccept
+         * @description ``POST /me/pdn-consent``: подтверждение согласия существующим пользователем.
+         */
+        PdnConsentAccept: {
+            /** Pdn Consent */
+            pdn_consent: boolean;
+            /** Pdn Consent Version */
+            pdn_consent_version: string;
+        };
         /** ProjectCreate */
         ProjectCreate: {
             /**
@@ -2321,6 +2431,13 @@ export interface components {
              * Format: password
              */
             password: string;
+            /**
+             * Pdn Consent
+             * @default false
+             */
+            pdn_consent: boolean;
+            /** Pdn Consent Version */
+            pdn_consent_version?: string | null;
         };
         /**
          * ResetPasswordRequest
@@ -3625,6 +3742,8 @@ export interface operations {
         parameters: {
             query?: {
                 remember?: boolean;
+                consent?: boolean;
+                consent_version?: string | null;
             };
             header?: never;
             path: {
@@ -4236,6 +4355,66 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    legal_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegalStatus"];
+                };
+            };
+        };
+    };
+    legal_document: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "privacy" | "consent";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegalDocument"];
+                };
+            };
+            /** @description Функция отключена (code: feature_disabled) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4985,6 +5164,64 @@ export interface operations {
             };
             /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    accept_pdn_consent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PdnConsentAccept"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
