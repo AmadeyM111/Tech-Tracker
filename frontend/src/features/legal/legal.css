@@ -49,3 +49,20 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Дизайн-проверка PR #56 (P2): «Выйти» и «Назад» — цель касания не меньше 44 px */
+.pdn-consent-logout,
+.legal-page .legal-back {
+  min-height: 44px;
+}
+.legal-page .legal-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.legal-page .legal-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}

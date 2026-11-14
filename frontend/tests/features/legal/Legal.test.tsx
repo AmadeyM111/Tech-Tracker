@@ -96,6 +96,7 @@ describe("LegalPage (021)", () => {
     expect(screen.getByText(t("legal.version", { date: "15.11.2026" }))).toBeTruthy();
     expect(screen.getByRole("heading", { level: 2, name: "1. Раздел" })).toBeTruthy();
     expect(screen.getByText("Абзац один")).toBeTruthy();
+    expect(screen.getByRole("button", { name: t("legal.back") })).toBeTruthy();
   });
 });
 
@@ -110,6 +111,13 @@ describe("PdnConsentPage (021)", () => {
     await waitFor(() => expect(calls.some((c) => keyOf(c) === "POST /api/v1/me/pdn-consent")).toBe(true));
     const post = calls.find((c) => keyOf(c) === "POST /api/v1/me/pdn-consent")!;
     expect(await post.json()).toEqual({ pdn_consent: true, pdn_consent_version: VERSION });
+  });
+
+  it("logout_button_is_a_44px_touch_target_class", async () => {
+    stubNet(LEGAL_ON);
+    renderAt("/pdn-consent", <PdnConsentPage />, "/pdn-consent");
+    const out = await screen.findByRole("button", { name: t("auth.logout") });
+    expect(out.classList.contains("pdn-consent-logout")).toBe(true);
   });
 
   it("without_the_box_nothing_is_sent", async () => {

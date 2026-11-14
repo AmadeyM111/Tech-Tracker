@@ -81,7 +81,12 @@ export function PdnConsentPage() {
         <button type="submit" className="login-submit" disabled={busyAny}>
           {t("legal.confirm_submit")}
         </button>
-        <button type="button" disabled={busyAny} onClick={() => void logout.run()}>
+        <button
+          type="button"
+          className="pdn-consent-logout"
+          disabled={busyAny}
+          onClick={() => void logout.run()}
+        >
           {t("auth.logout")}
         </button>
       </form>

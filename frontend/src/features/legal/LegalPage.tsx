@@ -1,6 +1,6 @@
 // Spec 021 FR-2: public pages /privacy and /consent. The text comes from the API (data with a version).
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { errorMessage, t } from "../../shared/i18n";
 import { ApiError } from "../../shared/api/client";
@@ -15,6 +15,7 @@ function versionDate(version: string): string {
 }
 
 export function LegalPage({ kind }: { kind: LegalKind }) {
+  const navigate = useNavigate();
   const query = useQuery({
     queryKey: ["legal", "document", kind],
     queryFn: () => legalDocument(kind),
@@ -43,6 +44,14 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
         </>
       ) : null}
       <p className="legal-footer">
+        {/* «Назад» — на прежний экран (форма, с которой открыли в той же вкладке); без истории — ко входу. */}
+        <button
+          type="button"
+          className="legal-back"
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/login"))}
+        >
+          {t("legal.back")}
+        </button>
         <Link to="/login">{t("legal.to_login")}</Link>
       </p>
     </article>
