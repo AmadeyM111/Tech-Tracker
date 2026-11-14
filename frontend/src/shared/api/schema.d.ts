@@ -1644,13 +1644,21 @@ export interface components {
          * @description ``POST /auth/login``: логин нормализуется и проверяется сервисом (FR-73).
          */
         LoginRequest: {
-            /** Login */
+            /**
+             * Login
+             * @description Логин или email
+             */
             login: string;
             /**
              * Password
              * Format: password
              */
             password: string;
+            /**
+             * Remember
+             * @default false
+             */
+            remember: boolean;
         };
         /** LoginResponse */
         LoginResponse: {
