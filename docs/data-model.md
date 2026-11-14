@@ -542,6 +542,7 @@ Access (1 час) и refresh (90 суток, ротация) токены гра
 | `verifier` | text | нет | PKCE `code_verifier`, живёт не дольше 10 минут |
 | `user_id` | uuid | да | пользователь привязки; обязателен при `purpose = link`, иначе `NULL` (`ck_oauth_login_state_link_has_user`); FK `fk_oauth_login_state_user_id_app_user` → `app_user.id` `ON DELETE CASCADE` |
 | `remember` | boolean | нет | «Запомнить меня» для входа; по умолчанию `false` |
+| `pdn_consent_version` | text | да | версия текста согласия на ПДн, отмеченного до перехода к провайдеру (спека 021, миграция 0017); копируется в `app_user`, если вход создаёт учётную запись |
 | `created_at`, `expires_at` | timestamptz | нет | `expires_at` = создание + 10 минут; индекс `ix_oauth_login_state_expires_at` |
 
 ## Эксплуатация
