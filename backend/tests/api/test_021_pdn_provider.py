@@ -113,3 +113,26 @@ async def test_ac8_disabled_function_ignores_consent_params(
     assert ext_env.token_from(response)
     row = (await _rows(ext_env, text("SELECT pdn_consent_version FROM app_user").text))[0]
     assert row.pdn_consent_version is None
+
+
+async def test_existing_user_ticking_the_box_on_login_gets_the_consent_recorded_once(
+    ext_env: ApiEnv,  # noqa: F811
+    fake: FakeProviders,  # noqa: F811
+) -> None:
+    _enable(ext_env)
+    await _workspace(ext_env)
+    first = await _login(ext_env, fake, "c1", **_with_consent())
+    assert ext_env.token_from(first)
+    await ext_env.execute(
+        text("UPDATE app_user SET pdn_consent_version = NULL, pdn_consented_at = NULL")
+    )
+    token = ext_env.token_from(await _login(ext_env, fake, "c2", **_with_consent()))
+    assert token
+    assert (await ext_env.me(token)).status_code == 200  # экран подтверждения не нужен
+    row = (await _rows(ext_env, "SELECT pdn_consent_version FROM app_user"))[0]
+    assert row.pdn_consent_version == documents.current_version()
+    count = "SELECT count(*) FROM domain_event WHERE action = 'user.pdn_consent_given'"
+    assert (await _rows(ext_env, count))[0][0] == 2  # при создании и при повторной отметке
+    again = await _login(ext_env, fake, "c3", **_with_consent())
+    assert ext_env.token_from(again)
+    assert (await _rows(ext_env, count))[0][0] == 2  # версия та же: нового события нет

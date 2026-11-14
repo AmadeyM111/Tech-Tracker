@@ -51,6 +51,7 @@ from app.domain.auth.login_generation import login_candidates, name_slug
 from app.domain.auth.sessions import SessionStore
 from app.domain.events.catalog import EventAction
 from app.domain.events.writer import UserEventDetails, record_event
+from app.domain.legal import consent as consent_domain
 from app.domain.oauth.service import pkce_s256
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import Workspace, WorkspaceMember
@@ -269,6 +270,25 @@ async def _member_workspace(db: AsyncSession, user_id: UUID) -> UUID | None:
     ).scalar_one_or_none()
 
 
+async def _accept_consent(
+    db: AsyncSession, user_id: UUID, consent_version: str | None, now: datetime
+) -> None:
+    """021: существующий пользователь отметил согласие на /login до перехода к провайдеру.
+
+    Пишется, только если версия в учётной записи другая (повторный вход событий не плодит).
+    """
+    if consent_version is None:
+        return
+    current = (
+        await db.execute(select(AppUser.pdn_consent_version).where(AppUser.id == user_id))
+    ).scalar_one()
+    workspace_id = await _member_workspace(db, user_id)
+    if current != consent_version and workspace_id is not None:
+        await consent_domain.accept(
+            db, user_id=user_id, workspace_id=workspace_id, version=consent_version, now=now
+        )
+
+
 async def _open_session(
     db: AsyncSession,
     sessions: SessionStore,
@@ -311,6 +331,7 @@ async def _login(
         token = await _open_session(db, sessions, identity.user_id, cfg, remember=remember, now=now)
         if token is not None:
             identity.last_used_at = now
+            await _accept_consent(db, identity.user_id, consent_version, now)
         return token
 
     existing_id = None
@@ -324,7 +345,10 @@ async def _login(
             return None
         if not await _insert_identity(db, existing_id, cfg, profile, now):
             return None
-        return await _open_session(db, sessions, existing_id, cfg, remember=remember, now=now)
+        token = await _open_session(db, sessions, existing_id, cfg, remember=remember, now=now)
+        if token is not None:
+            await _accept_consent(db, existing_id, consent_version, now)
+        return token
 
     if not registration_open:  # Q-3: учётки создаются только при открытой регистрации 019
         return None
