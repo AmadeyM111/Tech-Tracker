@@ -4,7 +4,8 @@
 (единственное место). В текстах подстановки ``{operator_name}``, ``{operator_ogrn}``,
 ``{operator_inn}``, ``{contact_email}``, ``{site_url}``; почтовый адрес необязателен (ИП работает
 онлайн): ``operator_postal_address`` пусто — ``{postal_part}`` и ``{postal_part_dot}`` пустые.
-Версия — дата ``ГГГГ-ММ-ДД``; у обоих документов она одна (``CURRENT_VERSION``). Модуль читает файлы один раз.
+Версия — дата ``ГГГГ-ММ-ДД``; у обоих документов она одна (``CURRENT_VERSION``).
+Модуль читает файлы один раз.
 """
 
 from __future__ import annotations
