@@ -53,7 +53,8 @@ class AppUser(UUIDPkMixin, TimestampMixin, AuthoredMixin, Base):
     self_registered: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
-    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    # 029: NULL — учётная запись создана внешним провайдером и пароля не имеет
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False)
     is_blocked: Mapped[bool] = mapped_column(Boolean, nullable=False)
     blocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

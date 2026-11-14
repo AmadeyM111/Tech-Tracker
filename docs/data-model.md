@@ -52,7 +52,7 @@
 | `first_name` | varchar(100) | да | имя (019, миграция 0010); `NULL` у учётных записей, созданных до 019, и у первого ТА; правится через `PUT /me/name` (сам пользователь) и `PUT /admin/users/{id}/name` (ТА) |
 | `last_name` | varchar(100) | да | фамилия (019, миграция 0010); то же, что `first_name` |
 | `self_registered` | boolean | нет | учётная запись создана самостоятельной регистрацией (019, миграция 0010); по умолчанию `false` |
-| `password_hash` | text | нет | хеш Argon2id (пароль в открытом виде не хранится) |
+| `password_hash` | text | да | хеш Argon2id (пароль в открытом виде не хранится); `NULL` — пароля нет (учётная запись создана входом через провайдера, spec 029, миграция 0016): вход по паролю невозможен, пароль можно задать из профиля |
 | `must_change_password` | boolean | нет | требуется смена пароля при входе |
 | `is_blocked` | boolean | нет | учётная запись заблокирована |
 | `blocked_at` | timestamptz | да | момент блокировки |
@@ -506,9 +506,39 @@ Access (1 час) и refresh (90 суток, ротация) токены гра
 | Столбец | Тип | NULL | Примечание |
 |---|---|---|---|
 | `id` | uuid | нет | PK `pk_oauth_attempt` |
-| `scope` | text | нет | `register_ip` / `token_ip` (`ck_oauth_attempt_scope_valid`) |
+| `scope` | text | нет | `register_ip` / `token_ip` / `external_ip` (вход через провайдера, 029; `ck_oauth_attempt_scope_valid`) |
 | `key_hash` | bytea | нет | HMAC-SHA256 ключа и IP, 32 байта (`ck_oauth_attempt_key_hash_length`) |
 | `created_at` | timestamptz | нет | индексы: `created_at`; `(scope, key_hash, created_at)` |
+
+### external_identity
+Привязка учётной записи к аккаунту внешнего провайдера входа (spec 029, ADR-0026, миграция 0016). Провайдерские токены не хранятся; строка живёт, пока привязка не снята (мягкая отвязка).
+
+| Столбец | Тип | NULL | Примечание |
+|---|---|---|---|
+| `id` | uuid | нет | PK `pk_external_identity` |
+| `user_id` | uuid | нет | FK `fk_external_identity_user_id_app_user` → `app_user.id` `ON DELETE RESTRICT`; индекс `ix_external_identity_user_id` |
+| `provider` | text | нет | `yandex` / `vk` / `google` (`ck_external_identity_provider_valid`) |
+| `provider_subject` | varchar(255) | нет | стабильный идентификатор у провайдера (ключ идентичности, FR-14); не пустой (`ck_external_identity_subject_not_empty`) |
+| `email_at_link` | varchar(254) | да | адрес, который сообщил провайдер при привязке (нижний регистр); справочно, в `app_user.email` не попадает, если провайдер адрес не подтверждает |
+| `email_verified_by_provider` | boolean | нет | подтвердил ли провайдер адрес (только Google, FR-16) |
+| `linked_at` | timestamptz | нет | момент привязки |
+| `last_used_at` | timestamptz | да | последний вход через эту привязку |
+| `unlinked_at` | timestamptz | да | момент отвязки (мягко); отвязанные строки не мешают привязать тот же аккаунт заново |
+
+Уникальность среди активных (`unlinked_at IS NULL`): `uq_external_identity_subject_active` на `(provider, provider_subject)` и `uq_external_identity_user_provider_active` на `(user_id, provider)` (по одному аккаунту каждого провайдера на пользователя).
+
+### oauth_login_state
+Одноразовое состояние входа или привязки через провайдера (spec 029, FR-13, миграция 0016). Строка удаляется первым же обращением к `callback`; просроченные удаляются при следующем старте входа.
+
+| Столбец | Тип | NULL | Примечание |
+|---|---|---|---|
+| `state_hash` | bytea | нет | PK `pk_oauth_login_state`: SHA-256 значения `state` (32 байта, `ck_oauth_login_state_state_hash_length`) |
+| `provider` | text | нет | `yandex` / `vk` / `google` (`ck_oauth_login_state_provider_valid`) |
+| `purpose` | text | нет | `login` / `link` (`ck_oauth_login_state_purpose_valid`) |
+| `verifier` | text | нет | PKCE `code_verifier`, живёт не дольше 10 минут |
+| `user_id` | uuid | да | пользователь привязки; обязателен при `purpose = link`, иначе `NULL` (`ck_oauth_login_state_link_has_user`); FK `fk_oauth_login_state_user_id_app_user` → `app_user.id` `ON DELETE CASCADE` |
+| `remember` | boolean | нет | «Запомнить меня» для входа; по умолчанию `false` |
+| `created_at`, `expires_at` | timestamptz | нет | `expires_at` = создание + 10 минут; индекс `ix_oauth_login_state_expires_at` |
 
 ## Эксплуатация
 

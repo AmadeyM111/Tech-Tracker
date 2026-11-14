@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -91,6 +92,10 @@ async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
         state.mailer = None
         state.password_reset_policy = None
         state.registration_policy = None
+    # spec 029: HTTP-клиент для обмена кода у провайдеров входа (тесты подменяют ``external_http``)
+    state.external_http = httpx.AsyncClient(
+        timeout=httpx.Timeout(10.0), follow_redirects=False, trust_env=False
+    )
     # spec 010: процесс API — под рабочей ролью БД (DB_APP_ROLE), не под владельцем схемы
     engine = create_engine(settings, url=app_database_url(settings))
     application.state.engine = engine
@@ -100,6 +105,7 @@ async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
             yield
     finally:
         await engine.dispose()
+        await state.external_http.aclose()
 
 
 def create_app(settings: Settings | None = None, *, clock: Clock | None = None) -> FastAPI:

@@ -57,6 +57,15 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      # Внешний вход (029): флаг И Client ID включают провайдера; секреты только ссылками на .env.
+      GTRACK_YANDEX_ENABLED: ${GTRACK_YANDEX_ENABLED:-false}
+      GTRACK_YANDEX_CLIENT_ID: ${GTRACK_YANDEX_CLIENT_ID:-}
+      GTRACK_YANDEX_CLIENT_SECRET: ${GTRACK_YANDEX_CLIENT_SECRET:-}
+      GTRACK_VK_ENABLED: ${GTRACK_VK_ENABLED:-false}
+      GTRACK_VK_CLIENT_ID: ${GTRACK_VK_CLIENT_ID:-}
+      GTRACK_GOOGLE_ENABLED: ${GTRACK_GOOGLE_ENABLED:-false}
+      GTRACK_GOOGLE_CLIENT_ID: ${GTRACK_GOOGLE_CLIENT_ID:-}
+      GTRACK_GOOGLE_CLIENT_SECRET: ${GTRACK_GOOGLE_CLIENT_SECRET:-}
     volumes:
       - appdata:/data
     depends_on:

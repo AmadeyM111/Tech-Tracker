@@ -11,6 +11,7 @@ import { safeConsentNext, withNext } from "../oauth/next";
 import { Icon } from "../../shared/ui/Icon";
 import { TextField } from "../../shared/ui/TextField";
 import { login, passwordResetStatus } from "./api";
+import { ExternalLogin, externalErrorText } from "./ExternalLogin";
 import { FOCUS_HEADING_STATE } from "./session";
 import "./auth-screens.css";
 
@@ -56,6 +57,9 @@ export function LoginPage() {
     retry: false,
     refetchOnWindowFocus: false,
   });
+
+  // A refusal of the external login comes back as ?external_error=<code> (spec 029): one neutral text.
+  const externalError = externalErrorText(searchParams.get("external_error"));
 
   useEffect(() => {
     loginRef.current?.focus();
@@ -146,7 +150,11 @@ export function LoginPage() {
           {t("auth.remember_me")}
         </label>
         {/* Error sits directly above the submit button (design, login-error state). */}
-        <ErrorAlert message={alert.message} seq={alert.seq} focus={emptyKeys.length === 0} />
+        <ErrorAlert
+          message={alert.message ?? externalError}
+          seq={alert.seq}
+          focus={emptyKeys.length === 0}
+        />
         <button type="submit" className="login-submit" disabled={pending}>
           {pending && <Icon name="spinner" className="login-spin" />}
           {t("auth.login_submit")}
@@ -159,6 +167,7 @@ export function LoginPage() {
           <Link to="/register">{t("auth.register_link")}</Link>
         </div>
       )}
+      <ExternalLogin remember={remember} />
       <section className="ui-login-help" aria-labelledby="login-help-title">
         <h2 id="login-help-title">{t("auth.help_title")}</h2>
         <p>{t("auth.help_p1")}</p>
