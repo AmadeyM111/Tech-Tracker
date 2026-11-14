@@ -212,7 +212,7 @@ describe("after password change and login (T23)", () => {
     fireEvent.click(submitButton(container));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith("/auth/login"))).toBe(true));
     const req = calls.find((c) => c.url.endsWith("/auth/login"))!;
-    expect(await req.json()).toEqual({ login: "uok", password: "Correct-Horse-Battery-9" });
+    expect(await req.json()).toEqual({ login: "uok", password: "Correct-Horse-Battery-9", remember: false });
   });
 
   // 003/AC-10: после входа - стартовый экран (USER -> /admin/users), кэш предыдущего пользователя очищен.

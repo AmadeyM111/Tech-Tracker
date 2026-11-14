@@ -10,8 +10,19 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, LargeBinary, String, Text, Uuid
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    LargeBinary,
+    String,
+    Text,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql.expression import false
 
 from app.core.clock import utcnow
 from app.core.models import Base
@@ -19,7 +30,14 @@ from app.core.models import Base
 
 class UserSession(Base):
     __tablename__ = "user_session"
-    __table_args__ = (CheckConstraint("octet_length(id) = 32", name="id_length"),)
+    __table_args__ = (
+        CheckConstraint("octet_length(id) = 32", name="id_length"),
+        # spec 029 (миграция 0015): способы входа; 'password' — до появления других
+        CheckConstraint(
+            "auth_method IN ('password', 'magic_link', 'yandex', 'vk', 'google')",
+            name="auth_method_valid",
+        ),
+    )
 
     id: Mapped[bytes] = mapped_column(LargeBinary, primary_key=True)
     user_id: Mapped[UUID] = mapped_column(
@@ -40,6 +58,10 @@ class UserSession(Base):
         DateTime(timezone=True), default=utcnow, nullable=False
     )
     absolute_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # «Запомнить меня» (spec 029 FR-5): длинный простой и абсолютный срок
+    # Серверные значения по умолчанию, как в миграции 0015 (старая схема тоже принимает вставку)
+    remember: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    auth_method: Mapped[str] = mapped_column(Text, nullable=False, server_default="password")
 
 
 class PasswordResetToken(Base):

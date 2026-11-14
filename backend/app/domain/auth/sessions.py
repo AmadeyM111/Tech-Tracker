@@ -36,9 +36,19 @@ class SessionRecord:
     last_activity_at: datetime
 
 
+# «Запомнить меня» (spec 029 FR-5): простой и абсолютный срок сессии, 30 дней.
+REMEMBER_TIMEOUT: Final = timedelta(days=30)
+
+
 class SessionStore:
     def __init__(
-        self, secret_key: bytes, *, idle_timeout: timedelta, absolute_timeout: timedelta
+        self,
+        secret_key: bytes,
+        *,
+        idle_timeout: timedelta,
+        absolute_timeout: timedelta,
+        remember_idle_timeout: timedelta = REMEMBER_TIMEOUT,
+        remember_absolute_timeout: timedelta = REMEMBER_TIMEOUT,
     ) -> None:
         if len(secret_key) < MIN_SECRET_KEY_BYTES:
             # значение ключа в сообщение не попадает
@@ -48,6 +58,8 @@ class SessionStore:
         self._secret_key = secret_key
         self._idle_timeout = idle_timeout
         self._absolute_timeout = absolute_timeout
+        self._remember_idle_timeout = remember_idle_timeout
+        self._remember_absolute_timeout = remember_absolute_timeout
 
     def token_id(self, token: str) -> bytes:
         """``HMAC-SHA256(secret_key, token)`` — идентификатор строки ``user_session``."""
@@ -57,20 +69,33 @@ class SessionStore:
         return hmac.new(self._secret_key, data, hashlib.sha256).digest()
 
     async def create(
-        self, db: AsyncSession, *, user_id: UUID, workspace_id: UUID, now: datetime
+        self,
+        db: AsyncSession,
+        *,
+        user_id: UUID,
+        workspace_id: UUID,
+        now: datetime,
+        remember: bool = False,
+        auth_method: str = "password",
     ) -> str:
         """Создаёт сессию; возвращает сырой токен (в БД его нет)."""
         token = secrets.token_urlsafe(TOKEN_BYTES)
-        await db.execute(
-            insert(UserSession).values(
-                id=self.token_id(token),
-                user_id=user_id,
-                workspace_id=workspace_id,
-                created_at=now,
-                last_activity_at=now,
-                absolute_expires_at=now + self._absolute_timeout,
-            )
-        )
+        absolute = self._remember_absolute_timeout if remember else self._absolute_timeout
+        values: dict[str, object] = {
+            "id": self.token_id(token),
+            "user_id": user_id,
+            "workspace_id": workspace_id,
+            "created_at": now,
+            "last_activity_at": now,
+            "absolute_expires_at": now + absolute,
+        }
+        # Колонки spec 029 (миграция 0015) пишутся только при значении, отличном от умолчания:
+        # вставка работает и на схеме до 0015 (тесты миграций создают данные на старой схеме).
+        if remember:
+            values["remember"] = True
+        if auth_method != "password":
+            values["auth_method"] = auth_method
+        await db.execute(insert(UserSession).values(**values))
         return token
 
     async def resolve(
@@ -91,12 +116,14 @@ class SessionStore:
                     UserSession.created_at,
                     UserSession.last_activity_at,
                     UserSession.absolute_expires_at,
+                    UserSession.remember,
                 ).where(UserSession.id == sid)
             )
         ).one_or_none()
         if row is None:
             return None
-        if now - row.last_activity_at >= self._idle_timeout or now >= row.absolute_expires_at:
+        idle_timeout = self._remember_idle_timeout if row.remember else self._idle_timeout
+        if now - row.last_activity_at >= idle_timeout or now >= row.absolute_expires_at:
             await db.execute(delete(UserSession).where(UserSession.id == sid))
             return None
         last_activity_at: datetime = row.last_activity_at

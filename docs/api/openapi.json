@@ -1143,6 +1143,7 @@
         "description": "``POST /auth/login``: логин нормализуется и проверяется сервисом (FR-73).",
         "properties": {
           "login": {
+            "description": "Логин или email",
             "maxLength": 1024,
             "title": "Login",
             "type": "string"
@@ -1153,6 +1154,11 @@
             "title": "Password",
             "type": "string",
             "writeOnly": true
+          },
+          "remember": {
+            "default": false,
+            "title": "Remember",
+            "type": "boolean"
           }
         },
         "required": [

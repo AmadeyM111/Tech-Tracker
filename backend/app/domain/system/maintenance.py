@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Final
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select
 
 from app.domain.auth.models import RegistrationRequest, UserSession
 
@@ -33,6 +33,7 @@ async def purge_expired_sessions(
     *,
     now: datetime,
     idle_timeout: timedelta,
+    remember_idle_timeout: timedelta | None = None,
     batch_size: int = DEFAULT_BATCH_SIZE,
     dry_run: bool = False,
 ) -> int:
@@ -43,6 +44,14 @@ async def purge_expired_sessions(
     if batch_size < 1:
         raise ValueError("batch_size must be >= 1")
     idle_cutoff = now - idle_timeout
+    remember_cutoff = now - (
+        idle_timeout if remember_idle_timeout is None else remember_idle_timeout
+    )
+    # Простой считается по признаку сессии: «Запомнить меня» живёт дольше (spec 029 FR-5)
+    idle_expired = or_(
+        and_(UserSession.remember.is_(False), UserSession.last_activity_at <= idle_cutoff),
+        and_(UserSession.remember.is_(True), UserSession.last_activity_at <= remember_cutoff),
+    )
     if dry_run:
         async with sessionmaker() as session, session.begin():
             counted = await session.execute(
@@ -50,7 +59,7 @@ async def purge_expired_sessions(
                 .select_from(UserSession)
                 .where(
                     or_(
-                        UserSession.last_activity_at <= idle_cutoff,
+                        idle_expired,
                         UserSession.absolute_expires_at <= now,
                     )
                 )
@@ -62,7 +71,7 @@ async def purge_expired_sessions(
             select(UserSession.id)
             .where(
                 or_(
-                    UserSession.last_activity_at <= idle_cutoff,
+                    idle_expired,
                     UserSession.absolute_expires_at <= now,
                 )
             )

@@ -42,7 +42,7 @@ describe("LoginPage (T23)", () => {
     fireEvent.click(submitButton(container));
     await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/"));
     expect(api.login).toHaveBeenCalledTimes(1);
-    expect(api.login).toHaveBeenCalledWith({ login: "ivanov", password: PASSWORD });
+    expect(api.login).toHaveBeenCalledWith({ login: "ivanov", password: PASSWORD, remember: false });
   });
 
   it("fr55_must_change_password_redirects_to_change_password", async () => {
@@ -203,7 +203,7 @@ describe("LoginPage (T23)", () => {
     fill(container, "  ivanov  ", PASSWORD);
     fireEvent.click(submitButton(container));
     await waitFor(() => expect(api.login).toHaveBeenCalledTimes(1));
-    expect(api.login).toHaveBeenCalledWith({ login: "ivanov", password: PASSWORD });
+    expect(api.login).toHaveBeenCalledWith({ login: "ivanov", password: PASSWORD, remember: false });
     expect(screen.queryByText(ru["auth.login_required_login"])).toBeNull();
   });
 
@@ -397,11 +397,12 @@ describe("LoginPage help block (spec 005)", () => {
         'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
       ),
     ).filter((el) => !(el as HTMLButtonElement).disabled);
-    // 006/AC-6: между «Пароль» и «Войти» появилась кнопка показа пароля.
+    // 006/AC-6: между «Пароль» и «Войти» появилась кнопка показа пароля; spec 029 FR-5: флажок «Запомнить меня».
     expect(focusable).toEqual([
       field(container, "username"),
       field(container, "current-password"),
       revealButtons(container)[0],
+      container.querySelector<HTMLElement>('input[type="checkbox"]'),
       submitButton(container),
     ]);
     expect(revealButtons(container)).toHaveLength(1);
@@ -491,7 +492,7 @@ describe("LoginPage password reveal (006)", () => {
     expect(pwd(container).type).toBe("text"); // три нажатия: показан -> скрыт -> показан
     fireEvent.submit(pwd(container).form!); // Enter в поле пароля
     await waitFor(() => expect(api.login).toHaveBeenCalledTimes(1));
-    expect(api.login).toHaveBeenCalledWith({ login: "ivanov", password: SECRET });
+    expect(api.login).toHaveBeenCalledWith({ login: "ivanov", password: SECRET, remember: false });
   });
 
   it("ac6_icon_is_first_child_aria_hidden_and_differs_between_states", () => {
@@ -694,6 +695,7 @@ describe("LoginPage registration link and help (spec 019)", () => {
       field(container, "username"),
       field(container, "current-password"),
       revealButtons(container)[0],
+      container.querySelector<HTMLElement>('input[type="checkbox"]'),
       submitButton(container),
       screen.getByRole("link", { name: t("auth.forgot_password") }),
       screen.getByRole("link", { name: t("auth.register_link") }),
@@ -808,5 +810,26 @@ describe("LoginPage design v0.3 (spec 005)", () => {
     const spinner = btn.querySelector("svg.ui-icon");
     expect(spinner).not.toBeNull();
     expect(spinner!.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+describe("«Запомнить меня» и email или логин (spec 029, этап а)", () => {
+  it("029a_remember_checkbox_is_off_by_default_and_sends_true_when_checked", async () => {
+    vi.mocked(api.login).mockResolvedValue(user() as never);
+    const { container } = renderAt("/login", <LoginPage />);
+    const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    expect(box.checked).toBe(false);
+    expect(screen.getByLabelText(t("auth.remember_me"))).toBe(box);
+    fill(container);
+    fireEvent.click(box);
+    fireEvent.click(submitButton(container));
+    await waitFor(() => expect(api.login).toHaveBeenCalledTimes(1));
+    expect(api.login).toHaveBeenCalledWith({ login: "ivanov", password: PASSWORD, remember: true });
+  });
+
+  it("029a_field_takes_email_or_login_and_its_label_says_so", () => {
+    const { container } = renderAt("/login", <LoginPage />);
+    expect(screen.getByLabelText(t("auth.login_label"))).toBe(field(container, "username"));
+    expect(t("auth.login_label")).toBe("Email или логин");
   });
 });

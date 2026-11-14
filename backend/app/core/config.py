@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     cookie_name: str = "gt_session"
     session_idle_timeout: timedelta = timedelta(hours=8)
     session_absolute_timeout: timedelta = timedelta(days=7)
+    # «Запомнить меня» (spec 029 FR-5): простой и абсолютный срок сессии
+    session_remember_timeout: timedelta = timedelta(days=30)
     login_max_failures: int = 5
     login_lock_duration: timedelta = timedelta(minutes=15)
     argon2_time_cost: int = 3
@@ -78,6 +80,7 @@ class Settings(BaseSettings):
     @field_validator(
         "session_idle_timeout",
         "session_absolute_timeout",
+        "session_remember_timeout",
         "login_lock_duration",
         "trash_retention",
         mode="before",

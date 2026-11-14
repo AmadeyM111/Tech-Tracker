@@ -39,7 +39,7 @@ from app.domain.auth.provider import (
     AttemptReservation,
     AuthProvider,
     PasswordCredentials,
-    normalize_login,
+    normalize_identifier,
     reserve_attempt,
     series_not_locked_by_others,
 )
@@ -87,6 +87,7 @@ async def login(
     login: str,
     password: SecretStr,
     now: datetime,
+    remember: bool = False,
 ) -> LoginResult:
     """Вход по логину и паролю; любая причина отказа — один и тот же ``InvalidCredentials``.
 
@@ -95,16 +96,20 @@ async def login(
     к БД. Заблокированный пользователь и пользователь без членства в пространстве получают тот
     же отказ (FR-5, FR-61). Роль ``NULL`` вход не запрещает (FR-66).
     """
-    normalized = normalize_login(login)
-    if normalized is None:
+    identified = normalize_identifier(login)
+    if identified is None:
         raise InvalidCredentials()
+    by_email, normalized = identified
 
     async def reserved() -> None:
         # занятый слот попытки виден параллельным запросам до медленной проверки пароля
         await commit_durably(db)
 
     user_id = await provider.authenticate(
-        db, PasswordCredentials(login=normalized, password=password), now=now, checkpoint=reserved
+        db,
+        PasswordCredentials(login=normalized, password=password, by_email=by_email),
+        now=now,
+        checkpoint=reserved,
     )
     if user_id is None:
         await commit_durably(db)
@@ -129,7 +134,9 @@ async def login(
         await commit_durably(db)
         raise InvalidCredentials()
 
-    token = await sessions.create(db, user_id=user_id, workspace_id=row.workspace_id, now=now)
+    token = await sessions.create(
+        db, user_id=user_id, workspace_id=row.workspace_id, now=now, remember=remember
+    )
     return LoginResult(
         token=token,
         user_id=user_id,

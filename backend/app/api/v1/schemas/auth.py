@@ -36,8 +36,11 @@ class LoginRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    login: Annotated[str, Field(max_length=MAX_CREDENTIAL_LENGTH)]
+    # Логин или email (spec 029 FR-1): значение с «@» — email; имя поля сохранено.
+    login: Annotated[str, Field(max_length=MAX_CREDENTIAL_LENGTH, description="Логин или email")]
     password: Password
+    # «Запомнить меня» (spec 029 FR-5): 30 дней простоя и абсолютно; по умолчанию выключено.
+    remember: bool = False
 
     _password_encodable = field_validator("password")(_require_encodable)
 

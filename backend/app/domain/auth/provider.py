@@ -55,6 +55,29 @@ def normalize_login(raw: str) -> str | None:
     return login
 
 
+# Email (spec 029 FR-1): ASCII, нижний регистр, до 254 символов (как email_lower, 007/PR-1).
+EMAIL_RE: Final = re.compile(r"[a-z0-9._%+-]{1,64}@[a-z0-9.-]{1,253}\.[a-z]{2,63}")
+MAX_EMAIL_LENGTH: Final = 254
+
+
+def normalize_identifier(raw: str) -> tuple[bool, str] | None:
+    """Поле «Логин или email» (spec 029 FR-1): с «@» — email, иначе логин.
+
+    Возвращает ``(это_email, значение_в_нижнем_регистре)`` или ``None``, если значение не может
+    принадлежать ни одной учётной записи. Только ASCII — как у ``normalize_login``.
+    """
+    if not raw.isascii():
+        return None
+    value = raw.lower()
+    if "@" in value:
+        if len(value) > MAX_EMAIL_LENGTH or EMAIL_RE.fullmatch(value) is None:
+            return None
+        return True, value
+    if LOGIN_RE.fullmatch(value) is None:
+        return None
+    return False, value
+
+
 # Вызывается провайдером сразу после резервирования попытки: вызывающий делает занятый слот
 # видимым параллельным запросам (фиксация), не дожидаясь медленной проверки пароля.
 Checkpoint = Callable[[], Awaitable[None]]
@@ -62,8 +85,9 @@ Checkpoint = Callable[[], Awaitable[None]]
 
 @dataclass(frozen=True)
 class PasswordCredentials:
-    login: str  # уже нормализован (lower)
+    login: str  # уже нормализован (lower); при by_email — email
     password: SecretStr
+    by_email: bool = False
 
 
 class AuthProvider(Protocol):
@@ -195,17 +219,24 @@ class LocalPasswordProvider:
         login = credentials.login
         password = credentials.password.get_secret_value()
 
-        # Логин вне шаблона (в том числе с NUL) не может существовать: в БД не ходим,
+        # Значение вне шаблона (в том числе с NUL) не может существовать: в БД не ходим,
         # NUL asyncpg отверг бы исключением.
-        if LOGIN_RE.fullmatch(login) is None:
-            await self._equalize_time(password)
-            return None
+        if credentials.by_email:
+            if EMAIL_RE.fullmatch(login) is None or len(login) > MAX_EMAIL_LENGTH:
+                await self._equalize_time(password)
+                return None
+            where = AppUser.email == login
+        else:
+            if LOGIN_RE.fullmatch(login) is None:
+                await self._equalize_time(password)
+                return None
+            where = AppUser.login == login
 
         # Резервирование попытки до проверки пароля: один атомарный UPDATE. Нет строки —
         # логина нет либо вход заблокирован: ответ и затраты времени одинаковы (FR-61).
         reservation = await reserve_attempt(
             db,
-            where=AppUser.login == login,
+            where=where,
             now=now,
             max_failures=self._max_failures,
             lock_duration=self._lock_duration,
