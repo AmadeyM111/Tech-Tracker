@@ -37,23 +37,53 @@
   font-size: 1.0625rem;
   font-weight: 600;
   text-decoration: none;
-  border-radius: 999px;
-  border: 1px solid var(--border);
+  border-radius: 12px;
 }
-/* Colours follow the brand rules as far as checked (design file): Yandex light, VK white #FFFFFF, no shadows. */
+.ext-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Yandex ID: the official button file is shown as it is; colours, text and radius are inside the file. */
 .ext-btn-yandex {
-  background: #f1f1f5;
-  color: #000000;
-  border-color: #f1f1f5;
+  background: transparent;
 }
-.ext-btn-vk {
-  background: #ffffff;
-  color: #000000;
-  border-color: #ffffff;
+.ext-btn-yandex img {
+  display: block;
+  height: 44px;
+  width: auto;
+  max-width: 100%;
 }
+/* «Sign in with Google», dark theme (official guide): fill #131314, 1 px stroke #8E918F, text #E3E3E3,
+   paddings 12 / 10 / 12 px, the G mark unchanged. */
 .ext-btn-google {
+  gap: 10px;
+  padding: 0 12px;
+  background: #131314;
+  color: #e3e3e3;
+  border: 1px solid #8e918f;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.ext-btn-google img {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+.ext-btn-plain {
+  border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text);
+}
+
+.methods-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.methods-icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
 }
 
 .methods {
