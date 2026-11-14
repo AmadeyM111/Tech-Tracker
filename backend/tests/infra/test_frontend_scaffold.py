@@ -420,3 +420,24 @@ def test_t22_node_version_enforced_by_npmrc_or_check_script() -> None:
         re.search(r"(?i)node[^\n]*(верси|version|22|24)", check)
     )
     assert by_npmrc or by_check, "нужен engine-strict=true или проверка версии Node в check.sh"
+
+
+# --- фавикон сайта --------------------------------------------------------------------------
+
+_FAVICON_FILES = (
+    "favicon.svg",
+    "favicon.ico",
+    "favicon-16x16.png",
+    "favicon-32x32.png",
+    "apple-touch-icon.png",
+)
+
+
+def test_favicon_files_exist_and_index_html_links_them() -> None:
+    root = Path(__file__).resolve().parents[3] / "frontend"
+    html = (root / "index.html").read_text(encoding="utf-8")
+    for name in _FAVICON_FILES:
+        assert (root / "public" / name).is_file(), name
+        assert f'href="/{name}"' in html, name
+    assert 'rel="apple-touch-icon"' in html
+    assert 'type="image/svg+xml"' in html
