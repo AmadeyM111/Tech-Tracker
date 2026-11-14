@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     smtp_starttls: bool = True
     public_base_url: str | None = None
+    # [030] хосты redirect_uri OAuth-клиентов через запятую; по умолчанию — callback-хосты ChatGPT и
+    # Claude (официальная документация, спека 030); "*" — любой https-хост (осознанное ослабление)
+    oauth_redirect_hosts: str = "chatgpt.com,claude.ai,claude.com"
+    # [030] абсолютный потолок жизни refresh-токена со дня выдачи гранта, суток
+    oauth_refresh_max_days: int = Field(90, ge=1, le=365)
     # [010] рабочая роль БД процесса API; пусто — API под DATABASE_URL (только не production)
     db_app_role: str | None = None
     # [009] резервные копии: каталог (том /backups), сколько хранить, порог «устарела», ч

@@ -443,6 +443,71 @@ TRUNCATE` — в бэклоге (plan D-8).
 
 Индексы: `(recipient_id, read_at, created_at DESC)` — список и счётчик; `created_at` — очистка старше 90 дней.
 
+## OAuth для облачных MCP-клиентов (spec 028)
+Секреты (код, access `gtat_`, refresh `gtrt_`) в БД не хранятся: только SHA-256 (32 байта), как у `api_token`.
+
+### oauth_client
+Клиент, зарегистрированный динамически (RFC 7591); публичный, без секрета. Глобальная таблица.
+
+| Столбец | Тип | NULL | Примечание |
+|---|---|---|---|
+| `id` | uuid | нет | PK `pk_oauth_client` |
+| `client_id` | text | нет | `UNIQUE`; 16..64 символа (`ck_oauth_client_client_id_length`) |
+| `client_name` | text | да | название, которое указал клиент; 1..64 символа (`ck_oauth_client_client_name_length`) |
+| `redirect_uris` | text[] | нет | только `https`, точное совпадение при авторизации |
+| `created_at` | timestamptz | нет | индекс; клиенты без грантов старше 7 суток удаляет `gtrack maintenance` |
+
+### oauth_grant
+Согласие пользователя клиенту; отзыв отзывает все токены гранта.
+
+| Столбец | Тип | NULL | Примечание |
+|---|---|---|---|
+| `id` | uuid | нет | PK `pk_oauth_grant` |
+| `workspace_id` | uuid | нет | FK → `workspace.id`; индекс |
+| `user_id` | uuid | нет | FK → `app_user.id`, `CASCADE`; частичный индекс активных `ix_oauth_grant_user_id_active` |
+| `client_id` | uuid | нет | FK → `oauth_client.id`, `CASCADE`; индекс |
+| `scope` | text | нет | сейчас `mcp` |
+| `resource` | text | нет | канонический адрес ресурса (`<PUBLIC_BASE_URL>/mcp`), audience токенов |
+| `created_at` | timestamptz | нет | |
+| `last_used_at` | timestamptz | да | обновляется не чаще раза в минуту |
+| `revoked_at` | timestamptz | да | момент отзыва |
+
+### oauth_code
+Одноразовый код авторизации (срок 60 с).
+
+| Столбец | Тип | NULL | Примечание |
+|---|---|---|---|
+| `id` | uuid | нет | PK `pk_oauth_code` |
+| `grant_id` | uuid | нет | FK → `oauth_grant.id`, `CASCADE`; индекс |
+| `code_hash` | bytea | нет | `UNIQUE`; 32 байта (`ck_oauth_code_code_hash_length`) |
+| `redirect_uri` | text | нет | адрес из запроса авторизации |
+| `code_challenge` | text | нет | PKCE S256 |
+| `created_at`, `expires_at` | timestamptz | нет | `expires_at` — индекс (очистка) |
+| `used_at` | timestamptz | да | код использован (повтор отзывает грант) |
+
+### oauth_token
+Access (1 час) и refresh (90 суток, ротация) токены гранта.
+
+| Столбец | Тип | NULL | Примечание |
+|---|---|---|---|
+| `id` | uuid | нет | PK `pk_oauth_token` |
+| `grant_id` | uuid | нет | FK → `oauth_grant.id`, `CASCADE`; индекс |
+| `kind` | text | нет | `access` / `refresh` (`ck_oauth_token_kind_valid`) |
+| `token_hash` | bytea | нет | `UNIQUE`; 32 байта (`ck_oauth_token_token_hash_length`) |
+| `created_at`, `expires_at` | timestamptz | нет | `expires_at` — индекс (очистка) |
+| `used_at` | timestamptz | да | refresh использован (повтор отзывает грант) |
+| `revoked_at` | timestamptz | да | |
+
+### oauth_attempt
+Счётчик лимитов по IP (регистрация клиентов, token endpoint); IP не хранится.
+
+| Столбец | Тип | NULL | Примечание |
+|---|---|---|---|
+| `id` | uuid | нет | PK `pk_oauth_attempt` |
+| `scope` | text | нет | `register_ip` / `token_ip` (`ck_oauth_attempt_scope_valid`) |
+| `key_hash` | bytea | нет | HMAC-SHA256 ключа и IP, 32 байта (`ck_oauth_attempt_key_hash_length`) |
+| `created_at` | timestamptz | нет | индексы: `created_at`; `(scope, key_hash, created_at)` |
+
 ## Эксплуатация
 
 ### backup_run
@@ -479,6 +544,7 @@ TRUNCATE` — в бэклоге (plan D-8).
 | `0011` | журнал резервного копирования `backup_run` (spec 009; `down_revision` `0010`); откат удаляет таблицу |
 | `0012` | вложения `attachment` (spec 011): файл в `DATA_DIR/attachments/<ключ[:2]>/<ключ>`, метаданные в БД; откат удаляет таблицу, файлы остаются |
 | `0013` | упоминания и уведомления: `comment_mention`, `notification` (spec 012); откат удаляет обе таблицы |
+| `0014` | OAuth для облачных MCP-клиентов (spec 028): `oauth_client`, `oauth_grant`, `oauth_code`, `oauth_token`, `oauth_attempt`; откат удаляет пять таблиц |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия
 моделей миграциям — `alembic -c backend/alembic.ini check` (входит в `scripts/check.sh` и CI).

@@ -66,3 +66,10 @@
     display: block;
   }
 }
+/* Логин цели — вторая строка под действием (правило «Логин как подсказка»): --text-muted, без жирного. */
+.audit-login-hint {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}

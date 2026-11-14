@@ -250,6 +250,9 @@ def test_t21_src_files_only_expected() -> None:
         "shared/ui/ErrorAlert.tsx", "shared/ui/ui.css",
         # T24
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
+        "features/oauth/ConsentPage.tsx", "features/oauth/next.ts",
+        "features/oauth/api.ts", "features/oauth/oauth.css",
+        "features/tokens/CloudClients.tsx",
         "features/projects/MemberAdd.tsx", "features/projects/members.css",
         "features/tokens/AgentConnect.tsx", "features/tokens/agent-connect.css",
         "features/tasks/tasks.css",  # P2: карточки «Мои задачи» на 360 px
@@ -266,6 +269,8 @@ def test_t21_src_files_only_expected() -> None:
         "features/notifications/NotificationsPage.tsx", "features/comments/MentionSuggest.tsx",
         "features/attachments/attachments.css",
         "shared/ui/ConfirmDialog.tsx", "shared/ui/Pagination.tsx",
+        # «Горит» на доске и в «Сводке» (spec 008 FR-8): один компонент и правило
+        "shared/ui/HotMark.tsx", "shared/ui/hot-mark.css",
         # 019/R8-T20: dialog for changing first and last name
         "features/admin/NameDialog.tsx",
         # 019/R8-T21: accounts without a role, /unassigned-accounts (AC-30)

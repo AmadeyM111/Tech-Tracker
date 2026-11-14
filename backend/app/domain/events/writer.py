@@ -34,6 +34,7 @@ class UserEventDetails(TypedDict, total=False):
 
     role_from: str | None
     role_to: str | None
+    client: str | None  # 028: название OAuth-клиента (без токенов и адресов)
     rows: str | None  # 025: число строк выгрузки CSV строкой; значения фильтров не пишутся
 
 

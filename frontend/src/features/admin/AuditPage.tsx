@@ -62,6 +62,8 @@ const ACTION_CODES: readonly string[] = [
   "user.self_registered",
   "user.name_changed",
   "user.overview_exported",
+  "user.oauth_granted",
+  "user.oauth_revoked",
   "project.ownership_transferred",
 ];
 // Field names with a readable text; any other name is shown as it is.
@@ -93,6 +95,9 @@ function detailsText(entry: AuditEntry): string {
       return roleName(to);
     case "user.role_removed":
       return roleName(from);
+    case "user.oauth_granted":
+    case "user.oauth_revoked":
+      return t("admin.audit.client", { client: entry.details?.["client"] ?? "" });
     case "user.overview_exported":
       return t("admin.audit.rows", { n: entry.details?.["rows"] ?? "" });
     case "user.role_changed":
@@ -109,6 +114,11 @@ function Details({ entry }: { entry: AuditEntry }) {
     <>
       <span data-field="changed_fields">{entry.changed_fields.map(fieldText).join(", ")}</span>
       <span data-field="details">{detailsText(entry)}</span>
+      {entry.entity_login ? (
+        <span data-field="entity_login" className="audit-login-hint">
+          {entry.entity_login}
+        </span>
+      ) : null}
       <details data-field="entity_id" className="audit-id">
         <summary>{t("admin.audit.col_details")}</summary>
         <span className="audit-uuid">{entry.entity_id}</span>
@@ -147,6 +157,11 @@ function EntryCard({ entry }: { entry: AuditEntry }) {
         {entityText(entry.entity_type)}
         {extra === "" ? "" : `: ${extra}`}
       </span>
+      {entry.entity_login ? (
+        <span data-field="entity_login" className="audit-login-hint">
+          {entry.entity_login}
+        </span>
+      ) : null}
       <details className="audit-id">
         <summary>{t("admin.audit.col_details")}</summary>
         <span className="audit-uuid">{entry.entity_id}</span>

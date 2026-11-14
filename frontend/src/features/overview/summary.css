@@ -197,17 +197,6 @@
 .sum-range input[aria-invalid="true"] {
   border-color: var(--danger);
 }
-.sum-burn-tag {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 0 6px;
-  border: 1px solid var(--danger);
-  border-radius: 6px;
-  font-size: 0.9375rem;
-  color: var(--danger);
-  font-weight: 600;
-  white-space: nowrap;
-}
 @media (max-width: 719px) {
   .sum-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));

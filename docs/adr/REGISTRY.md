@@ -15,8 +15,9 @@
 | 0019 | Самостоятельная регистрация по email (фича 019) | `feat/self-registration` | предложено |
 | 0020 | `0020-agent-access.md` (ключи агентов R7) | `feat/r1.0-foundation` | занят |
 | 0021 | Удаление пользователей (спека 023) | предложено спеке 023 | резерв |
-| 0022 | Облачные MCP-клиенты через шлюз (вариант B, T-14) | вне R2 (бывший черновик «ADR-0020» из Shared) | вариант B подтверждён владельцем 2026-11-08; реализация — R3 |
+| 0022 | Облачные MCP-клиенты: OAuth 2.1 на /mcp (вариант B; обновлён 2026-11-12, спека 028) | `docs/adr/0022-cloud-mcp-clients.md` | принято |
 | 0023 | Выгрузка выборки «Сводки» в CSV: право, формат, предел, аудит (спека 025) | `docs/adr/0023-summary-csv-export.md` | принято (R3, 2026-11-10) |
+| 0025 | Пересмотр ADR-0018 в части OAuth: облачные клиенты через OAuth 2.1 на /mcp (спека 028) | `docs/adr/0025-oauth-revises-adr-0018.md` | принято 2026-11-12 |
 | 0024 | Личные проекты «Пользователя» (спека 027) | `docs/adr/0024-personal-projects.md` (ветка `docs/personal-projects-spec`) | принято 2026-11-11 |
 | 0026 | Внешние провайдеры входа и правила привязки (спека 029) | `docs/adr/0026-external-login-and-linking.md` (ветка `docs/login-simplify-spec`) | принято |
 | 0027+ | ADR — с 0027 (0025 занят OAuth, 0026 — входом) | — | свободно |
@@ -36,6 +37,8 @@
 | 024 | «Сводка»: диапазон дат срока «с / по» (R3) | `specs/` (R3), APPROVED 2026-11-10 |
 | 025 | «Сводка»: выгрузка CSV для БА (R3) | `specs/` (R3), APPROVED 2026-11-10 |
 | 026 | Карточка «Подключить ИИ-агента» на «Сводке» (R3, T-13) | `specs/` (R3), APPROVED 2026-11-10 |
+| 030 | Усиление OAuth: allowlist redirect URI и потолок refresh (APPROVED 2026-11-13) | `specs/030-oauth-hardening/` (ветка `feat/oauth-hardening`) |
+| 028 | OAuth 2.1 на /mcp для облачных клиентов (ChatGPT, Claude.ai), T-14 — APPROVED 2026-11-12 | `specs/028-mcp-oauth/` (ветка `docs/mcp-oauth-spec-028`) |
 | 027 | Личные проекты «Пользователя» (APPROVED 2026-11-11, ветка `docs/personal-projects-spec`) | `specs/027-personal-projects/` |
 | 029 | Упрощённый вход: email или логин, «Запомнить меня», magic link, Яндекс ID / VK ID / Google (DRAFT, ветка `docs/login-simplify-spec`) | `specs/029-login-simplify/` |
 | 020 | MCP AI Native | main |

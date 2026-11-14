@@ -59,6 +59,7 @@ REPORT_KEYS = [
     "orphan_files_removed",
     "registration_requests_expired",
     "notifications_purged",  # spec 012 FR-9
+    "oauth_purged",  # spec 028 FR-13
 ]
 
 

@@ -44,6 +44,7 @@ ENTRY_FIELDS = {
     "entity_type",
     "entity_id",
     "entity_deleted",
+    "entity_login",
     "changed_fields",
     "details",
 }
@@ -1032,3 +1033,24 @@ async def test_t72_d55_other_project_operations_do_not_write_audit(api_env: ApiE
     after = await _all_entries(env, w.tok("ta"))
     assert after == before
     assert await _all_entries(env, w.tok("ta"), entity_type="project") == []
+
+
+async def test_audit_entity_login_is_target_user_login_and_null_otherwise(api_env: ApiEnv) -> None:
+    """Подсказка «логин» (правило журнала): логин объекта-пользователя; иначе null."""
+    env = api_env
+    ws, admin, token = await admin_in_new_workspace(env)
+    target, _ = await seed(env, ws, "user", sessions=0)
+    gone = uuid.uuid4()
+    ids = await _add_events(
+        env,
+        ws.id,
+        [
+            {"actor_id": admin.id, "entity_id": target.id},
+            {"actor_id": admin.id, "entity_id": gone},
+            {"actor_id": admin.id, "entity_id": uuid.uuid4(), "entity_type": "project"},
+        ],
+    )
+    by_id = {e["id"]: e for e in await _all_entries(env, token)}
+    assert by_id[ids[0]]["entity_login"] == target.login
+    assert by_id[ids[1]]["entity_login"] is None
+    assert by_id[ids[2]]["entity_login"] is None

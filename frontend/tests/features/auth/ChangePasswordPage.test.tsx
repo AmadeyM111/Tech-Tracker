@@ -49,6 +49,28 @@ describe("ChangePasswordPage (T23)", () => {
     expect(api.changePassword).toHaveBeenCalledWith({ current_password: OLD, new_password: NEW });
   });
 
+  it("028_next_is_kept_through_the_forced_change_and_leads_back_to_the_consent_request", async () => {
+    vi.mocked(api.changePassword).mockResolvedValue(undefined as never);
+    const next = "/oauth/authorize?client_id=cid1&redirect_uri=https%3A%2F%2Fchatgpt.com%2Fcb&state=xyz";
+    renderAt(`/change-password?next=${encodeURIComponent(next)}`, <ChangePasswordPage />, "/change-password");
+    const container = screen.getByRole("dialog");
+    fill(container);
+    fireEvent.click(submitButton(container));
+    await waitFor(() => expect(screen.getByTestId("where").textContent).toBe(next));
+  });
+
+  it.each(["https://evil.example/", "//evil.example/oauth/authorize?x=1", "/projects", "/oauth/authorize"])(
+    "028_next_that_is_not_a_consent_request_is_ignored: %s",
+    async (bad) => {
+      vi.mocked(api.changePassword).mockResolvedValue(undefined as never);
+      renderAt(`/change-password?next=${encodeURIComponent(bad)}`, <ChangePasswordPage />, "/change-password");
+      const container = screen.getByRole("dialog");
+      fill(container);
+      fireEvent.click(submitButton(container));
+      await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/"));
+    },
+  );
+
   it("hint_min_length_comes_from_password_min_length", () => {
     renderAt("/change-password", <ChangePasswordPage />);
     const container = screen.getByRole("dialog");
