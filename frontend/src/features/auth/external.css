@@ -39,10 +39,6 @@
   text-decoration: none;
   border-radius: 12px;
 }
-.ext-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
 /* Yandex ID: the official button file is shown as it is; colours, text and radius are inside the file. */
 .ext-btn-yandex {
   background: transparent;
