@@ -19,7 +19,8 @@
 | 0023 | Выгрузка выборки «Сводки» в CSV: право, формат, предел, аудит (спека 025) | `docs/adr/0023-summary-csv-export.md` | принято (R3, 2026-11-10) |
 | 0025 | Пересмотр ADR-0018 в части OAuth: облачные клиенты через OAuth 2.1 на /mcp (спека 028) | `docs/adr/0025-oauth-revises-adr-0018.md` | принято 2026-11-12 |
 | 0024 | Личные проекты «Пользователя» (спека 027) | `docs/adr/0024-personal-projects.md` (ветка `docs/personal-projects-spec`) | принято 2026-11-11 |
-| 0026+ | ADR — с 0026 | — | свободно |
+| 0026 | Внешние провайдеры входа и правила привязки (спека 029) | `docs/adr/0026-external-login-and-linking.md` (ветка `docs/login-simplify-spec`) | принято |
+| 0027+ | ADR — с 0027 (0025 занят OAuth, 0026 — входом) | — | свободно |
 
 ## Спеки
 | № | Тема | Где |
@@ -39,7 +40,7 @@
 | 030 | Усиление OAuth: allowlist redirect URI и потолок refresh (APPROVED 2026-11-13) | `specs/030-oauth-hardening/` (ветка `feat/oauth-hardening`) |
 | 028 | OAuth 2.1 на /mcp для облачных клиентов (ChatGPT, Claude.ai), T-14 — APPROVED 2026-11-12 | `specs/028-mcp-oauth/` (ветка `docs/mcp-oauth-spec-028`) |
 | 027 | Личные проекты «Пользователя» (APPROVED 2026-11-11, ветка `docs/personal-projects-spec`) | `specs/027-personal-projects/` |
-| 031 | Метрики пилота к контрольной точке 2026-11-23 (read-only, `docs/pilot/`) | `specs/031-pilot-metrics/` (ветка `feat/pilot-metrics`) |
+| 029 | Упрощённый вход: email или логин, «Запомнить меня», magic link, Яндекс ID / VK ID / Google (DRAFT, ветка `docs/login-simplify-spec`) | `specs/029-login-simplify/` |
 | 020 | MCP AI Native | main |
 | 021–023 | заняты (023 — удаление пользователей, черновик) | — |
 
@@ -50,4 +51,5 @@
 | 0008 | `0008_agent_api_keys` — конфликт с main | `feat/r1.0-foundation` |
 | 0010 | `0010_self_registration` | `feat/self-registration` |
 | 0011–0013 | R2: `backup_run`, `attachment`, `notification` | main (на проде, 2026-11-10) |
-| 0014 | `0014_mcp_oauth` (спека 028, DRAFT): клиенты, гранты, коды, токены, лимиты OAuth | разрешена владельцем 2026-11-12; реализация — `feat/mcp-oauth` |
+| 0014 | свободен (резерв под 026 снят: состояние в браузере) | — |
+| 0015 | Упрощённый вход: внешние идентичности, токены входа, `password_hash` nullable (спека 029, предварительно — номер подтвердить после `0014` из `feat/mcp-oauth`) | предложено, ветка `docs/login-simplify-spec` |
