@@ -248,6 +248,7 @@ def test_t21_src_files_only_expected() -> None:
         "features/auth/NoRolePage.tsx",
         "features/auth/useLogout.ts", "shared/ui/TextField.tsx",
         "shared/ui/ErrorAlert.tsx", "shared/ui/ui.css",
+        "shared/ui/person.ts",  # dense board: display name + initials
         # T24
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
         # 021: согласие на обработку ПДн
