@@ -64,7 +64,7 @@ __all__ = [
 ]
 
 PREFIX = "u002."
-HEAD_REVISION = "0017"  # голова цепочки миграций (spec 021: 0017 pdn_consent; 0015 — вход)
+HEAD_REVISION = "0018"  # голова цепочки: 0018 mcp read_only (после 0017 pdn_consent)
 FAILURE_MARK = "gt_test_injected_failure"
 _FAIL_FUNCTION = "gt_test_fail_0006"
 _PAST = datetime(2026, 10, 1, 8, 0, 0, tzinfo=UTC)
