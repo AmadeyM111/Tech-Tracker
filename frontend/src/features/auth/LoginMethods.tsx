@@ -8,6 +8,8 @@ import { ApiError } from "../../shared/api/client";
 import { errorMessage, t, type MessageKey } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { TextField } from "../../shared/ui/TextField";
+import googleG from "./brand/google-g.png";
+import yandexIcon from "./brand/login-with-yandex-8-1.svg";
 import {
   LOGIN_METHODS_KEY,
   getLoginMethods,
@@ -23,7 +25,29 @@ type Pending =
   | { kind: "link"; provider: ProviderName }
   | { kind: "unlink"; identity: LinkedIdentity };
 
-const providerName = (p: string) => t(`profile.methods_provider.${p}` as MessageKey);
+// Official brand files, decorative: the provider name next to the icon is the accessible name.
+function ProviderTitle({ provider }: { provider: string }) {
+  const icon =
+    provider === "yandex" ? yandexIcon : provider === "google" ? googleG : null;
+  return (
+    <strong className="methods-name">
+      {icon !== null ? (
+        <img
+          className="methods-icon"
+          src={icon}
+          alt=""
+          aria-hidden="true"
+          width={24}
+          height={24}
+        />
+      ) : null}
+      {providerName(provider)}
+    </strong>
+  );
+}
+
+const providerName = (p: string) =>
+  t(`profile.methods_provider.${p}` as MessageKey);
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString("ru-RU");
 
 export function LoginMethods() {
@@ -68,7 +92,8 @@ export function LoginMethods() {
       setPasswordSaved(true);
       await queryClient.invalidateQueries({ queryKey: LOGIN_METHODS_KEY });
     },
-    onError: (e) => alert.show(errorMessage(e instanceof ApiError ? e.code : "unknown")),
+    onError: (e) =>
+      alert.show(errorMessage(e instanceof ApiError ? e.code : "unknown")),
   });
 
   if (methods.data === undefined) return null;
@@ -86,17 +111,23 @@ export function LoginMethods() {
     <section className="methods" aria-labelledby="methods-title">
       <h2 id="methods-title">{t("profile.methods_title")}</h2>
       <ErrorAlert message={alert.message} seq={alert.seq} />
-      {returned === "linked" ? <p role="status">{t("profile.methods_linked_ok")}</p> : null}
+      {returned === "linked" ? (
+        <p role="status">{t("profile.methods_linked_ok")}</p>
+      ) : null}
       {returnedError === "already_linked" ? (
         <p role="alert">{t("profile.methods_already_linked")}</p>
       ) : null}
-      {passwordSaved ? <p role="status">{t("profile.methods_password_saved")}</p> : null}
+      {passwordSaved ? (
+        <p role="status">{t("profile.methods_password_saved")}</p>
+      ) : null}
 
       <div className="methods-row">
         <div>
           <strong>{t("profile.methods_password")}</strong>
           <p className="methods-meta">
-            {hasPassword ? t("profile.methods_password_set") : t("profile.methods_password_missing")}
+            {hasPassword
+              ? t("profile.methods_password_set")
+              : t("profile.methods_password_missing")}
           </p>
         </div>
         {hasPassword ? null : (
@@ -126,9 +157,11 @@ export function LoginMethods() {
       {linked.map((identity) => (
         <div className="methods-row" key={identity.id}>
           <div>
-            <strong>{providerName(identity.provider)}</strong>
+            <ProviderTitle provider={identity.provider} />
             <p className="methods-meta">
-              {t("profile.methods_linked", { date: formatDate(identity.linked_at) })}
+              {t("profile.methods_linked", {
+                date: formatDate(identity.linked_at),
+              })}
             </p>
           </div>
           <button
@@ -143,10 +176,13 @@ export function LoginMethods() {
       {available.map((provider) => (
         <div className="methods-row" key={provider}>
           <div>
-            <strong>{providerName(provider)}</strong>
+            <ProviderTitle provider={provider} />
             <p className="methods-meta">{t("profile.methods_not_linked")}</p>
           </div>
-          <button type="button" onClick={() => setPending({ kind: "link", provider })}>
+          <button
+            type="button"
+            onClick={() => setPending({ kind: "link", provider })}
+          >
             {t("profile.methods_link")}
           </button>
         </div>
@@ -156,17 +192,25 @@ export function LoginMethods() {
       ) : null}
 
       {pending !== null ? (
-        <div className="methods-dialog" role="alertdialog" aria-labelledby="methods-dialog-title">
+        <div
+          className="methods-dialog"
+          role="alertdialog"
+          aria-labelledby="methods-dialog-title"
+        >
           <h3 id="methods-dialog-title">
             {pending.kind === "link"
-              ? t("profile.methods_link_title", { provider: providerName(pending.provider) })
+              ? t("profile.methods_link_title", {
+                  provider: providerName(pending.provider),
+                })
               : t("profile.methods_unlink_title", {
                   provider: providerName(pending.identity.provider),
                 })}
           </h3>
           <p>
             {pending.kind === "link"
-              ? t("profile.methods_link_text", { provider: providerName(pending.provider) })
+              ? t("profile.methods_link_text", {
+                  provider: providerName(pending.provider),
+                })
               : t("profile.methods_unlink_text", {
                   provider: providerName(pending.identity.provider),
                 })}

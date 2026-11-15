@@ -58,6 +58,30 @@ describe("login screen providers", () => {
     ).toBeTruthy();
   });
 
+  it("brand logos: decorative Google mark beside the text, Yandex official button named by alt", async () => {
+    installFetch({
+      ...base,
+      [PROVIDERS]: () => j(200, [{ name: "yandex" }, { name: "google" }]),
+    });
+    renderApp("/login");
+    const yandex = await screen.findByRole("link", {
+      name: ru["auth.external_yandex"],
+    });
+    const yandexImg = yandex.querySelector("img");
+    expect(yandexImg?.getAttribute("alt")).toBe(ru["auth.external_yandex"]);
+    expect(yandexImg?.getAttribute("src")).toMatch(
+      /login-with-yandex-14.*\.svg|^data:image\/svg/,
+    );
+    const google = screen.getByRole("link", {
+      name: ru["auth.external_google"],
+    });
+    const mark = google.querySelector("img");
+    expect(mark).not.toBeNull();
+    expect(mark?.getAttribute("alt")).toBe(""); // decorative: the name comes from the text
+    expect(mark?.getAttribute("aria-hidden")).toBe("true");
+    expect(google.textContent).toBe(ru["auth.external_google"]);
+  });
+
   it("shows no block when no provider is enabled", async () => {
     installFetch({ ...base, [PROVIDERS]: () => j(200, []) });
     renderApp("/login");
@@ -124,6 +148,13 @@ describe("profile: login methods", () => {
     });
     expect((unlink as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(ru["profile.methods_last"])).toBeTruthy();
+    // brand icons in the rows are decorative (the name is the text next to them)
+    const icons = document.querySelectorAll(".methods-icon");
+    expect(icons.length).toBe(2); // Yandex (linked) and Google (available)
+    icons.forEach((img) => {
+      expect(img.getAttribute("alt")).toBe("");
+      expect(img.getAttribute("aria-hidden")).toBe("true");
+    });
     expect(
       screen.getByRole("button", {
         name: ru["profile.methods_password_set_button"],
