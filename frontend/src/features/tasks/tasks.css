@@ -22,6 +22,16 @@
   color: var(--text-muted);
   overflow-wrap: anywhere;
 }
+
+.task-table-wrap td[data-field="due_date"],
+.task-table-wrap th[data-field="due_date"] {
+  white-space: nowrap;
+}
+
+.task-cards .c-meta.ui-due-overdue,
+.ui-table .ui-due-overdue {
+  color: var(--danger);
+}
 @media (max-width: 719px) {
   .task-table-wrap {
     display: none;

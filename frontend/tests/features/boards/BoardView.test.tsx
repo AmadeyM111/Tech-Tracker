@@ -80,9 +80,9 @@ describe("rendering", () => {
     expect(f_(cardEl(container, TB)!, "priority")!.textContent).toBe(ru["tasks.priority.medium"]);
     const time = f_(a, "due_date")!.querySelector("time")!;
     expect(time.getAttribute("datetime")).toBe("2026-12-31");
-    expect(time.textContent).toBe("31.12.2026");
-    expect(f_(a, "assignee")!.textContent).toBe("kuznetsov");
-    expect(f_(a, "progress")!.textContent).toBe(t("tasks.progress_value", { percent: 50 }));
+    expect(time.textContent).toBe("31.12");
+    expect(f_(a, "assignee")!.textContent).toContain("kuznetsov");
+    expect(f_(a, "progress")!.textContent).toBe(t("tasks.subtask_fraction", { done: 1, total: 2 }));
   });
 
   it("uf5_card_without_due_assignee_progress_uses_dictionary_texts", async () => {
@@ -97,15 +97,15 @@ describe("rendering", () => {
   it("uf5_zero_progress_is_a_number_not_none", async () => {
     const { container } = await openBoard();
     expect(f_(cardEl(container, TC)!, "progress")!.textContent).toBe(
-      t("tasks.progress_value", { percent: 0 }),
+      t("tasks.subtask_fraction", { done: 0, total: 1 }),
     );
-    expect(f_(cardEl(container, TC)!, "due_date")!.querySelector("time")!.textContent).toBe("05.01.2026");
+    expect(f_(cardEl(container, TC)!, "due_date")!.querySelector("time")!.textContent).toBe("05.01");
   });
 
   it("nfr5_due_date_does_not_depend_on_timezone_or_date", async () => {
     const dateSpy = vi.spyOn(Date.prototype, "getTimezoneOffset").mockReturnValue(-720);
     const { container } = await openBoard();
-    expect(f_(cardEl(container, TA)!, "due_date")!.querySelector("time")!.textContent).toBe("31.12.2026");
+    expect(f_(cardEl(container, TA)!, "due_date")!.querySelector("time")!.textContent).toBe("31.12");
     dateSpy.mockRestore();
   });
 
@@ -125,11 +125,11 @@ describe("rendering", () => {
         if (el.dataset.field === "title") {
           expect(titles).toContain(el.textContent);
         } else if (el.dataset.field === "assignee" && el.textContent !== ru["tasks.assignee_none"]) {
-          expect(["kuznetsov", "admin"]).toContain(el.textContent);
-        } else if (el.dataset.field === "progress" && /^\d+%$/.test(el.textContent ?? "")) {
-          expect(el.textContent).toBe(t("tasks.progress_value", { percent: parseInt(el.textContent!, 10) }));
+          expect(["kuznetsov", "admin"].some((n) => el.textContent?.includes(n))).toBe(true);
+        } else if (el.dataset.field === "progress" && el.textContent !== ru["tasks.progress_none"]) {
+          expect(el.textContent).toMatch(/^\d+ из \d+$/);
         } else if (el.querySelector("time")) {
-          expect(el.textContent).toMatch(/^\d{2}\.\d{2}\.\d{4}$/);
+          expect(el.textContent).toMatch(/^\d{2}\.\d{2}$/);
         } else {
           expect(DICT).toContain(el.textContent);
         }

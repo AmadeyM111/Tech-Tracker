@@ -15,6 +15,7 @@ import { usePolledQuery } from "../../shared/api/polling";
 import { MentionSuggest, MentionText, insertMention, mentionAt, useMentionOptions } from "./MentionSuggest";
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
+import { personName } from "../../shared/ui/person";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import { ErrorAlert, type AlertState } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
@@ -108,7 +109,7 @@ function CommentItem({ comment, pending, alert, onSave, onDelete }: ItemProps) {
   }
 
   const author = (
-    <span data-field="author">{comment.author.login}</span>
+    <span data-field="author">{personName(comment.author)}</span>
   );
   const when = (
     <span data-field="created_at">

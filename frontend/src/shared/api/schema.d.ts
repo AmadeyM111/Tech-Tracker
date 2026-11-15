@@ -1664,6 +1664,8 @@ export interface components {
             status: components["schemas"]["TaskStatus"];
             /** Subtask Count */
             subtask_count: number;
+            /** Subtask Done */
+            subtask_done: number;
             /** Title */
             title: string;
         };
@@ -2767,11 +2769,15 @@ export interface components {
         };
         /** UserRef */
         UserRef: {
+            /** First Name */
+            first_name?: string | null;
             /**
              * Id
              * Format: uuid
              */
             id: string;
+            /** Last Name */
+            last_name?: string | null;
             /** Login */
             login: string;
         };

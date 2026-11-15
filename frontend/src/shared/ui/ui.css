@@ -592,10 +592,54 @@ h1,
   min-width: 0;
 }
 
+.ui-column-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.ui-column-head h3 {
+  margin: 0;
+  min-width: 0;
+}
+
 [data-column] h3 {
   color: var(--text-muted);
   font-size: 1.125rem;
   font-weight: 600;
+}
+
+.ui-column-add {
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--text-muted);
+  border-radius: 999px;
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+.ui-clip {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .ui-board-filter {
@@ -630,13 +674,85 @@ tr[data-task-id] {
   margin: 0;
 }
 
+li[data-task-id] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
 li[data-task-id] [data-field="title"] {
   font-weight: 500;
+  font-size: 1.0625rem;
+  line-height: 1.3;
+}
+
+li[data-task-id] [data-field="title"] a {
+  color: var(--text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+li[data-task-id] [data-field="title"] a:hover {
+  text-decoration: underline;
 }
 
 li[data-task-id] [data-field]:not([data-field="title"]) {
   color: var(--text-muted);
-  font-size: 1.0625rem;
+  font-size: 0.9375rem;
+}
+
+.ui-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  line-height: 1.2;
+}
+
+.ui-prio-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+  display: inline-block;
+}
+
+.ui-prio-dot--high {
+  background: var(--danger);
+}
+
+.ui-prio-dot--medium {
+  background: var(--accent);
+}
+
+.ui-prio-dot--low {
+  background: var(--text-muted);
+}
+
+.ui-due-short {
+  white-space: nowrap;
+}
+
+.ui-due-overdue,
+.ui-due-overdue time {
+  color: var(--danger);
+}
+
+.ui-ava {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* User picker (combobox listbox). The active option keeps an inline outline (forced colors). */
@@ -801,6 +917,25 @@ li[data-task-id] [data-field]:not([data-field="title"]) {
   .ui-board-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .ui-tabs [role="tab"] {
+    flex-shrink: 0;
+  }
+
+  .ui-task-doc {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ui-task-side {
+    order: -1;
+  }
+
+  h1,
+  .ui-task-body,
+  li[data-task-id] [data-field="title"] a {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -853,10 +988,87 @@ li[data-task-id] [data-field]:not([data-field="title"]) {
   margin-top: 8px;
 }
 
+.ui-task-doc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 24px;
+  align-items: start;
+}
+
+.ui-task-doc > * {
+  min-width: 0;
+}
+
+.ui-task-body {
+  margin: 0 0 16px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.ui-task-side {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px 16px;
+  min-width: 0;
+}
+
+.ui-task-side .ui-props {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+
+.ui-task-side .ui-props dt {
+  margin: 0;
+  padding: 0;
+  font-size: 0.9375rem;
+}
+
+.ui-task-side .ui-props dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.ui-task-side .ui-props dd input:not([type="checkbox"]):not([type="radio"]),
+.ui-task-side .ui-props dd select,
+.ui-task-side .ui-props dd textarea {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  min-height: 44px;
+  border-color: var(--text-muted);
+}
+
+[data-section="comments"] ul {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+[data-section="comments"] li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+[data-section="comments"] li:last-child {
+  border-bottom: none;
+}
+
 /* The title input sits in the h1 and keeps the heading look. */
 h1 input[name="title"] {
   width: 100%;
-  max-width: 48rem;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 /* UI-kit §1–2 (2026-11-08): secondary button — "Отмена", "Назад", "Показать/Скрыть пароль". */

@@ -132,6 +132,8 @@ async def project_view(db: AsyncSession, actor: Actor, facts: ProjectFacts) -> P
                 Project.created_at,
                 Project.updated_at,
                 AppUser.login_display.label("owner_login"),
+                AppUser.first_name.label("owner_first_name"),
+                AppUser.last_name.label("owner_last_name"),
                 _task_count_subquery().label("task_count"),
             )
             .join(AppUser, AppUser.id == Project.owner_id)
@@ -142,7 +144,12 @@ async def project_view(db: AsyncSession, actor: Actor, facts: ProjectFacts) -> P
         id=facts.project_id,
         name=row.name,
         description=row.description,
-        owner=UserRef(id=facts.owner_id, login=row.owner_login),
+        owner=UserRef(
+            id=facts.owner_id,
+            login=row.owner_login,
+            first_name=row.owner_first_name,
+            last_name=row.owner_last_name,
+        ),
         task_count=row.task_count,
         is_member=facts.actor_is_member,
         created_at=row.created_at,

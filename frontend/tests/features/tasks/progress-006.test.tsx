@@ -61,10 +61,16 @@ describe("AC-46: показ прогресса", () => {
   });
 
   it("ac46_board_card_shows_66_percent_and_null_shows_no_subtasks", async () => {
-    const withProgress = boardCard(TA, "Подготовить отчёт", "todo", 10, { progress: 66, subtask_count: 3 });
+    const withProgress = boardCard(TA, "Подготовить отчёт", "todo", 10, {
+      progress: 66,
+      subtask_count: 3,
+      subtask_done: 1,
+    });
     const plain = boardCard("a2a2a2a2-0000-4000-8000-000000000002", "Без подзадач", "todo", 20);
     const { container } = await openBoard({}, { ...INITIAL, todo: [withProgress, plain] });
-    expect(f_(cardEl(container, TA)!, "progress")!.textContent).toBe("66%");
+    expect(f_(cardEl(container, TA)!, "progress")!.textContent).toBe(
+      t("tasks.subtask_fraction", { done: 1, total: 3 }),
+    );
     expect(f_(cardEl(container, plain.id)!, "progress")!.textContent).toBe("Нет подзадач");
   });
 });

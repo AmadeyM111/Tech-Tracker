@@ -636,6 +636,10 @@
             "title": "Subtask Count",
             "type": "integer"
           },
+          "subtask_done": {
+            "title": "Subtask Done",
+            "type": "integer"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -650,6 +654,7 @@
           "assignee",
           "position",
           "subtask_count",
+          "subtask_done",
           "progress",
           "hot"
         ],
@@ -3352,10 +3357,32 @@
       },
       "UserRef": {
         "properties": {
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
           },
           "login": {
             "title": "Login",

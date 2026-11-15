@@ -71,12 +71,12 @@ const ADD_TASK_TEXT = "Добавить задачу";
 const createPosts = (f: { calls: Request[] }) =>
   f.calls.filter((r) => r.method === "POST" && /^\/api\/v1\/projects\/[^/]+\/tasks$/.test(new URL(r.url).pathname));
 
-describe("004 AC-1: на Доске нет создания", () => {
+describe("column create button", () => {
   it.each([
-    ["BA с create_task", "business_admin", BUSINESS, PERM_READ],
-    ["U с create_task", "user", USER_CAPS, PERM_READ],
-    ["BA без create_task", "business_admin", BUSINESS, { ...PERM_READ, create_task: false }],
-  ])("004_ac1_%s_no_button_form_input_or_add_text_on_board", async (_n, role, caps, perms) => {
+    ["BA с create_task", "business_admin", BUSINESS, PERM_READ, true],
+    ["U с create_task", "user", USER_CAPS, PERM_READ, true],
+    ["BA без create_task", "business_admin", BUSINESS, { ...PERM_READ, create_task: false }, false],
+  ])("column_plus_%s", async (_n, role, caps, perms, hasPlus) => {
     const { container } = await openBoard({
       [ME]: () => j(200, meWith(caps, role)),
       [ONE]: () => j(200, detail({ permissions: perms })),
@@ -84,23 +84,38 @@ describe("004 AC-1: на Доске нет создания", () => {
     for (const s of STATUS_LIST) {
       const col = column(container, s)!;
       expect(col).toBeTruthy();
-      expect(col.querySelector("button")).toBeNull();
       expect(col.querySelector("form")).toBeNull();
       expect(col.querySelector("input, textarea")).toBeNull();
       expect(col.textContent).not.toContain(ADD_TASK_TEXT);
       expect(col.querySelector("h3")).toBeTruthy();
       expect(col.querySelector('[data-role="column-cards"]')).toBeTruthy();
+      const plus = col.querySelector("button.ui-column-add");
+      if (hasPlus) {
+        expect(plus).toBeTruthy();
+        expect(plus!.getAttribute("aria-label")).toBe(
+          ru["boards.column_create"].replace("{status}", ru[`tasks.status.${s}` as keyof typeof ru]),
+        );
+      } else {
+        expect(plus).toBeNull();
+        expect(col.querySelector("button")).toBeNull();
+      }
     }
-    // доска действительно показана (проверка не вырождена)
     expect(idsIn(container, "todo")).toEqual([TA, TB, TC]);
     const panel = container.querySelector('[role="tabpanel"]')!;
     expect(panel.querySelector('[data-role="board"]')).toBeTruthy();
     expect(panel.querySelector("form")).toBeNull();
     expect(panel.querySelector('input[name="title"]')).toBeNull();
-    expect(panel.querySelector('[data-action="add-task"], [data-form]')).toBeNull();
     expect(panel.textContent).not.toContain(ADD_TASK_TEXT);
     expect(screen.queryByRole("button", { name: ADD_TASK_TEXT })).toBeNull();
     expect(screen.queryByText(ADD_TASK_TEXT)).toBeNull();
+  });
+
+  it("column_plus_opens_create_dialog", async () => {
+    const { container } = await openBoard();
+    const plus = column(container, "in_progress")!.querySelector("button.ui-column-add")!;
+    fireEvent.click(plus);
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: ru["tasks.create_title"] })).toBeTruthy();
   });
 });
 
@@ -192,7 +207,7 @@ describe("004 AC-7: создание через вкладку «Задачи»,
     await waitFor(() => expect(cardEl(container, TN)).toBeTruthy());
     expect(column(container, "todo")!.contains(cardEl(container, TN))).toBe(true);
     expect(cardEl(container, TN)!.textContent).toContain("Проверка");
-    expect(column(container, "todo")!.querySelector("button")).toBeNull();
+    expect(column(container, "todo")!.querySelector("button.ui-column-add")).toBeTruthy();
     expect(container.textContent).not.toContain(ADD_TASK_TEXT);
     expect(screen.queryByRole("button", { name: ADD_TASK_TEXT })).toBeNull();
     expect(createPosts(f)).toHaveLength(1);

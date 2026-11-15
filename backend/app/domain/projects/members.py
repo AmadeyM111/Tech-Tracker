@@ -61,7 +61,15 @@ async def list_members(
         raise Forbidden()
     stmt = (
         select(AppUser)
-        .options(load_only(AppUser.id, AppUser.login_display, AppUser.is_blocked))
+        .options(
+            load_only(
+                AppUser.id,
+                AppUser.login_display,
+                AppUser.first_name,
+                AppUser.last_name,
+                AppUser.is_blocked,
+            )
+        )
         .join(ProjectMember, ProjectMember.user_id == AppUser.id)
         .where(ProjectMember.project_id == project_id)
         .order_by(AppUser.login, AppUser.id)
@@ -78,7 +86,12 @@ async def list_members(
     roles = {row.user_id: None if row.role is None else Role(row.role) for row in role_rows}
     return [
         ProjectMemberRow(
-            user=UserRef(id=u.id, login=u.login_display),
+            user=UserRef(
+                id=u.id,
+                login=u.login_display,
+                first_name=u.first_name,
+                last_name=u.last_name,
+            ),
             role=roles.get(u.id),
             is_blocked=u.is_blocked,
             is_owner=u.id == facts.owner_id,

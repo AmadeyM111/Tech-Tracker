@@ -8,7 +8,7 @@ AC-21 (только своё пространство), FR-13, FR-70 (факты
         -> tuple[list[DirectoryUser{id, login, role}], bool]   # (items, has_next)
         # пространство берётся из actor.workspace_id; PageParams(page=, page_size=)
     load_recipient(db, workspace_id, user_id, *, lock: bool) -> RecipientFacts
-    user_refs(db, workspace_id, ids) -> dict[UUID, UserRef{id, login}]       # один SELECT
+    user_refs(db, workspace_id, ids) -> dict[UUID, UserRef]  # id, login, имена; один SELECT
 
 Нет сети; БД ``tracker_test``; данные откатываются (фикстура ``db``) либо чистая схема
 (``committed``) в тесте блокировок.

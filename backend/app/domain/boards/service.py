@@ -44,6 +44,7 @@ class BoardCard:
     assignee: UserRef | None
     position: int
     subtask_count: int
+    subtask_done: int
     progress: int | None
     # «Горит» — тот же критерий, что на «Сводке» (overview.due.is_hot, FR-8 spec 008)
     hot: bool
@@ -142,6 +143,7 @@ async def get_board(db: AsyncSession, actor: Actor, project_id: UUID) -> BoardVi
                 assignee=None if r.assignee_id is None else refs[r.assignee_id],
                 position=int(r.position),
                 subtask_count=int(r.total),
+                subtask_done=int(r.done),
                 progress=progress(done=int(r.done), in_work=int(r.in_work), total=int(r.total)),
                 hot=is_hot(r.priority, r.due_date, r.status, today),
             )

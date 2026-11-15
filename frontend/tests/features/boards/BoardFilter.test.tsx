@@ -319,7 +319,8 @@ describe("T98 assignee order is case-insensitive", () => {
 
   it("t98_cards_show_logins_as_received", async () => {
     const { container } = await openBoard({}, cols);
-    const login = (id: string) => cardEl(container, id)!.querySelector('[data-field="assignee"]')!.textContent;
+    const login = (id: string) =>
+      cardEl(container, id)!.querySelector('[data-field="assignee"] .ui-clip')!.textContent;
     expect([login(TA), login(TB), login(TD), login(TC)]).toEqual(["Boris", "anna", "Kirill", "ivan"]);
   });
 
