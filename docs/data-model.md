@@ -52,6 +52,8 @@
 | `first_name` | varchar(100) | да | имя (019, миграция 0010); `NULL` у учётных записей, созданных до 019, и у первого ТА; правится через `PUT /me/name` (сам пользователь) и `PUT /admin/users/{id}/name` (ТА) |
 | `last_name` | varchar(100) | да | фамилия (019, миграция 0010); то же, что `first_name` |
 | `self_registered` | boolean | нет | учётная запись создана самостоятельной регистрацией (019, миграция 0010); по умолчанию `false` |
+| `pdn_consent_version` | text | да | версия (дата) текста согласия на обработку ПДн, которое дал пользователь (спека 021, миграция 0017); `NULL` — согласия нет; при `PDN_CONSENT_ENABLED` такой пользователь видит экран подтверждения |
+| `pdn_consented_at` | timestamptz | да | момент согласия (спека 021, миграция 0017) |
 | `password_hash` | text | да | хеш Argon2id (пароль в открытом виде не хранится); `NULL` — пароля нет (учётная запись создана входом через провайдера, spec 029, миграция 0016): вход по паролю невозможен, пароль можно задать из профиля |
 | `must_change_password` | boolean | нет | требуется смена пароля при входе |
 | `is_blocked` | boolean | нет | учётная запись заблокирована |
@@ -77,6 +79,8 @@
 | `last_name` | varchar(100) | нет | фамилия из заявки |
 | `password_hash` | text | нет | хеш Argon2id пароля из заявки (пароль в открытом виде не хранится) |
 | `token_hash` | bytea | нет | хеш одноразового токена подтверждения, 32 байта (`CHECK` `ck_registration_request_token_hash_length`); `UNIQUE` `uq_registration_request_token_hash` |
+| `pdn_consent_version` | text | да | версия текста согласия из заявки (спека 021, миграция 0017); при подтверждении email копируется в `app_user` |
+| `pdn_consent_at` | timestamptz | да | момент согласия в заявке (спека 021, миграция 0017) |
 | `created_at` | timestamptz | нет | момент подачи заявки |
 | `expires_at` | timestamptz | нет | срок токена (30 минут); индекс `ix_registration_request_expires_at` |
 
@@ -538,6 +542,7 @@ Access (1 час) и refresh (90 суток, ротация) токены гра
 | `verifier` | text | нет | PKCE `code_verifier`, живёт не дольше 10 минут |
 | `user_id` | uuid | да | пользователь привязки; обязателен при `purpose = link`, иначе `NULL` (`ck_oauth_login_state_link_has_user`); FK `fk_oauth_login_state_user_id_app_user` → `app_user.id` `ON DELETE CASCADE` |
 | `remember` | boolean | нет | «Запомнить меня» для входа; по умолчанию `false` |
+| `pdn_consent_version` | text | да | версия текста согласия на ПДн, отмеченного до перехода к провайдеру (спека 021, миграция 0017); копируется в `app_user`, если вход создаёт учётную запись |
 | `created_at`, `expires_at` | timestamptz | нет | `expires_at` = создание + 10 минут; индекс `ix_oauth_login_state_expires_at` |
 
 ## Эксплуатация
@@ -577,6 +582,7 @@ Access (1 час) и refresh (90 суток, ротация) токены гра
 | `0012` | вложения `attachment` (spec 011): файл в `DATA_DIR/attachments/<ключ[:2]>/<ключ>`, метаданные в БД; откат удаляет таблицу, файлы остаются |
 | `0015` | упрощённый вход (spec 029, этап а): `user_session.remember` (`false`) и `user_session.auth_method` (`password`), `CHECK` `ck_user_session_auth_method_valid`; откат снимает `CHECK` и столбцы |
 | `0013` | упоминания и уведомления: `comment_mention`, `notification` (spec 012); откат удаляет обе таблицы |
+| `0017` | согласие на обработку ПДн (спека 021): `app_user.pdn_consent_version`, `pdn_consented_at`, `registration_request.pdn_consent_version`, `pdn_consent_at` (все `NULL`); откат удаляет столбцы |
 | `0014` | OAuth для облачных MCP-клиентов (spec 028): `oauth_client`, `oauth_grant`, `oauth_code`, `oauth_token`, `oauth_attempt`; откат удаляет пять таблиц |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия

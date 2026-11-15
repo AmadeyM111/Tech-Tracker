@@ -53,6 +53,8 @@ async def request_registration(
         first_name=body.first_name,
         last_name=body.last_name,
         password=body.password,
+        pdn_consent=body.pdn_consent,
+        pdn_consent_version=body.pdn_consent_version,
     )
     message = await registration_domain.request_registration(
         db,

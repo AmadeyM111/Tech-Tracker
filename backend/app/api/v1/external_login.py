@@ -30,6 +30,7 @@ from app.domain.access.roles import Actor
 from app.domain.auth import external
 from app.domain.auth.external_providers import enabled_providers
 from app.domain.auth.sessions import SessionStore
+from app.domain.legal import documents
 from app.domain.oauth.service import hit_limit
 
 router = APIRouter(prefix="/auth/external", tags=["auth"])
@@ -78,16 +79,38 @@ async def list_providers(request: Request) -> list[ProviderItem]:
     responses=error_responses(422),
 )
 async def start_login(
-    provider: Provider, request: Request, db: DbSession, remember: bool = False
+    provider: Provider,
+    request: Request,
+    db: DbSession,
+    remember: bool = False,
+    consent: bool = False,
+    consent_version: Annotated[str | None, Query(max_length=32)] = None,
 ) -> RedirectResponse:
-    """Начало входа: редирект к провайдеру (PKCE S256, одноразовый ``state``)."""
+    """Начало входа: редирект к провайдеру (PKCE S256, одноразовый ``state``).
+
+    Спека 021 (FR-4): при включённом согласии нужны ``consent=true`` и актуальная
+    ``consent_version``, иначе возврат на ``/login?external_error=pdn_consent_required``; версия
+    уходит в состояние входа и попадает в учётную запись, если вход создаёт её.
+    """
     settings: Settings = request.app.state.settings
     base = oauth_base_url(settings)
     cfg = enabled_providers(settings).get(provider)
     if base is None or cfg is None or await _throttled(request, db):
         return _redirect("/login", external_error="provider_unavailable", provider=provider)
+    consent_ok: str | None = None
+    if settings.pdn_consent_enabled:
+        if not consent or consent_version != documents.current_version():
+            return _redirect("/login", external_error="pdn_consent_required", provider=provider)
+        consent_ok = consent_version
     url = await external.start(
-        db, cfg, base_url=base, purpose="login", user_id=None, remember=remember, now=utcnow()
+        db,
+        cfg,
+        base_url=base,
+        purpose="login",
+        user_id=None,
+        remember=remember,
+        now=utcnow(),
+        consent_version=consent_ok,
     )
     return RedirectResponse(url, status_code=302, headers=_NO_STORE)
 

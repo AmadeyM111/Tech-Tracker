@@ -109,6 +109,13 @@ async def _build_previous_version_installation(
             "ADD COLUMN self_registered boolean NOT NULL DEFAULT false"
         )
     )
+    # 021: pdn_consent_version/pdn_consented_at (миграция 0017) - так же
+    await env.execute(
+        text(
+            "ALTER TABLE app_user ADD COLUMN pdn_consent_version text, "
+            "ADD COLUMN pdn_consented_at timestamptz"
+        )
+    )
     settings = env.settings
     settings.secrets_dir.mkdir(parents=True, exist_ok=True)
     settings.secrets_dir.chmod(0o700)
@@ -133,7 +140,8 @@ async def _build_previous_version_installation(
     await env.execute(
         text(
             "ALTER TABLE app_user DROP COLUMN email, DROP COLUMN first_name, "
-            "DROP COLUMN last_name, DROP COLUMN self_registered"
+            "DROP COLUMN last_name, DROP COLUMN self_registered, "
+            "DROP COLUMN pdn_consent_version, DROP COLUMN pdn_consented_at"
         )
     )
     await env.sessionmaker.kw["bind"].dispose()

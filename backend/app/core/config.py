@@ -94,6 +94,9 @@ class Settings(BaseSettings):
     )
     # [010] рабочая роль БД процесса API; пусто — API под DATABASE_URL (только не production)
     db_app_role: str | None = None
+    # [021] согласие на обработку ПДн: флажок при регистрации, гейт и публичные тексты; в production
+    # не стартует, пока в реквизитах оператора остался «[ЗАПОЛНИТЬ]» (domain/legal)
+    pdn_consent_enabled: bool = False
     # [009] резервные копии: каталог (том /backups), сколько хранить, порог «устарела», ч
     backup_dir: Path = Path("/backups")
     backup_keep: int = Field(14, ge=1)

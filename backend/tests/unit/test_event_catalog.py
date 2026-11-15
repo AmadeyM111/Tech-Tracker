@@ -42,6 +42,8 @@ USER_ACTIONS = {
     # 029 (ADR-0026): привязка и отвязка внешнего аккаунта входа — аудит пользователя
     "user.external_linked",
     "user.external_unlinked",
+    # 021: согласие на обработку ПДн — аудит пользователя (в details только версия)
+    "user.pdn_consent_given",
 }
 
 F = frozenset

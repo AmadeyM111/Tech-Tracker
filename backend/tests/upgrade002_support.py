@@ -64,9 +64,7 @@ __all__ = [
 ]
 
 PREFIX = "u002."
-HEAD_REVISION = (
-    "0016"  # голова цепочки миграций (spec 029: 0016 external_login; 0015 login_remember)
-)
+HEAD_REVISION = "0017"  # голова цепочки миграций (spec 021: 0017 pdn_consent; 0015 — вход)
 FAILURE_MARK = "gt_test_injected_failure"
 _FAIL_FUNCTION = "gt_test_fail_0006"
 _PAST = datetime(2026, 10, 1, 8, 0, 0, tzinfo=UTC)
@@ -449,8 +447,10 @@ async def data_fingerprint(
                 "CASE t.priority WHEN 'base' THEN 'medium' ELSE t.priority END))::text"
             )
         elif table == "app_user":
+            # 0017 (spec 021): pdn_consent_version и pdn_consented_at — так же исключаются
             row_text = (
-                "(to_jsonb(t) - 'email' - 'first_name' - 'last_name' - 'self_registered')::text"
+                "(to_jsonb(t) - 'email' - 'first_name' - 'last_name' - 'self_registered' "
+                "- 'pdn_consent_version' - 'pdn_consented_at')::text"
             )
         elif table == "user_session":
             # 0015 (spec 029): remember и auth_method добавляет миграция — как у app_user выше

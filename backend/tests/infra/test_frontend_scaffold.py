@@ -250,6 +250,9 @@ def test_t21_src_files_only_expected() -> None:
         "shared/ui/ErrorAlert.tsx", "shared/ui/ui.css",
         # T24
         "features/admin/api.ts", "features/admin/UsersPage.tsx", "features/admin/AuditPage.tsx",
+        # 021: согласие на обработку ПДн
+        "features/legal/LegalPage.tsx", "features/legal/PdnConsentField.tsx",
+        "features/legal/PdnConsentPage.tsx", "features/legal/api.ts", "features/legal/legal.css",
         "features/oauth/ConsentPage.tsx", "features/oauth/next.ts",
         "features/oauth/api.ts", "features/oauth/oauth.css",
         # 029: внешний вход и «Способы входа» в профиле

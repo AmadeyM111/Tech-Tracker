@@ -28,9 +28,11 @@ from app.core.errors import (
     NotAuthenticated,
     OriginMismatch,
     PasswordChangeRequired,
+    PdnConsentPending,
 )
 from app.domain.access.roles import Actor, Capability, Role
 from app.domain.auth.sessions import SessionStore
+from app.domain.legal import documents as legal
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import WorkspaceMember
 
@@ -80,6 +82,7 @@ async def get_actor(request: Request, db: DbSession) -> Actor:
                 AppUser.login_display,
                 AppUser.is_blocked,
                 AppUser.must_change_password,
+                AppUser.pdn_consent_version,
                 WorkspaceMember.role,
             )
             .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
@@ -99,15 +102,19 @@ async def get_actor(request: Request, db: DbSession) -> Actor:
         role=None if row.role is None else Role(row.role),
         must_change_password=row.must_change_password,
         session_id=record.id,
+        pdn_consent_pending=settings.pdn_consent_enabled
+        and row.pdn_consent_version != legal.current_version(),
     )
     request.state.user_id = actor.user_id  # access-лог (FR-57)
     return actor
 
 
 async def get_active_actor(actor: Annotated[Actor, Depends(get_actor)]) -> Actor:
-    """Гейты 2-3: одноразовый пароль (FR-55), затем «без роли» (FR-66)."""
+    """Гейты 2-4: одноразовый пароль (FR-55), согласие на ПДн (021), «без роли» (FR-66)."""
     if actor.must_change_password:
         raise PasswordChangeRequired()
+    if actor.pdn_consent_pending:
+        raise PdnConsentPending()
     if actor.role is None:
         raise NoRole()
     return actor

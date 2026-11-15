@@ -1138,6 +1138,90 @@
         "type": "string"
       },
       "JsonValue": {},
+      "LegalDocument": {
+        "description": "``GET /legal/{kind}``: текст с подставленными реквизитами оператора.",
+        "properties": {
+          "effective_date": {
+            "title": "Effective Date",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/LegalSection"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "version",
+          "effective_date",
+          "sections"
+        ],
+        "title": "LegalDocument",
+        "type": "object"
+      },
+      "LegalSection": {
+        "properties": {
+          "heading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heading"
+          },
+          "paragraphs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Paragraphs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "heading",
+          "paragraphs"
+        ],
+        "title": "LegalSection",
+        "type": "object"
+      },
+      "LegalStatus": {
+        "description": "``GET /legal``: включена ли функция и текущая версия текстов.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "version"
+        ],
+        "title": "LegalStatus",
+        "type": "object"
+      },
       "LinkStart": {
         "properties": {
           "url": {
@@ -2112,6 +2196,27 @@
         "title": "PasswordResetStatus",
         "type": "object"
       },
+      "PdnConsentAccept": {
+        "additionalProperties": false,
+        "description": "``POST /me/pdn-consent``: подтверждение согласия существующим пользователем.",
+        "properties": {
+          "pdn_consent": {
+            "title": "Pdn Consent",
+            "type": "boolean"
+          },
+          "pdn_consent_version": {
+            "maxLength": 32,
+            "title": "Pdn Consent Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pdn_consent",
+          "pdn_consent_version"
+        ],
+        "title": "PdnConsentAccept",
+        "type": "object"
+      },
       "ProjectCreate": {
         "additionalProperties": false,
         "properties": {
@@ -2420,6 +2525,23 @@
             "title": "Password",
             "type": "string",
             "writeOnly": true
+          },
+          "pdn_consent": {
+            "default": false,
+            "title": "Pdn Consent",
+            "type": "boolean"
+          },
+          "pdn_consent_version": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdn Consent Version"
           }
         },
         "required": [
@@ -4602,7 +4724,7 @@
     },
     "/api/v1/auth/external/{provider}/start": {
       "get": {
-        "description": "Начало входа: редирект к провайдеру (PKCE S256, одноразовый ``state``).",
+        "description": "Начало входа: редирект к провайдеру (PKCE S256, одноразовый ``state``).\n\nСпека 021 (FR-4): при включённом согласии нужны ``consent=true`` и актуальная\n``consent_version``, иначе возврат на ``/login?external_error=pdn_consent_required``; версия\nуходит в состояние входа и попадает в учётную запись, если вход создаёт её.",
         "operationId": "start_login",
         "parameters": [
           {
@@ -4627,6 +4749,33 @@
               "default": false,
               "title": "Remember",
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "consent",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Consent",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "consent_version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Consent Version"
             }
           }
         ],
@@ -5336,6 +5485,85 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/v1/legal": {
+      "get": {
+        "description": "Публично: включена ли функция согласия и версия текстов (для флажка и экрана).",
+        "operationId": "legal_status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Legal Status",
+        "tags": [
+          "legal"
+        ]
+      }
+    },
+    "/api/v1/legal/{kind}": {
+      "get": {
+        "description": "Публично, без входа: Политика (``privacy``) или Согласие (``consent``).",
+        "operationId": "legal_document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "privacy",
+                "consent"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalDocument"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Функция отключена (code: feature_disabled)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Legal Document",
+        "tags": [
+          "legal"
+        ]
       }
     },
     "/api/v1/me": {
@@ -6453,6 +6681,71 @@
         "summary": "Export Overview Tasks",
         "tags": [
           "overview"
+        ]
+      }
+    },
+    "/api/v1/me/pdn-consent": {
+      "post": {
+        "description": "Принятие согласия текущей версии (204).\n\n``get_actor``, а не ``get_active_actor``: маршрут доступен именно тому, кого гейт\n``pdn_consent_pending`` не пускает дальше (как выход и смена пароля).",
+        "operationId": "accept_pdn_consent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PdnConsentAccept"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Accept Pdn Consent",
+        "tags": [
+          "legal"
         ]
       }
     },

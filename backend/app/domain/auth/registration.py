@@ -59,6 +59,7 @@ from app.domain.auth.registration_limits import Scope, register_attempt
 from app.domain.auth.registration_mail import build_registration_mail
 from app.domain.events.catalog import EventAction
 from app.domain.events.writer import UserEventDetails, record_event
+from app.domain.legal import consent as consent_domain
 from app.domain.users.email import normalize_email
 from app.domain.users.models import AppUser
 from app.domain.users.names import normalize_person_name
@@ -80,6 +81,7 @@ CONFIRM_LOGIN_ATTEMPTS: Final = 100
 class RegistrationPolicy:
     base_url: str
     limit_key: bytes = field(repr=False)
+    pdn_consent_required: bool = False  # 021: PDN_CONSENT_ENABLED
 
 
 @dataclass(frozen=True)
@@ -90,6 +92,8 @@ class RegistrationForm:
     first_name: str = field(repr=False)
     last_name: str = field(repr=False)
     password: SecretStr
+    pdn_consent: bool = False
+    pdn_consent_version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -205,6 +209,7 @@ async def _upsert_request(
     checked: _Checked,
     password_hash: str,
     token_digest: bytes,
+    consent_version: str | None,
     now: datetime,
 ) -> None:
     """RG-1: заявка на тот же адрес заменяет токен, логин, имя, фамилию, хеш пароля и сроки.
@@ -219,6 +224,8 @@ async def _upsert_request(
         last_name=checked.last_name,
         password_hash=password_hash,
         token_hash=token_digest,
+        pdn_consent_version=consent_version,
+        pdn_consent_at=None if consent_version is None else now,
         created_at=now,
         expires_at=now + TOKEN_TTL,
     )
@@ -233,6 +240,8 @@ async def _upsert_request(
                 "last_name": fresh.last_name,
                 "password_hash": fresh.password_hash,
                 "token_hash": fresh.token_hash,
+                "pdn_consent_version": fresh.pdn_consent_version,
+                "pdn_consent_at": fresh.pdn_consent_at,
                 "created_at": fresh.created_at,
                 "expires_at": fresh.expires_at,
             },
@@ -259,6 +268,12 @@ async def request_registration(
         raise FeatureDisabled()
     await _single_workspace_id(db)
     await _admit(db, policy, [("request_ip", _ip_value(client_ip))], now)
+    # 021: согласие проверяется до разбора остальной формы (FR-3)
+    consent_version = (
+        consent_domain.check_form(form.pdn_consent, form.pdn_consent_version)
+        if policy.pdn_consent_required
+        else None
+    )
     checked = await _validate_form(db, form, now)
     password_hash = await hash_in_thread(hasher, form.password.get_secret_value())
     if await _email_taken(db, checked.email):
@@ -270,6 +285,7 @@ async def request_registration(
         checked=checked,
         password_hash=password_hash,
         token_digest=digest,
+        consent_version=consent_version,
         now=now,
     )
     return build_registration_mail(
@@ -340,6 +356,8 @@ async def _insert_row(
             is_blocked=False,
             failed_login_count=0,
             password_changed_at=now,
+            pdn_consent_version=req.pdn_consent_version,
+            pdn_consented_at=req.pdn_consent_at,
             created_at=now,
             updated_at=now,
             created_by=None,
@@ -450,4 +468,14 @@ async def confirm_registration(
         entity_id=user_id,
         details=UserEventDetails(role_from=None, role_to=Role.USER.value),
     )
+    if req.pdn_consent_version is not None:
+        # 021/FR-7: согласие, данное в заявке; в событии только версия текста
+        await record_event(
+            db,
+            workspace_id=workspace_id,
+            actor_id=user_id,
+            action=EventAction.USER_PDN_CONSENT_GIVEN,
+            entity_id=user_id,
+            details=UserEventDetails(version=req.pdn_consent_version),
+        )
     return login

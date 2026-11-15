@@ -118,6 +118,9 @@ class RegistrationRequest(Base):
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     token_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True, nullable=False)
+    # 021: согласие на обработку ПДн, данное в заявке (копируется в app_user при подтверждении)
+    pdn_consent_version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pdn_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

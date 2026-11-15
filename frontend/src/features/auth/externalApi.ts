@@ -21,8 +21,20 @@ export async function listProviders(): Promise<ProviderName[]> {
 }
 
 /** Start address of the login: a plain link, the browser navigates (redirect to the provider). */
-export function loginStartUrl(provider: ProviderName, remember: boolean): string {
-  return `/api/v1/auth/external/${provider}/start${remember ? "?remember=true" : ""}`;
+// Spec 021: while the consent is required the address carries `consent=true&consent_version=<date>`.
+export function loginStartUrl(
+  provider: ProviderName,
+  remember: boolean,
+  consentVersion: string | null = null,
+): string {
+  const query = new URLSearchParams();
+  if (remember) query.set("remember", "true");
+  if (consentVersion !== null) {
+    query.set("consent", "true");
+    query.set("consent_version", consentVersion);
+  }
+  const text = query.toString();
+  return `/api/v1/auth/external/${provider}/start${text === "" ? "" : `?${text}`}`;
 }
 
 export async function getLoginMethods(): Promise<LoginMethods> {

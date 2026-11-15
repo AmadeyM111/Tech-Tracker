@@ -19,11 +19,13 @@ import {
 } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { TextField } from "../../shared/ui/TextField";
+import { LEGAL_STATUS_KEY, legalStatus } from "../legal/api";
+import { PdnConsentField } from "../legal/PdnConsentField";
 import { ExternalLogin } from "./ExternalLogin";
 import {
   passwordResetStatus,
   requestRegistration,
-  type RegistrationRequest,
+  type RegistrationForm,
 } from "./api";
 import "./auth-screens.css";
 
@@ -63,6 +65,16 @@ export function RegisterPage() {
   const [badField, setBadField] = useState<"email" | null>(null);
   // Fields that were empty on the last submit; each shows its text under it (cleared on the next submit).
   const [emptyKeys, setEmptyKeys] = useState<FieldKey[]>([]);
+  // Spec 021: the required consent box, shown only while the feature is on (GET /legal).
+  const [agreed, setAgreed] = useState(false);
+  const [consentMissing, setConsentMissing] = useState(false);
+  const legal = useQuery({
+    queryKey: LEGAL_STATUS_KEY,
+    queryFn: () => legalStatus(),
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const consentOn = legal.data?.enabled === true;
 
   // The same query and key as on /login (RG-13): the status is shared, no extra request is made.
   const status = useQuery({
@@ -101,11 +113,19 @@ export function RegisterPage() {
       missing[0]?.ref.current?.focus();
       return;
     }
-    const body: RegistrationRequest = {
+    if (consentOn && !agreed) {
+      setConsentMissing(true);
+      return;
+    }
+    setConsentMissing(false);
+    const body: RegistrationForm = {
       email: email.trim(),
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       password,
+      ...(consentOn
+        ? { pdn_consent: true, pdn_consent_version: legal.data?.version ?? null }
+        : {}),
     };
     busy.current = true;
     setPending(true);
@@ -118,6 +138,14 @@ export function RegisterPage() {
       const code = e instanceof ApiError ? e.code : "unknown";
       if (code === "feature_disabled") {
         setOff(true);
+      } else if (
+        code === "pdn_consent_required" ||
+        code === "pdn_consent_version_mismatch"
+      ) {
+        // The text changed under the form: take the new version, the user ticks again.
+        setAgreed(false);
+        setConsentMissing(true);
+        if (code === "pdn_consent_version_mismatch") void legal.refetch();
       } else {
         setBadField(badFieldFor(code));
         alert.show(errorMessage(code));
@@ -195,6 +223,17 @@ export function RegisterPage() {
                 onToggle: () => setShown((v) => !v),
               }}
             />
+            {consentOn ? (
+              <PdnConsentField
+                checked={agreed}
+                onChange={(v) => {
+                  setAgreed(v);
+                  if (v) setConsentMissing(false);
+                }}
+                error={consentMissing ? t("legal.consent_required") : null}
+                disabled={pending}
+              />
+            ) : null}
             {/* Focus stays on the first empty field: the alert takes focus only for server errors. */}
             <ErrorAlert
               message={alert.message}
@@ -206,7 +245,7 @@ export function RegisterPage() {
             </button>
           </form>
           {/* Spec 029: the same provider buttons as on /login; an account is created only while registration is open. */}
-          <ExternalLogin remember={false} />
+          <ExternalLogin remember={false} consent={{ agreed }} />
         </>
       )}
       <div className="login-links">

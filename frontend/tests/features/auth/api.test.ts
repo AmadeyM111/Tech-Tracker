@@ -102,7 +102,8 @@ describe("auth api (T23)", () => {
     await requestRegistration(body);
     expect(new URL(calls[0]!.url).pathname).toBe("/api/v1/auth/registration/request");
     expect(calls[0]!.method).toBe("POST");
-    expect(await calls[0]!.json()).toEqual(body);
+    // 021: the body always carries `pdn_consent` (false while the feature is off)
+    expect(await calls[0]!.json()).toEqual({ ...body, pdn_consent: false });
     expect(calls[0]!.url).not.toContain("Correct-Horse");
   });
 

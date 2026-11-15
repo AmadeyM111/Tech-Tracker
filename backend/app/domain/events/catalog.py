@@ -45,6 +45,7 @@ class EventAction(StrEnum):
     USER_OAUTH_REVOKED = "user.oauth_revoked"
     USER_EXTERNAL_LINKED = "user.external_linked"
     USER_EXTERNAL_UNLINKED = "user.external_unlinked"
+    USER_PDN_CONSENT_GIVEN = "user.pdn_consent_given"
     PROJECT_UPDATED = "project.updated"
     PROJECT_OWNERSHIP_TRANSFERRED = "project.ownership_transferred"
     PROJECT_ARCHIVED = "project.archived"
@@ -102,6 +103,7 @@ EVENT_CATALOG: Final[Mapping[EventAction, EventSpec]] = {
     EventAction.USER_OAUTH_REVOKED: _USER_AUDITED,
     EventAction.USER_EXTERNAL_LINKED: _USER_AUDITED,
     EventAction.USER_EXTERNAL_UNLINKED: _USER_AUDITED,
+    EventAction.USER_PDN_CONSENT_GIVEN: _USER_AUDITED,
     EventAction.USER_NAME_CHANGED: EventSpec(
         entity_type=EntityType.USER,
         audit=True,

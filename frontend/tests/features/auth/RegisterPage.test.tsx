@@ -208,6 +208,7 @@ describe("RegisterPage (019/R8-T16)", () => {
       first_name: "Ivan",
       last_name: "Petrov",
       password: PASSWORD,
+      pdn_consent: false, // 021: feature off
     });
     expect(request.url).not.toContain(PASSWORD);
   });

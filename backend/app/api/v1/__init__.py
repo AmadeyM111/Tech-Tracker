@@ -12,6 +12,7 @@ from app.api.v1 import (
     comments,
     external_login,
     health,
+    legal,
     me,
     me_oauth,
     notifications,
@@ -28,6 +29,7 @@ from app.api.v1 import (
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(health.router)
+router.include_router(legal.router)
 router.include_router(auth.router)
 router.include_router(me.router)
 router.include_router(external_login.router)

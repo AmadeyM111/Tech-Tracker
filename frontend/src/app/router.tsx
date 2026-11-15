@@ -11,6 +11,8 @@ import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
 import { PasswordResetConfirmPage } from "../features/auth/PasswordResetConfirmPage";
 import { PasswordResetRequestPage } from "../features/auth/PasswordResetRequestPage";
+import { LegalPage } from "../features/legal/LegalPage";
+import { PdnConsentPage } from "../features/legal/PdnConsentPage";
 import { NoRolePage } from "../features/auth/NoRolePage";
 import { ProfilePage } from "../features/auth/ProfilePage";
 import { RegisterConfirmPage } from "../features/auth/RegisterConfirmPage";
@@ -57,6 +59,7 @@ function redirectFor(error: unknown): string | null {
   if (!(error instanceof ApiError)) return null;
   if (error.status === 401) return "/login";
   if (error.status === 403 && error.code === "password_change_required") return "/change-password";
+  if (error.status === 403 && error.code === "pdn_consent_pending") return "/pdn-consent";
   if (error.status === 403 && error.code === "no_role") return "/no-role";
   return null;
 }
@@ -375,6 +378,26 @@ function PasswordModal() {
   );
 }
 
+/**
+ * Spec 021, FR-5: «Подтвердите согласие». Only a user whose answer to /me is 403 pdn_consent_pending sees it;
+ * everybody else goes where the profile check sends them.
+ */
+function PdnConsentScreen() {
+  const session = useSession(0);
+  const { state } = useLocation();
+  const [fresh, setFresh] = useState(false);
+  if (!fresh && !session.isFetching) setFresh(true);
+  if (session.isPending || !fresh) return <p role="status">{t("app.loading")}</p>;
+  if (session.isError) {
+    const error = session.error;
+    if (error instanceof ApiError && error.status === 403 && error.code === "pdn_consent_pending") {
+      return <PdnConsentPage />;
+    }
+    return <Navigate to={redirectFor(error) ?? "/"} replace state={focusHeadingState(state)} />;
+  }
+  return <Navigate to={startPath(session.data)} replace state={focusHeadingState(state)} />;
+}
+
 function GuestOnly({ children }: { children: ReactNode }) {
   const session = useSession();
   const { state } = useLocation();
@@ -414,6 +437,12 @@ function useClientHandlers(): void {
           // A consent request that meets the forced change comes back to itself afterwards (spec 028 FR-6).
           const back = pathRef.current === "/oauth/authorize" ? "/oauth/authorize" + searchRef.current : null;
           navigate(withNext("/change-password", safeConsentNext(back)), { replace: true });
+        },
+        onPdnConsentPending: () => {
+          // Already on the consent screen: a repeated 403 must not add a history step.
+          if (pathRef.current === "/pdn-consent") return;
+          const back = pathRef.current === "/oauth/authorize" ? "/oauth/authorize" + searchRef.current : null;
+          navigate(withNext("/pdn-consent", safeConsentNext(back)), { replace: true });
         },
         onNoRole: () => {
           // A 403 no_role inside the password modal (a forced user without a role) keeps the modal on screen.
@@ -463,6 +492,10 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
       {/* RG-14: no GuestOnly here, the link from the e-mail works for any session state. */}
       <Route path="/register/confirm" element={<RegisterConfirmPage />} />
       <Route path="/oauth/authorize" element={<ConsentPage />} />
+      {/* Spec 021: public legal texts (no session) and the consent confirmation screen. */}
+      <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+      <Route path="/consent" element={<LegalPage kind="consent" />} />
+      <Route path="/pdn-consent" element={<PdnConsentScreen />} />
       <Route path="/password-reset" element={<PasswordResetRequestPage />} />
       <Route path="/password-reset/confirm" element={<PasswordResetConfirmPage />} />
       <Route path="/" element={<StartRedirect insideMain={insideMain} />} />

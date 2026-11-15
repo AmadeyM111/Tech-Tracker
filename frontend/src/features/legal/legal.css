@@ -1,0 +1,68 @@
+/* Spec 021: чекбокс согласия, публичные тексты и экран «Подтвердите согласие». */
+.pdn-consent {
+  margin: 8px 0;
+}
+.pdn-consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 44px; /* UI-кит: цель касания не меньше 44 px */
+  cursor: pointer;
+}
+.pdn-consent-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  flex: none;
+}
+.pdn-consent-error {
+  margin: 4px 0 0;
+  color: var(--text-error, #ff8a80);
+}
+
+.legal-page {
+  max-width: 720px; /* читаемая ширина строки */
+  margin: 2rem auto;
+  padding: 0 12px;
+}
+.legal-page h1 {
+  margin: 0 0 4px;
+}
+.legal-page h2 {
+  font-size: 1.15rem;
+  margin: 24px 0 8px;
+}
+.legal-page .legal-version {
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+.legal-page p {
+  line-height: 1.55;
+  margin: 0 0 10px;
+}
+.legal-page .legal-footer {
+  margin-top: 24px;
+}
+
+/* Кнопки провайдеров без отмеченного согласия (ExternalLogin): неактивны, без перехода. */
+.ext-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Дизайн-проверка PR #56 (P2): «Выйти» и «Назад» — цель касания не меньше 44 px */
+.pdn-consent-logout,
+.legal-page .legal-back {
+  min-height: 44px;
+}
+.legal-page .legal-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.legal-page .legal-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}

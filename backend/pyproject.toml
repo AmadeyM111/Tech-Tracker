@@ -32,6 +32,7 @@ include = ["app*"]
 
 [tool.setuptools.package-data]
 "app.core.security" = ["data/*"]
+"app.domain.legal" = ["documents/*.json"]
 
 [tool.ruff]
 line-length = 100

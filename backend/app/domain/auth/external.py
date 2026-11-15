@@ -51,6 +51,7 @@ from app.domain.auth.login_generation import login_candidates, name_slug
 from app.domain.auth.sessions import SessionStore
 from app.domain.events.catalog import EventAction
 from app.domain.events.writer import UserEventDetails, record_event
+from app.domain.legal import consent as consent_domain
 from app.domain.oauth.service import pkce_s256
 from app.domain.users.models import AppUser
 from app.domain.workspaces.models import Workspace, WorkspaceMember
@@ -99,6 +100,7 @@ async def start(
     user_id: UUID | None,
     remember: bool,
     now: datetime,
+    consent_version: str | None = None,
 ) -> str:
     """Создаёт состояние и возвращает адрес авторизации у провайдера (FR-13)."""
     await db.execute(delete(OauthLoginState).where(OauthLoginState.expires_at <= now))
@@ -112,6 +114,7 @@ async def start(
             verifier=verifier,
             user_id=user_id if purpose == "link" else None,
             remember=remember and purpose == "login",
+            pdn_consent_version=consent_version if purpose == "login" else None,
             created_at=now,
             expires_at=now + STATE_TTL,
         )
@@ -149,6 +152,7 @@ async def complete(
                     OauthLoginState.verifier,
                     OauthLoginState.user_id,
                     OauthLoginState.remember,
+                    OauthLoginState.pdn_consent_version,
                     OauthLoginState.expires_at,
                 )
             )
@@ -188,6 +192,7 @@ async def complete(
         profile,
         remember=row.remember,
         registration_open=registration_open,
+        consent_version=row.pdn_consent_version,
         now=now,
     )
     if token is None:
@@ -265,6 +270,25 @@ async def _member_workspace(db: AsyncSession, user_id: UUID) -> UUID | None:
     ).scalar_one_or_none()
 
 
+async def _accept_consent(
+    db: AsyncSession, user_id: UUID, consent_version: str | None, now: datetime
+) -> None:
+    """021: существующий пользователь отметил согласие на /login до перехода к провайдеру.
+
+    Пишется, только если версия в учётной записи другая (повторный вход событий не плодит).
+    """
+    if consent_version is None:
+        return
+    current = (
+        await db.execute(select(AppUser.pdn_consent_version).where(AppUser.id == user_id))
+    ).scalar_one()
+    workspace_id = await _member_workspace(db, user_id)
+    if current != consent_version and workspace_id is not None:
+        await consent_domain.accept(
+            db, user_id=user_id, workspace_id=workspace_id, version=consent_version, now=now
+        )
+
+
 async def _open_session(
     db: AsyncSession,
     sessions: SessionStore,
@@ -299,6 +323,7 @@ async def _login(
     *,
     remember: bool,
     registration_open: bool,
+    consent_version: str | None,
     now: datetime,
 ) -> str | None:
     identity = await _active_identity(db, cfg.name, profile.subject)
@@ -306,6 +331,7 @@ async def _login(
         token = await _open_session(db, sessions, identity.user_id, cfg, remember=remember, now=now)
         if token is not None:
             identity.last_used_at = now
+            await _accept_consent(db, identity.user_id, consent_version, now)
         return token
 
     existing_id = None
@@ -319,11 +345,14 @@ async def _login(
             return None
         if not await _insert_identity(db, existing_id, cfg, profile, now):
             return None
-        return await _open_session(db, sessions, existing_id, cfg, remember=remember, now=now)
+        token = await _open_session(db, sessions, existing_id, cfg, remember=remember, now=now)
+        if token is not None:
+            await _accept_consent(db, existing_id, consent_version, now)
+        return token
 
     if not registration_open:  # Q-3: учётки создаются только при открытой регистрации 019
         return None
-    user_id = await _create_account(db, cfg, profile, now)
+    user_id = await _create_account(db, cfg, profile, consent_version, now)
     if user_id is None:
         return None
     return await _open_session(db, sessions, user_id, cfg, remember=remember, now=now)
@@ -338,7 +367,11 @@ def _login_base(email: str | None) -> str:
 
 
 async def _create_account(
-    db: AsyncSession, cfg: ProviderConfig, profile: ExternalProfile, now: datetime
+    db: AsyncSession,
+    cfg: ProviderConfig,
+    profile: ExternalProfile,
+    consent_version: str | None,
+    now: datetime,
 ) -> UUID | None:
     ids = (await db.scalars(select(Workspace.id).limit(2))).all()
     if len(ids) != 1:
@@ -358,6 +391,9 @@ async def _create_account(
                 login_display=login,
                 email=stored_email,
                 self_registered=True,
+                # 021: согласие, отмеченное до перехода к провайдеру
+                pdn_consent_version=consent_version,
+                pdn_consented_at=None if consent_version is None else now,
                 password_hash=None,
                 must_change_password=False,
                 is_blocked=False,
@@ -407,6 +443,15 @@ async def _create_account(
         entity_id=user_id,
         details=UserEventDetails(role_from=None, role_to=Role.USER.value),
     )
+    if consent_version is not None:
+        await record_event(
+            db,
+            workspace_id=workspace_id,
+            actor_id=user_id,
+            action=EventAction.USER_PDN_CONSENT_GIVEN,
+            entity_id=user_id,
+            details=UserEventDetails(version=consent_version),
+        )
     return user_id
 
 

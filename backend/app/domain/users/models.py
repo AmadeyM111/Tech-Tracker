@@ -53,6 +53,11 @@ class AppUser(UUIDPkMixin, TimestampMixin, AuthoredMixin, Base):
     self_registered: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    # 021: согласие на обработку ПДн (NULL — не давал); версия — дата текста
+    pdn_consent_version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pdn_consented_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # 029: NULL — учётная запись создана внешним провайдером и пароля не имеет
     password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False)
