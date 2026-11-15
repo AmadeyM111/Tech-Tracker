@@ -54,5 +54,6 @@ def comment_tools() -> list[ToolSpec]:
             AddCommentArgs,
             Capability.BUSINESS_ACCESS,
             _add,
+            write=True,
         ),
     ]

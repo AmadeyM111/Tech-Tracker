@@ -38,7 +38,7 @@ export function TokenList({
                 {token.last_used_at === null ? t("agent_tokens.never_used") : formatMsk(token.last_used_at)}
               </td>
               <td data-field="status" data-status={status} data-label={t("agent_tokens.col_status")}>
-                {tokenStatusText(status)}
+                {tokenStatusText(status, token.read_only)}
               </td>
               <td data-field="actions">
                 {status === "active" ? (

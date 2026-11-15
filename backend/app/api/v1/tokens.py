@@ -35,6 +35,7 @@ def _item(view: TokenView) -> TokenItem:
         last_used_at=view.last_used_at,
         revoked_at=view.revoked_at,
         active=_is_active(view),
+        read_only=view.read_only,
     )
 
 
@@ -56,7 +57,7 @@ async def list_my_tokens(db: DbSession, actor: CurrentActor) -> list[TokenItem]:
 )
 async def create_my_token(body: TokenCreate, db: DbSession, actor: CurrentActor) -> TokenCreated:
     """Выдаёт токен агента. Значение ``token`` в ответе — единственный раз (AC-1)."""
-    created = await service.create_token(db, actor, body.name)
+    created = await service.create_token(db, actor, body.name, read_only=body.read_only)
     item = _item(created.view)
     return TokenCreated(**item.model_dump(), token=created.token)
 

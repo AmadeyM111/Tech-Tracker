@@ -49,6 +49,7 @@ class TokenView:
     expires_at: datetime
     last_used_at: datetime | None
     revoked_at: datetime | None
+    read_only: bool
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,7 @@ class ResolvedToken:
     role: Role | None
     must_change_password: bool
     name: str
+    read_only: bool = False
 
 
 def hash_token(raw: str) -> bytes:
@@ -90,10 +92,13 @@ def _view(row: ApiToken) -> TokenView:
         expires_at=row.expires_at,
         last_used_at=row.last_used_at,
         revoked_at=row.revoked_at,
+        read_only=row.read_only,
     )
 
 
-async def create_token(db: AsyncSession, actor: Actor, name: str) -> CreatedToken:
+async def create_token(
+    db: AsyncSession, actor: Actor, name: str, *, read_only: bool = False
+) -> CreatedToken:
     """Выдаёт токен текущему пользователю; лимит активных — ``MAX_ACTIVE_TOKENS`` (PN-1)."""
     clean = _clean_name(name)
     # Блокировка строки пользователя: два одновременных выпуска не обходят лимит.
@@ -118,6 +123,7 @@ async def create_token(db: AsyncSession, actor: Actor, name: str) -> CreatedToke
         token_hash=hash_token(raw),
         created_at=now,
         expires_at=now + TOKEN_LIFETIME,
+        read_only=read_only,
     )
     db.add(row)
     await db.flush()
@@ -197,6 +203,7 @@ async def resolve_token(db: AsyncSession, raw: str) -> ResolvedToken | None:
                 ApiToken.id,
                 ApiToken.name,
                 ApiToken.last_used_at,
+                ApiToken.read_only,
                 ApiToken.user_id,
                 ApiToken.workspace_id,
                 AppUser.login_display,
@@ -234,4 +241,5 @@ async def resolve_token(db: AsyncSession, raw: str) -> ResolvedToken | None:
         role=None if row.role is None else Role(row.role),
         must_change_password=row.must_change_password,
         name=row.name,
+        read_only=row.read_only,
     )

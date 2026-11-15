@@ -173,6 +173,7 @@
 | `expires_at` | timestamptz | нет | момент истечения срока (выдача + 90 дней) |
 | `last_used_at` | timestamptz | да | последнее использование; записывается не чаще раза в минуту |
 | `revoked_at` | timestamptz | да | момент отзыва; `NULL` — токен не отозван |
+| `read_only` | boolean | нет | только чтение MCP (спека 032, миграция 0018); `false` у токенов до миграции |
 
 Индекс `ix_api_token_user_id_active` на `(user_id)` с условием `revoked_at IS NULL`.
 
@@ -472,7 +473,7 @@ TRUNCATE` — в бэклоге (plan D-8).
 | `workspace_id` | uuid | нет | FK → `workspace.id`; индекс |
 | `user_id` | uuid | нет | FK → `app_user.id`, `CASCADE`; частичный индекс активных `ix_oauth_grant_user_id_active` |
 | `client_id` | uuid | нет | FK → `oauth_client.id`, `CASCADE`; индекс |
-| `scope` | text | нет | сейчас `mcp` |
+| `scope` | text | нет | `mcp` (запись) и/или `mcp:read` (только чтение), плюс `offline_access` |
 | `resource` | text | нет | канонический адрес ресурса (`<PUBLIC_BASE_URL>/mcp`), audience токенов |
 | `created_at` | timestamptz | нет | |
 | `last_used_at` | timestamptz | да | обновляется не чаще раза в минуту |
@@ -584,6 +585,7 @@ Access (1 час) и refresh (90 суток, ротация) токены гра
 | `0013` | упоминания и уведомления: `comment_mention`, `notification` (spec 012); откат удаляет обе таблицы |
 | `0017` | согласие на обработку ПДн (спека 021): `app_user.pdn_consent_version`, `pdn_consented_at`, `registration_request.pdn_consent_version`, `pdn_consent_at` (все `NULL`); откат удаляет столбцы |
 | `0014` | OAuth для облачных MCP-клиентов (spec 028): `oauth_client`, `oauth_grant`, `oauth_code`, `oauth_token`, `oauth_attempt`; откат удаляет пять таблиц |
+| `0018` | MCP read-only: `api_token.read_only boolean NOT NULL` (спека 032); откат удаляет столбец |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия
 моделей миграциям — `alembic -c backend/alembic.ini check` (входит в `scripts/check.sh` и CI).

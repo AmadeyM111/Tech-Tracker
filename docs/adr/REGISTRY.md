@@ -21,7 +21,8 @@
 | 0024 | Личные проекты «Пользователя» (спека 027) | `docs/adr/0024-personal-projects.md` (ветка `docs/personal-projects-spec`) | принято 2026-11-11 |
 | 0026 | Внешние провайдеры входа и правила привязки (спека 029) | `docs/adr/0026-external-login-and-linking.md` (ветка `docs/login-simplify-spec`) | принято |
 | 0027 | Согласие на обработку ПДн (спека 021) | `docs/adr/0027-pdn-consent.md` (ветка `feat/021-pdn-consent`) | принято 2026-11-15 |
-| 0028+ | ADR — с 0028 | — | свободно |
+| 0028 | MCP: 120 `tools/call` в минуту на токен и read-only (`gtrk_` + OAuth `mcp:read`) | `docs/adr/0028-mcp-rate-limit-readonly.md` | предложено |
+| 0029+ | ADR — с 0029 | — | свободно |
 
 ## Спеки
 | № | Тема | Где |
@@ -45,6 +46,8 @@
 | 020 | MCP AI Native | main |
 | 021 | Согласие на обработку ПДн (возобновлена владельцем 2026-11-15) | `specs/021-pdn-consent-form/` (ветка `feat/021-pdn-consent`) |
 | 022–023 | заняты (023 — удаление пользователей, черновик) | — |
+| 031 | метрики пилота | `specs/031-pilot-metrics/` |
+| 032 | MCP: лимит 120/мин и read-only scope | `specs/032-mcp-rate-limit-readonly/` |
 
 ## Миграции alembic
 | № | Тема | Где |
@@ -57,3 +60,4 @@
 | 0015 | Упрощённый вход: внешние идентичности, токены входа, `password_hash` nullable (спека 029, предварительно — номер подтвердить после `0014` из `feat/mcp-oauth`) | предложено, ветка `docs/login-simplify-spec` |
 | 0016 | Внешний вход: `external_identity`, `oauth_login_state`, … (спека 029, этап б) | `feat/029-providers`, PR #55 |
 | 0017 | Согласие на ПДн: колонки `pdn_consent_*` в `app_user`, `registration_request`, `oauth_login_state` (спека 021) | `feat/021-pdn-consent`; `down_revision` = 0016 (слита в main) |
+| 0018 | `api_token.read_only` (спека 032) | `feat/mcp-rate-limit-readonly`; `down_revision` = 0017 |

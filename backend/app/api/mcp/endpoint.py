@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable
 
 from fastapi.responses import JSONResponse
@@ -18,7 +19,7 @@ from app.api.deps import check_origin
 from app.api.mcp.context import McpRequest, reset_request, set_request
 from app.api.wellknown import oauth_base_url
 from app.core.db import transaction
-from app.core.errors import AppError, NotAuthenticated, OriginMismatch
+from app.core.errors import AppError, NotAuthenticated, OriginMismatch, RateLimited
 from app.domain.oauth.service import ACCESS_PREFIX, resolve_access
 from app.domain.tokens.service import ResolvedToken, resolve_token
 
@@ -43,11 +44,57 @@ async def _reject(
     *,
     challenge: str | None = None,
 ) -> None:
-    headers = {"WWW-Authenticate": challenge} if challenge else None
+    headers: dict[str, str] = {}
+    if challenge:
+        headers["WWW-Authenticate"] = challenge
+    if isinstance(exc, RateLimited) and exc.retry_after is not None:
+        headers["Retry-After"] = str(max(1, exc.retry_after))
     response = JSONResponse(
-        {"detail": exc.detail, "code": exc.code}, status_code=exc.status_code, headers=headers
+        {"detail": exc.detail, "code": exc.code},
+        status_code=exc.status_code,
+        headers=headers or None,
     )
     await response(scope, receive, send)
+
+
+async def _read_body(receive: Receive) -> bytes:
+    chunks: list[bytes] = []
+    while True:
+        message = await receive()
+        if message["type"] != "http.request":
+            break
+        chunks.append(message.get("body") or b"")
+        if not message.get("more_body"):
+            break
+    return b"".join(chunks)
+
+
+def _replay(body: bytes) -> Receive:
+    sent = False
+
+    async def receive() -> dict[str, object]:
+        nonlocal sent
+        if not sent:
+            sent = True
+            return {"type": "http.request", "body": body, "more_body": False}
+        return {"type": "http.disconnect"}
+
+    return receive
+
+
+def _tools_call_count(body: bytes) -> int:
+    """Сколько ``tools/call`` в JSON-RPC теле; мусор — 0 (его разберёт SDK)."""
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+        return 0
+    if isinstance(payload, dict):
+        return 1 if payload.get("method") == "tools/call" else 0
+    if isinstance(payload, list):
+        return sum(
+            1 for item in payload if isinstance(item, dict) and item.get("method") == "tools/call"
+        )
+    return 0
 
 
 def _challenge(base: str | None, *, invalid: bool) -> str | None:
@@ -76,6 +123,7 @@ async def _principal(app, raw: str) -> ResolvedToken | None:  # type: ignore[no-
                 role=oauth.role,
                 must_change_password=oauth.must_change_password,
                 name=oauth.name,
+                read_only=oauth.read_only,
             )
         return await resolve_token(db, raw)
 
@@ -109,6 +157,21 @@ class McpEndpoint:
                 NotAuthenticated(), scope, receive, send, challenge=_challenge(base, invalid=True)
             )
             return
+        replay = receive
+        if scope.get("method") == "POST":
+            body = await _read_body(receive)
+            replay = _replay(body)
+            n = _tools_call_count(body)
+            limiter = getattr(app.state, "mcp_limiter", None)
+            if n and limiter is not None:
+                wait: int | None = None
+                for _ in range(n):
+                    wait = limiter.hit(principal.token_id)
+                    if wait is not None:
+                        break
+                if wait is not None:
+                    await _reject(RateLimited(retry_after=wait), scope, replay, send)
+                    return
         context = McpRequest(
             principal=principal,
             registry=app.state.mcp_registry,
@@ -116,6 +179,6 @@ class McpEndpoint:
         )
         token = set_request(context)
         try:
-            await self._sessions.handle_request(scope, receive, send)
+            await self._sessions.handle_request(scope, replay, send)
         finally:
             reset_request(token)

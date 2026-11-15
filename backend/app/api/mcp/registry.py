@@ -25,6 +25,7 @@ class ToolSpec:
     input_schema: dict[str, Any]
     capability: Capability
     handler: ToolHandler
+    write: bool = False
 
 
 class ToolRegistry:
@@ -41,8 +42,12 @@ class ToolRegistry:
     def get(self, name: str) -> ToolSpec | None:
         return self._tools.get(name)
 
-    def allowed(self, role: Role | None, spec: ToolSpec) -> bool:
+    def allowed(self, role: Role | None, spec: ToolSpec, *, read_only: bool = False) -> bool:
+        if read_only and spec.write:
+            return False
         return role is not None and spec.capability in ROLE_CAPABILITIES[role]
 
-    def visible_for(self, role: Role | None) -> list[ToolSpec]:
-        return [spec for spec in self._tools.values() if self.allowed(role, spec)]
+    def visible_for(self, role: Role | None, *, read_only: bool = False) -> list[ToolSpec]:
+        return [
+            spec for spec in self._tools.values() if self.allowed(role, spec, read_only=read_only)
+        ]

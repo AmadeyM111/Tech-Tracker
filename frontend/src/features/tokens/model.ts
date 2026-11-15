@@ -23,7 +23,8 @@ const STATUS_KEY: Record<TokenStatus, MessageKey> = {
   expired: "agent_tokens.status_expired",
 };
 
-export function tokenStatusText(status: TokenStatus): string {
+export function tokenStatusText(status: TokenStatus, readOnly = false): string {
+  if (status === "active" && readOnly) return t("agent_tokens.status_read_only");
   return t(STATUS_KEY[status]);
 }
 

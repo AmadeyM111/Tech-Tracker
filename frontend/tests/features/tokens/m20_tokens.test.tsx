@@ -27,6 +27,7 @@ const ACTIVE = {
   last_used_at: null,
   revoked_at: null,
   active: true,
+  read_only: false,
 };
 const REVOKED = {
   id: T_REVOKED,
@@ -36,6 +37,7 @@ const REVOKED = {
   last_used_at: "2026-10-05T08:00:00Z",
   revoked_at: "2026-10-20T10:00:00Z",
   active: false,
+  read_only: false,
 };
 const EXPIRED = {
   id: T_EXPIRED,
@@ -45,6 +47,7 @@ const EXPIRED = {
   last_used_at: "2026-08-30T12:00:00Z",
   revoked_at: null,
   active: false,
+  read_only: false,
 };
 const CREATED_ITEM = {
   id: T_NEW,
@@ -54,6 +57,7 @@ const CREATED_ITEM = {
   last_used_at: null,
   revoked_at: null,
   active: true,
+  read_only: false,
 };
 
 type Fetcher = ReturnType<typeof installFetch>;
@@ -165,7 +169,7 @@ describe("create token (AC-1)", () => {
 
     await screen.findByText(ru["agent_connect.created_title"]);
     const field = screen.getByLabelText(ru["agent_connect.field_label"]) as HTMLTextAreaElement;
-    expect(bodies).toEqual([{ name: "Ноутбук" }]);
+    expect(bodies).toEqual([{ name: "Ноутбук", read_only: false }]);
     expect(field.readOnly).toBe(true);
     // Claude Code by default: the ready command carries the address of this site (+ /mcp) and the token.
     expect(field.value).toBe(
@@ -341,6 +345,21 @@ describe("revoke token (AC-3)", () => {
     expect(rowOf(container, T_ACTIVE).querySelector('button[data-action="revoke-token"]')).toBeNull();
     // Focus does not fall to the page body after the row loses its button.
     expect(document.activeElement).toBe(screen.getByRole("heading", { name: ru["agent_tokens.own_title"] }));
+  });
+
+  it("posts read_only true when the checkbox is on", async () => {
+    const bodies: unknown[] = [];
+    await open(() => j(200, []), {
+      [CREATE]: async (r) => {
+        bodies.push(await r.json());
+        return j(201, { ...CREATED_ITEM, read_only: true, token: TOKEN_VALUE });
+      },
+    });
+    fireEvent.click(screen.getByLabelText(ru["agent_tokens.read_only"]));
+    fireEvent.change(screen.getByLabelText(ru["agent_tokens.name_label"]), { target: { value: "Наблюдатель" } });
+    fireEvent.click(screen.getByRole("button", { name: ru["agent_tokens.create_submit"] }));
+    await screen.findByText(ru["agent_connect.created_title"]);
+    expect(bodies).toEqual([{ name: "Наблюдатель", read_only: true }]);
   });
 
   it("shows a readable error when the revoke fails and still refreshes the list", async () => {
