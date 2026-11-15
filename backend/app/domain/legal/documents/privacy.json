@@ -78,7 +78,7 @@
     {
       "heading": "8. Сведения об Операторе",
       "paragraphs": [
-        "Наименование: {operator_name}. ОГРНИП: {operator_ogrn}. ИНН: {operator_inn}.{postal_part_dot} Адрес для обращений: электронная почта {contact_email}. Сведения об индивидуальном предпринимателе — в ЕГРИП по ИНН {operator_inn}. [предложение, подтвердить у юриста]"
+        "Наименование: {operator_name}. ОГРНИП: {operator_ogrn}. ИНН: {operator_inn}.{postal_part_dot} Адрес для обращений: электронная почта {contact_email}. Сведения об индивидуальном предпринимателе — в ЕГРИП по ИНН {operator_inn} (сервис ФНС: https://egrul.nalog.ru/). [предложение, подтвердить у юриста]"
       ]
     }
   ]

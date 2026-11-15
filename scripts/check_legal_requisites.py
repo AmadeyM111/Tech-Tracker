@@ -19,7 +19,10 @@ def main() -> int:
     left = documents.unfilled_placeholders()
     proposals = documents.proposal_count()
     if proposals:
-        print(f"Предупреждение: абзацев с пометкой «предложение»: {proposals}")
+        print(
+            f"Предупреждение: в текстах {proposals} абзацев с пометкой «[предложение, подтвердить у юриста]»: "
+            "перед включением флага в production их снимают (documents/README.md); на код не влияет"
+        )
     if left:
         print("Не заполнено [ЗАПОЛНИТЬ]: " + ", ".join(left))
         return 1

@@ -100,6 +100,31 @@ describe("LegalPage (021)", () => {
   });
 });
 
+describe("LegalPage when the feature is off (021)", () => {
+  it("feature_disabled_sends_to_login", async () => {
+    stubNet({ "GET /api/v1/legal/privacy": () => json(404, { detail: "x", code: "feature_disabled" }) });
+    const { container } = renderAt("/privacy", <LegalPage kind="privacy" />, "/privacy");
+    await waitFor(() => expect(container.querySelector("article")).toBeNull());
+  });
+
+  it("a web address in the text is a link opening in a new tab", async () => {
+    stubNet({
+      "GET /api/v1/legal/consent": () =>
+        json(200, {
+          kind: "consent",
+          title: "Согласие",
+          version: VERSION,
+          effective_date: VERSION,
+          sections: [{ heading: null, paragraphs: ["Сведения — в ЕГРИП (сервис ФНС: https://egrul.nalog.ru/)."] }],
+        }),
+    });
+    renderAt("/consent", <LegalPage kind="consent" />, "/consent");
+    const link = await screen.findByRole("link", { name: "https://egrul.nalog.ru/" });
+    expect(link.getAttribute("href")).toBe("https://egrul.nalog.ru/");
+    expect(link.getAttribute("target")).toBe("_blank");
+  });
+});
+
 describe("PdnConsentPage (021)", () => {
   it("accept_posts_the_current_version", async () => {
     const calls = stubNet({ ...LEGAL_ON, "POST /api/v1/me/pdn-consent": () => new Response(null, { status: 204 }) });
