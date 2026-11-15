@@ -1,8 +1,10 @@
 // Provider buttons under the login form (spec 029 FR-12; design gtrack-login-029). Only enabled providers
-// are shown. Logos are not drawn: the official brand assets are not taken yet (design file, open questions).
+// are shown. Logos are the official brand files, unchanged (see brand/README.md for sources and rules).
 import { useQuery } from "@tanstack/react-query";
 
 import { t, type MessageKey } from "../../shared/i18n";
+import googleG from "./brand/google-g.png";
+import yandexButton from "./brand/login-with-yandex-14.svg";
 import { listProviders, loginStartUrl, type ProviderName } from "./externalApi";
 import "./external.css";
 
@@ -34,6 +36,40 @@ export function externalErrorText(
   return t(`auth.external_error.${code}` as MessageKey, { provider: name });
 }
 
+/** Provider button. Yandex: the official button file as it is (its colours and text must not change). */
+function ProviderButton({
+  name,
+  remember,
+}: {
+  name: ProviderName;
+  remember: boolean;
+}) {
+  const label = t(LABELS[name]);
+  const href = loginStartUrl(name, remember);
+  if (name === "yandex") {
+    // The image text is part of the official file; the link name comes from alt.
+    return (
+      <a className="ext-btn ext-btn-yandex" href={href}>
+        <img src={yandexButton} alt={label} height={44} />
+      </a>
+    );
+  }
+  if (name === "google") {
+    // «Sign in with Google», dark theme: the unchanged G mark beside the translated text.
+    return (
+      <a className="ext-btn ext-btn-google" href={href}>
+        <img src={googleG} alt="" aria-hidden="true" width={20} height={20} />
+        <span>{label}</span>
+      </a>
+    );
+  }
+  return (
+    <a className="ext-btn ext-btn-plain" href={href}>
+      {label}
+    </a>
+  );
+}
+
 export function ExternalLogin({ remember }: { remember: boolean }) {
   const providers = useQuery({
     queryKey: ["auth", "external-providers"],
@@ -49,13 +85,7 @@ export function ExternalLogin({ remember }: { remember: boolean }) {
       <p className="ext-hint">{t("auth.external_with")}</p>
       <div className="ext-list">
         {names.map((name) => (
-          <a
-            key={name}
-            className={`ext-btn ext-btn-${name}`}
-            href={loginStartUrl(name, remember)}
-          >
-            {t(LABELS[name])}
-          </a>
+          <ProviderButton key={name} name={name} remember={remember} />
         ))}
       </div>
     </div>

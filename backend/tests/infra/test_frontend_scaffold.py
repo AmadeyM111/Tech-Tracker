@@ -255,6 +255,10 @@ def test_t21_src_files_only_expected() -> None:
         # 029: внешний вход и «Способы входа» в профиле
         "features/auth/externalApi.ts", "features/auth/ExternalLogin.tsx",
         "features/auth/LoginMethods.tsx", "features/auth/external.css",
+        # официальные логотипы провайдеров (источники и правила — в brand/README.md)
+        "features/auth/brand/README.md", "features/auth/brand/google-g.png",
+        "features/auth/brand/login-with-yandex-14.svg",
+        "features/auth/brand/login-with-yandex-8-1.svg",
         "features/tokens/CloudClients.tsx",
         "features/projects/MemberAdd.tsx", "features/projects/members.css",
         "features/tokens/AgentConnect.tsx", "features/tokens/agent-connect.css",
