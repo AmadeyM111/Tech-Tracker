@@ -59,6 +59,7 @@ def project_tools() -> list[ToolSpec]:
             ProjectCreate,
             Capability.PROJECT_CREATE,
             _create,
+            write=True,
         ),
         make_tool(
             "get_project",

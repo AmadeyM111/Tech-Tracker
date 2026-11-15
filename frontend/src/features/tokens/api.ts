@@ -22,8 +22,13 @@ export async function listAgentTokens(): Promise<AgentToken[]> {
 }
 
 /** The returned `token` value is shown once; the caller must not store it anywhere but local state. */
-export async function createAgentToken(name: string): Promise<CreatedAgentToken> {
-  const { data } = await getAppClient().POST("/api/v1/me/tokens", { body: { name } });
+export async function createAgentToken(
+  name: string,
+  readOnly = false,
+): Promise<CreatedAgentToken> {
+  const { data } = await getAppClient().POST("/api/v1/me/tokens", {
+    body: { name, read_only: readOnly },
+  });
   if (data === undefined) throw invalidBody(201);
   return data;
 }

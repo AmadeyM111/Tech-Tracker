@@ -1,3 +1,17 @@
+.agent-read-only {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: 8px 0;
+  cursor: pointer;
+}
+.agent-read-only input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex: none;
+}
 .agent-connect {
   margin-top: 12px;
   max-width: 44rem;

@@ -18,6 +18,8 @@ def make_tool[ArgsT: BaseModel](
     args: type[ArgsT],
     capability: Capability,
     run: Callable[[AsyncSession, Actor, ArgsT], Awaitable[Any]],
+    *,
+    write: bool = False,
 ) -> ToolSpec:
     async def handler(db: AsyncSession, actor: Actor, raw: dict[str, Any]) -> Any:
         return await run(db, actor, args.model_validate(raw))
@@ -28,4 +30,5 @@ def make_tool[ArgsT: BaseModel](
         input_schema=args.model_json_schema(),
         capability=capability,
         handler=handler,
+        write=write,
     )

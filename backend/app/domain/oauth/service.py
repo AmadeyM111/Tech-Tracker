@@ -44,7 +44,9 @@ if TYPE_CHECKING:
 ACCESS_PREFIX: Final = "gtat_"
 REFRESH_PREFIX: Final = "gtrt_"
 SCOPE: Final = "mcp"
-SCOPES_SUPPORTED: Final = ("mcp", "offline_access")
+SCOPE_READ: Final = "mcp:read"
+SCOPES_SUPPORTED: Final = ("mcp", "mcp:read", "offline_access")
+_MCP_SCOPES: Final = frozenset({SCOPE, SCOPE_READ})
 ACCESS_TTL: Final = timedelta(hours=1)
 REFRESH_TTL: Final = timedelta(days=90)  # владелец 2026-11-12: 90 суток, ротация
 CODE_TTL: Final = timedelta(seconds=60)
@@ -93,6 +95,12 @@ def new_secret(prefix: str = "") -> str:
 
 def canonical_resource(base_url: str) -> str:
     return f"{base_url.rstrip('/')}/mcp"
+
+
+def scope_is_read_only(scope: str) -> bool:
+    """``mcp:read`` без ``mcp`` — только чтение; ``mcp`` (и оба сразу) — запись."""
+    parts = set(scope.split())
+    return SCOPE_READ in parts and SCOPE not in parts
 
 
 def issuer(base_url: str) -> str:
@@ -278,15 +286,17 @@ async def check_authorize_request(
             "invalid_target", "resource не принадлежит этому серверу", redirect=True
         )
     scope = params.get("scope") or SCOPE
-    if not set(scope.split()) <= set(SCOPES_SUPPORTED):
+    requested = {part for part in scope.split() if part}
+    if not requested <= set(SCOPES_SUPPORTED) or not requested & _MCP_SCOPES:
         raise AuthorizeError("invalid_scope", "Недопустимый scope", redirect=True)
+    scope = " ".join(dict.fromkeys(part for part in scope.split() if part))
     state = params.get("state")
     return AuthRequest(
         client=client,
         redirect_uri=redirect_uri,
         code_challenge=challenge,
         state=state,
-        scope=SCOPE,
+        scope=scope,
         resource=canonical_resource(base_url),
     )
 
@@ -310,6 +320,7 @@ def sign_context(key: bytes, req: AuthRequest, user_id: UUID, now: datetime) -> 
         "r": req.redirect_uri,
         "ch": req.code_challenge,
         "s": req.state,
+        "sc": req.scope,
         "u": str(user_id),
         "e": int((now + CONTEXT_TTL).timestamp()),
     }
@@ -345,6 +356,7 @@ async def grant_consent(db: AsyncSession, actor: Actor, base_url: str, ctx: dict
             "code_challenge": ctx["ch"],
             "code_challenge_method": "S256",
             **({"state": ctx["s"]} if ctx.get("s") else {}),
+            **({"scope": ctx["sc"]} if ctx.get("sc") else {}),
         },
     )
     await db.execute(select(AppUser.id).where(AppUser.id == actor.user_id).with_for_update())
@@ -530,6 +542,11 @@ class OauthPrincipal:
     role: Role | None
     must_change_password: bool
     name: str
+    scope: str = SCOPE
+
+    @property
+    def read_only(self) -> bool:
+        return scope_is_read_only(self.scope)
 
 
 async def resolve_access(db: AsyncSession, raw: str, base_url: str) -> OauthPrincipal | None:
@@ -545,6 +562,7 @@ async def resolve_access(db: AsyncSession, raw: str, base_url: str) -> OauthPrin
                 OauthGrant.user_id,
                 OauthGrant.workspace_id,
                 OauthGrant.resource,
+                OauthGrant.scope,
                 OauthGrant.last_used_at,
                 OauthClient.client_name,
                 OauthClient.redirect_uris,
@@ -586,6 +604,7 @@ async def resolve_access(db: AsyncSession, raw: str, base_url: str) -> OauthPrin
         role=None if row.role is None else Role(row.role),
         must_change_password=row.must_change_password,
         name=f"{label[:54]} (OAuth)",
+        scope=row.scope,
     )
 
 

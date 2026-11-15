@@ -12,6 +12,7 @@ from app.domain.tokens.service import NAME_MAX_LENGTH
 
 class TokenCreate(BaseModel):
     name: str = Field(max_length=NAME_MAX_LENGTH)
+    read_only: bool = False
 
 
 class TokenItem(BaseModel):
@@ -26,6 +27,7 @@ class TokenItem(BaseModel):
     last_used_at: datetime | None
     revoked_at: datetime | None
     active: bool
+    read_only: bool
 
 
 class TokenCreated(TokenItem):

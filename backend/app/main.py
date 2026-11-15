@@ -13,6 +13,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.api.deps import check_origin
 from app.api.mcp.endpoint import McpEndpoint
+from app.api.mcp.rate_limit import TokenRateLimiter
 from app.api.mcp.server import McpRuntime, build_session_manager
 from app.api.mcp.tools import default_registry
 from app.api.v1 import router as api_v1_router
@@ -151,6 +152,7 @@ def create_app(settings: Settings | None = None, *, clock: Clock | None = None) 
     application.include_router(wellknown_router)  # /.well-known/* (OAuth, спека 028)
     # MCP для AI-агентов (ADR-0018): реестр инструментов и протокольный слой на /mcp
     application.state.mcp_registry = default_registry()
+    application.state.mcp_limiter = TokenRateLimiter()
     session_manager = build_session_manager()
     application.state.mcp_runtime = McpRuntime(session_manager)
     # ASGI-приложение как endpoint: Starlette передаёт не-функции без обёртки (типы этого не видят)

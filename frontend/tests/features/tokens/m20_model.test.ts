@@ -1,7 +1,13 @@
 // M20 / PN-15: pure helpers of "Доступ для агентов" (status, Moscow time, name check, error text).
 import { describe, expect, it } from "vitest";
 
-import { failureMessage, formatMsk, nameProblem, tokenStatus } from "../../../src/features/tokens/model";
+import {
+  failureMessage,
+  formatMsk,
+  nameProblem,
+  tokenStatus,
+  tokenStatusText,
+} from "../../../src/features/tokens/model";
 import { ApiError } from "../../../src/shared/api/client";
 import { errorMessage, ru } from "../../../src/shared/i18n";
 
@@ -17,6 +23,11 @@ describe("tokenStatus (PN-15, AC-3)", () => {
 
   it("is active otherwise", () => {
     expect(tokenStatus({ active: true, revoked_at: null })).toBe("active");
+  });
+
+  it("marks an active read-only token in the status text", () => {
+    expect(tokenStatusText("active", true)).toBe(ru["agent_tokens.status_read_only"]);
+    expect(tokenStatusText("active", false)).toBe(ru["agent_tokens.status_active"]);
   });
 });
 

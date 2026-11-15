@@ -70,7 +70,9 @@ async def _list_tools() -> list[types.Tool]:
         return []
     return [
         types.Tool(name=spec.name, description=spec.description, inputSchema=spec.input_schema)
-        for spec in request.registry.visible_for(request.principal.role)
+        for spec in request.registry.visible_for(
+            request.principal.role, read_only=request.principal.read_only
+        )
     ]
 
 
@@ -84,7 +86,9 @@ async def _call_tool(name: str, arguments: dict[str, Any] | None) -> types.CallT
     spec = request.registry.get(name)
     if spec is None:
         return _error_result(NotFound("Инструмент не найден", code="not_found"))
-    if not request.registry.allowed(request.principal.role, spec):
+    if not request.registry.allowed(
+        request.principal.role, spec, read_only=request.principal.read_only
+    ):
         return _error_result(Forbidden())
     try:
         async with transaction(request.sessionmaker) as db:

@@ -20,6 +20,7 @@ import {
 import { AgentConnect, AgentMore } from "./AgentConnect";
 import { CloudClients } from "./CloudClients";
 import { TokenList } from "./TokenList";
+import "./agent-connect.css";
 import { failureMessage, nameProblem } from "./model";
 
 const CONNECT_ID = "agent-connect";
@@ -41,6 +42,7 @@ export function AgentAccessPage() {
   const busy = useRef(false);
   const [name, setName] = useState(t("agent_tokens.name_default"));
   const [nameFailed, setNameFailed] = useState(false);
+  const [readOnly, setReadOnly] = useState(false);
   const [pending, setPending] = useState(false);
   const [issued, setIssued] = useState<CreatedAgentToken | null>(null);
   const [confirming, setConfirming] = useState<AgentToken | null>(null);
@@ -58,9 +60,10 @@ export function AgentAccessPage() {
     setPending(true);
     alert.clear();
     try {
-      const created = await createAgentToken(name.trim());
+      const created = await createAgentToken(name.trim(), readOnly);
       setIssued(created);
       setName(t("agent_tokens.name_default"));
+      setReadOnly(false);
       setNameFailed(false);
     } catch (e) {
       alert.show(failureMessage(e));
@@ -124,6 +127,15 @@ export function AgentAccessPage() {
             inputRef={nameRef}
             disabled={pending}
           />
+          <label className="agent-read-only">
+            <input
+              type="checkbox"
+              checked={readOnly}
+              onChange={(e) => setReadOnly(e.target.checked)}
+              disabled={pending}
+            />
+            {t("agent_tokens.read_only")}
+          </label>
           <button type="submit" disabled={pending}>
             {t("agent_tokens.create_submit")}
           </button>

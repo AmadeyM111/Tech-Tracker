@@ -2677,6 +2677,11 @@ export interface components {
         TokenCreate: {
             /** Name */
             name: string;
+            /**
+             * Read Only
+             * @default false
+             */
+            read_only: boolean;
         };
         /**
          * TokenCreated
@@ -2704,6 +2709,8 @@ export interface components {
             last_used_at: string | null;
             /** Name */
             name: string;
+            /** Read Only */
+            read_only: boolean;
             /** Revoked At */
             revoked_at: string | null;
             /** Token */
@@ -2735,6 +2742,8 @@ export interface components {
             last_used_at: string | null;
             /** Name */
             name: string;
+            /** Read Only */
+            read_only: boolean;
             /** Revoked At */
             revoked_at: string | null;
         };

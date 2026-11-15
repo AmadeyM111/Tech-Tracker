@@ -3148,6 +3148,11 @@
             "maxLength": 64,
             "title": "Name",
             "type": "string"
+          },
+          "read_only": {
+            "default": false,
+            "title": "Read Only",
+            "type": "boolean"
           }
         },
         "required": [
@@ -3194,6 +3199,10 @@
             "title": "Name",
             "type": "string"
           },
+          "read_only": {
+            "title": "Read Only",
+            "type": "boolean"
+          },
           "revoked_at": {
             "anyOf": [
               {
@@ -3219,6 +3228,7 @@
           "last_used_at",
           "revoked_at",
           "active",
+          "read_only",
           "token"
         ],
         "title": "TokenCreated",
@@ -3262,6 +3272,10 @@
             "title": "Name",
             "type": "string"
           },
+          "read_only": {
+            "title": "Read Only",
+            "type": "boolean"
+          },
           "revoked_at": {
             "anyOf": [
               {
@@ -3282,7 +3296,8 @@
           "expires_at",
           "last_used_at",
           "revoked_at",
-          "active"
+          "active",
+          "read_only"
         ],
         "title": "TokenItem",
         "type": "object"

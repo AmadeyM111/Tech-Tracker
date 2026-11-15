@@ -127,6 +127,7 @@ def task_tools() -> list[ToolSpec]:
             CreateTaskArgs,
             BA,
             _create,
+            write=True,
         ),
         make_tool(
             "create_subtask",
@@ -134,6 +135,7 @@ def task_tools() -> list[ToolSpec]:
             CreateSubtaskArgs,
             BA,
             _create_sub,
+            write=True,
         ),
         make_tool(
             "update_task",
@@ -141,5 +143,6 @@ def task_tools() -> list[ToolSpec]:
             UpdateTaskArgs,
             BA,
             _update,
+            write=True,
         ),
     ]
