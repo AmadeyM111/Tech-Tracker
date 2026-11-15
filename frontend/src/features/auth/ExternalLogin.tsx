@@ -51,7 +51,8 @@ function ProviderButton({
 }) {
   const label = t(LABELS[name]);
   // Without an address the link is inert (no navigation) and announced as disabled; the brand files stay as they are.
-  const link = href === null ? { role: "link", "aria-disabled": true } : { href };
+  const link =
+    href === null ? { role: "link", "aria-disabled": true } : { href };
   if (name === "yandex") {
     // The image text is part of the official file; the link name comes from alt.
     return (
@@ -80,7 +81,13 @@ function ProviderButton({
  * Spec 021: while the consent is required the buttons stay disabled until the box is ticked. The page that has its own
  * box (/register) passes the state in `consent`; otherwise the box is drawn here (/login).
  */
-export function ExternalLogin({ remember, consent }: { remember: boolean; consent?: { agreed: boolean } }) {
+export function ExternalLogin({
+  remember,
+  consent,
+}: {
+  remember: boolean;
+  consent?: { agreed: boolean };
+}) {
   const providers = useQuery({
     queryKey: ["auth", "external-providers"],
     queryFn: () => listProviders(),
@@ -101,16 +108,29 @@ export function ExternalLogin({ remember, consent }: { remember: boolean; consen
       {consentOn && consent === undefined ? (
         <PdnConsentField checked={ownAgreed} onChange={setOwnAgreed} />
       ) : null}
-      <div className="ext-list">
+      <div
+        className={
+          consentOn && !agreed ? "ext-list ext-list-locked" : "ext-list"
+        }
+        aria-describedby={consentOn && !agreed ? "ext-need-consent" : undefined}
+      >
         {names.map((name) => (
           <ProviderButton
             key={name}
             name={name}
-            href={consentOn && !agreed ? null : loginStartUrl(name, remember, version)}
+            href={
+              consentOn && !agreed
+                ? null
+                : loginStartUrl(name, remember, version)
+            }
           />
         ))}
       </div>
-      {consentOn && !agreed ? <p className="ext-hint">{t("legal.providers_need_consent")}</p> : null}
+      {consentOn && !agreed ? (
+        <p id="ext-need-consent" className="ext-hint">
+          {t("legal.providers_need_consent")}
+        </p>
+      ) : null}
     </div>
   );
 }

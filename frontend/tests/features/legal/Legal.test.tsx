@@ -178,9 +178,15 @@ describe("ExternalLogin consent (021)", () => {
     expect(button.getAttribute("aria-disabled")).toBe("true");
     expect(button.getAttribute("href")).toBeNull();
     expect(screen.getByText(t("legal.providers_need_consent"))).toBeTruthy();
+    // the block is marked as locked around the buttons; the official button itself is not restyled
+    const list = button.parentElement as HTMLElement;
+    expect(list.className).toContain("ext-list-locked");
+    expect(list.getAttribute("aria-describedby")).toBe("ext-need-consent");
+    expect(button.getAttribute("style")).toBeNull();
     fireEvent.click(box);
     expect(screen.queryByText(t("legal.providers_need_consent"))).toBeNull();
     const ready = screen.getByRole("link", { name: t("auth.external_yandex") });
+    expect((ready.parentElement as HTMLElement).className).not.toContain("ext-list-locked");
     expect(ready.getAttribute("href")).toBe(
       `/api/v1/auth/external/yandex/start?consent=true&consent_version=${VERSION}`,
     );
