@@ -40,7 +40,12 @@ const OLD: Record<string, number> = {
   "[data-column] h3": 14,
   // UI-kit 2026-11-08: badge 15 px = 11 px + 4 px (T100 rule); 11 px is the assumed prior size, no prior badge existed.
   ".ui-badge": 11,
-  'li[data-task-id] [data-field]:not([data-field="title"])': 13,
+  // Dense board 2026-11-15: card meta 15 px, title 17 px, + 22 px, ava 11 px, property labels 15 px.
+  'li[data-task-id] [data-field]:not([data-field="title"])': 11,
+  'li[data-task-id] [data-field="title"]': 13,
+  ".ui-column-add": 18,
+  ".ui-ava": 7,
+  ".ui-task-side .ui-props dt": 11,
 };
 
 describe("T100 font sizes +4px", () => {

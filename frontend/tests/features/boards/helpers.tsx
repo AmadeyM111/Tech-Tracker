@@ -2,9 +2,8 @@
 //
 // Ключи ru.ts: boards.filter_label (подпись select); boards.filter_all "Все исполнители";
 //   boards.filter_none "Без исполнителя".
-// 004/AC-1, AC-2: на Доске нет создания задач - ни кнопок, ни форм, ни полей ввода названия, ни текста
-//   «Добавить задачу» в колонках и на вкладке; запросов POST /projects/{id}/tasks с Доски не бывает
-//   (создание - диалог бокового меню и вкладка «Задачи»). BoardView получает только projectId.
+// «+» в шапке колонки (canCreate) открывает тот же диалог «Новая задача» со статусом колонки.
+//   Текст «Добавить задачу» не используется. DnD/фильтр/опрос не шлют POST создания.
 // Оптимистичность: после опускания до ответа POST /move карточка уже в новой колонке/позиции;
 //   на ошибку (403/422/503/сеть) - порядок сервера и ровно один alert errorMessage(code); опрос
 //   во время запроса оптимистичное состояние не затирает; после успеха - перечитывание.
@@ -83,12 +82,12 @@
 //   карточка: li[data-task-id="<uuid>"] - ЕЁ ЖЕ элемент и есть перетаскиваемый (атрибуты/слушатели
 //     useSortable на нём, tabIndex=0 у карточки, фокус клавиатуры - на ней); внутри:
 //     [data-field="title"] c <a href="/tasks/<id>"> (текст = название),
-//     [data-field="priority"] (ru["tasks.priority.<p>"]),
+//     [data-field="priority"] (точка; текст ru["tasks.priority.<p>"] для a11y),
 //     [data-field="due_date"] - пусто -> ru["tasks.due_none"], иначе time[datetime="YYYY-MM-DD"]
-//       с текстом DD.MM.YYYY (без Date/пояса),
-//     [data-field="assignee"] - login или ru["tasks.assignee_none"],
-//     [data-field="progress"] - null -> ru["tasks.progress_none"], число N ->
-//       t("tasks.progress_value", { percent: N });
+//       с текстом DD.MM (без Date/пояса),
+//     [data-field="assignee"] - имя (иначе login) или ru["tasks.assignee_none"],
+//     [data-field="progress"] - нет подзадач -> ru["tasks.progress_none"], иначе
+//       t("tasks.subtask_fraction", { done, total });
 //   доступность dnd: у карточки aria-roledescription = ru["boards.card_roledescription"],
 //     aria-describedby -> элемент с текстом ru["boards.dnd_instructions"] (DndContext
 //     accessibility.screenReaderInstructions); DndContext accessibility.announcements - только
@@ -158,6 +157,7 @@ export function card(id: string, title: string, status: Status, position: number
     assignee: null,
     progress: null,
     subtask_count: 0,
+    subtask_done: 0,
     position,
     ...over,
   };
@@ -169,9 +169,15 @@ export const CA = card(TA, "Подготовить отчёт", "todo", 10, {
   assignee: R_KUZNETSOV,
   progress: 50,
   subtask_count: 2,
+  subtask_done: 1,
 });
 export const CB = card(TB, "Согласовать бюджет", "todo", 20);
-export const CC = card(TC, "Проверить договор", "todo", 30, { due_date: "2026-01-05", progress: 0, subtask_count: 1 });
+export const CC = card(TC, "Проверить договор", "todo", 30, {
+  due_date: "2026-01-05",
+  progress: 0,
+  subtask_count: 1,
+  subtask_done: 0,
+});
 export const CD = card(TD, "Запустить рассылку", "in_progress", 10, { assignee: R_ME });
 export const CE = card(TE, "Архивировать", "done", 10);
 

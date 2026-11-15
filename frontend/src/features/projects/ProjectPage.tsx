@@ -51,10 +51,14 @@ function breakable(login: string): ReactNode[] {
 export function ProjectPage({
   currentUserId,
   currentLogin,
+  currentFirstName = null,
+  currentLastName = null,
   currentRole = null,
 }: {
   currentUserId: string;
   currentLogin: string;
+  currentFirstName?: string | null;
+  currentLastName?: string | null;
   /** Role of the current user from /me (decides whether an assignee may be chosen). */
   currentRole?: string | null;
 }) {
@@ -71,6 +75,8 @@ export function ProjectPage({
         project={project.data}
         currentUserId={currentUserId}
         currentLogin={currentLogin}
+        currentFirstName={currentFirstName}
+        currentLastName={currentLastName}
         currentRole={currentRole}
       />
     );
@@ -100,11 +106,15 @@ function ProjectCard({
   project,
   currentUserId,
   currentLogin,
+  currentFirstName,
+  currentLastName,
   currentRole,
 }: {
   project: ProjectDetail;
   currentUserId: string;
   currentLogin: string;
+  currentFirstName: string | null;
+  currentLastName: string | null;
   currentRole: string | null;
 }) {
   const baseId = useId();
@@ -352,14 +362,31 @@ function ProjectCard({
 
       <div role="tabpanel" id={panelId} aria-labelledby={tabId(tab)} tabIndex={panelHasFocusable ? undefined : 0}>
         <h2>{t(TAB_LABELS[tab])}</h2>
-        {tab === "board" ? <BoardView projectId={project.id} /> : null}
+        {tab === "board" ? (
+          <BoardView
+            projectId={project.id}
+            canCreate={permissions.create_task}
+            canPickAssignee={currentRole === "business_admin"}
+            currentUser={{
+              id: currentUserId,
+              login: currentLogin,
+              first_name: currentFirstName,
+              last_name: currentLastName,
+            }}
+          />
+        ) : null}
         {tab === "tasks" ? (
           <ProjectTaskList
             projectId={project.id}
             members={all}
             canCreate={permissions.create_task}
             actorRole={currentRole}
-            currentUser={{ id: currentUserId, login: currentLogin }}
+            currentUser={{
+              id: currentUserId,
+              login: currentLogin,
+              first_name: currentFirstName,
+              last_name: currentLastName,
+            }}
           />
         ) : null}
         {tab === "members" ? (

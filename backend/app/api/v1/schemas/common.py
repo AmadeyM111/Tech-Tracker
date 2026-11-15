@@ -10,11 +10,17 @@ from app.core.pagination import PageParams
 from app.domain.access.roles import Role
 
 
+def _omit_none(value: object) -> bool:
+    return value is None
+
+
 class UserRef(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     login: str
+    first_name: str | None = Field(default=None, exclude_if=_omit_none)
+    last_name: str | None = Field(default=None, exclude_if=_omit_none)
 
 
 class ProjectRef(BaseModel):

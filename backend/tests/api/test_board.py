@@ -32,6 +32,7 @@ CARD_FIELDS = {
     "assignee",
     "position",
     "subtask_count",
+    "subtask_done",
     "progress",
     "hot",  # «Горит» — тот же критерий, что на «Сводке» (spec 008 FR-8)
 }
@@ -100,6 +101,7 @@ async def test_ac25_cards_are_grouped_by_status_with_full_shape(api_env: ApiEnv)
     assert set(card["assignee"]) == USER_REF_FIELDS
     assert card["assignee"]["id"] == str(w.uid("usr"))
     assert card["subtask_count"] == 0
+    assert card["subtask_done"] == 0
     assert card["progress"] is None
     assert _col(body, "todo")[0]["assignee"] is None
 
@@ -132,6 +134,7 @@ async def test_ac80_board_has_one_card_for_task_with_two_subtasks_and_progress(
     cards = [c for col in body["columns"] for c in col["tasks"]]
     assert [c["id"] for c in cards] == [str(parent)]
     assert cards[0]["subtask_count"] == 2
+    assert cards[0]["subtask_done"] == 1
     assert cards[0]["progress"] == 50
     # подзадача в колонке «done» не создаёт отдельной карточки
     assert _col(body, "done") == []
@@ -148,7 +151,7 @@ async def test_ac80_progress_all_done_is_100_and_only_live_subtasks_counted(
 
     (card,) = _col(await _board(env, w.tok("ba"), w.project_id), "todo")
 
-    assert (card["subtask_count"], card["progress"]) == (1, 100)
+    assert (card["subtask_count"], card["subtask_done"], card["progress"]) == (1, 1, 100)
 
 
 async def test_ac18_deleted_tasks_are_not_on_board(api_env: ApiEnv) -> None:

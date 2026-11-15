@@ -245,7 +245,12 @@ function Sidebar({ profile }: { profile: MeResponse }) {
       {createOpen ? (
         <CreateTaskDialog
           currentProjectId={projectMatch?.params.projectId ?? null}
-          currentUser={{ id: profile.id, login: profile.login }}
+          currentUser={{
+            id: profile.id,
+            login: profile.login,
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+          }}
           canPickAssignee={profile.capabilities.includes("task_assign_others")}
           onClose={() => {
             setCreatePath(null);
@@ -536,7 +541,15 @@ export function AppRoutes({ insideMain = false }: { insideMain?: boolean }) {
         path="/projects/:projectId"
         element={
           <RoleScreen insideMain={insideMain} capability="business_access">
-            {(profile) => <ProjectPage currentUserId={profile.id} currentLogin={profile.login} currentRole={profile.role} />}
+            {(profile) => (
+              <ProjectPage
+                currentUserId={profile.id}
+                currentLogin={profile.login}
+                currentFirstName={profile.first_name}
+                currentLastName={profile.last_name}
+                currentRole={profile.role}
+              />
+            )}
           </RoleScreen>
         }
       />

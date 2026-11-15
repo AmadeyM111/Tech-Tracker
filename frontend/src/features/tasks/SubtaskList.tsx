@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { FieldError } from "../../shared/ui/ErrorAlert";
+import { personName } from "../../shared/ui/person";
 import { createSubtask, type TaskDetail } from "./api";
 
 const MAX_TITLE = 255;
@@ -91,7 +92,7 @@ export function SubtaskList({ task, onCreated }: SubtaskListProps) {
               {" "}
               <span data-field="status">{t(`tasks.status.${s.status}`)}</span>
               {" "}
-              <span data-field="assignee">{s.assignee === null ? t("tasks.assignee_none") : s.assignee.login}</span>
+              <span data-field="assignee">{s.assignee === null ? t("tasks.assignee_none") : personName(s.assignee)}</span>
             </li>
           ))}
         </ul>

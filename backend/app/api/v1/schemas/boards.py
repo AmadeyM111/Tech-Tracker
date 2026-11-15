@@ -36,6 +36,7 @@ class BoardCard(BaseModel):
     assignee: UserRef | None
     position: int
     subtask_count: int
+    subtask_done: int
     progress: int | None
     # «Горит» (spec 008 FR-8): высокий приоритет, срок сегодня или раньше, задача не завершена
     hot: bool

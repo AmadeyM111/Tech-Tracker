@@ -9,6 +9,7 @@ import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import { ErrorAlert, FieldError, useAlertState } from "../../shared/ui/ErrorAlert";
+import { personName } from "../../shared/ui/person";
 import { UserPicker } from "../../shared/ui/UserPicker";
 import { Attachments } from "../attachments/Attachments";
 import { Comments } from "../comments/Comments";
@@ -251,7 +252,7 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
       t(key)
     );
 
-  const head = (
+  const titleAndAlert = (
     <>
       <h1 ref={headingRef} tabIndex={-1}>
         {permissions.edit ? (
@@ -268,7 +269,10 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
         )}
       </h1>
       <ErrorAlert message={alert.message ?? pollError ?? membersError} seq={alert.seq} />
+    </>
+  );
 
+  const propsDl = (
       <dl className="ui-props">
         <dt>{label("status", "tasks.col_status")}</dt>
         <dd data-field="status">
@@ -321,7 +325,7 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
                 if (e.key === "Enter") e.preventDefault();
               }}
             >
-              <span className="ui-current">{task.assignee === null ? t("tasks.assignee_none") : task.assignee.login}</span>
+              <span className="ui-current">{task.assignee === null ? t("tasks.assignee_none") : personName(task.assignee)}</span>
               <UserPicker
                 key={pickerKey}
                 label={t("tasks.col_assignee")}
@@ -340,7 +344,7 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
           ) : task.assignee === null ? (
             t("tasks.assignee_none")
           ) : (
-            task.assignee.login
+            personName(task.assignee)
           )}
         </dd>
 
@@ -377,47 +381,43 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
             </dd>
           </>
         )}
-
-        <dt>{label("description", "tasks.field_description")}</dt>
-        <dd data-field="description" className="ui-pre">
-          {permissions.edit ? (
-            <textarea
-              id={field("description")}
-              name="description"
-              ref={descriptionRef}
-              {...invalidProps("description")}
-              value={edits.description ?? task.description}
-              onChange={(e) => setEdits((p) => ({ ...p, description: e.target.value }))}
-            />
-          ) : task.description === "" ? (
-            t("tasks.description_none")
-          ) : (
-            task.description
-          )}
-          <FieldError id={errorId("description")} message={errorText("description")} />
-        </dd>
       </dl>
-    </>
   );
 
-  return (
-    <section className="ui-wide">
+  const description = (
+    <div className="ui-task-body">
       {permissions.edit ? (
-        <form data-form="edit-task" onSubmit={onSave} noValidate aria-busy={pending ? "true" : undefined}>
-          {head}
-          <button type="submit">{t("tasks.save")}</button>
-        </form>
+        <label htmlFor={field("description")}>{t("tasks.field_description")}</label>
       ) : (
-        <div>{head}</div>
+        <p className="ui-clip">{t("tasks.field_description")}</p>
       )}
+      <div data-field="description">
+        {permissions.edit ? (
+          <textarea
+            id={field("description")}
+            name="description"
+            ref={descriptionRef}
+            {...invalidProps("description")}
+            value={edits.description ?? task.description}
+            onChange={(e) => setEdits((p) => ({ ...p, description: e.target.value }))}
+          />
+        ) : task.description === "" ? (
+          t("tasks.description_none")
+        ) : (
+          task.description
+        )}
+        <FieldError id={errorId("description")} message={errorText("description")} />
+      </div>
+    </div>
+  );
 
+  const rest = (
+    <>
       <SubtaskList
         task={task}
         onCreated={() => queryClient.invalidateQueries({ queryKey: cardKey })}
       />
-
       <Attachments taskId={task.id} alert={alert} />
-
       <div data-slot="comments">
         <Comments
           taskId={task.id}
@@ -426,7 +426,6 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
           suppressLoadError={pollError !== null}
         />
       </div>
-
       {permissions.delete ? (
         <p>
           <button type="button" data-action="delete-task" disabled={pending} onClick={() => setConfirmation("delete")}>
@@ -434,6 +433,36 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
           </button>
         </p>
       ) : null}
+    </>
+  );
+
+  return (
+    <section className="ui-wide">
+      {permissions.edit ? (
+        <form
+          data-form="edit-task"
+          className="ui-task-doc"
+          onSubmit={onSave}
+          noValidate
+          aria-busy={pending ? "true" : undefined}
+        >
+          <div className="ui-task-main">
+            {titleAndAlert}
+            {description}
+            <button type="submit">{t("tasks.save")}</button>
+          </div>
+          <aside className="ui-task-side">{propsDl}</aside>
+        </form>
+      ) : (
+        <div className="ui-task-doc">
+          <div className="ui-task-main">
+            {titleAndAlert}
+            {description}
+          </div>
+          <aside className="ui-task-side">{propsDl}</aside>
+        </div>
+      )}
+      {rest}
 
       {confirmation === null ? null : (
         <ConfirmDialog

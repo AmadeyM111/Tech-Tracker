@@ -6,6 +6,7 @@ import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
+import { personName, type PersonRef } from "../../shared/ui/person";
 import type { ProjectMember } from "../projects/api";
 import {
   listMyTasks,
@@ -13,7 +14,7 @@ import {
   type TaskListItem,
   type TaskStatus,
 } from "./api";
-import { CreateTaskForm } from "./CreateTaskForm";
+import { CreateTaskForm, todayMsk } from "./CreateTaskForm";
 import "./tasks.css";
 
 const STATUSES: readonly TaskStatus[] = ["todo", "in_progress", "review", "done"];
@@ -30,12 +31,22 @@ function codeOf(e: unknown): string {
   return typeof code === "string" ? code : "unknown";
 }
 
+function dueOverdue(task: TaskListItem): boolean {
+  return task.due_date !== null && task.status !== "done" && task.due_date < todayMsk();
+}
+
 function dueText(task: TaskListItem) {
   return task.due_date === null ? (
     t("tasks.due_none")
   ) : (
-    <time dateTime={task.due_date}>{formatDate(task.due_date)}</time>
+    <time dateTime={task.due_date} className={dueOverdue(task) ? "ui-due-overdue" : undefined}>
+      {formatDate(task.due_date)}
+    </time>
   );
+}
+
+function assigneeText(task: TaskListItem) {
+  return task.assignee === null ? t("tasks.assignee_none") : personName(task.assignee);
 }
 
 // Below 720 px the table becomes cards (same data, no horizontal scroll).
@@ -51,8 +62,8 @@ function TaskCards({ items, withProject }: { items: TaskListItem[]; withProject:
             {withProject ? `${task.project.name} · ` : ""}
             {t(`tasks.status.${task.status}`)} · {t(`tasks.priority.${task.priority}`)}
           </span>
-          <span className="c-meta">
-            {task.assignee === null ? t("tasks.assignee_none") : task.assignee.login} · {dueText(task)}
+          <span className={dueOverdue(task) ? "c-meta ui-due-overdue" : "c-meta"}>
+            {assigneeText(task)} · {dueText(task)}
           </span>
         </li>
       ))}
@@ -97,8 +108,10 @@ function TaskTableBody({ items, withProject }: { items: TaskListItem[]; withProj
             ) : null}
             <td data-field="status">{t(`tasks.status.${task.status}`)}</td>
             <td data-field="priority">{t(`tasks.priority.${task.priority}`)}</td>
-            <td data-field="assignee">{task.assignee === null ? t("tasks.assignee_none") : task.assignee.login}</td>
-            <td data-field="due_date">{dueText(task)}</td>
+            <td data-field="assignee">{assigneeText(task)}</td>
+            <td data-field="due_date" className={dueOverdue(task) ? "ui-due-overdue" : undefined}>
+              {dueText(task)}
+            </td>
           </tr>
         ))}
       </tbody>
@@ -148,7 +161,7 @@ export interface ProjectTaskListProps {
   /** The actor's role from /me: only a business admin may choose an assignee (FR-9). */
   actorRole: string | null;
   /** 006/FR-19: исполнитель по умолчанию в форме создания. */
-  currentUser: { id: string; login: string };
+  currentUser: PersonRef;
 }
 
 /** Content of the "Tasks" tab (without the tab heading). */
@@ -200,7 +213,7 @@ export function ProjectTaskList({ projectId, members, canCreate, actorRole, curr
             <option value="">{t("tasks.filter_assignee_all")}</option>
             {members.map((m) => (
               <option key={m.user.id} value={m.user.id}>
-                {m.user.login}
+                {personName(m.user)}
               </option>
             ))}
           </select>

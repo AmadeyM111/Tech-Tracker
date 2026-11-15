@@ -42,6 +42,8 @@ class DirectoryUser:
 class UserRef:
     id: UUID
     login: str
+    first_name: str | None = None
+    last_name: str | None = None
 
 
 def like_contains_pattern(q: str) -> str:
@@ -175,8 +177,16 @@ async def user_refs(
     if not wanted:
         return {}
     rows = await db.execute(
-        select(AppUser.id, AppUser.login_display)
+        select(AppUser.id, AppUser.login_display, AppUser.first_name, AppUser.last_name)
         .join(WorkspaceMember, WorkspaceMember.user_id == AppUser.id)
         .where(WorkspaceMember.workspace_id == workspace_id, AppUser.id.in_(wanted))
     )
-    return {row.id: UserRef(id=row.id, login=row.login_display) for row in rows}
+    return {
+        row.id: UserRef(
+            id=row.id,
+            login=row.login_display,
+            first_name=row.first_name,
+            last_name=row.last_name,
+        )
+        for row in rows
+    }

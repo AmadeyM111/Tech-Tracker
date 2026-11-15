@@ -6,9 +6,18 @@ import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent 
 import { ApiError } from "../../shared/api/client";
 import { errorMessage, t, type MessageKey } from "../../shared/i18n";
 import { ErrorAlert, FieldError, useAlertState } from "../../shared/ui/ErrorAlert";
+import { personName, type PersonRef } from "../../shared/ui/person";
 import { UserPicker } from "../../shared/ui/UserPicker";
 import { listAllMembers, listCreatableProjects, type CreatableProject } from "../projects/api";
-import { createTask, type TaskCreate, type TaskCreateInput, type TaskDetail, type TaskPriority } from "./api";
+import {
+  createTask,
+  updateTask,
+  type TaskCreate,
+  type TaskCreateInput,
+  type TaskDetail,
+  type TaskPriority,
+  type TaskStatus,
+} from "./api";
 
 const PRIORITIES: readonly TaskPriority[] = ["low", "medium", "high"];
 
@@ -69,7 +78,7 @@ export interface CreateTaskFormProps {
   /** Ids the assignee may be chosen from (project members). */
   assigneeIds: readonly string[];
   /** 006/FR-19: исполнитель по умолчанию; строка «Исполнитель: <логин>» у «Пользователя». */
-  currentUser: { id: string; login: string };
+  currentUser: PersonRef;
 }
 
 function RequiredMark() {
@@ -239,7 +248,7 @@ export function CreateTaskForm({ projectId, canPickAssignee, assigneeIds, curren
             )}
           </div>
         ) : (
-          <p data-field="fixed-assignee">{t("tasks.assignee_fixed", { login: currentUser.login })}</p>
+          <p data-field="fixed-assignee">{t("tasks.assignee_fixed", { login: personName(currentUser) })}</p>
         )}
         <div className="ui-field">
           <label htmlFor={`${baseId}-priority`}>{t("tasks.priority_label")}</label>
@@ -266,9 +275,11 @@ export interface CreateTaskDialogProps {
   /** id проекта из пути `/projects/:projectId` (любая вкладка) или null. */
   currentProjectId: string | null;
   /** 006/FR-20: исполнитель по умолчанию; строка «Исполнитель: <логин>» у «Пользователя». */
-  currentUser: { id: string; login: string };
+  currentUser: PersonRef;
   /** 006/FR-20: выбор исполнителя только у БА. */
   canPickAssignee: boolean;
+  /** Status of the column whose "+" opened the dialog; omitted from the sidebar. */
+  initialStatus?: TaskStatus;
   /** Закрытие без создания: Escape, «Отмена», «Закрыть». Фокус возвращает вызывающий. */
   onClose: () => void;
   /** 201: задача создана, кэши инвалидированы. Вызывающий закрывает диалог и открывает карточку. */
@@ -285,6 +296,7 @@ export function CreateTaskDialog({
   currentProjectId,
   currentUser,
   canPickAssignee,
+  initialStatus,
   onClose,
   onCreated,
 }: CreateTaskDialogProps) {
@@ -453,6 +465,13 @@ export function CreateTaskDialog({
         setPending(false);
         return;
       }
+      if (initialStatus !== undefined && initialStatus !== "todo" && initialStatus !== task.status) {
+        try {
+          task = await updateTask(task.id, { status: initialStatus });
+        } catch {
+          // The task already exists in "todo"; the board still shows it.
+        }
+      }
       // The task exists: a repeated submit must not create a duplicate even if onCreated throws.
       created.current = true;
       // invalidateQueries marks the cache stale synchronously; refetches are not awaited (FR-15).
@@ -551,7 +570,7 @@ export function CreateTaskDialog({
           )}
         </div>
       ) : (
-        <p data-field="fixed-assignee">{t("tasks.assignee_fixed", { login: currentUser.login })}</p>
+        <p data-field="fixed-assignee">{t("tasks.assignee_fixed", { login: personName(currentUser) })}</p>
       )}
     </>
   );

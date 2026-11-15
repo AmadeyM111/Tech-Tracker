@@ -1,7 +1,7 @@
 // Kanban board: content of the project's "Board" tab (T86).
 // UF-5, FR-18a, FR-28, FR-28a (the client sends the neighbours), FR-29 (polling),
 // FR-19b (a refused move is rolled back with a message), AC-97 (keyboard), NFR-5..7, D-61.
-// 004: создания задач на Доске нет (создание — диалог бокового меню и вкладка "Задачи").
+// Column "+" opens the same create dialog with that column's status.
 // T91: optimistic move, client-side assignee filter.
 import {
   DndContext,
@@ -27,22 +27,24 @@ import {
 import { CSS, type Coordinates } from "@dnd-kit/utilities";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
 import { HotMark } from "../../shared/ui/HotMark";
+import { personInitials, personName, type PersonRef } from "../../shared/ui/person";
 import type { TaskStatus } from "../tasks/api";
+import { CreateTaskDialog, todayMsk } from "../tasks/CreateTaskForm";
 import { getBoard, moveTask, type Board, type BoardCard, type BoardColumn } from "./api";
 import { dropIndexInColumn, insertIndexFor, nearestCardIndex, neighborsInFullOrder, pickDropColumn } from "./dnd";
 
 const YMD = /^(\d{4})-(\d{2})-(\d{2})/;
 
 /** A calendar date is re-ordered as text: no Date object, so no time zone (NFR-5). */
-function formatDate(value: string): string {
+function formatDueShort(value: string): string {
   const m = YMD.exec(value);
-  return m === null ? value : `${m[3]}.${m[2]}.${m[1]}`;
+  return m === null ? value : `${m[3]}.${m[2]}`;
 }
 
 function codeOf(e: unknown): string {
@@ -129,6 +131,9 @@ function Card({ card }: { card: BoardCard }) {
   void _role;
   void _pressed;
   void _disabled;
+  const overdue = card.due_date !== null && card.status !== "done" && card.due_date < todayMsk();
+  const name = card.assignee === null ? null : personName(card.assignee);
+  const done = card.subtask_done ?? 0;
   return (
     <li
       ref={(el) => {
@@ -149,28 +154,64 @@ function Card({ card }: { card: BoardCard }) {
         {/* No pointer events while dragging: the click after pointerup must not navigate. */}
         <Link to={`/tasks/${card.id}`} style={isDragging ? { pointerEvents: "none" } : undefined}>
           {card.title}
-          {/* One place for every card and width: its own line under the title, inside the card link (правило «Горит»). */}
+          {/* One place for every card and width: its own line under the title, inside the card link. */}
           <HotMark hot={card.hot} block />
         </Link>
       </div>
-      <div data-field="priority">{t(`tasks.priority.${card.priority}`)}</div>
-      {/* One place for every card and width: the mark sits right of the due date (правило «Горит»). */}
-      <div data-field="due_date">
-        {card.due_date === null ? (
-          t("tasks.due_none")
+      <div className="ui-card-meta">
+        <span
+          data-field="priority"
+          className={`ui-prio-dot ui-prio-dot--${card.priority}`}
+          aria-label={t(`tasks.priority.${card.priority}`)}
+        >
+          <span className="ui-clip">{t(`tasks.priority.${card.priority}`)}</span>
+        </span>
+        <div data-field="due_date" className={overdue ? "ui-due-overdue" : undefined}>
+          {card.due_date === null ? (
+            <>
+              <span className="ui-clip">{t("tasks.due_none")}</span>
+            </>
+          ) : (
+            <time className="ui-due-short" dateTime={card.due_date}>
+              {formatDueShort(card.due_date)}
+            </time>
+          )}
+        </div>
+        {card.assignee === null ? (
+          <div data-field="assignee">
+            <span className="ui-clip">{t("tasks.assignee_none")}</span>
+          </div>
         ) : (
-          <time dateTime={card.due_date}>{formatDate(card.due_date)}</time>
+          <div data-field="assignee" title={name ?? undefined}>
+            <span className="ui-ava" aria-hidden="true">
+              {personInitials(card.assignee)}
+            </span>
+            <span className="ui-clip">{name}</span>
+          </div>
         )}
-      </div>
-      <div data-field="assignee">{card.assignee === null ? t("tasks.assignee_none") : card.assignee.login}</div>
-      <div data-field="progress">
-        {card.progress === null ? t("tasks.progress_none") : t("tasks.progress_value", { percent: card.progress })}
+        {card.subtask_count > 0 ? (
+          <div data-field="progress">
+            {t("tasks.subtask_fraction", { done, total: card.subtask_count })}
+          </div>
+        ) : (
+          <div data-field="progress">
+            <span className="ui-clip">{t("tasks.progress_none")}</span>
+          </div>
+        )}
       </div>
     </li>
   );
 }
 
-function Column({ status, cards }: { status: TaskStatus; cards: readonly BoardCard[] }) {
+function Column({
+  status,
+  cards,
+  onCreate,
+}: {
+  status: TaskStatus;
+  cards: readonly BoardCard[];
+  onCreate?: (status: TaskStatus) => void;
+}) {
   const headingId = useId();
   // The drop zone is the whole section, not only the list of cards (B2).
   const { setNodeRef } = useDroppable({
@@ -179,7 +220,19 @@ function Column({ status, cards }: { status: TaskStatus; cards: readonly BoardCa
   });
   return (
     <section ref={setNodeRef} data-column={status} aria-labelledby={headingId}>
-      <h3 id={headingId}>{statusTitle(status)}</h3>
+      <div className="ui-column-head">
+        <h3 id={headingId}>{statusTitle(status)}</h3>
+        {onCreate === undefined ? null : (
+          <button
+            type="button"
+            className="ui-column-add"
+            aria-label={t("boards.column_create", { status: statusTitle(status) })}
+            onClick={() => onCreate(status)}
+          >
+            +
+          </button>
+        )}
+      </div>
       <SortableContext id={status} items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <ul
           data-role="column-cards"
@@ -219,9 +272,21 @@ function applyMove(
 
 const PRIORITIES = ["low", "medium", "high"] as const;
 
-export function BoardView({ projectId }: { projectId: string }) {
+export function BoardView({
+  projectId,
+  canCreate = false,
+  canPickAssignee = false,
+  currentUser,
+}: {
+  projectId: string;
+  canCreate?: boolean;
+  canPickAssignee?: boolean;
+  currentUser?: PersonRef;
+}) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const alert = useAlertState();
+  const [createStatus, setCreateStatus] = useState<TaskStatus | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const focusId = useRef<string | null>(null);
   const [focusTick, setFocusTick] = useState(0);
@@ -258,12 +323,12 @@ export function BoardView({ projectId }: { projectId: string }) {
   const assignees = useMemo(() => {
     const byId = new Map<string, string>();
     for (const column of columns ?? []) {
-      for (const card of column.tasks) if (card.assignee !== null) byId.set(card.assignee.id, card.assignee.login);
+      for (const card of column.tasks) if (card.assignee !== null) byId.set(card.assignee.id, personName(card.assignee));
     }
-    // Case-insensitive order by login (FR-73a); equal lowercase logins fall back to the id.
-    return Array.from(byId, ([id, login]) => ({ id, login })).sort((a, b) => {
-      const la = a.login.toLowerCase();
-      const lb = b.login.toLowerCase();
+    // Case-insensitive order by the shown name; equal names fall back to the id.
+    return Array.from(byId, ([id, name]) => ({ id, name })).sort((a, b) => {
+      const la = a.name.toLowerCase();
+      const lb = b.name.toLowerCase();
       if (la !== lb) return la < lb ? -1 : 1;
       return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
     });
@@ -460,7 +525,7 @@ export function BoardView({ projectId }: { projectId: string }) {
               <option value="none">{t("boards.filter_none")}</option>
               {assignees.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.login}
+                  {a.name}
                 </option>
               ))}
             </select>
@@ -494,12 +559,30 @@ export function BoardView({ projectId }: { projectId: string }) {
           >
             <div className="ui-board-grid">
               {(shown ?? columns).map((column) => (
-                <Column key={column.status} status={column.status} cards={column.tasks} />
+                <Column
+                  key={column.status}
+                  status={column.status}
+                  cards={column.tasks}
+                  onCreate={canCreate && currentUser !== undefined ? setCreateStatus : undefined}
+                />
               ))}
             </div>
           </DndContext>
         </>
       )}
+      {createStatus !== null && currentUser !== undefined ? (
+        <CreateTaskDialog
+          currentProjectId={projectId}
+          currentUser={currentUser}
+          canPickAssignee={canPickAssignee}
+          initialStatus={createStatus}
+          onClose={() => setCreateStatus(null)}
+          onCreated={(task) => {
+            setCreateStatus(null);
+            navigate(`/tasks/${task.id}`);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
