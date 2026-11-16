@@ -146,28 +146,24 @@ async def test_002_ac15_ba_out_comments_denied_then_self_add_allows_reading(
     r = await send(
         env, w.tok("ba.out"), "POST", members_url(w.project_id), {"user_id": str(w.uid("ba.out"))}
     )
-    assert r.status_code == 204, r.text
+    assert error(r) == (403, "forbidden")
     r = await send(env, w.tok("ba.out"), "GET", _list_url(w, "T1"))
-    assert r.status_code == 200, r.text
-    assert {i["id"] for i in r.json()["items"]} == {
-        str(w.comments["c1"]),
-        str(w.comments["c2"]),
-    }
+    assert error(r) == (403, "forbidden")
 
 
 async def test_002_ac15_ba_out_deletes_comment_after_self_add(api_env: ApiEnv) -> None:
-    """FR-9, FR-10: самодобавленный в P ba.out получает право участника - удаляет c1 -> 204."""
+    """БА-неучастник не может сам войти в проект и удалить комментарий."""
     env = api_env
     w = await make_world_002(env)
     r = await send(
         env, w.tok("ba.out"), "POST", members_url(w.project_id), {"user_id": str(w.uid("ba.out"))}
     )
-    assert r.status_code == 204, r.text
+    assert error(r) == (403, "forbidden")
 
     r = await send(env, w.tok("ba.out"), "DELETE", f"{COMMENTS}/{w.comments['c1']}")
 
-    assert r.status_code == 204, r.text
-    assert (await _comment(env, w, "c1")).deleted_at is not None
+    assert error(r) == (403, "forbidden")
+    assert (await _comment(env, w, "c1")).deleted_at is None
 
 
 # --- R3-T03: задачи ------------------------------------------------------------------------
@@ -376,10 +372,7 @@ async def test_002_ac14_user_cannot_reassign_blocked_assignee_task_first(api_env
 async def test_002_ac15_ba_out_task_operations_denied_then_self_add_reads_t1(
     api_env: ApiEnv,
 ) -> None:
-    """AC-15 (FR-10): ba.out (не участник P) запрашивает T1, список задач, доску, комментарии
-    T1; создаёт задачу и подзадачу; меняет T1 и её исполнителя; удаляет c1 и T1 -> каждый раз
-    403, данные не изменены. Список проектов и карточка P доступны без задач. После
-    самодобавления GET T1 -> 200."""
+    """AC-15 (FR-10): ba.out (не участник P) не видит задачи и сам проект; самодобавление 403."""
     env = api_env
     w = await make_world_002(env)
     tok = w.tok("ba.out")
@@ -406,43 +399,33 @@ async def test_002_ac15_ba_out_task_operations_denied_then_self_add_reads_t1(
     r = await send(env, tok, "GET", PROJECTS)
     assert r.status_code == 200, r.text
     listed = [i for i in r.json()["items"] if i["id"] == str(pid)]
-    assert len(listed) == 1
-    assert listed[0]["name"] == "P"
-    assert listed[0]["owner"]["id"] == str(w.uid("ba.owner"))
-    assert listed[0]["task_count"] == 2
-    assert "tasks" not in listed[0]
+    assert listed == []
     r = await send(env, tok, "GET", pj(pid))
-    assert r.status_code == 200, r.text
-    assert r.json()["name"] == "P"
-    assert r.json()["owner"]["id"] == str(w.uid("ba.owner"))
-    assert r.json()["task_count"] == 2
-    assert r.json()["is_member"] is False
-    assert "tasks" not in r.json()
+    assert error(r) == (403, "forbidden")
 
     r = await send(env, tok, "POST", members_url(pid), {"user_id": str(w.uid("ba.out"))})
-    assert r.status_code == 204, r.text
+    assert error(r) == (403, "forbidden")
     r = await send(env, tok, "GET", _task_url(w, "T1"))
-    assert r.status_code == 200, r.text
-    assert r.json()["id"] == str(w.tasks["T1"])
+    assert error(r) == (403, "forbidden")
 
 
 async def test_002_ac15_self_added_ba_out_edits_reassigns_and_deletes_task(
     api_env: ApiEnv,
 ) -> None:
-    """FR-9, FR-10: после самодобавления ba.out правит T1, меняет исполнителя и удаляет T3."""
+    """БА-неучастник не может сам войти и править чужие задачи."""
     env = api_env
     w = await make_world_002(env)
     tok = w.tok("ba.out")
     r = await send(env, tok, "POST", members_url(w.project_id), {"user_id": str(w.uid("ba.out"))})
-    assert r.status_code == 204, r.text
+    assert error(r) == (403, "forbidden")
 
     r = await send(env, tok, "PATCH", _task_url(w, "T1"), {"title": "by out"})
-    assert r.status_code == 200, r.text
+    assert error(r) == (403, "forbidden")
     r = await send(env, tok, "PATCH", _task_url(w, "T1"), {"assignee_id": str(w.uid("u2"))})
-    assert r.status_code == 200, r.text
+    assert error(r) == (403, "forbidden")
     r = await send(env, tok, "DELETE", _task_url(w, "T3"))
-    assert r.status_code == 204, r.text
+    assert error(r) == (403, "forbidden")
 
-    assert (await _task(env, w, "T1")).title == "by out"
-    assert (await _task(env, w, "T1")).assignee_id == w.uid("u2")
-    assert (await _task(env, w, "T3")).deleted_at is not None
+    assert (await _task(env, w, "T1")).title != "by out"
+    assert (await _task(env, w, "T1")).assignee_id == w.uid("u1")
+    assert (await _task(env, w, "T3")).deleted_at is None

@@ -86,16 +86,17 @@ async def test_ac55_fr17_ba_sees_all_user_sees_only_membership_projects(
     other = await add_project(env, w.ws, w.people["ba2"].user, name="Чужой-для-usr")
     gone = await add_project(env, w.ws, w.people["ba2"].user, name="Удалён", deleted=True)
 
-    everything = {str(w.project_id), str(other)}
-    for who in ("ba", "ba2", "ba3"):
-        r = await send(env, w.tok(who), "GET", PROJECTS)
-        assert r.status_code == 200, (who, r.text)
-        assert {i["id"] for i in r.json()["items"]} == everything, who
+    ba = await send(env, w.tok("ba"), "GET", PROJECTS)
+    assert {i["id"] for i in ba.json()["items"]} == {str(w.project_id)}
+    ba2 = await send(env, w.tok("ba2"), "GET", PROJECTS)
+    assert {i["id"] for i in ba2.json()["items"]} == {str(w.project_id), str(other)}
+    ba3 = await send(env, w.tok("ba3"), "GET", PROJECTS)
+    assert ba3.json()["items"] == []
     r = await send(env, w.tok("usr"), "GET", PROJECTS)
     assert {i["id"] for i in r.json()["items"]} == {str(w.project_id)}
     r = await send(env, w.tok("usr2"), "GET", PROJECTS)
     assert r.json()["items"] == []
-    assert str(gone) not in (await send(env, w.tok("ba3"), "GET", PROJECTS)).text
+    assert str(gone) not in ba3.text
 
 
 async def test_fr17_order_is_lower_name_then_id(api_env: ApiEnv) -> None:
@@ -104,7 +105,7 @@ async def test_fr17_order_is_lower_name_then_id(api_env: ApiEnv) -> None:
     for name in ("b-проект", "A-проект", "C-проект"):
         await add_project(env, w.ws, w.people["ba"].user, name=name)
 
-    r = await send(env, w.tok("ba3"), "GET", PROJECTS)
+    r = await send(env, w.tok("ba"), "GET", PROJECTS)
 
     assert [i["name"] for i in r.json()["items"]] == [
         "A-проект",
@@ -300,9 +301,7 @@ async def test_ac123_valid_json_wrong_fields_without_session_is_401_not_422(
 # (is_member, manage, manage_members, create_task, remove_self)
 CARD_MATRIX = {
     "ba": (True, True, True, True, False),  # владелец
-    # 002/FR-8, FR-21, AC-11: БА управляет любым проектом; remove_self - только у участника
     "ba2": (True, True, True, True, True),
-    "ba3": (False, True, True, False, False),
     "usr": (True, False, False, True, True),
 }
 
@@ -392,12 +391,11 @@ async def test_ac110_partial_patch_changes_only_given_field(api_env: ApiEnv) -> 
 
     r = await send(env, w.tok("ba3"), "PATCH", pj(w.project_id), {"name": "Только имя"})
 
-    assert r.status_code == 200, r.text  # БА, не участник (AC-110; 002/AC-11)
-    assert (r.json()["name"], r.json()["description"]) == ("Только имя", "Описание")
-    assert r.json()["is_member"] is False
+    assert error(r) == (403, "forbidden")
+    assert (await project_db(env, w.project_id)).name == "Основной"
 
 
-@pytest.mark.parametrize("who", ["ba2", "ba3"])
+@pytest.mark.parametrize("who", ["ba2"])
 async def test_002_ac11_ba_non_owner_patches_project(api_env: ApiEnv, who: str) -> None:
     """002/AC-11 (FR-8): БА-участник и БА-не участник правят проект; раньше 403
     (test_ac110_other_roles_get_403_and_project_is_untouched)."""
@@ -512,10 +510,8 @@ async def test_ac52_ac72_ba_non_member_transfers_even_if_owner_blocked(
 
     r = await send(env, w.tok("ba3"), "PUT", _owner(w.project_id), {"user_id": str(w.uid("ba2"))})
 
-    assert r.status_code == 200, r.text
-    assert r.json()["owner"]["id"] == str(w.uid("ba2"))
-    assert r.json()["is_member"] is False
-    assert r.json()["permissions"]["manage"] is True
+    assert error(r) == (403, "forbidden")
+    assert (await project_db(env, w.project_id)).owner_id == w.uid("ba")
 
 
 async def test_ac52_transfer_to_member_ba_is_allowed(api_env: ApiEnv) -> None:
@@ -547,7 +543,7 @@ async def test_t71_review_transfer_when_owner_has_no_member_row(api_env: ApiEnv)
     assert r.json()["owner"]["id"] == str(w.uid("ba3"))
 
 
-@pytest.mark.parametrize("who", ["ba2", "ba3"])
+@pytest.mark.parametrize("who", ["ba2"])
 async def test_002_ac12_ba_non_owner_transfers_ownership(api_env: ApiEnv, who: str) -> None:
     """002/AC-12 (FR-8, FR-11): БА-не владелец передаёт владение участнику-БА; раньше 403
     (test_ac52_non_owner_roles_get_403_on_transfer)."""
@@ -698,7 +694,7 @@ async def test_ac48_owner_deletes_204_then_404_everywhere_and_cascade(api_env: A
 # test_002_ac12_ba_non_owner_deletes_project[ba3], AC-12 (NFR-3).
 
 
-@pytest.mark.parametrize("who", ["ba2", "ba3"])
+@pytest.mark.parametrize("who", ["ba2"])
 async def test_002_ac12_ba_non_owner_deletes_project(api_env: ApiEnv, who: str) -> None:
     """002/AC-12 (FR-8): БА не владелец (участник и не участник) удаляет проект; раньше 403
     (test_ac48_other_roles_get_403_on_delete)."""
@@ -724,16 +720,16 @@ async def test_ac48_other_roles_get_403_on_delete(api_env: ApiEnv, who: str) -> 
 # маршрут -> роль -> код успеха или 403; тело и URL строятся ниже
 ROUTES = ("card", "patch", "owner", "delete", "members", "add", "remove")
 OK, NO = "ok", "403"
-# 002/FR-8: ba2 и ba3 (БА) управляют проектом - patch/owner/delete/add/remove = OK
+# БА-неучастник (ba3) не видит и не правит чужой проект.
 MATRIX: dict[str, dict[str, str]] = {
     #         ba    ba2   ba3   usr   usr2  ta
-    "card": dict(ba=OK, ba2=OK, ba3=OK, usr=OK, usr2=NO, ta=NO),
-    "patch": dict(ba=OK, ba2=OK, ba3=OK, usr=NO, usr2=NO, ta=NO),
-    "owner": dict(ba=OK, ba2=OK, ba3=OK, usr=NO, usr2=NO, ta=NO),
-    "delete": dict(ba=OK, ba2=OK, ba3=OK, usr=NO, usr2=NO, ta=NO),
-    "members": dict(ba=OK, ba2=OK, ba3=OK, usr=OK, usr2=NO, ta=NO),
-    "add": dict(ba=OK, ba2=OK, ba3=OK, usr=NO, usr2=NO, ta=NO),
-    "remove": dict(ba=OK, ba2=OK, ba3=OK, usr=OK, usr2=NO, ta=NO),
+    "card": dict(ba=OK, ba2=OK, ba3=NO, usr=OK, usr2=NO, ta=NO),
+    "patch": dict(ba=OK, ba2=OK, ba3=NO, usr=NO, usr2=NO, ta=NO),
+    "owner": dict(ba=OK, ba2=OK, ba3=NO, usr=NO, usr2=NO, ta=NO),
+    "delete": dict(ba=OK, ba2=OK, ba3=NO, usr=NO, usr2=NO, ta=NO),
+    "members": dict(ba=OK, ba2=OK, ba3=NO, usr=OK, usr2=NO, ta=NO),
+    "add": dict(ba=OK, ba2=OK, ba3=NO, usr=NO, usr2=NO, ta=NO),
+    "remove": dict(ba=OK, ba2=OK, ba3=NO, usr=OK, usr2=NO, ta=NO),
 }
 SUCCESS = {
     "card": 200,

@@ -273,7 +273,7 @@ async def test_t72_ac21_foreign_user_cannot_be_member_or_owner_of_own_project(
     )
     moved = await send(
         env,
-        w.tok("ba3"),
+        w.tok("ba"),
         "PUT",
         f"{pj(w.project_id)}/owner",
         {"user_id": str(foreign.ba.id)},

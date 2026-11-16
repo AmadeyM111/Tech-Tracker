@@ -81,7 +81,7 @@ VIEW = [
     (None, True, False),
     (None, False, False),
     ("BUSINESS_ADMIN", True, True),
-    ("BUSINESS_ADMIN", False, True),
+    ("BUSINESS_ADMIN", False, False),
     ("USER", True, True),
     ("USER", False, False),
 ]
@@ -416,9 +416,8 @@ MANAGE = [
     ("USER", True, True, True),
     ("USER", False, True, False),
     ("BUSINESS_ADMIN", True, True, True),
-    # 002/AC-11, AC-12 (FR-8): БА управляет любым проектом, участие и владение не нужны
     ("BUSINESS_ADMIN", False, True, True),
-    ("BUSINESS_ADMIN", False, False, True),
+    ("BUSINESS_ADMIN", False, False, False),
 ]
 
 
@@ -438,9 +437,9 @@ def test_ac48_can_manage_project_and_members(pol, roles, role, is_owner, member,
     ("role", "is_owner", "target_me", "expected"),
     [
         ("BUSINESS_ADMIN", True, False, True),
-        ("BUSINESS_ADMIN", True, True, True),  # 002/AC-11 (FR-8): БА добавляет себя
-        ("BUSINESS_ADMIN", False, False, True),  # 002/AC-11: любой проект
-        ("BUSINESS_ADMIN", False, True, True),  # 002/AC-11: себя в любой проект
+        ("BUSINESS_ADMIN", True, True, True),  # БА-участник добавляет себя
+        ("BUSINESS_ADMIN", False, False, True),  # БА-участник чужого владельца
+        ("BUSINESS_ADMIN", False, True, True),  # БА-участник добавляет себя
         ("USER", False, False, False),
         ("TECH_ADMIN", False, False, False),
         (None, False, False, False),
@@ -451,6 +450,14 @@ def test_ac73_can_add_member(pol, roles, role, is_owner, target_me, expected) ->
     a = _actor(roles, role)
     p = _proj(pol, owner=ME if is_owner else OWNER, member=True)
     assert pol.can_add_member(a, p, ME if target_me else OTHER) is expected
+
+
+def test_ba_non_member_cannot_add_or_view(pol, roles) -> None:
+    a = _actor(roles, "BUSINESS_ADMIN")
+    p = _proj(pol, owner=OWNER, member=False)
+    assert pol.can_add_member(a, p, ME) is False
+    assert pol.can_view_project(a, p) is False
+    assert pol.can_manage_project(a, p) is False
 
 
 @pytest.mark.parametrize(
@@ -602,4 +609,5 @@ def test_027_owner_user_manages_own_project_but_participant_does_not(pol, roles)
     assert pol.can_manage_project(owner, foreign) is False
     assert pol.can_add_member(owner, foreign, OTHER) is False
     ba = _actor(roles, "BUSINESS_ADMIN")
-    assert pol.can_manage_project(ba, _proj(pol, owner=OWNER, member=False)) is True
+    assert pol.can_manage_project(ba, _proj(pol, owner=OWNER, member=False)) is False
+    assert pol.can_manage_project(ba, _proj(pol, owner=OWNER, member=True)) is True

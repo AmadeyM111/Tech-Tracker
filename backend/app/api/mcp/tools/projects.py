@@ -48,7 +48,7 @@ def project_tools() -> list[ToolSpec]:
     return [
         make_tool(
             "list_projects",
-            "Проекты: БА видит все, пользователь — где он участник.",
+            "Проекты, где вызывающий участник (БА — тоже только свои).",
             PageParams,
             Capability.BUSINESS_ACCESS,
             _list,
