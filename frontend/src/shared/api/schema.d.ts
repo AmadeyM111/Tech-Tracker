@@ -1770,9 +1770,9 @@ export interface components {
             is_deleted: boolean;
             permissions: components["schemas"]["CommentPermissions"];
             /** Source */
-            source?: string | null;
+            source: string | null;
             /** Source Url */
-            source_url?: string | null;
+            source_url: string | null;
             /**
              * Task Id
              * Format: uuid
@@ -2714,9 +2714,9 @@ export interface components {
             progress: number | null;
             project: components["schemas"]["ProjectRef"];
             /** Source */
-            source?: string | null;
+            source: string | null;
             /** Source Url */
-            source_url?: string | null;
+            source_url: string | null;
             status: components["schemas"]["TaskStatus"];
             /** Subtasks */
             subtasks: components["schemas"]["TaskBrief"][];
