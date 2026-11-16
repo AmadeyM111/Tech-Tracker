@@ -23,6 +23,7 @@ WRITE_TOOLS = frozenset(
         "upsert_knowledge",
         "check_dod_criterion",
         "classify_task",
+        "ingest_message",
     }
 )
 

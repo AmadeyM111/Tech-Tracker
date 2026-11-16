@@ -28,6 +28,7 @@ from app.domain.access.policy import (
     can_read_project_content,
 )
 from app.domain.access.roles import Actor, Capability
+from app.domain.inbox import service as inbox
 from app.domain.projects.models import Project, ProjectMember
 from app.domain.projects.queries import load_project_facts
 from app.domain.tasks.attribution import attr_of, load_task_attribution
@@ -95,6 +96,8 @@ class TaskView:
     blocked_at: datetime | None
     dod: DodView
     mode: TaskMode
+    source: str | None = None
+    source_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -174,6 +177,7 @@ async def get_task(db: AsyncSession, actor: Actor, task_id: UUID) -> TaskView:
         await load_task_attribution(db, actor.workspace_id, [task_id]),
         task_id,
     )
+    source, source_url = await inbox.source_for_task(db, actor.workspace_id, task.id)
     return TaskView(
         id=task.id,
         project=TaskProjectRef(id=task.project_id, name=row.project_name),
@@ -217,6 +221,8 @@ async def get_task(db: AsyncSession, actor: Actor, task_id: UUID) -> TaskView:
         blocked_at=task.blocked_at,
         dod=dod,
         mode=TaskMode(task.mode),
+        source=source,
+        source_url=source_url,
     )
 
 

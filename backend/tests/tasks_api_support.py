@@ -100,6 +100,8 @@ DETAIL_FIELDS = {
     "blocked_at",
     "dod",
     "mode",
+    "source",
+    "source_url",
 }
 PERM_FIELDS = {
     "edit",

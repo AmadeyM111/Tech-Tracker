@@ -39,7 +39,7 @@
 
 ## 4. Нефункциональные требования
 - **NFR-1:** миграция 0020 — новая таблица `external_message`, без ALTER `task`.
-  `down_revision=0018`. 0019 не занимать.
+  `down_revision=0019` (после 0021→0019 на main).
 - **NFR-2:** веб-бота Telegram нет.
 
 ## 5. Критерии приёмки
@@ -49,8 +49,8 @@
   с тем текстом, `source=telegram`; статус задачи прежний.
 - **AC-3** (FR-4): Given повтор тех же `source`+`external_id` Then та же `task_id`/`comment_id`,
   число задач не выросло.
-- **AC-4** (FR-1): Given проект, где актор не участник When ingest Then ошибка как у
-  `create_task` (не найдено / запрещено), строки `external_message` нет.
+- **AC-4** (FR-1): Given проект, где актор не участник When ingest Then `forbidden`
+  (как `create_task` в том же пространстве), строки `external_message` нет.
 - **AC-5** (FR-6): Given задача не `done` без комментариев 48 ч When `list_stuck_work`
   Then она в списке; `overdue` true только если срок раньше сегодняшней даты МСК.
 - **AC-6** (FR-6): Given комментарий только что When `list_stuck_work` Then этой задачи нет.

@@ -814,6 +814,28 @@
           "permissions": {
             "$ref": "#/components/schemas/CommentPermissions"
           },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
           "task_id": {
             "format": "uuid",
             "title": "Task Id",
@@ -3194,6 +3216,28 @@
           },
           "project": {
             "$ref": "#/components/schemas/ProjectRef"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
           },
           "status": {
             "$ref": "#/components/schemas/TaskStatus"

@@ -41,6 +41,8 @@ COMMENT_FIELDS = {
     "created_at",
     "edited_at",
     "permissions",
+    "source",
+    "source_url",
 }
 PERMS = {"edit", "delete"}
 

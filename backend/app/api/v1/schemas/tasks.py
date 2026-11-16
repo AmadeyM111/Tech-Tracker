@@ -192,6 +192,8 @@ class TaskDetail(BaseModel):
     blocked_at: datetime | None
     dod: DodOut
     mode: TaskMode
+    source: str | None = None
+    source_url: str | None = None
 
 
 class TaskListItem(BaseModel):
