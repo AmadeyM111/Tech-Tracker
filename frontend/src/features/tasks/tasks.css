@@ -40,3 +40,32 @@
     display: block;
   }
 }
+
+.task-dod {
+  margin: 16px 0;
+}
+.task-dod-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.task-dod-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.task-dod-item input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+}
+.task-dod-req {
+  color: var(--text-muted);
+}
+.task-dod button,
+[data-form="set-blocker"] button,
+[data-action="clear-blocker"] {
+  min-height: 44px;
+}

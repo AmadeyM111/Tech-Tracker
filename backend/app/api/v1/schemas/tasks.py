@@ -40,10 +40,11 @@ DueDate = Annotated[
 
 
 class TaskListQuery(PageParams):
-    """``?assignee_id&status&page&page_size`` списка задач проекта; фильтры — через «И»."""
+    """``?assignee_id&status&blocked&page&page_size`` списка задач проекта; фильтры — через «И»."""
 
     assignee_id: UUID | None = None
     status: TaskStatus | None = None
+    blocked: bool | None = None
 
 
 class TaskCreate(BaseModel):
@@ -94,6 +95,43 @@ class TaskUpdate(BaseModel):
     due_date: DueDate | None = None
     priority: TaskPriority = Field(default_factory=lambda: TaskPriority.MEDIUM)
     status: TaskStatus = Field(default_factory=lambda: TaskStatus.TODO)
+    blocked: bool = Field(default_factory=lambda: False)
+    blocked_reason: str | None = None
+    human_close_only: bool = Field(default_factory=lambda: True)
+
+
+class DodCriterionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    body: str = Field(min_length=1, max_length=500, pattern=_NO_NUL)
+    required: bool = True
+
+
+class DodCriterionPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    checked: bool
+
+
+class DodCriterionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    body: str
+    required: bool
+    checked: bool
+    checked_by: UserRef | None
+    checked_at: datetime | None
+    position: int
+
+
+class DodOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    closed: int
+    total: int
+    human_close_only: bool
+    items: list[DodCriterionOut]
 
 
 class TaskPermissions(BaseModel):
@@ -104,6 +142,7 @@ class TaskPermissions(BaseModel):
     change_assignee: bool
     delete: bool
     create_subtask: bool
+    check_dod: bool
 
 
 class TaskBrief(BaseModel):
@@ -138,6 +177,11 @@ class TaskDetail(BaseModel):
     permissions: TaskPermissions
     last_client_name: str | None
     assignee_client_name: str | None
+    blocked: bool
+    blocked_reason: str | None
+    blocked_by: UserRef | None
+    blocked_at: datetime | None
+    dod: DodOut
 
 
 class TaskListItem(BaseModel):
@@ -154,3 +198,4 @@ class TaskListItem(BaseModel):
     created_at: datetime
     last_client_name: str | None
     assignee_client_name: str | None
+    blocked: bool

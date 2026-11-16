@@ -37,6 +37,7 @@ CARD_FIELDS = {
     "hot",  # «Горит» — тот же критерий, что на «Сводке» (spec 008 FR-8)
     "last_client_name",
     "assignee_client_name",
+    "blocked",  # спека 033, отдельно от hot
 }
 
 

@@ -73,6 +73,15 @@ def can_edit_task_fully(a: Actor, p: ProjectFacts, t: TaskFacts) -> bool:
     return False
 
 
+def can_check_dod(a: Actor, p: ProjectFacts, t: TaskFacts) -> bool:
+    """Отметить критерий DoD: исполнитель, автор, владелец, БА-участник (спека 033 FR-5)."""
+    if not (a.can(Capability.BUSINESS_ACCESS) and p.actor_is_member):
+        return False
+    if is_project_admin(a, p):
+        return True
+    return t.created_by == a.user_id or t.assignee_id == a.user_id
+
+
 def can_change_task_status(a: Actor, p: ProjectFacts, t: TaskFacts) -> bool:
     """Статус (FR-19b): полная правка либо участник-исполнитель."""
     if can_edit_task_fully(a, p, t):

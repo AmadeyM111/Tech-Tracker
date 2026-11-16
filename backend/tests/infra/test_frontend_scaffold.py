@@ -283,6 +283,7 @@ def test_t21_src_files_only_expected() -> None:
         # «Горит» на доске и в «Сводке» (spec 008 FR-8): один компонент и правило
         "shared/ui/HotMark.tsx", "shared/ui/hot-mark.css",
         "shared/ui/AgentMark.tsx",
+        "shared/ui/BlockerMark.tsx", "shared/ui/blocker-mark.css",
         # 019/R8-T20: dialog for changing first and last name
         "features/admin/NameDialog.tsx",
         # 019/R8-T21: accounts without a role, /unassigned-accounts (AC-30)

@@ -161,6 +161,8 @@ export function card(id: string, title: string, status: Status, position: number
     position,
     last_client_name: null,
     assignee_client_name: null,
+    hot: false,
+    blocked: false,
     ...over,
   };
 }

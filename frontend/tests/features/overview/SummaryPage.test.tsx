@@ -25,6 +25,7 @@ function item(id: string, over: Record<string, unknown> = {}) {
     due_date: null,
     assignee: null,
     hot: false,
+    blocked: false,
     ...over,
   };
 }
@@ -118,6 +119,25 @@ describe("SummaryPage", () => {
     expect(hotRow.querySelector('[data-field="due_date"]')?.textContent).toBe("01.01.2020 · просрочено");
     const plain = container.querySelector('tr[data-task-id="aaaaaaaa-0000-4000-8000-000000000002"]')!;
     expect(within(plain as HTMLElement).queryByText("Горит")).toBeNull();
+  });
+
+  it("shows_blocker_mark_separately_from_hot", async () => {
+    setup(
+      COUNTS_24,
+      [
+        item("aaaaaaaa-0000-4000-8000-000000000003", { blocked: true, hot: false }),
+        item("aaaaaaaa-0000-4000-8000-000000000004", { hot: true, blocked: false }),
+      ],
+      2,
+    );
+    const { container } = renderApp("/summary");
+    await screen.findByText("Показано 2 из 2");
+    const blockedRow = container.querySelector('tr[data-task-id="aaaaaaaa-0000-4000-8000-000000000003"]')!;
+    expect(within(blockedRow as HTMLElement).getByText("Блокер")).toBeTruthy();
+    expect(within(blockedRow as HTMLElement).queryByText("Горит")).toBeNull();
+    const hotRow = container.querySelector('tr[data-task-id="aaaaaaaa-0000-4000-8000-000000000004"]')!;
+    expect(within(hotRow as HTMLElement).getByText("Горит")).toBeTruthy();
+    expect(within(hotRow as HTMLElement).queryByText("Блокер")).toBeNull();
   });
 
   it("tech_admin_has_no_summary_menu_item", async () => {
