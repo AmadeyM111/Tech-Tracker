@@ -590,6 +590,10 @@
               }
             ]
           },
+          "blocked": {
+            "title": "Blocked",
+            "type": "boolean"
+          },
           "due_date": {
             "anyOf": [
               {
@@ -656,7 +660,8 @@
           "subtask_count",
           "subtask_done",
           "progress",
-          "hot"
+          "hot",
+          "blocked"
         ],
         "title": "BoardCard",
         "type": "object"
@@ -1037,6 +1042,131 @@
           "role"
         ],
         "title": "DirectoryUser",
+        "type": "object"
+      },
+      "DodCriterionCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "maxLength": 500,
+            "minLength": 1,
+            "pattern": "^[^\\x00]*$",
+            "title": "Body",
+            "type": "string"
+          },
+          "required": {
+            "default": true,
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "DodCriterionCreate",
+        "type": "object"
+      },
+      "DodCriterionOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "checked": {
+            "title": "Checked",
+            "type": "boolean"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "checked_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "required",
+          "checked",
+          "checked_by",
+          "checked_at",
+          "position"
+        ],
+        "title": "DodCriterionOut",
+        "type": "object"
+      },
+      "DodCriterionPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "checked": {
+            "title": "Checked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "checked"
+        ],
+        "title": "DodCriterionPatch",
+        "type": "object"
+      },
+      "DodOut": {
+        "properties": {
+          "closed": {
+            "title": "Closed",
+            "type": "integer"
+          },
+          "human_close_only": {
+            "title": "Human Close Only",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DodCriterionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "closed",
+          "total",
+          "human_close_only",
+          "items"
+        ],
+        "title": "DodOut",
         "type": "object"
       },
       "DuePreset": {
@@ -1740,6 +1870,10 @@
               }
             ]
           },
+          "blocked": {
+            "title": "Blocked",
+            "type": "boolean"
+          },
           "due_date": {
             "anyOf": [
               {
@@ -1796,7 +1930,8 @@
           "priority",
           "due_date",
           "assignee",
-          "hot"
+          "hot",
+          "blocked"
         ],
         "title": "OverviewTaskItem",
         "type": "object"
@@ -2821,6 +2956,43 @@
           "author": {
             "$ref": "#/components/schemas/UserRef"
           },
+          "blocked": {
+            "title": "Blocked",
+            "type": "boolean"
+          },
+          "blocked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked At"
+          },
+          "blocked_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -2829,6 +3001,9 @@
           "description": {
             "title": "Description",
             "type": "string"
+          },
+          "dod": {
+            "$ref": "#/components/schemas/DodOut"
           },
           "due_date": {
             "anyOf": [
@@ -2926,7 +3101,12 @@
           "progress",
           "created_at",
           "updated_at",
-          "permissions"
+          "permissions",
+          "blocked",
+          "blocked_reason",
+          "blocked_by",
+          "blocked_at",
+          "dod"
         ],
         "title": "TaskDetail",
         "type": "object"
@@ -2942,6 +3122,10 @@
                 "type": "null"
               }
             ]
+          },
+          "blocked": {
+            "title": "Blocked",
+            "type": "boolean"
           },
           "created_at": {
             "format": "date-time",
@@ -3000,7 +3184,8 @@
           "priority",
           "due_date",
           "assignee",
-          "created_at"
+          "created_at",
+          "blocked"
         ],
         "title": "TaskListItem",
         "type": "object"
@@ -3053,6 +3238,10 @@
             "title": "Change Status",
             "type": "boolean"
           },
+          "check_dod": {
+            "title": "Check Dod",
+            "type": "boolean"
+          },
           "create_subtask": {
             "title": "Create Subtask",
             "type": "boolean"
@@ -3071,7 +3260,8 @@
           "change_status",
           "change_assignee",
           "delete",
-          "create_subtask"
+          "create_subtask",
+          "check_dod"
         ],
         "title": "TaskPermissions",
         "type": "object"
@@ -3111,6 +3301,21 @@
             ],
             "title": "Assignee Id"
           },
+          "blocked": {
+            "title": "Blocked",
+            "type": "boolean"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
           "description": {
             "maxLength": 10000,
             "pattern": "^[^\\x00]*$",
@@ -3129,6 +3334,10 @@
               }
             ],
             "title": "Due Date"
+          },
+          "human_close_only": {
+            "title": "Human Close Only",
+            "type": "boolean"
           },
           "priority": {
             "$ref": "#/components/schemas/TaskPriority"
@@ -8358,6 +8567,22 @@
               ],
               "title": "Status"
             }
+          },
+          {
+            "in": "query",
+            "name": "blocked",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Blocked"
+            }
           }
         ],
         "responses": {
@@ -9152,6 +9377,278 @@
         "summary": "Create Comment",
         "tags": [
           "comments"
+        ]
+      }
+    },
+    "/api/v1/tasks/{task_id}/dod-criteria": {
+      "post": {
+        "description": "Добавляет критерий готовности в конец списка.",
+        "operationId": "add_dod_criterion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DodCriterionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Add Dod Criterion",
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/v1/tasks/{task_id}/dod-criteria/{criterion_id}": {
+      "delete": {
+        "operationId": "delete_dod_criterion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "criterion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Criterion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Delete Dod Criterion",
+        "tags": [
+          "tasks"
+        ]
+      },
+      "patch": {
+        "description": "Отмечает или снимает отметку критерия готовности.",
+        "operationId": "patch_dod_criterion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "criterion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Criterion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DodCriterionPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Некорректный JSON в теле запроса (code: bad_request)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Не выполнен вход или сессия недействительна (code: not_authenticated)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Объект не найден или принадлежит другому пространству (code: not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации или бизнес-правила (code: validation_error или код из каталога)"
+          }
+        },
+        "summary": "Patch Dod Criterion",
+        "tags": [
+          "tasks"
         ]
       }
     },

@@ -22,7 +22,8 @@
 | 0026 | Внешние провайдеры входа и правила привязки (спека 029) | `docs/adr/0026-external-login-and-linking.md` (ветка `docs/login-simplify-spec`) | принято |
 | 0027 | Согласие на обработку ПДн (спека 021) | `docs/adr/0027-pdn-consent.md` (ветка `feat/021-pdn-consent`) | принято 2026-11-15 |
 | 0028 | MCP: 120 `tools/call` в минуту на токен и read-only (`gtrk_` + OAuth `mcp:read`) | `docs/adr/0028-mcp-rate-limit-readonly.md` | предложено |
-| 0029+ | ADR — с 0029 | — | свободно |
+| 0029 | DoD на задаче и блокер отдельно от «Горит» (спека 033, CD-01+CD-03) | `docs/adr/0029-dod-and-blocker.md` | предложено |
+| 0030+ | ADR — с 0030 | — | свободно |
 
 ## Спеки
 | № | Тема | Где |
@@ -48,6 +49,7 @@
 | 022–023 | заняты (023 — удаление пользователей, черновик) | — |
 | 031 | метрики пилота | `specs/031-pilot-metrics/` |
 | 032 | MCP: лимит 120/мин и read-only scope | `specs/032-mcp-rate-limit-readonly/` |
+| 033 | DoD и блокер (CD-01+CD-03) | `specs/033-dod-and-blocker/` (ветка `feat/cd-01-03-dod-blocker`) |
 
 ## Миграции alembic
 | № | Тема | Где |
@@ -61,3 +63,4 @@
 | 0016 | Внешний вход: `external_identity`, `oauth_login_state`, … (спека 029, этап б) | `feat/029-providers`, PR #55 |
 | 0017 | Согласие на ПДн: колонки `pdn_consent_*` в `app_user`, `registration_request`, `oauth_login_state` (спека 021) | `feat/021-pdn-consent`; `down_revision` = 0016 (слита в main) |
 | 0018 | `api_token.read_only` (спека 032) | `feat/mcp-rate-limit-readonly`; `down_revision` = 0017 |
+| 0019 | DoD и блокер: колонки `task.blocked*` / `human_close_only`, таблица `task_dod_criterion` (спека 033) | `feat/cd-01-03-dod-blocker`; `down_revision` = 0018 |

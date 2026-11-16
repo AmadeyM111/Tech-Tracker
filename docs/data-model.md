@@ -243,6 +243,35 @@
 | `updated_at` | timestamptz | нет | момент последнего изменения |
 | `deleted_at` | timestamptz | да | момент мягкого удаления |
 | `deleted_batch_id` | uuid | да | пакет удаления |
+| `blocked` | boolean | нет | блокер/инцидент (спека 033, CD-03, миграция 0019); по умолчанию `false` |
+| `blocked_reason` | text | да | причина блокера, 1–500 символов; `NULL` если не блокер; `CHECK` `ck_task_blocked_reason_length` |
+| `blocked_by` | uuid | да | кто поставил блокер; FK → `app_user.id`, `RESTRICT` |
+| `blocked_at` | timestamptz | да | когда поставили блокер |
+| `human_close_only` | boolean | нет | `done` только человек, не MCP (спека 033, CD-01); по умолчанию `true` |
+
+`CHECK` `ck_task_blocked_fields`: при `blocked` заполнены причина, кто и когда; иначе все три `NULL`.
+
+### task_dod_criterion
+
+Критерий готовности задачи (спека 033, CD-01, миграция 0019). Подзадачи не подменяют список родителя.
+
+| Столбец | Тип | NULL | Описание |
+|---|---|---|---|
+| `id` | uuid | нет | первичный ключ `pk_task_dod_criterion` |
+| `workspace_id` | uuid | нет | FK → `workspace.id` |
+| `task_id` | uuid | нет | FK → `task.id`, `CASCADE` |
+| `body` | text | нет | текст критерия; `CHECK` `ck_task_dod_criterion_body_length`: 1–500 |
+| `required` | boolean | нет | обязательный для `done` |
+| `checked` | boolean | нет | отмечен |
+| `checked_by` | uuid | да | кто отметил; FK → `app_user.id`, `RESTRICT` |
+| `checked_at` | timestamptz | да | когда отметили |
+| `position` | integer | нет | порядок в списке |
+| `created_by` | uuid | нет | кто добавил; FK → `app_user.id`, `RESTRICT` |
+| `created_at` | timestamptz | нет | момент создания |
+| `updated_at` | timestamptz | нет | момент последнего изменения |
+
+`CHECK` `ck_task_dod_criterion_checked_fields`: неотмеченный — без кто/когда; отмеченный — оба заданы.
+Индекс: `ix_task_dod_criterion_task_id_position` на `(task_id, position)`.
 
 #### Индексы
 
@@ -586,6 +615,7 @@ Access (1 час) и refresh (90 суток, ротация) токены гра
 | `0017` | согласие на обработку ПДн (спека 021): `app_user.pdn_consent_version`, `pdn_consented_at`, `registration_request.pdn_consent_version`, `pdn_consent_at` (все `NULL`); откат удаляет столбцы |
 | `0014` | OAuth для облачных MCP-клиентов (spec 028): `oauth_client`, `oauth_grant`, `oauth_code`, `oauth_token`, `oauth_attempt`; откат удаляет пять таблиц |
 | `0018` | MCP read-only: `api_token.read_only boolean NOT NULL` (спека 032); откат удаляет столбец |
+| `0019` | DoD и блокер: колонки `task.blocked*` / `human_close_only`, таблица `task_dod_criterion` (спека 033) |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия
 моделей миграциям — `alembic -c backend/alembic.ini check` (входит в `scripts/check.sh` и CI).
