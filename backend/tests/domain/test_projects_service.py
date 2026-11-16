@@ -426,7 +426,7 @@ async def test_d46_no_change_still_checks_permissions(db: AsyncSession, svc: Any
 async def test_002_ac11_ba_non_owner_updates_project_even_without_membership(
     db: AsyncSession, svc: Any
 ) -> None:
-    """002/AC-11 (FR-8): БА-участник (ba2) и БА-не участник (ba3) правят название и описание."""
+    """002/AC-11 (FR-8): БА-участник (ba2) правит; БА-не участник (ba3) — 403."""
     w = await make_world(db)
     view = await svc.update_project(
         db, actor_of(w.ba2), w.project_id, changes=_patch(svc, name="Имя-ba2", description="д-ba2")
@@ -434,9 +434,7 @@ async def test_002_ac11_ba_non_owner_updates_project_even_without_membership(
     assert (view.name, view.description) == ("Имя-ba2", "д-ba2")
     await forbidden(
         db,
-        svc.update_project(
-            db, actor_of(w.ba3), w.project_id, changes=_patch(svc, name="Имя-ba3")
-        ),
+        svc.update_project(db, actor_of(w.ba3), w.project_id, changes=_patch(svc, name="Имя-ba3")),
     )
 
 
