@@ -29,7 +29,7 @@ async def _new_project(env: ApiEnv, w: Any, who: str, name: str = "Личный"
 
 
 async def _add_member_by_ba(env: ApiEnv, w: Any, project_id: str, who: str) -> None:
-    r = await send(env, w.tok("ba"), "POST", members_url(project_id), {"user_id": str(w.uid(who))})
+    r = await send(env, w.tok("usr2"), "POST", members_url(project_id), {"login": w.login(who)})
     assert r.status_code in (200, 201, 204), r.text
 
 

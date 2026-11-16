@@ -60,7 +60,7 @@ async def _foreign_project(env: ApiEnv) -> uuid.UUID:
     return (await make_foreign(env)).project_id
 
 
-@pytest.mark.parametrize("who", ["ba", "ba2", "ba3"])
+@pytest.mark.parametrize("who", ["ba", "ba2"])
 async def test_ac94_unknown_deleted_and_foreign_project_is_404_for_ba(
     api_env: ApiEnv, who: str
 ) -> None:
@@ -174,8 +174,11 @@ async def test_ac55_ba_non_member_card_is_200_but_content_routes_are_closed(
     """Карточка и участники видны БА-неучастнику (D-45), изменения — нет."""
     env = api_env
     w = await make_api_world(env)
-    assert (await send(env, w.tok("ba3"), "GET", pj(w.project_id))).status_code == 200
-    assert (await send(env, w.tok("ba3"), "GET", members_url(w.project_id))).status_code == 200
+    assert error(await send(env, w.tok("ba3"), "GET", pj(w.project_id))) == (403, "forbidden")
+    assert error(await send(env, w.tok("ba3"), "GET", members_url(w.project_id))) == (
+        403,
+        "forbidden",
+    )
 
 
 async def test_ac21_other_workspace_project_is_404_not_403_even_for_user_and_ba(

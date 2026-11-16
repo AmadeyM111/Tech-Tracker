@@ -54,10 +54,8 @@ def is_own_project(a: Actor, p: ProjectFacts) -> bool:
 
 
 def can_view_project(a: Actor, p: ProjectFacts) -> bool:
-    """Карточка проекта: БА — любой проект пространства, «Пользователь» — свой."""
-    if a.role is Role.BUSINESS_ADMIN:
-        return True
-    return a.role == Role.USER and p.actor_is_member
+    """Карточка проекта: БА и «Пользователь» — только где участник (владелец всегда участник)."""
+    return a.can(Capability.BUSINESS_ACCESS) and p.actor_is_member
 
 
 def can_read_project_content(a: Actor, p: ProjectFacts) -> bool:
@@ -123,9 +121,10 @@ def can_delete_comment(a: Actor, p: ProjectFacts, author_id: UUID) -> bool:
 
 
 def can_manage_project(a: Actor, p: ProjectFacts) -> bool:
-    """Правка, передача владения, удаление, участники: БА в любом проекте (002/FR-8, D-1) и
-    владелец-«Пользователь» своего проекта (spec 027 FR-2, ``is_project_admin``)."""
-    return a.can(Capability.PROJECT_MANAGE_ANY) or is_project_admin(a, p)
+    """Правка, передача владения, удаление, участники: БА-участник проекта или
+    владелец-«Пользователь» своего проекта (``is_project_admin``). Глобальный БА
+    чужой проект не видит и не правит."""
+    return is_project_admin(a, p)
 
 
 def can_manage_members(a: Actor, p: ProjectFacts) -> bool:
@@ -133,7 +132,7 @@ def can_manage_members(a: Actor, p: ProjectFacts) -> bool:
 
 
 def can_add_member(a: Actor, p: ProjectFacts, user_id: UUID) -> bool:
-    """Участники (002/FR-8): БА добавляет любого, в том числе себя; ``user_id`` не участвует."""
+    """Участники: БА-участник или владелец-«Пользователь»; ``user_id`` не участвует."""
     del user_id  # сигнатура по plan §4.2
     return can_manage_members(a, p)
 

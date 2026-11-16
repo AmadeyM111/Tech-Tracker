@@ -300,29 +300,30 @@ async def test_002_ac22_ba_pm_transfers_pm_ownership_to_self(committed_api_env: 
 async def test_002_ac23_ownership_task_reassign_and_wrong_role_assignee(
     committed_api_env: ApiEnv,
 ) -> None:
-    """002/AC-23: ba.owner (не участник PM) передаёт PM участнику ba.pm - владелец ba.pm и
-    запись журнала с автором ba.owner; переназначает T2 с m1 на u1 - сохранено; создаёт в P
-    задачу с исполнителем m1 - 422 recipient_wrong_role, задача не создана."""
+    """002/AC-23: ba.owner (не участник PM) не передаёт PM; переназначает T2 с m1 на u1
+    в своём P; создаёт в P задачу с исполнителем m1 - 422 recipient_wrong_role."""
     env = committed_api_env
     w, _ = await make_ac20_world(env)
     assert w.project_p is not None and w.project_pm is not None and w.task_t2 is not None
     await to_head(env)
-    ba_owner = w.uid("ba.owner")
     token, _ = await _login(env, "ba.owner")
 
     moved = await send(
         env, token, "PUT", f"{pj(w.project_pm)}/owner", {"user_id": str(w.uid("ba.pm"))}
     )
-    assert moved.status_code == 200, moved.text
-    assert moved.json()["owner"]["id"] == str(w.uid("ba.pm"))
+    assert moved.status_code == 403, moved.text
+    assert code_of(moved) == "forbidden"
     events = await env.execute(
         text(
             "SELECT actor_id, entity_id FROM domain_event "
             "WHERE action = 'project.ownership_transferred' AND entity_id = :p"
         ).bindparams(p=w.project_pm)
     )
-    assert events is not None and len(events) == 1
-    assert events[0][0] == ba_owner
+    assert not events
+    owner_row = await env.execute(
+        text("SELECT owner_id FROM project WHERE id = :p").bindparams(p=w.project_pm)
+    )
+    assert owner_row is not None and owner_row[0][0] == w.uid("m1")
 
     reassigned = await send(
         env, token, "PATCH", f"/api/v1/tasks/{w.task_t2}", {"assignee_id": str(w.uid("u1"))}

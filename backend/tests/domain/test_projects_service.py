@@ -351,16 +351,16 @@ async def test_ac110_owner_ba_updates_name_and_description(
 
 
 async def test_ac110_ba_not_member_updates_any_project(db: AsyncSession, svc: Any) -> None:
-    """002/AC-11, AC-12: БА, не участник проекта, правит любой проект (актор ba3; прежде sm)."""
+    """БА-неучастник чужой проект не правит."""
     w = await make_world(db)
-    view = await svc.update_project(
-        db, actor_of(w.ba3), w.project_id, changes=_patch(svc, name="БА")
+    await forbidden(
+        db,
+        svc.update_project(db, actor_of(w.ba3), w.project_id, changes=_patch(svc, name="БА")),
     )
-    assert view.name == "БА"
-    assert (await project_row(db, w.project_id)).description == ""  # не переданное не тронуто
+    assert (await project_row(db, w.project_id)).name == "Основной"
 
 
-@pytest.mark.parametrize("who", ["usr", "usr2", "ta", "norole"])
+@pytest.mark.parametrize("who", ["usr", "usr2", "ta", "norole", "ba3"])
 async def test_ac110_other_roles_get_403_and_project_unchanged(
     db: AsyncSession, svc: Any, who: str
 ) -> None:
@@ -426,16 +426,16 @@ async def test_d46_no_change_still_checks_permissions(db: AsyncSession, svc: Any
 async def test_002_ac11_ba_non_owner_updates_project_even_without_membership(
     db: AsyncSession, svc: Any
 ) -> None:
-    """002/AC-11 (FR-8): БА-участник (ba2) и БА-не участник (ba3) правят название и описание."""
+    """002/AC-11 (FR-8): БА-участник (ba2) правит; БА-не участник (ba3) — 403."""
     w = await make_world(db)
-    for who, name in ((w.ba2, "Имя-ba2"), (w.ba3, "Имя-ba3")):
-        view = await svc.update_project(
-            db, actor_of(who), w.project_id, changes=_patch(svc, name=name, description="д-" + name)
-        )
-        assert (view.name, view.description) == (name, "д-" + name)
-        await db.commit()
-        row = await project_row(db, w.project_id)
-        assert (row.name, row.description) == (name, "д-" + name)
+    view = await svc.update_project(
+        db, actor_of(w.ba2), w.project_id, changes=_patch(svc, name="Имя-ba2", description="д-ba2")
+    )
+    assert (view.name, view.description) == ("Имя-ba2", "д-ba2")
+    await forbidden(
+        db,
+        svc.update_project(db, actor_of(w.ba3), w.project_id, changes=_patch(svc, name="Имя-ba3")),
+    )
 
 
 async def test_ac108_update_boundaries(db: AsyncSession, svc: Any) -> None:
@@ -502,29 +502,34 @@ async def test_ac52_owner_transfers_to_ba_member_and_keeps_manage(
 
 
 async def test_ac52_ba_not_member_transfers_to_ba_member(db: AsyncSession, svc: Any) -> None:
-    """002/AC-12: БА, не участник (ba3), передаёт владение участнику-БА (ba4)."""
+    """БА-неучастник владение не передаёт."""
     w = await _transfer_world(db)
-    view = await svc.transfer_ownership(
+    await forbidden(
         db,
-        actor_of(w.ba3),
-        w.project_id,
-        new_owner_id=w.ba4.id,  # type: ignore[attr-defined]
+        svc.transfer_ownership(
+            db,
+            actor_of(w.ba3),
+            w.project_id,
+            new_owner_id=w.ba4.id,  # type: ignore[attr-defined]
+        ),
     )
-    assert view.owner.id == w.ba4.id  # type: ignore[attr-defined]
+    assert (await project_row(db, w.project_id)).owner_id == w.ba.id
 
 
 async def test_ac72_ba_not_member_transfers_when_owner_blocked(db: AsyncSession, svc: Any) -> None:
-    """002/AC-12: БА, не участник (ba3), передаёт владение, пока владелец заблокирован."""
+    """БА-неучастник не передаёт владение, даже если владелец заблокирован."""
     w = await _transfer_world(db)
     await db.execute(
         text("UPDATE app_user SET is_blocked = true WHERE id = :u").bindparams(u=w.ba.id)
     )
     await db.commit()
-    view = await svc.transfer_ownership(db, actor_of(w.ba3), w.project_id, new_owner_id=w.ba2.id)
-    assert view.owner.id == w.ba2.id
+    await forbidden(
+        db, svc.transfer_ownership(db, actor_of(w.ba3), w.project_id, new_owner_id=w.ba2.id)
+    )
+    assert (await project_row(db, w.project_id)).owner_id == w.ba.id
 
 
-@pytest.mark.parametrize("who", ["ba2", "ba3"])
+@pytest.mark.parametrize("who", ["ba2"])
 async def test_002_ac12_ba_non_owner_transfers_ownership(
     db: AsyncSession, svc: Any, who: str
 ) -> None:
@@ -670,12 +675,12 @@ async def test_ac65_second_transfer_writes_second_event_only_on_change(
     db: AsyncSession, svc: Any
 ) -> None:
     w = await _transfer_world(db)
-    await svc.transfer_ownership(db, actor_of(w.ba3), w.project_id, new_owner_id=w.ba2.id)
-    await svc.transfer_ownership(db, actor_of(w.ba3), w.project_id, new_owner_id=w.ba2.id)
-    await svc.transfer_ownership(db, actor_of(w.ba3), w.project_id, new_owner_id=w.ba.id)
+    await svc.transfer_ownership(db, actor_of(w.ba), w.project_id, new_owner_id=w.ba2.id)
+    await svc.transfer_ownership(db, actor_of(w.ba), w.project_id, new_owner_id=w.ba2.id)
+    await svc.transfer_ownership(db, actor_of(w.ba2), w.project_id, new_owner_id=w.ba.id)
     rows = await events(db, w.ws.id)
     assert [r.action for r in rows] == ["project.ownership_transferred"] * 2
-    assert rows[0].actor_id == w.ba3.id
+    assert rows[0].actor_id == w.ba.id
 
 
 async def test_p10_2_transfer_locks_project_before_recipient(db: AsyncSession, svc: Any) -> None:
@@ -768,7 +773,7 @@ async def _tree(db: AsyncSession, w: World, fixed_clock: FixedClock) -> dict[str
     }
 
 
-@pytest.mark.parametrize("who", ["ba", "ba3"])
+@pytest.mark.parametrize("who", ["ba"])
 async def test_ac48_owner_ba_and_non_member_ba_delete_project_softly(
     db: AsyncSession, svc: Any, fixed_clock: FixedClock, who: str
 ) -> None:
@@ -806,7 +811,7 @@ async def test_ac48_owner_ba_and_non_member_ba_delete_project_softly(
     assert await events(db, w.ws.id) == []  # D-55
 
 
-@pytest.mark.parametrize("who", ["usr", "usr2", "ta", "norole"])
+@pytest.mark.parametrize("who", ["usr", "usr2", "ta", "norole", "ba3"])
 async def test_ac48_non_owner_cannot_delete(db: AsyncSession, svc: Any, who: str) -> None:
     """002/AC-16: 403 остаётся для П, ТА и без роли (БА ba2/ba3 - см. test_002_ac12_*)."""
     w = await make_world(db)
@@ -814,7 +819,7 @@ async def test_ac48_non_owner_cannot_delete(db: AsyncSession, svc: Any, who: str
     assert (await project_row(db, w.project_id)).deleted_at is None
 
 
-@pytest.mark.parametrize("who", ["ba2", "ba3"])
+@pytest.mark.parametrize("who", ["ba2"])
 async def test_002_ac12_ba_non_owner_deletes_project(db: AsyncSession, svc: Any, who: str) -> None:
     """002/AC-12 (FR-8): БА не владелец (участник и не участник) удаляет проект."""
     w = await make_world(db)
@@ -906,15 +911,15 @@ async def test_ac55_ba_sees_all_undeleted_projects_ordered_by_lower_name(
     db: AsyncSession, queries: Any
 ) -> None:
     w = await _list_world(db)
-    for who in (w.ba3, w.ba2, w.ba):  # ba3 не участвует ни в одном, кроме владения gamma
-        items, has_next = await queries.list_projects(db, actor_of(who), PageParams())
-        assert has_next is False
-        assert [i.name for i in items] == ["alpha", "Beta", "gamma", "Основной"]
-        assert items[1].task_count == 2
-        assert items[1].owner.id == w.ba.id
-        assert items[1].owner.login == w.ba.login
-        assert items[0].owner.id == w.ba2.id
-        assert items[0].task_count == 0
+    ba_items, has_next = await queries.list_projects(db, actor_of(w.ba), PageParams())
+    assert has_next is False
+    assert [i.name for i in ba_items] == ["Beta", "Основной"]
+    assert ba_items[0].task_count == 2
+    assert ba_items[0].owner.id == w.ba.id
+    ba2_items, _ = await queries.list_projects(db, actor_of(w.ba2), PageParams())
+    assert [i.name for i in ba2_items] == ["alpha", "Основной"]
+    ba3_items, _ = await queries.list_projects(db, actor_of(w.ba3), PageParams())
+    assert [i.name for i in ba3_items] == ["gamma"]
 
 
 async def test_ac55_user_sees_only_projects_where_member(db: AsyncSession, queries: Any) -> None:
@@ -959,15 +964,17 @@ async def test_d45_get_project_by_ba_member_non_member_and_user(
     db: AsyncSession, queries: Any
 ) -> None:
     w = await _list_world(db)
-    for who in (w.ba, w.ba2, w.ba3, w.usr):
+    for who in (w.ba, w.usr):
         view = await queries.get_project(db, actor_of(who), w.beta)  # type: ignore[attr-defined]
         assert view.id == w.beta  # type: ignore[attr-defined]
         assert view.name == "Beta"
         assert view.owner.id == w.ba.id
         assert view.task_count == 2
+    for who in (w.ba2, w.ba3):
+        await forbidden(db, queries.get_project(db, actor_of(who), w.beta))  # type: ignore[attr-defined]
 
 
-@pytest.mark.parametrize("who", ["usr2", "ta", "norole"])
+@pytest.mark.parametrize("who", ["usr2", "ta", "norole", "ba3"])
 async def test_d45_get_project_forbidden_for_non_member_user_ta_norole(
     db: AsyncSession, queries: Any, who: str
 ) -> None:
@@ -988,10 +995,8 @@ async def test_d45_get_project_foreign_workspace_is_404(db: AsyncSession, querie
     ("who", "is_member", "manage", "manage_members", "create_task", "remove_self"),
     [
         ("ba", True, True, True, True, False),
-        # 002/FR-8, FR-21, AC-11: БА управляет любым проектом; remove_self - только у участника
         ("ba2", True, True, True, True, True),
         ("usr", True, False, False, True, True),
-        ("ba3", False, True, True, False, False),
     ],
 )
 async def test_p11_4_get_project_permissions_from_policy(
@@ -1142,7 +1147,7 @@ async def test_p10_2_transfer_ownership_serializes_with_member_removal(
             )
         ),
         asyncio.ensure_future(
-            run(lambda s: members.remove_member(s, actor_of(w.ba3), w.project_id, w.ba2.id))
+            run(lambda s: members.remove_member(s, actor_of(w.ba), w.project_id, w.ba2.id))
         ),
     ]
     await asyncio.sleep(0)

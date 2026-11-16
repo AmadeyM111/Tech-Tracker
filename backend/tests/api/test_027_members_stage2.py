@@ -143,9 +143,14 @@ async def test_027_body_needs_exactly_one_key_and_user_cannot_use_user_id(api_en
         assert error(r) == (422, "validation_error"), body
     by_id = await send(env, w.tok("usr2"), "POST", members_url(pid), {"user_id": str(w.uid("usr"))})
     assert error(by_id) == (422, "validation_error")
-    # БА по-прежнему добавляет по user_id, а повтор — без ошибки (D-46)
+    # БА-неучастник чужой проект не правит
+    denied = await send(env, w.tok("ba"), "POST", members_url(pid), {"user_id": str(w.uid("usr"))})
+    assert error(denied) == (403, "forbidden")
+    # На своём проекте БА добавляет по user_id, повтор — без ошибки (D-46)
     for _ in range(2):
-        ok = await send(env, w.tok("ba"), "POST", members_url(pid), {"user_id": str(w.uid("usr"))})
+        ok = await send(
+            env, w.tok("ba"), "POST", members_url(w.project_id), {"user_id": str(w.uid("usr2"))}
+        )
         assert ok.status_code == 204, ok.text
 
 

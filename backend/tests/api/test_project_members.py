@@ -108,9 +108,10 @@ async def test_d45_members_visible_to_ba_non_members_but_not_to_user_non_member(
 ) -> None:
     env = api_env
     w = await make_api_world(env)
-    for who in ("ba2", "ba3"):
-        r = await send(env, w.tok(who), "GET", members_url(w.project_id))
-        assert r.status_code == 200, who
+    r = await send(env, w.tok("ba2"), "GET", members_url(w.project_id))
+    assert r.status_code == 200
+    r = await send(env, w.tok("ba3"), "GET", members_url(w.project_id))
+    assert error(r) == (403, "forbidden")
     r = await send(env, w.tok("usr2"), "GET", members_url(w.project_id))
     assert error(r) == (403, "forbidden")
     assert "w.ba2" not in r.text
@@ -168,11 +169,10 @@ async def test_ac73_ba_non_member_adds_other_user_and_himself(api_env: ApiEnv) -
         env, w.tok("ba3"), "POST", members_url(w.project_id), {"user_id": str(w.uid("ba3"))}
     )
 
-    assert (other.status_code, itself.status_code) == (204, 204)
+    assert error(other) == (403, "forbidden")
+    assert error(itself) == (403, "forbidden")
     members = await member_ids(env, w.project_id)
-    assert {w.uid("usr2"), w.uid("ba3")} <= members
-    card = await send(env, w.tok("ba3"), "GET", pj(w.project_id))
-    assert card.json()["is_member"] is True
+    assert {w.uid("usr2"), w.uid("ba3")}.isdisjoint(members)
 
 
 async def test_ac54_ba_non_member_adding_himself_is_204(api_env: ApiEnv) -> None:
@@ -183,8 +183,8 @@ async def test_ac54_ba_non_member_adding_himself_is_204(api_env: ApiEnv) -> None
     r = await send(
         env, w.tok("ba3"), "POST", members_url(w.project_id), {"user_id": str(w.uid("ba3"))}
     )
-    assert r.status_code == 204, r.text
-    assert w.uid("ba3") in await member_ids(env, w.project_id)
+    assert error(r) == (403, "forbidden")
+    assert w.uid("ba3") not in await member_ids(env, w.project_id)
 
 
 @pytest.mark.parametrize("who", ["usr", "usr2", "ta"])
@@ -210,7 +210,7 @@ async def test_ac73_ac54_non_managers_get_403_even_for_unknown_target(
     assert await member_ids(env, w.project_id) == before
 
 
-@pytest.mark.parametrize("who", ["ba2", "ba3"])
+@pytest.mark.parametrize("who", ["ba2"])
 async def test_002_ac11_ba_non_owner_unknown_target_is_422(api_env: ApiEnv, who: str) -> None:
     """002/AC-11 (FR-8): БА-не владелец проходит проверку прав; неизвестный получатель -
     422 user_not_found, а не 403 (раньше 403, см. test_ac73_ac54_*)."""
@@ -343,10 +343,12 @@ async def test_ac53_removing_owner_is_422_owner_cannot_be_removed(api_env: ApiEn
     env = api_env
     w = await make_api_world(env)
 
-    for who in ("ba", "ba3"):
+    for who in ("ba", "ba2"):
         r = await send(env, w.tok(who), "DELETE", members_url(w.project_id, w.uid("ba")))
         assert error(r) == (422, "owner_cannot_be_removed"), who
         assert r.json()["detail"]  # пояснение
+    r = await send(env, w.tok("ba3"), "DELETE", members_url(w.project_id, w.uid("ba")))
+    assert error(r) == (403, "forbidden")
     assert w.uid("ba") in await member_ids(env, w.project_id)
 
 
@@ -387,11 +389,10 @@ async def test_ac53_ba_member_self_removal_keeps_ba_card_visibility_not_membersh
     r = await send(env, w.tok("ba2"), "DELETE", members_url(w.project_id, w.uid("ba2")))
     assert r.status_code == 204
     card = await send(env, w.tok("ba2"), "GET", pj(w.project_id))
-    assert card.status_code == 200  # БА видит проект (D-45), но не участник
-    assert card.json()["is_member"] is False
+    assert error(card) == (403, "forbidden")
 
 
-@pytest.mark.parametrize("who", ["ba2", "ba3"])
+@pytest.mark.parametrize("who", ["ba2"])
 async def test_002_ac11_ba_non_owner_removes_others(api_env: ApiEnv, who: str) -> None:
     """002/AC-11 (FR-8): БА (участник не владелец / не участник) исключает участника; раньше
     403 (test_ac73_non_managers_cannot_remove_others)."""
@@ -419,8 +420,8 @@ async def test_ac73_ba_non_member_removes_member(api_env: ApiEnv) -> None:
     env = api_env
     w = await make_api_world(env)
     r = await send(env, w.tok("ba3"), "DELETE", members_url(w.project_id, w.uid("ba2")))
-    assert r.status_code == 204
-    assert w.uid("ba2") not in await member_ids(env, w.project_id)
+    assert error(r) == (403, "forbidden")
+    assert w.uid("ba2") in await member_ids(env, w.project_id)
 
 
 async def test_ac54_tech_admin_cannot_add_or_remove(api_env: ApiEnv) -> None:
@@ -476,7 +477,7 @@ async def test_fr15a_remove_non_member_target_is_404_for_participants_and_manage
 ) -> None:
     env = api_env
     w = await make_api_world(env)
-    for who in ("ba", "ba2", "usr", "ba3"):
+    for who in ("ba", "ba2", "usr"):
         own = await send(env, w.tok(who), "GET", members_url(w.project_id))
         assert own.status_code == 200, own.text  # маршрут существует, проект виден
         r = await send(env, w.tok(who), "DELETE", members_url(w.project_id, w.uid("usr2")))
@@ -530,8 +531,8 @@ async def test_fr15_ac54_ba_non_member_adding_himself_is_204(api_env: ApiEnv) ->
         env, w.tok("ba3"), "POST", members_url(w.project_id), {"user_id": str(w.uid("ba3"))}
     )
 
-    assert r.status_code == 204, r.text
-    assert w.uid("ba3") in await member_ids(env, w.project_id)
+    assert error(r) == (403, "forbidden")
+    assert w.uid("ba3") not in await member_ids(env, w.project_id)
 
 
 async def test_fr15_ac54_ba_member_not_owner_adding_other_is_204(api_env: ApiEnv) -> None:

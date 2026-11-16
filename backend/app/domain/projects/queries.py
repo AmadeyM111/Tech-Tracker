@@ -23,7 +23,7 @@ from app.domain.access.policy import (
     can_remove_self,
     can_view_project,
 )
-from app.domain.access.roles import Actor, Capability, Role
+from app.domain.access.roles import Actor, Capability
 from app.domain.projects.models import Project, ProjectMember
 from app.domain.tasks.models import Task
 from app.domain.users.directory import UserRef, user_refs
@@ -173,17 +173,19 @@ async def get_project(db: AsyncSession, actor: Actor, project_id: UUID) -> Proje
 async def list_projects(
     db: AsyncSession, actor: Actor, params: PageParams
 ) -> tuple[list[ProjectListRow], bool]:
-    """БА — все неудалённые проекты пространства, «Пользователь» — где участник."""
+    """Неудалённые проекты пространства, где актор участник (БА — тоже только свои)."""
     if not actor.can(Capability.BUSINESS_ACCESS):
         raise Forbidden()
     stmt = (
         select(Project)
-        .where(Project.workspace_id == actor.workspace_id, Project.deleted_at.is_(None))
+        .where(
+            Project.workspace_id == actor.workspace_id,
+            Project.deleted_at.is_(None),
+            or_(_is_member_of(actor.user_id), Project.owner_id == actor.user_id),
+        )
         .order_by(func.lower(Project.name), Project.id)
         .execution_options(populate_existing=True)
     )
-    if actor.role is not Role.BUSINESS_ADMIN:
-        stmt = stmt.where(_is_member_of(actor.user_id))
     projects, has_next = await paginate(db, stmt, params)
     if not projects:
         return [], has_next
