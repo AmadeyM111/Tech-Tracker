@@ -100,6 +100,8 @@ codex mcp add gtrack --env GTRACK_TOKEN=$GTRACK_TOKEN --env GTRACK_URL=https://l
 | `upsert_knowledge` | решение / причина / договорённость; без `commit=true` в БД не пишет |
 | `check_dod_criterion` | отметить критерий готовности; для `evidence` передайте `evidence_ref`; задачу не закрывает |
 | `classify_task` | `routine`/`research` и каких полей не хватает; без `commit` ничего не пишет; с `commit=true` пишет только `mode` |
+| `ingest_message` | сообщение из Telegram: новая задача или комментарий; повтор того же id не дублирует |
+| `list_stuck_work` | задачи без движения 48 часов (не done); просрочка — отдельное поле |
 
 Удаление задач и проектов, участники, роли, учётные записи и CRM через MCP в R1 не открыты.
 
