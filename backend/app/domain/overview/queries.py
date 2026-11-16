@@ -63,6 +63,7 @@ class OverviewItem:
     due_date: date | None
     assignee: UserRef | None
     hot: bool
+    blocked: bool
 
 
 def _visible(actor: Actor) -> list[Any]:
@@ -222,6 +223,7 @@ async def _items(
             due_date=t.due_date,
             assignee=None if t.assignee_id is None else refs.get(t.assignee_id),
             hot=is_hot(t.priority, t.due_date, t.status, today),
+            blocked=t.blocked,
         )
         for t in tasks
     ]

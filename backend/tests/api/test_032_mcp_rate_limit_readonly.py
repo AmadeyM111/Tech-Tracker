@@ -13,7 +13,14 @@ from tests.projects_api_support import make_api_world, send
 
 TOKENS = "/api/v1/me/tokens"
 WRITE_TOOLS = frozenset(
-    {"create_task", "create_subtask", "update_task", "create_project", "add_comment"}
+    {
+        "create_task",
+        "create_subtask",
+        "update_task",
+        "create_project",
+        "add_comment",
+        "check_dod_criterion",
+    }
 )
 
 

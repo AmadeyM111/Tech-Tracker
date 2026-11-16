@@ -6,6 +6,7 @@ import { useId, useRef, useState } from "react";
 import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, FieldError } from "../../shared/ui/ErrorAlert";
+import { BlockerMark } from "../../shared/ui/BlockerMark";
 import { HotMark } from "../../shared/ui/HotMark";
 import { Pagination } from "../../shared/ui/Pagination";
 import { AiAgentHint } from "./AiAgentHint";
@@ -233,11 +234,12 @@ function TaskRows({ items, today }: { items: OverviewTaskItem[]; today: string }
           </thead>
           <tbody>
             {items.map((task) => (
-              <tr key={task.id} data-task-id={task.id} data-hot={task.hot}>
+              <tr key={task.id} data-task-id={task.id} data-hot={task.hot} data-blocked={task.blocked}>
                 <td data-field="project">{task.project.name}</td>
                 <td data-field="title">
                   <a href={`/tasks/${task.id}`}>{task.title}</a>
                   <Hot task={task} />
+                  <BlockerMark blocked={task.blocked} />
                 </td>
                 <td data-field="status">{t(`summary.tile.${task.status}`)}</td>
                 <td data-field="priority">{t(`tasks.priority.${task.priority}`)}</td>

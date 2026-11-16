@@ -48,6 +48,8 @@ class BoardCard:
     progress: int | None
     # «Горит» — тот же критерий, что на «Сводке» (overview.due.is_hot, FR-8 spec 008)
     hot: bool
+    # Блокер/инцидент (спека 033); не путать с ``hot``
+    blocked: bool
 
 
 @dataclass(frozen=True)
@@ -109,6 +111,7 @@ async def get_board(db: AsyncSession, actor: Actor, project_id: UUID) -> BoardVi
                 Task.due_date,
                 Task.assignee_id,
                 Task.position,
+                Task.blocked,
                 func.coalesce(subs.c.total, 0).label("total"),
                 func.coalesce(subs.c.done, 0).label("done"),
                 func.coalesce(subs.c.in_work, 0).label("in_work"),
@@ -146,6 +149,7 @@ async def get_board(db: AsyncSession, actor: Actor, project_id: UUID) -> BoardVi
                 subtask_done=int(r.done),
                 progress=progress(done=int(r.done), in_work=int(r.in_work), total=int(r.total)),
                 hot=is_hot(r.priority, r.due_date, r.status, today),
+                blocked=bool(r.blocked),
             )
         )
     return BoardView(

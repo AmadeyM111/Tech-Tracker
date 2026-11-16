@@ -32,6 +32,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert, useAlertState } from "../../shared/ui/ErrorAlert";
+import { BlockerMark } from "../../shared/ui/BlockerMark";
 import { HotMark } from "../../shared/ui/HotMark";
 import { personInitials, personName, type PersonRef } from "../../shared/ui/person";
 import type { TaskStatus } from "../tasks/api";
@@ -156,6 +157,7 @@ function Card({ card }: { card: BoardCard }) {
           {card.title}
           {/* One place for every card and width: its own line under the title, inside the card link. */}
           <HotMark hot={card.hot} block />
+          <BlockerMark blocked={card.blocked} block />
         </Link>
       </div>
       <div className="ui-card-meta">

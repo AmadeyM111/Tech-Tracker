@@ -1066,11 +1066,16 @@ TASK_OPERATIONS: set[tuple[str, str]] = {
     ("PATCH", "/api/v1/tasks/{}"),
     ("DELETE", "/api/v1/tasks/{}"),
     ("POST", "/api/v1/tasks/{}/subtasks"),
+    ("POST", "/api/v1/tasks/{}/dod-criteria"),
+    ("PATCH", "/api/v1/tasks/{}/dod-criteria/{}"),
+    ("DELETE", "/api/v1/tasks/{}/dod-criteria/{}"),
 }
 WITH_BODY = {
     ("POST", "/api/v1/projects/{}/tasks"),
     ("PATCH", "/api/v1/tasks/{}"),
     ("POST", "/api/v1/tasks/{}/subtasks"),
+    ("POST", "/api/v1/tasks/{}/dod-criteria"),
+    ("PATCH", "/api/v1/tasks/{}/dod-criteria/{}"),
 }
 
 
@@ -1152,7 +1157,16 @@ async def test_t77_response_schemas_match_plan_11_4_and_nulls_only_where_allowed
     assert "description" not in item["properties"]  # в списках описания нет
     perms = _resolve(spec, detail["properties"]["permissions"])
     assert set(perms["properties"]) == PERM_FIELDS
-    nullable_detail = {"parent_id", "due_date", "assignee", "position", "progress"}
+    nullable_detail = {
+        "parent_id",
+        "due_date",
+        "assignee",
+        "position",
+        "progress",
+        "blocked_reason",
+        "blocked_by",
+        "blocked_at",
+    }
     for name, prop in detail["properties"].items():
         assert _is_nullable(spec, prop) == (name in nullable_detail), name
     for name, prop in item["properties"].items():
@@ -1177,17 +1191,21 @@ async def test_t77_request_schemas_forbid_extra_and_have_no_null_where_required(
     schema = spec["components"]["schemas"][name]
     expected = {"title", "description", "assignee_id", "due_date", "priority"}
     if name == "TaskUpdate":
-        expected |= {"status"}
+        expected |= {"status", "blocked", "blocked_reason", "human_close_only"}
     assert set(schema["properties"]) == expected
     assert schema.get("additionalProperties") is False
     required = set(schema.get("required", []))
     assert required == ({"title"} if name == "TaskCreate" else set())
     props = schema["properties"]
-    for field in ("title", "description", "priority", "status"):
+    for field in ("title", "description", "priority", "status", "blocked", "human_close_only"):
         if field in props:
             assert not _is_nullable(spec, props[field]), field
-    for field in ("assignee_id", "due_date"):
+    nullable = {"assignee_id", "due_date"}
+    if name == "TaskUpdate":
+        nullable.add("blocked_reason")
+    for field in nullable:
         assert _is_nullable(spec, props[field]), field
+    assert any(v.get("type") == "string" for v in _variants(props["due_date"]))
     assert any(v.get("type") == "string" for v in _variants(props["due_date"]))
 
 

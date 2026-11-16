@@ -21,6 +21,7 @@ from app.domain.access.policy import (
     TaskFacts,
     can_change_assignee,
     can_change_task_status,
+    can_check_dod,
     can_create_subtask,
     can_delete_task,
     can_edit_task_fully,
@@ -30,6 +31,7 @@ from app.domain.access.roles import Actor, Capability
 from app.domain.projects.models import Project, ProjectMember
 from app.domain.projects.queries import load_project_facts
 from app.domain.tasks.context import load_task_context
+from app.domain.tasks.dod import DodView, load_dod
 from app.domain.tasks.models import Task, TaskPriority, TaskStatus
 from app.domain.tasks.progress import progress
 from app.domain.users.directory import UserRef, user_refs
@@ -53,6 +55,7 @@ class TaskPermissions:
     change_assignee: bool
     delete: bool
     create_subtask: bool
+    check_dod: bool
 
 
 @dataclass(frozen=True)
@@ -83,6 +86,11 @@ class TaskView:
     created_at: datetime
     updated_at: datetime
     permissions: TaskPermissions
+    blocked: bool
+    blocked_reason: str | None
+    blocked_by: UserRef | None
+    blocked_at: datetime | None
+    dod: DodView
 
 
 @dataclass(frozen=True)
@@ -96,6 +104,7 @@ class TaskListItem:
     due_date: date | None
     assignee: UserRef | None
     created_at: datetime
+    blocked: bool
 
 
 def _author(refs: dict[UUID, UserRef], user_id: UUID) -> UserRef:
@@ -149,7 +158,10 @@ async def get_task(db: AsyncSession, actor: Actor, task_id: UUID) -> TaskView:
     user_ids = {task.created_by, *(s.assignee_id for s in subs)}
     if task.assignee_id is not None:
         user_ids.add(task.assignee_id)
+    if task.blocked_by is not None:
+        user_ids.add(task.blocked_by)
     refs = await user_refs(db, actor.workspace_id, [u for u in user_ids if u is not None])
+    dod = await load_dod(db, actor.workspace_id, task)
     done = sum(1 for s in subs if s.status == TaskStatus.DONE)
     in_work = sum(1 for s in subs if s.status in (TaskStatus.IN_PROGRESS, TaskStatus.REVIEW))
     return TaskView(
@@ -185,7 +197,13 @@ async def get_task(db: AsyncSession, actor: Actor, task_id: UUID) -> TaskView:
             delete=can_delete_task(actor, ctx.project, facts),
             create_subtask=facts.parent_id is None
             and can_create_subtask(actor, ctx.project, facts, actor.user_id),
+            check_dod=can_check_dod(actor, ctx.project, facts),
         ),
+        blocked=task.blocked,
+        blocked_reason=task.blocked_reason,
+        blocked_by=_ref(refs, task.blocked_by),
+        blocked_at=task.blocked_at,
+        dod=dod,
     )
 
 
@@ -216,6 +234,7 @@ async def _list_items(db: AsyncSession, actor: Actor, tasks: Sequence[Task]) -> 
             due_date=t.due_date,
             assignee=_ref(refs, t.assignee_id),
             created_at=t.created_at,
+            blocked=t.blocked,
         )
         for t in tasks
     ]
@@ -229,6 +248,7 @@ async def list_project_tasks(
     *,
     assignee_id: UUID | None,
     status: TaskStatus | None,
+    blocked: bool | None = None,
 ) -> tuple[list[TaskListItem], bool]:
     """Задачи и подзадачи проекта (новые сверху); фильтры исполнителя и статуса — через «И»."""
     facts = await load_project_facts(db, actor, project_id)
@@ -243,6 +263,8 @@ async def list_project_tasks(
         conditions.append(Task.assignee_id == assignee_id)
     if status is not None:
         conditions.append(Task.status == str(status))
+    if blocked is not None:
+        conditions.append(Task.blocked.is_(blocked))
     stmt = (
         select(Task)
         .options(defer(Task.description))

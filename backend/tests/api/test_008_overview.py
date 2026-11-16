@@ -179,6 +179,7 @@ async def test_008_ac8_hot_flag_and_order(api_env: ApiEnv) -> None:
         "due_date",
         "assignee",
         "hot",
+        "blocked",
     }
 
 

@@ -26,6 +26,9 @@ const ACTION_KEYS: Readonly<Record<string, MessageKey>> = {
   "task.updated": "activity.action.task.updated",
   "task.deleted": "activity.action.task.deleted",
   "task.unassigned_member_removed": "activity.action.task.unassigned_member_removed",
+  "task.dod_checked": "activity.action.task.dod_checked",
+  "task.blocked": "activity.action.task.blocked",
+  "task.unblocked": "activity.action.task.unblocked",
   "comment.created": "activity.action.comment.created",
   "comment.deleted": "activity.action.comment.deleted",
 };

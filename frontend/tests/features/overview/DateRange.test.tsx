@@ -25,6 +25,7 @@ function item(id: string) {
     due_date: null,
     assignee: null,
     hot: false,
+    blocked: false,
   };
 }
 

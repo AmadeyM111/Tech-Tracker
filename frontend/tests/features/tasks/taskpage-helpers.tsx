@@ -138,9 +138,23 @@ export const SUB1 = "c1c1c1c1-0000-4000-8000-000000000001";
 export const SUB2 = "c2c2c2c2-0000-4000-8000-000000000002";
 export const SUB3 = "c3c3c3c3-0000-4000-8000-000000000003";
 
-export const ALL_PERMS = { edit: true, change_status: true, change_assignee: true, delete: true, create_subtask: true };
-export const NO_PERMS = { edit: false, change_status: false, change_assignee: false, delete: false, create_subtask: false };
-export const EXECUTOR_PERMS = { ...NO_PERMS, change_status: true, create_subtask: true };
+export const ALL_PERMS = {
+  edit: true,
+  change_status: true,
+  change_assignee: true,
+  delete: true,
+  create_subtask: true,
+  check_dod: true,
+};
+export const NO_PERMS = {
+  edit: false,
+  change_status: false,
+  change_assignee: false,
+  delete: false,
+  create_subtask: false,
+  check_dod: false,
+};
+export const EXECUTOR_PERMS = { ...NO_PERMS, change_status: true, create_subtask: true, check_dod: true };
 
 export function sub(id: string, title: string, status = "todo") {
   return {

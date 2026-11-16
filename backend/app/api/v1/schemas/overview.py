@@ -73,6 +73,7 @@ class OverviewTaskItem(BaseModel):
     due_date: date | None
     assignee: UserRef | None
     hot: bool
+    blocked: bool
 
 
 class OverviewTaskPage(BaseModel):

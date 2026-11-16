@@ -19,7 +19,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select, update
 
 from app.core.clock import today_msk, utcnow
-from app.core.errors import ErrorCode, Forbidden, NotFound, Unprocessable
+from app.core.errors import ErrorCode, Forbidden, HumanCloseOnly, NotFound, Unprocessable
 from app.domain.access.policy import (
     ProjectFacts,
     TaskFacts,
@@ -35,10 +35,12 @@ from app.domain.access.recipients import RecipientPurpose, check_recipient
 from app.domain.access.roles import Actor, Role
 from app.domain.comments.models import Comment
 from app.domain.events.catalog import EventAction
+from app.domain.events.client_context import current_client_name
 from app.domain.events.writer import FieldChange, JsonValue, record_event
 from app.domain.notifications import producer as notifications
 from app.domain.projects.models import ProjectMember
 from app.domain.projects.queries import load_project_facts
+from app.domain.tasks import dod as dod_mod
 from app.domain.tasks import positions
 from app.domain.tasks.context import load_task_context
 from app.domain.tasks.models import Task, TaskPriority, TaskStatus
@@ -248,9 +250,20 @@ class TaskPatch:
     due_date: date | None | Unset = UNSET
     priority: str | TaskPriority | Unset = UNSET
     status: str | TaskStatus | Unset = UNSET
+    blocked: bool | Unset = UNSET
+    blocked_reason: str | None | Unset = UNSET
+    human_close_only: bool | Unset = UNSET
 
 
-_FIELDS: Final = ("title", "description", "assignee_id", "due_date", "priority", "status")
+_FIELDS: Final = (
+    "title",
+    "description",
+    "assignee_id",
+    "due_date",
+    "priority",
+    "status",
+    "human_close_only",
+)
 _FULL_EDIT_FIELDS: Final = ("title", "description", "due_date", "priority")
 # лента (plan §10.5): приоритет и метки событий не дают
 _FEED_FIELDS: Final = frozenset({"status", "assignee_id", "due_date", "title", "description"})
@@ -329,6 +342,20 @@ def _authorize(actor: Actor, project: ProjectFacts, task: Task, changed: dict[st
         _check_top_level(changed, today_msk())
     if "status" in changed:
         _status(changed["status"])
+    if "human_close_only" in changed and not can_edit_task_fully(actor, project, facts):
+        raise Forbidden()
+    if "human_close_only" in changed and current_client_name() is not None:
+        raise HumanCloseOnly()
+
+
+def _apply_block_patch(
+    actor: Actor, project: ProjectFacts, task: Task, patch: TaskPatch
+) -> EventAction | None:
+    if isinstance(patch.blocked, Unset):
+        return None
+    dod_mod.authorize_block_or_flag(actor, project, task)
+    reason = None if isinstance(patch.blocked_reason, Unset) else patch.blocked_reason
+    return dod_mod.apply_blocked(task, actor, blocked=bool(patch.blocked), reason=reason)
 
 
 async def _precheck_assignee(
@@ -366,9 +393,11 @@ async def update_task(db: AsyncSession, actor: Actor, task_id: UUID, patch: Task
         raise Forbidden()
     task = await _load_task(db, task_id)
     changed = _changes(task, patch)
-    if not changed:
+    block_requested = not isinstance(patch.blocked, Unset)
+    if not changed and not block_requested:
         return
-    _authorize(actor, ctx.project, task, changed)
+    if changed:
+        _authorize(actor, ctx.project, task, changed)
     recipient_error = await _precheck_assignee(db, actor, ctx.project, patch, changed)
     status = None if isinstance(patch.status, Unset) else _status(patch.status)
     if status is not None and task.parent_id is None:
@@ -376,12 +405,39 @@ async def update_task(db: AsyncSession, actor: Actor, task_id: UUID, patch: Task
     task = await _lock_task(db, task_id)
 
     changed = _changes(task, patch)
-    if not changed:
+    if not changed and not block_requested:
         return
-    _authorize(actor, ctx.project, task, changed)
+    await _persist_patch(
+        db,
+        actor,
+        ctx.project,
+        task,
+        patch,
+        changed,
+        status=status,
+        recipient_error=recipient_error,
+    )
+
+
+async def _persist_patch(
+    db: AsyncSession,
+    actor: Actor,
+    project: ProjectFacts,
+    task: Task,
+    patch: TaskPatch,
+    changed: dict[str, Any],
+    *,
+    status: TaskStatus | None,
+    recipient_error: Unprocessable | None,
+) -> None:
+    if changed:
+        _authorize(actor, project, task, changed)
     if recipient_error is not None and "assignee_id" in changed:
         raise recipient_error
-    before = {name: getattr(task, name) for name in changed}  # снимок для ленты
+    block_action = _apply_block_patch(actor, project, task, patch)
+    if "status" in changed and _status(changed["status"]) == TaskStatus.DONE:
+        await dod_mod.assert_can_close(db, task)
+    before = {name: getattr(task, name) for name in changed}
     if "status" in changed:
         assert status is not None
         if task.parent_id is None:
@@ -390,13 +446,15 @@ async def update_task(db: AsyncSession, actor: Actor, task_id: UUID, patch: Task
             )
         else:
             task.status = status.value
-    for name in (*_FULL_EDIT_FIELDS, "assignee_id"):
+    for name in (*_FULL_EDIT_FIELDS, "assignee_id", "human_close_only"):
         if name in changed:
             value = changed[name]
             setattr(task, name, TaskPriority(value).value if name == "priority" else value)
     await db.flush()
     await _record_update(db, actor, task, before, changed)
-    await _notify_update(db, actor, ctx.project, task, before, changed)
+    await _notify_update(db, actor, project, task, before, changed)
+    if block_action is not None:
+        await dod_mod.record_block_event(db, actor, task, block_action)
 
 
 async def _notify_update(
@@ -550,6 +608,8 @@ async def move(
         raise _invalid(positions.SUBTASK_NOT_ON_BOARD)
     target = _status(status)
     task = await _load_task(db, task_id)
+    if target == TaskStatus.DONE:
+        await dod_mod.assert_can_close(db, task)
     # статус «до» — по строке под блокировками колонок (перечитывается), а не по снимку без
     # блокировки: параллельный перенос не исказит переход для уведомлений (ревью 012, п. 3)
     await positions.lock_task_columns(db, task, target)

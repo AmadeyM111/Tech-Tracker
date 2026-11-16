@@ -159,6 +159,8 @@ export function card(id: string, title: string, status: Status, position: number
     subtask_count: 0,
     subtask_done: 0,
     position,
+    hot: false,
+    blocked: false,
     ...over,
   };
 }

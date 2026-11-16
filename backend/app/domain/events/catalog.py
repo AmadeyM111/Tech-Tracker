@@ -57,6 +57,9 @@ class EventAction(StrEnum):
     TASK_RESTORED = "task.restored"
     TASK_UPDATED = "task.updated"
     TASK_UNASSIGNED_MEMBER_REMOVED = "task.unassigned_member_removed"
+    TASK_DOD_CHECKED = "task.dod_checked"
+    TASK_BLOCKED = "task.blocked"
+    TASK_UNBLOCKED = "task.unblocked"
     COMMENT_CREATED = "comment.created"
     COMMENT_DELETED = "comment.deleted"
     ATTACHMENT_CREATED = "attachment.created"
@@ -141,6 +144,9 @@ EVENT_CATALOG: Final[Mapping[EventAction, EventSpec]] = {
         fields=frozenset({"assignee_id"}),
         value_fields=frozenset({"assignee_id"}),
     ),
+    EventAction.TASK_DOD_CHECKED: _feed(EntityType.TASK),
+    EventAction.TASK_BLOCKED: _feed(EntityType.TASK),
+    EventAction.TASK_UNBLOCKED: _feed(EntityType.TASK),
     EventAction.COMMENT_CREATED: _feed(EntityType.COMMENT),
     EventAction.COMMENT_DELETED: _feed(EntityType.COMMENT),
     EventAction.ATTACHMENT_CREATED: _feed(EntityType.ATTACHMENT),

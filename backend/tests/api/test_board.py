@@ -35,6 +35,7 @@ CARD_FIELDS = {
     "subtask_done",
     "progress",
     "hot",  # «Горит» — тот же критерий, что на «Сводке» (spec 008 FR-8)
+    "blocked",  # спека 033, отдельно от hot
 }
 
 

@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.mcp.registry import ToolSpec
 from app.api.mcp.tools.base import make_tool
 from app.api.v1.schemas.tasks import (
+    DodCriterionPatch,
     TaskCreate,
     TaskDetail,
     TaskListItem,
@@ -25,6 +26,7 @@ from app.api.v1.schemas.tasks import (
 from app.api.v1.tasks import create_data, patch_data
 from app.core.pagination import Page, PageParams
 from app.domain.access.roles import Actor, Capability
+from app.domain.tasks import dod as dod_mod
 from app.domain.tasks import queries, service
 
 
@@ -52,6 +54,11 @@ class UpdateTaskArgs(TaskUpdate):
     task_id: UUID
 
 
+class CheckDodArgs(DodCriterionPatch):
+    task_id: UUID
+    criterion_id: UUID
+
+
 def _page(items: list[queries.TaskListItem], has_next: bool, params: PageParams) -> dict[str, Any]:
     page = Page[TaskListItem](
         items=[TaskListItem.model_validate(item) for item in items],
@@ -77,7 +84,13 @@ async def _list_project(
     db: AsyncSession, actor: Actor, args: ListProjectTasksArgs
 ) -> dict[str, Any]:
     items, has_next = await queries.list_project_tasks(
-        db, actor, args.project_id, args, assignee_id=args.assignee_id, status=args.status
+        db,
+        actor,
+        args.project_id,
+        args,
+        assignee_id=args.assignee_id,
+        status=args.status,
+        blocked=args.blocked,
     )
     return _page(items, has_next, args)
 
@@ -101,6 +114,11 @@ async def _update(db: AsyncSession, actor: Actor, args: UpdateTaskArgs) -> dict[
     return await _detail(db, actor, args.task_id)
 
 
+async def _check_dod(db: AsyncSession, actor: Actor, args: CheckDodArgs) -> dict[str, Any]:
+    await dod_mod.check_criterion(db, actor, args.task_id, args.criterion_id, checked=args.checked)
+    return await _detail(db, actor, args.task_id)
+
+
 BA = Capability.BUSINESS_ACCESS
 
 
@@ -115,7 +133,7 @@ def task_tools() -> list[ToolSpec]:
         ),
         make_tool(
             "list_project_tasks",
-            "Задачи и подзадачи проекта; фильтры по исполнителю и статусу.",
+            "Задачи и подзадачи проекта; фильтры по исполнителю, статусу и блокеру.",
             ListProjectTasksArgs,
             BA,
             _list_project,
@@ -139,10 +157,18 @@ def task_tools() -> list[ToolSpec]:
         ),
         make_tool(
             "update_task",
-            "Изменить поля задачи; передавайте только меняемые поля.",
+            "Изменить поля задачи; только меняемые поля. Блокер: blocked и blocked_reason.",
             UpdateTaskArgs,
             BA,
             _update,
+            write=True,
+        ),
+        make_tool(
+            "check_dod_criterion",
+            "Отметить или снять отметку критерия готовности. Не закрывает задачу.",
+            CheckDodArgs,
+            BA,
+            _check_dod,
             write=True,
         ),
     ]

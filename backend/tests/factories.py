@@ -344,6 +344,8 @@ async def make_task(
         "assignee_id": assignee_id,
         "position": pos,
         "created_by": created_by,
+        "blocked": False,
+        "human_close_only": True,
         "created_at": now,
         "updated_at": now,
         "deleted_at": None,

@@ -7,16 +7,19 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     Uuid,
@@ -48,6 +51,16 @@ class Task(UUIDPkMixin, TimestampMixin, WorkspaceMixin, SoftDeleteMixin, Base):
         CheckConstraint("status IN ('todo','in_progress','review','done')", name="status_valid"),
         CheckConstraint("priority IN ('low','medium','high')", name="priority_valid"),
         CheckConstraint("(parent_id IS NULL) = (position IS NOT NULL)", name="position_top_level"),
+        CheckConstraint(
+            "blocked_reason IS NULL OR char_length(blocked_reason) BETWEEN 1 AND 500",
+            name="blocked_reason_length",
+        ),
+        CheckConstraint(
+            "(blocked = false AND blocked_reason IS NULL AND blocked_by IS NULL"
+            " AND blocked_at IS NULL) OR (blocked = true AND blocked_reason IS NOT NULL"
+            " AND blocked_by IS NOT NULL AND blocked_at IS NOT NULL)",
+            name="blocked_fields",
+        ),
     )
 
     project_id: Mapped[UUID] = mapped_column(
@@ -72,6 +85,51 @@ class Task(UUIDPkMixin, TimestampMixin, WorkspaceMixin, SoftDeleteMixin, Base):
         nullable=True,
     )
     position: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created_by: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("app_user.id", ondelete="RESTRICT", deferrable=True, initially="IMMEDIATE"),
+        nullable=False,
+    )
+    blocked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    blocked_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    blocked_by: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("app_user.id", ondelete="RESTRICT", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
+    blocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    human_close_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class TaskDodCriterion(UUIDPkMixin, TimestampMixin, WorkspaceMixin, Base):
+    """Критерий готовности задачи (спека 033, CD-01)."""
+
+    __tablename__ = "task_dod_criterion"
+    __table_args__ = (
+        CheckConstraint("char_length(body) BETWEEN 1 AND 500", name="body_length"),
+        CheckConstraint(
+            "(checked = false AND checked_by IS NULL AND checked_at IS NULL) OR "
+            "(checked = true AND checked_by IS NOT NULL AND checked_at IS NOT NULL)",
+            name="checked_fields",
+        ),
+        Index("ix_task_dod_criterion_task_id_position", "task_id", "position"),
+    )
+
+    task_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("task.id", ondelete="CASCADE", deferrable=True, initially="IMMEDIATE"),
+        nullable=False,
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    required: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    checked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    checked_by: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("app_user.id", ondelete="RESTRICT", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
     created_by: Mapped[UUID] = mapped_column(
         Uuid,
         ForeignKey("app_user.id", ondelete="RESTRICT", deferrable=True, initially="IMMEDIATE"),

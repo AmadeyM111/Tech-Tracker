@@ -40,6 +40,8 @@ class BoardCard(BaseModel):
     progress: int | None
     # «Горит» (spec 008 FR-8): высокий приоритет, срок сегодня или раньше, задача не завершена
     hot: bool
+    # Блокер/инцидент (спека 033); не путать с ``hot``
+    blocked: bool
 
 
 class BoardColumn(BaseModel):

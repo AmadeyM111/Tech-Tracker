@@ -53,6 +53,8 @@ TS_N = ("timestamp with time zone", None, True)
 UUID_ = ("uuid", None, False)
 UUID_N = ("uuid", None, True)
 TEXT = ("text", None, False)
+TEXT_N = ("text", None, True)
+BOOL = ("boolean", None, False)
 V255 = ("character varying", 255, False)
 
 EXPECTED_COLUMNS: dict[str, dict[str, tuple[str, int | None, bool]]] = {
@@ -89,6 +91,11 @@ EXPECTED_COLUMNS: dict[str, dict[str, tuple[str, int | None, bool]]] = {
         "assignee_id": UUID_N,
         "position": ("bigint", None, True),
         "created_by": UUID_,
+        "blocked": BOOL,
+        "blocked_reason": TEXT_N,
+        "blocked_by": UUID_N,
+        "blocked_at": TS_N,
+        "human_close_only": BOOL,
         "created_at": TS,
         "updated_at": TS,
         "deleted_at": TS_N,
@@ -126,6 +133,7 @@ EXPECTED_FK = [
     ("task", "parent_id", "task", "c"),
     ("task", "assignee_id", "app_user", "r"),
     ("task", "created_by", "app_user", "r"),
+    ("task", "blocked_by", "app_user", "r"),
     ("comment", "task_id", "task", "c"),
     ("comment", "created_by", "app_user", "r"),
 ]

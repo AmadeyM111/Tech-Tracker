@@ -102,6 +102,10 @@ class ErrorCode(StrEnum):
     # [029]
     last_login_method = "last_login_method"
     password_already_set = "password_already_set"
+    # [033]
+    dod_open = "dod_open"
+    task_blocked = "task_blocked"
+    task_already_done = "task_already_done"
 
 
 class AppError(Exception):
@@ -137,6 +141,13 @@ class Forbidden(AppError):
     status_code = 403
     code = "forbidden"
     default_detail = "Недостаточно прав"
+
+
+class HumanCloseOnly(Forbidden):
+    """MCP не ставит ``done`` при флаге «закрывает только человек» (спека 033 FR-4)."""
+
+    code = "human_close_only"
+    default_detail = "Закрыть задачу может только человек"
 
 
 class PasswordChangeRequired(Forbidden):

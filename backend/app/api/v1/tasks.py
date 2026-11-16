@@ -16,6 +16,8 @@ from fastapi import APIRouter, Depends, Query, Response
 from app.api.deps import get_active_actor, require_capability
 from app.api.openapi import error_responses
 from app.api.v1.schemas.tasks import (
+    DodCriterionCreate,
+    DodCriterionPatch,
     TaskCreate,
     TaskDetail,
     TaskListItem,
@@ -25,6 +27,7 @@ from app.api.v1.schemas.tasks import (
 from app.core.db import DbSession
 from app.core.pagination import Page, PageParams
 from app.domain.access.roles import Actor, Capability
+from app.domain.tasks import dod as dod_mod
 from app.domain.tasks import queries, service
 
 router = APIRouter(
@@ -72,6 +75,9 @@ def patch_data(body: TaskUpdate) -> service.TaskPatch:
         due_date=pick("due_date", body.due_date),
         priority=pick("priority", body.priority),
         status=pick("status", body.status),
+        blocked=pick("blocked", body.blocked),
+        blocked_reason=pick("blocked_reason", body.blocked_reason),
+        human_close_only=pick("human_close_only", body.human_close_only),
     )
 
 
@@ -85,7 +91,13 @@ async def list_project_tasks(
 ) -> Page[TaskListItem]:
     """Задачи и подзадачи проекта, новые сверху; фильтры исполнителя и статуса — через «И»."""
     items, has_next = await queries.list_project_tasks(
-        db, actor, project_id, query, assignee_id=query.assignee_id, status=query.status
+        db,
+        actor,
+        project_id,
+        query,
+        assignee_id=query.assignee_id,
+        status=query.status,
+        blocked=query.blocked,
     )
     return _page(items, has_next, query)
 
@@ -154,3 +166,47 @@ async def create_subtask(
     """Создаёт подзадачу; родитель — задача верхнего уровня (FR-21)."""
     sub_id = await service.create_subtask(db, actor, task_id, create_data(body))
     return TaskDetail.model_validate(await queries.get_task(db, actor, sub_id))
+
+
+@router.post(
+    "/tasks/{task_id}/dod-criteria",
+    status_code=201,
+    response_model=TaskDetail,
+    responses=error_responses(400, 404, 422),
+)
+async def add_dod_criterion(
+    task_id: UUID, body: DodCriterionCreate, db: DbSession, actor: CurrentActor
+) -> TaskDetail:
+    """Добавляет критерий готовности в конец списка."""
+    await dod_mod.add_criterion(db, actor, task_id, body=body.body, required=body.required)
+    return TaskDetail.model_validate(await queries.get_task(db, actor, task_id))
+
+
+@router.patch(
+    "/tasks/{task_id}/dod-criteria/{criterion_id}",
+    response_model=TaskDetail,
+    responses=error_responses(400, 404, 422),
+)
+async def patch_dod_criterion(
+    task_id: UUID,
+    criterion_id: UUID,
+    body: DodCriterionPatch,
+    db: DbSession,
+    actor: CurrentActor,
+) -> TaskDetail:
+    """Отмечает или снимает отметку критерия готовности."""
+    await dod_mod.check_criterion(db, actor, task_id, criterion_id, checked=body.checked)
+    return TaskDetail.model_validate(await queries.get_task(db, actor, task_id))
+
+
+@router.delete(
+    "/tasks/{task_id}/dod-criteria/{criterion_id}",
+    status_code=204,
+    response_class=Response,
+    responses=error_responses(404, 422),
+)
+async def delete_dod_criterion(
+    task_id: UUID, criterion_id: UUID, db: DbSession, actor: CurrentActor
+) -> Response:
+    await dod_mod.delete_criterion(db, actor, task_id, criterion_id)
+    return Response(status_code=204)

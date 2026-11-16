@@ -92,8 +92,20 @@ DETAIL_FIELDS = {
     "created_at",
     "updated_at",
     "permissions",
+    "blocked",
+    "blocked_reason",
+    "blocked_by",
+    "blocked_at",
+    "dod",
 }
-PERM_FIELDS = {"edit", "change_status", "change_assignee", "delete", "create_subtask"}
+PERM_FIELDS = {
+    "edit",
+    "change_status",
+    "change_assignee",
+    "delete",
+    "create_subtask",
+    "check_dod",
+}
 BRIEF_FIELDS = {"id", "title", "status", "priority", "due_date", "assignee"}
 LIST_FIELDS = {
     "id",
@@ -105,6 +117,7 @@ LIST_FIELDS = {
     "due_date",
     "assignee",
     "created_at",
+    "blocked",
 }
 
 
