@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final
 from uuid import UUID
 
-from sqlalchemy import exists, func, or_, select
+from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.clock import today_msk, utcnow
@@ -77,7 +77,7 @@ def _clean_url(url: str | None) -> str | None:
     return value
 
 
-def _is_member_of(user_id: UUID):
+def _is_member_of(user_id: UUID) -> ColumnElement[bool]:
     return exists().where(ProjectMember.project_id == Project.id, ProjectMember.user_id == user_id)
 
 
