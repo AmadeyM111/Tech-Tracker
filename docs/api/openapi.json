@@ -590,6 +590,17 @@
               }
             ]
           },
+          "assignee_client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Client Name"
+          },
           "due_date": {
             "anyOf": [
               {
@@ -610,6 +621,17 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "last_client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Client Name"
           },
           "position": {
             "title": "Position",
@@ -656,7 +678,9 @@
           "subtask_count",
           "subtask_done",
           "progress",
-          "hot"
+          "hot",
+          "last_client_name",
+          "assignee_client_name"
         ],
         "title": "BoardCard",
         "type": "object"
@@ -2818,6 +2842,17 @@
               }
             ]
           },
+          "assignee_client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Client Name"
+          },
           "author": {
             "$ref": "#/components/schemas/UserRef"
           },
@@ -2846,6 +2881,17 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "last_client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Client Name"
           },
           "parent_id": {
             "anyOf": [
@@ -2926,7 +2972,9 @@
           "progress",
           "created_at",
           "updated_at",
-          "permissions"
+          "permissions",
+          "last_client_name",
+          "assignee_client_name"
         ],
         "title": "TaskDetail",
         "type": "object"
@@ -2942,6 +2990,17 @@
                 "type": "null"
               }
             ]
+          },
+          "assignee_client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Client Name"
           },
           "created_at": {
             "format": "date-time",
@@ -2964,6 +3023,17 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "last_client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Client Name"
           },
           "parent_id": {
             "anyOf": [
@@ -3000,7 +3070,9 @@
           "priority",
           "due_date",
           "assignee",
-          "created_at"
+          "created_at",
+          "last_client_name",
+          "assignee_client_name"
         ],
         "title": "TaskListItem",
         "type": "object"

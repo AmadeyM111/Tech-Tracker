@@ -1647,6 +1647,8 @@ export interface components {
         /** BoardCard */
         BoardCard: {
             assignee: components["schemas"]["UserRef"] | null;
+            /** Assignee Client Name */
+            assignee_client_name: string | null;
             /** Due Date */
             due_date: string | null;
             /** Hot */
@@ -1656,6 +1658,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Last Client Name */
+            last_client_name: string | null;
             /** Position */
             position: number;
             priority: components["schemas"]["TaskPriority"];
@@ -2556,6 +2560,8 @@ export interface components {
         /** TaskDetail */
         TaskDetail: {
             assignee: components["schemas"]["UserRef"] | null;
+            /** Assignee Client Name */
+            assignee_client_name: string | null;
             author: components["schemas"]["UserRef"];
             /**
              * Created At
@@ -2571,6 +2577,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Last Client Name */
+            last_client_name: string | null;
             /** Parent Id */
             parent_id: string | null;
             permissions: components["schemas"]["TaskPermissions"];
@@ -2594,6 +2602,8 @@ export interface components {
         /** TaskListItem */
         TaskListItem: {
             assignee: components["schemas"]["UserRef"] | null;
+            /** Assignee Client Name */
+            assignee_client_name: string | null;
             /**
              * Created At
              * Format: date-time
@@ -2606,6 +2616,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Last Client Name */
+            last_client_name: string | null;
             /** Parent Id */
             parent_id: string | null;
             priority: components["schemas"]["TaskPriority"];

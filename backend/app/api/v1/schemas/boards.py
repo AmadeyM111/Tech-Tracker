@@ -40,6 +40,8 @@ class BoardCard(BaseModel):
     progress: int | None
     # «Горит» (spec 008 FR-8): высокий приоритет, срок сегодня или раньше, задача не завершена
     hot: bool
+    last_client_name: str | None
+    assignee_client_name: str | None
 
 
 class BoardColumn(BaseModel):

@@ -22,7 +22,10 @@
 | 0026 | Внешние провайдеры входа и правила привязки (спека 029) | `docs/adr/0026-external-login-and-linking.md` (ветка `docs/login-simplify-spec`) | принято |
 | 0027 | Согласие на обработку ПДн (спека 021) | `docs/adr/0027-pdn-consent.md` (ветка `feat/021-pdn-consent`) | принято 2026-11-15 |
 | 0028 | MCP: 120 `tools/call` в минуту на токен и read-only (`gtrk_` + OAuth `mcp:read`) | `docs/adr/0028-mcp-rate-limit-readonly.md` | предложено |
-| 0029+ | ADR — с 0029 | — | свободно |
+| 0029 | DoD и блокер (спека 033, CD-01+CD-03) | `feat/cd-01-03-dod-blocker` | занят другой сессией |
+| 0030 | MCP inbox / stuck (спека 034, CD-02+CD-04) | `feat/cd-02-04-mcp-inbox` | занят другой сессией |
+| 0031 | Атрибуция агента по `client_name` без `is_agent` (спека 022 CD-05, 035 CD-06) | `docs/adr/0031-agent-attribution-client-name.md` | предложено |
+| 0032+ | ADR — с 0032 | — | свободно |
 
 ## Спеки
 | № | Тема | Где |
@@ -45,9 +48,12 @@
 | 029 | Упрощённый вход: email или логин, «Запомнить меня», magic link, Яндекс ID / VK ID / Google (DRAFT, ветка `docs/login-simplify-spec`) | `specs/029-login-simplify/` |
 | 020 | MCP AI Native | main |
 | 021 | Согласие на обработку ПДн (возобновлена владельцем 2026-11-15) | `specs/021-pdn-consent-form/` (ветка `feat/021-pdn-consent`) |
-| 022–023 | заняты (023 — удаление пользователей, черновик) | — |
+| 022 | агент как коллега: атрибуция MCP по `client_name` (CD-05; учётка — следующий срез) | `specs/022-agent-accounts/` (ветка `feat/cd-05-06-agent-entities`) |
+| 023 | удаление пользователей, черновик | занят |
 | 031 | метрики пилота | `specs/031-pilot-metrics/` |
 | 032 | MCP: лимит 120/мин и read-only scope | `specs/032-mcp-rate-limit-readonly/` |
+| 034 | MCP inbox / stuck (CD-02+CD-04) | `feat/cd-02-04-mcp-inbox` |
+| 035 | черновик сущностей `propose_entities` (CD-06) | `specs/035-entity-draft/` (ветка `feat/cd-05-06-agent-entities`) |
 
 ## Миграции alembic
 | № | Тема | Где |
