@@ -6,6 +6,7 @@ import { usePolledQuery } from "../../shared/api/polling";
 import { errorMessage, t } from "../../shared/i18n";
 import { ErrorAlert } from "../../shared/ui/ErrorAlert";
 import { Pagination } from "../../shared/ui/Pagination";
+import { AgentMark } from "../../shared/ui/AgentMark";
 import { personName, type PersonRef } from "../../shared/ui/person";
 import type { ProjectMember } from "../projects/api";
 import {
@@ -58,12 +59,14 @@ function TaskCards({ items, withProject }: { items: TaskListItem[]; withProject:
           <a className="c-title" href={`/tasks/${task.id}`}>
             {task.title}
           </a>
+          <AgentMark name={task.last_client_name} />
           <span className="c-meta">
             {withProject ? `${task.project.name} · ` : ""}
             {t(`tasks.status.${task.status}`)} · {t(`tasks.priority.${task.priority}`)}
           </span>
           <span className={dueOverdue(task) ? "c-meta ui-due-overdue" : "c-meta"}>
-            {assigneeText(task)} · {dueText(task)}
+            {assigneeText(task)}
+            <AgentMark name={task.assignee_client_name} /> · {dueText(task)}
           </span>
         </li>
       ))}
@@ -100,6 +103,7 @@ function TaskTableBody({ items, withProject }: { items: TaskListItem[]; withProj
           <tr key={task.id} data-task-id={task.id}>
             <td data-field="title">
               <a href={`/tasks/${task.id}`}>{task.title}</a>
+              <AgentMark name={task.last_client_name} />
             </td>
             {withProject ? (
               <td data-field="project">
@@ -108,7 +112,10 @@ function TaskTableBody({ items, withProject }: { items: TaskListItem[]; withProj
             ) : null}
             <td data-field="status">{t(`tasks.status.${task.status}`)}</td>
             <td data-field="priority">{t(`tasks.priority.${task.priority}`)}</td>
-            <td data-field="assignee">{assigneeText(task)}</td>
+            <td data-field="assignee">
+              {assigneeText(task)}
+              <AgentMark name={task.assignee_client_name} />
+            </td>
             <td data-field="due_date" className={dueOverdue(task) ? "ui-due-overdue" : undefined}>
               {dueText(task)}
             </td>

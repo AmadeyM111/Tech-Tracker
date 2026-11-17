@@ -29,6 +29,7 @@ from app.domain.access.policy import (
 from app.domain.access.roles import Actor, Capability
 from app.domain.projects.models import Project, ProjectMember
 from app.domain.projects.queries import load_project_facts
+from app.domain.tasks.attribution import attr_of, load_task_attribution
 from app.domain.tasks.context import load_task_context
 from app.domain.tasks.models import Task, TaskPriority, TaskStatus
 from app.domain.tasks.progress import progress
@@ -83,6 +84,8 @@ class TaskView:
     created_at: datetime
     updated_at: datetime
     permissions: TaskPermissions
+    last_client_name: str | None
+    assignee_client_name: str | None
 
 
 @dataclass(frozen=True)
@@ -96,6 +99,8 @@ class TaskListItem:
     due_date: date | None
     assignee: UserRef | None
     created_at: datetime
+    last_client_name: str | None
+    assignee_client_name: str | None
 
 
 def _author(refs: dict[UUID, UserRef], user_id: UUID) -> UserRef:
@@ -152,6 +157,10 @@ async def get_task(db: AsyncSession, actor: Actor, task_id: UUID) -> TaskView:
     refs = await user_refs(db, actor.workspace_id, [u for u in user_ids if u is not None])
     done = sum(1 for s in subs if s.status == TaskStatus.DONE)
     in_work = sum(1 for s in subs if s.status in (TaskStatus.IN_PROGRESS, TaskStatus.REVIEW))
+    attr = attr_of(
+        await load_task_attribution(db, actor.workspace_id, [task_id]),
+        task_id,
+    )
     return TaskView(
         id=task.id,
         project=TaskProjectRef(id=task.project_id, name=row.project_name),
@@ -178,6 +187,8 @@ async def get_task(db: AsyncSession, actor: Actor, task_id: UUID) -> TaskView:
         progress=progress(done=done, in_work=in_work, total=len(subs)),
         created_at=task.created_at,
         updated_at=task.updated_at,
+        last_client_name=attr.last_client_name,
+        assignee_client_name=attr.assignee_client_name,
         permissions=TaskPermissions(
             edit=can_edit_task_fully(actor, ctx.project, facts),
             change_status=can_change_task_status(actor, ctx.project, facts),
@@ -205,6 +216,7 @@ async def _list_items(db: AsyncSession, actor: Actor, tasks: Sequence[Task]) -> 
     refs = await user_refs(
         db, actor.workspace_id, [t.assignee_id for t in tasks if t.assignee_id is not None]
     )
+    attrs = await load_task_attribution(db, actor.workspace_id, [t.id for t in tasks])
     return [
         TaskListItem(
             id=t.id,
@@ -216,6 +228,8 @@ async def _list_items(db: AsyncSession, actor: Actor, tasks: Sequence[Task]) -> 
             due_date=t.due_date,
             assignee=_ref(refs, t.assignee_id),
             created_at=t.created_at,
+            last_client_name=attr_of(attrs, t.id).last_client_name,
+            assignee_client_name=attr_of(attrs, t.id).assignee_client_name,
         )
         for t in tasks
     ]

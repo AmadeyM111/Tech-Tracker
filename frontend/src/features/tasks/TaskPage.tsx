@@ -9,6 +9,7 @@ import { ApiError } from "../../shared/api/client";
 import { errorMessage, t } from "../../shared/i18n";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import { ErrorAlert, FieldError, useAlertState } from "../../shared/ui/ErrorAlert";
+import { AgentMark } from "../../shared/ui/AgentMark";
 import { personName } from "../../shared/ui/person";
 import { UserPicker } from "../../shared/ui/UserPicker";
 import { Attachments } from "../attachments/Attachments";
@@ -268,6 +269,7 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
           task.title
         )}
       </h1>
+      <AgentMark name={task.last_client_name} />
       <ErrorAlert message={alert.message ?? pollError ?? membersError} seq={alert.seq} />
     </>
   );
@@ -326,6 +328,7 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
               }}
             >
               <span className="ui-current">{task.assignee === null ? t("tasks.assignee_none") : personName(task.assignee)}</span>
+              <AgentMark name={task.assignee_client_name} />
               <UserPicker
                 key={pickerKey}
                 label={t("tasks.col_assignee")}
@@ -344,7 +347,10 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
           ) : task.assignee === null ? (
             t("tasks.assignee_none")
           ) : (
-            personName(task.assignee)
+            <>
+              {personName(task.assignee)}
+              <AgentMark name={task.assignee_client_name} />
+            </>
           )}
         </dd>
 

@@ -91,6 +91,8 @@ export function taskItem(id: string, title: string, over: Record<string, unknown
     due_date: null,
     assignee: null,
     created_at: "2026-10-05T08:00:00Z",
+    last_client_name: null,
+    assignee_client_name: null,
     ...over,
   };
 }

@@ -35,6 +35,8 @@ CARD_FIELDS = {
     "subtask_done",
     "progress",
     "hot",  # «Горит» — тот же критерий, что на «Сводке» (spec 008 FR-8)
+    "last_client_name",
+    "assignee_client_name",
 }
 
 

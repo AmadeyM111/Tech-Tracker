@@ -7,10 +7,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.mcp.registry import ToolSpec
@@ -23,9 +23,13 @@ from app.api.v1.schemas.tasks import (
     TaskUpdate,
 )
 from app.api.v1.tasks import create_data, patch_data
+from app.core.clock import today_msk
+from app.core.errors import ErrorCode, Unprocessable
 from app.core.pagination import Page, PageParams
 from app.domain.access.roles import Actor, Capability
+from app.domain.comments import service as comments
 from app.domain.tasks import queries, service
+from app.domain.tasks.entity_draft import EntityDraft, parse_entities
 
 
 class TaskIdArgs(BaseModel):
@@ -50,6 +54,25 @@ class CreateSubtaskArgs(TaskCreate):
 
 class UpdateTaskArgs(TaskUpdate):
     task_id: UUID
+
+
+class ProposeEntitiesArgs(BaseModel):
+    text: str = Field(min_length=1, max_length=20_000)
+    commit: bool = False
+    project_id: UUID | None = None
+
+
+class EntityDraftOut(BaseModel):
+    type: Literal["task", "incident", "note"]
+    title: str
+    project_id: UUID | None = None
+    existing_task_id: UUID | None = None
+
+
+class CommittedEntity(BaseModel):
+    type: Literal["task", "incident", "note"]
+    task_id: UUID | None = None
+    comment_id: UUID | None = None
 
 
 def _page(items: list[queries.TaskListItem], has_next: bool, params: PageParams) -> dict[str, Any]:
@@ -101,6 +124,60 @@ async def _update(db: AsyncSession, actor: Actor, args: UpdateTaskArgs) -> dict[
     return await _detail(db, actor, args.task_id)
 
 
+def _dump_draft(item: EntityDraft) -> dict[str, Any]:
+    return EntityDraftOut(
+        type=item.type,
+        title=item.title,
+        project_id=item.project_id,
+        existing_task_id=item.existing_task_id,
+    ).model_dump(mode="json")
+
+
+def _project_of(item: EntityDraft, default: UUID | None) -> UUID:
+    pid = item.project_id or default
+    if pid is None:
+        raise Unprocessable("Нужен project_id", code=ErrorCode.entity_parse_error)
+    return pid
+
+
+async def _commit_one(
+    db: AsyncSession, actor: Actor, item: EntityDraft, default_project: UUID | None
+) -> dict[str, Any]:
+    if item.type == "note" and item.existing_task_id is not None:
+        view = await comments.create_comment(db, actor, item.existing_task_id, item.title)
+        return CommittedEntity(
+            type="note", task_id=item.existing_task_id, comment_id=view.id
+        ).model_dump(mode="json")
+    data = service.TaskCreateData(
+        title=item.title,
+        description=item.title,
+        due_date=today_msk(),
+    )
+    task_id = await service.create_task(db, actor, _project_of(item, default_project), data)
+    comment_id = None
+    if item.type == "incident":
+        comment = await comments.create_comment(db, actor, task_id, "блокер")
+        comment_id = comment.id
+    return CommittedEntity(type=item.type, task_id=task_id, comment_id=comment_id).model_dump(
+        mode="json"
+    )
+
+
+async def _propose(
+    db: AsyncSession, actor: Actor, args: ProposeEntitiesArgs
+) -> dict[str, Any]:
+    drafts = parse_entities(args.text)
+    dumped = [_dump_draft(item) for item in drafts]
+    if not args.commit:
+        return {"drafts": dumped, "committed": []}
+    for item in drafts:
+        if item.type == "note" and item.existing_task_id is not None:
+            continue
+        _project_of(item, args.project_id)
+    committed = [await _commit_one(db, actor, item, args.project_id) for item in drafts]
+    return {"drafts": dumped, "committed": committed}
+
+
 BA = Capability.BUSINESS_ACCESS
 
 
@@ -143,6 +220,14 @@ def task_tools() -> list[ToolSpec]:
             UpdateTaskArgs,
             BA,
             _update,
+            write=True,
+        ),
+        make_tool(
+            "propose_entities",
+            "Черновик сущностей из текста. Без commit записей нет.",
+            ProposeEntitiesArgs,
+            BA,
+            _propose,
             write=True,
         ),
     ]
