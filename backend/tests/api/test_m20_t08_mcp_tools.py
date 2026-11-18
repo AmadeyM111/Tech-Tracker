@@ -90,9 +90,12 @@ async def test_registry_lists_tools_for_business_roles(api_env: ApiEnv) -> None:
             "list_comments",
             "list_my_tasks",
             "list_project_tasks",
+            "get_knowledge",
+            "list_knowledge",
             "list_projects",
             "propose_entities",
             "update_task",
+            "upsert_knowledge",
         ]
     )
 

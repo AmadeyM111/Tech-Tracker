@@ -20,6 +20,7 @@ WRITE_TOOLS = frozenset(
         "create_project",
         "add_comment",
         "propose_entities",
+        "upsert_knowledge",
     }
 )
 

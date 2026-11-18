@@ -5,6 +5,7 @@
 """
 
 from app.domain.attachments import models as attachments_models  # noqa: F401
+from app.domain.knowledge import models as knowledge_models  # noqa: F401
 from app.domain.auth import external_models  # noqa: F401
 from app.domain.auth import models as auth_models  # noqa: F401
 from app.domain.comments import models as comments_models  # noqa: F401

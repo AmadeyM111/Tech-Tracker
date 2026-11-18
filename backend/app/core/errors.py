@@ -104,6 +104,8 @@ class ErrorCode(StrEnum):
     password_already_set = "password_already_set"
     # [035]
     entity_parse_error = "entity_parse_error"
+    # [037]
+    knowledge_unstructured = "knowledge_unstructured"
 
 
 class AppError(Exception):

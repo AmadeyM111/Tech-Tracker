@@ -36,6 +36,7 @@ import sqlalchemy as sa
 import app.domain.attachments.models  # noqa: F401
 import app.domain.auth.models  # noqa: F401
 import app.domain.comments.models  # noqa: F401
+import app.domain.knowledge.models  # noqa: F401
 import app.domain.events.models  # noqa: F401
 import app.domain.projects.models  # noqa: F401
 import app.domain.tasks.models  # noqa: F401
