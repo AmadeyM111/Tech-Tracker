@@ -92,6 +92,8 @@ DETAIL_FIELDS = {
     "created_at",
     "updated_at",
     "permissions",
+    "last_client_name",
+    "assignee_client_name",
 }
 PERM_FIELDS = {"edit", "change_status", "change_assignee", "delete", "create_subtask"}
 BRIEF_FIELDS = {"id", "title", "status", "priority", "due_date", "assignee"}
@@ -105,6 +107,8 @@ LIST_FIELDS = {
     "due_date",
     "assignee",
     "created_at",
+    "last_client_name",
+    "assignee_client_name",
 }
 
 

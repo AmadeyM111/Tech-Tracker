@@ -1152,11 +1152,26 @@ async def test_t77_response_schemas_match_plan_11_4_and_nulls_only_where_allowed
     assert "description" not in item["properties"]  # в списках описания нет
     perms = _resolve(spec, detail["properties"]["permissions"])
     assert set(perms["properties"]) == PERM_FIELDS
-    nullable_detail = {"parent_id", "due_date", "assignee", "position", "progress"}
+    nullable_detail = {
+        "parent_id",
+        "due_date",
+        "assignee",
+        "position",
+        "progress",
+        "last_client_name",
+        "assignee_client_name",
+    }
     for name, prop in detail["properties"].items():
         assert _is_nullable(spec, prop) == (name in nullable_detail), name
+    nullable_item = {
+        "parent_id",
+        "due_date",
+        "assignee",
+        "last_client_name",
+        "assignee_client_name",
+    }
     for name, prop in item["properties"].items():
-        assert _is_nullable(spec, prop) == (name in {"parent_id", "due_date", "assignee"}), name
+        assert _is_nullable(spec, prop) == (name in nullable_item), name
     for name, prop in brief["properties"].items():
         assert _is_nullable(spec, prop) == (name in {"due_date", "assignee"}), name
     assert any(n.startswith("Page_TaskListItem") for n in schemas)

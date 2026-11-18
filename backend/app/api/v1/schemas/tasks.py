@@ -136,6 +136,8 @@ class TaskDetail(BaseModel):
     created_at: datetime
     updated_at: datetime
     permissions: TaskPermissions
+    last_client_name: str | None
+    assignee_client_name: str | None
 
 
 class TaskListItem(BaseModel):
@@ -150,3 +152,5 @@ class TaskListItem(BaseModel):
     due_date: date | None
     assignee: UserRef | None
     created_at: datetime
+    last_client_name: str | None
+    assignee_client_name: str | None

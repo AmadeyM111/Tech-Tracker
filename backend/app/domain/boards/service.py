@@ -22,6 +22,7 @@ from app.domain.access.policy import can_read_project_content
 from app.domain.overview.due import is_hot
 from app.domain.projects.models import Project
 from app.domain.projects.queries import load_project_facts
+from app.domain.tasks.attribution import attr_of, load_task_attribution
 from app.domain.tasks.models import Task, TaskPriority, TaskStatus
 from app.domain.tasks.positions import COLUMN_ORDER
 from app.domain.tasks.progress import progress
@@ -48,6 +49,8 @@ class BoardCard:
     progress: int | None
     # «Горит» — тот же критерий, что на «Сводке» (overview.due.is_hot, FR-8 spec 008)
     hot: bool
+    last_client_name: str | None
+    assignee_client_name: str | None
 
 
 @dataclass(frozen=True)
@@ -127,6 +130,7 @@ async def get_board(db: AsyncSession, actor: Actor, project_id: UUID) -> BoardVi
     refs = await user_refs(
         db, actor.workspace_id, list({r.assignee_id for r in rows if r.assignee_id is not None})
     )
+    attrs = await load_task_attribution(db, actor.workspace_id, [r.id for r in rows])
     columns = {status: BoardColumn(status=status, tasks=[]) for status in TaskStatus}
     today = today_msk()
     for r in rows:
@@ -146,6 +150,8 @@ async def get_board(db: AsyncSession, actor: Actor, project_id: UUID) -> BoardVi
                 subtask_done=int(r.done),
                 progress=progress(done=int(r.done), in_work=int(r.in_work), total=int(r.total)),
                 hot=is_hot(r.priority, r.due_date, r.status, today),
+                last_client_name=attr_of(attrs, r.id).last_client_name,
+                assignee_client_name=attr_of(attrs, r.id).assignee_client_name,
             )
         )
     return BoardView(

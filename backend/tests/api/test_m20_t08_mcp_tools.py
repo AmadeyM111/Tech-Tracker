@@ -64,7 +64,7 @@ async def _task_count(env: ApiEnv, w: ApiWorld) -> int:
     return int(rows[0][0])
 
 
-async def test_registry_lists_ten_tools_for_business_roles(api_env: ApiEnv) -> None:
+async def test_registry_lists_tools_for_business_roles(api_env: ApiEnv) -> None:
     env = api_env
     w = await make_api_world(env)
     token = await _agent_token(env, w, "ba")
@@ -91,6 +91,7 @@ async def test_registry_lists_ten_tools_for_business_roles(api_env: ApiEnv) -> N
             "list_my_tasks",
             "list_project_tasks",
             "list_projects",
+            "propose_entities",
             "update_task",
         ]
     )

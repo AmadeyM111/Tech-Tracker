@@ -330,7 +330,7 @@
 | `in_audit` | boolean | нет | событие попадает в журнал аудита |
 | `changes` | jsonb | да | список `{field, old, new}` (с R1.1); в API аудита не отдаётся |
 | `details` | jsonb | да | только для `entity_type = user`: `role_from`, `role_to`, `rows` (025: число строк выгрузки CSV строкой); паролей и секретов нет |
-| `client_name` | text | да | имя токена агента, через который сделано действие (миграция 0009, ADR-0018); `NULL` — веб-интерфейс; `CHECK` `ck_domain_event_client_name_length`: `client_name IS NULL OR char_length(client_name) BETWEEN 1 AND 64` |
+| `client_name` | text | да | имя токена агента, через который сделано действие (миграция 0009, ADR-0018); `NULL` — веб-интерфейс; `CHECK` `ck_domain_event_client_name_length`: `client_name IS NULL OR char_length(client_name) BETWEEN 1 AND 64`. Спека 022 (CD-05): из этого поля (без колонки `is_agent`) считаются `last_client_name` и `assignee_client_name` карточки, списка и доски |
 
 #### Индексы
 
