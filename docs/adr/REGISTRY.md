@@ -54,6 +54,7 @@
 | 032 | MCP: лимит 120/мин и read-only scope | `specs/032-mcp-rate-limit-readonly/` |
 | 034 | MCP inbox / stuck (CD-02+CD-04) | `feat/cd-02-04-mcp-inbox` |
 | 035 | черновик сущностей `propose_entities` (CD-06) | `specs/035-entity-draft/` (ветка `feat/cd-05-06-agent-entities`) |
+| 038 | классификатор `routine` vs `research`, MCP `classify_task` (CD-10); ADR нет, колонка `task.mode` — спека 036 | `specs/038-classify-task/` (ветка `docs/038-classify-task`) |
 
 ## Миграции alembic
 | № | Тема | Где |
