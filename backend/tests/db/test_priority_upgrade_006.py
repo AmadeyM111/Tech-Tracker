@@ -155,7 +155,10 @@ async def _priorities(env: ApiEnv) -> dict[uuid.UUID, str]:
 async def _snapshot_without_priority(env: ApiEnv) -> list[str]:
     """Все остальные столбцы каждой строки ``task`` (включая ``updated_at``) текстом."""
     rows = await env.execute(
-        text("SELECT (to_jsonb(t) - 'priority')::text FROM task t ORDER BY id")
+        text(
+            "SELECT (to_jsonb(t) - 'priority' - 'blocked' - 'blocked_reason' - 'blocked_by'"
+            " - 'blocked_at' - 'human_close_only' - 'mode')::text FROM task t ORDER BY id"
+        )
     )
     assert rows is not None
     return [str(r[0]) for r in rows]

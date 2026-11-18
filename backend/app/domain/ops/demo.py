@@ -22,7 +22,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final
 from uuid import UUID, uuid4
 
+from sqlalchemy import column as sa_column
 from sqlalchemy import func, select, text
+from sqlalchemy import table as sa_table
 
 from app.core.clock import Clock, today_msk, use_clock
 from app.core.config import Settings
@@ -191,6 +193,9 @@ def _add_subtasks(
                     assignee_id=rng.choice(members),
                     position=None,
                     created_by=owners[parent.project_id],
+                    blocked=False,
+                    human_close_only=True,
+                    mode="routine",
                     **_stamp(base, number),
                 )
             )
@@ -263,6 +268,9 @@ def _build_content(
                     assignee_id=assignee_id,
                     position=STEP * counters[status],
                     created_by=author_id,
+                    blocked=False,
+                    human_close_only=True,
+                    mode="routine",
                     **_stamp(base, number),
                 )
             )
@@ -381,6 +389,25 @@ def _write_passwords(settings: Settings, path: Path, passwords: dict[str, str]) 
     )
 
 
+async def _insert_tasks_for_schema(session: AsyncSession, tasks: list[Task]) -> None:
+    """Вставка без колонок 0019, если их ещё нет в живой схеме (апгрейд со схемы 0005)."""
+    if not tasks:
+        return
+    live = {
+        row[0]
+        for row in await session.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = 'task'"
+            )
+        )
+    }
+    cols = [column for column in Task.__table__.columns if column.name in live]
+    light = sa_table("task", *[sa_column(column.name, column.type) for column in cols])
+    payload = [{column.name: getattr(task, column.name) for column in cols} for task in tasks]
+    await session.execute(light.insert(), payload)
+
+
 async def load_demo_data(
     sessionmaker: async_sessionmaker[AsyncSession],
     settings: Settings,
@@ -404,9 +431,9 @@ async def load_demo_data(
                 session.add_all(plan.projects)
                 await session.flush()
                 session.add_all(plan.project_members)
-                session.add_all(plan.tasks)
+                await _insert_tasks_for_schema(session, plan.tasks)
                 await session.flush()
-                session.add_all(plan.subtasks)
+                await _insert_tasks_for_schema(session, plan.subtasks)
                 session.add_all(plan.comments)
                 await session.flush()
                 report = DemoReport(

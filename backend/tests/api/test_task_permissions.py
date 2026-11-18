@@ -202,6 +202,7 @@ async def test_subtask_card_permissions_follow_the_same_rules(api_env: ApiEnv) -
         "change_assignee": False,
         "delete": True,
         "create_subtask": False,
+        "check_dod": True,
     }
     assert owner == {
         "edit": True,
@@ -209,6 +210,7 @@ async def test_subtask_card_permissions_follow_the_same_rules(api_env: ApiEnv) -
         "change_assignee": True,
         "delete": True,
         "create_subtask": False,
+        "check_dod": True,
     }
     assert other == {  # 002/AC-13: БА-участник не владелец; подзадач у подзадачи нет
         "edit": True,
@@ -216,6 +218,7 @@ async def test_subtask_card_permissions_follow_the_same_rules(api_env: ApiEnv) -
         "change_assignee": True,
         "delete": True,
         "create_subtask": False,
+        "check_dod": True,
     }
 
 

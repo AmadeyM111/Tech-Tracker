@@ -62,8 +62,10 @@ async def _snapshot(env: ApiEnv) -> dict[str, Any]:
         order = "t.project_id, t.user_id" if table == "project_member" else "t.id"
         # 006/PD-18: у task приоритет приводится по FR-10 (base -> medium), остальное - побайтно
         row_text = (
-            "(to_jsonb(t) || jsonb_build_object('priority', "
-            "CASE t.priority WHEN 'base' THEN 'medium' ELSE t.priority END))::text"
+            "((to_jsonb(t) || jsonb_build_object('priority', "
+            "CASE t.priority WHEN 'base' THEN 'medium' ELSE t.priority END))"
+            " - 'blocked' - 'blocked_reason' - 'blocked_by' - 'blocked_at'"
+            " - 'human_close_only' - 'mode')::text"
             if table == "task"
             else "t::text"
         )

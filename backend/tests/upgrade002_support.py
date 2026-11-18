@@ -442,9 +442,12 @@ async def data_fingerprint(
         # отпечаток app_user сравнивается без этой колонки; first_name/last_name/self_registered
         # появляются миграцией 0010 - так же исключаются
         if table == "task":
+            # 0019: blocked/mode появляются позже схемы 0005 — как email у app_user
             row_text = (
-                "(to_jsonb(t) || jsonb_build_object('priority', "
-                "CASE t.priority WHEN 'base' THEN 'medium' ELSE t.priority END))::text"
+                "((to_jsonb(t) || jsonb_build_object('priority', "
+                "CASE t.priority WHEN 'base' THEN 'medium' ELSE t.priority END))"
+                " - 'blocked' - 'blocked_reason' - 'blocked_by' - 'blocked_at'"
+                " - 'human_close_only' - 'mode')::text"
             )
         elif table == "app_user":
             # 0017 (spec 021): pdn_consent_version и pdn_consented_at — так же исключаются
