@@ -99,6 +99,7 @@ DETAIL_FIELDS = {
     "blocked_by",
     "blocked_at",
     "dod",
+    "mode",
 }
 PERM_FIELDS = {
     "edit",

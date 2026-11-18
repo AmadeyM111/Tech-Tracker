@@ -58,6 +58,11 @@ def create_data(body: TaskCreate) -> service.TaskCreateData:
         assignee=body.assignee_id if "assignee_id" in body.model_fields_set else service.UNSET,
         due_date=body.due_date,
         priority=body.priority,
+        mode=body.mode,
+        dod_criteria=tuple(
+            service.DodCriterionInput(body=c.body, required=c.required, kind=c.kind.value)
+            for c in body.dod_criteria
+        ),
     )
 
 
@@ -178,7 +183,9 @@ async def add_dod_criterion(
     task_id: UUID, body: DodCriterionCreate, db: DbSession, actor: CurrentActor
 ) -> TaskDetail:
     """Добавляет критерий готовности в конец списка."""
-    await dod_mod.add_criterion(db, actor, task_id, body=body.body, required=body.required)
+    await dod_mod.add_criterion(
+        db, actor, task_id, body=body.body, required=body.required, kind=body.kind.value
+    )
     return TaskDetail.model_validate(await queries.get_task(db, actor, task_id))
 
 
@@ -195,7 +202,15 @@ async def patch_dod_criterion(
     actor: CurrentActor,
 ) -> TaskDetail:
     """Отмечает или снимает отметку критерия готовности."""
-    await dod_mod.check_criterion(db, actor, task_id, criterion_id, checked=body.checked)
+    await dod_mod.check_criterion(
+        db,
+        actor,
+        task_id,
+        criterion_id,
+        checked=body.checked,
+        evidence_ref=body.evidence_ref,
+        evidence_note=body.evidence_note,
+    )
     return TaskDetail.model_validate(await queries.get_task(db, actor, task_id))
 
 

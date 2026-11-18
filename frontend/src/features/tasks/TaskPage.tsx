@@ -93,6 +93,8 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
   const [pickerFocus, setPickerFocus] = useState(0);
   const pickerRef = useRef<HTMLDivElement>(null);
   const [dodBody, setDodBody] = useState("");
+  const [dodKind, setDodKind] = useState<"checklist" | "evidence">("checklist");
+  const [evidenceDrafts, setEvidenceDrafts] = useState<Record<string, string>>({});
   const [blockerReason, setBlockerReason] = useState(task.blocked_reason ?? "");
   // 006/FR-23: messages at the fields of a top-level task; they live until the next save.
   const [fieldErrors, setFieldErrors] = useState<DraftErrors>({});
@@ -262,10 +264,18 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
     queryClient.setQueryData(cardKey, updated);
   }
 
-  function onCheckDod(criterionId: string, checked: boolean): void {
+  function onCheckDod(criterionId: string, checked: boolean, kind: string): void {
+    const evidence_ref = evidenceDrafts[criterionId];
     void run(async () => {
       await queryClient.cancelQueries({ queryKey: cardKey });
-      applyDetail(await patchDodCriterion(task.id, criterionId, { checked }));
+      applyDetail(
+        await patchDodCriterion(task.id, criterionId, {
+          checked,
+          ...(kind === "evidence" && checked && evidence_ref
+            ? { evidence_ref }
+            : {}),
+        }),
+      );
     });
   }
 
@@ -275,8 +285,9 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
     if (body === "") return;
     void run(async () => {
       await queryClient.cancelQueries({ queryKey: cardKey });
-      applyDetail(await addDodCriterion(task.id, { body, required: true }));
+      applyDetail(await addDodCriterion(task.id, { body, required: true, kind: dodKind }));
       setDodBody("");
+      setDodKind("checklist");
     });
   }
 
@@ -512,7 +523,15 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
     <>
       <section data-slot="dod" className="task-dod">
         <h2>{t("tasks.dod_title")}</h2>
+        <p data-field="task-mode">
+          {t("tasks.mode_label")}: {task.mode === "research" ? t("tasks.mode_research") : t("tasks.mode_routine")}
+        </p>
         <p data-field="dod-progress">{t("tasks.dod_progress", { closed: task.dod.closed, total: task.dod.total })}</p>
+        {task.dod.missing_artifacts.length > 0 ? (
+          <p data-field="dod-missing">
+            {t("tasks.dod_missing")}: {task.dod.missing_artifacts.join("; ")}
+          </p>
+        ) : null}
         <ul className="task-dod-list">
           {task.dod.items.map((item) => (
             <li key={item.id}>
@@ -521,11 +540,26 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
                   type="checkbox"
                   checked={item.checked}
                   disabled={!permissions.check_dod || pending}
-                  onChange={(e) => onCheckDod(item.id, e.target.checked)}
+                  onChange={(e) => onCheckDod(item.id, e.target.checked, item.kind)}
                 />
                 <span>{item.body}</span>
+                {item.kind === "evidence" ? (
+                  <span className="task-dod-kind">{t("tasks.dod_kind_evidence")}</span>
+                ) : null}
                 {item.required ? <span className="task-dod-req">{t("tasks.dod_required")}</span> : null}
               </label>
+              {item.kind === "evidence" && permissions.check_dod ? (
+                <input
+                  data-field="evidence-ref"
+                  placeholder={t("tasks.dod_evidence_ref")}
+                  value={evidenceDrafts[item.id] ?? item.evidence_ref ?? ""}
+                  onChange={(e) =>
+                    setEvidenceDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))
+                  }
+                />
+              ) : item.evidence_ref ? (
+                <span data-field="evidence-ref">{item.evidence_ref}</span>
+              ) : null}
               {permissions.edit ? (
                 <button
                   type="button"
@@ -548,6 +582,15 @@ function TaskCard({ task, pollError }: { task: TaskDetail; pollError: string | n
               value={dodBody}
               onChange={(e) => setDodBody(e.target.value)}
             />
+            <label htmlFor={field("dod-kind")}>{t("tasks.dod_kind")}</label>
+            <select
+              id={field("dod-kind")}
+              value={dodKind}
+              onChange={(e) => setDodKind(e.target.value as "checklist" | "evidence")}
+            >
+              <option value="checklist">{t("tasks.dod_kind_checklist")}</option>
+              <option value="evidence">{t("tasks.dod_kind_evidence")}</option>
+            </select>
             <button type="submit" disabled={pending}>
               {t("tasks.dod_add")}
             </button>

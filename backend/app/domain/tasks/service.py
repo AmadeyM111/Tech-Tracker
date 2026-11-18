@@ -42,8 +42,9 @@ from app.domain.projects.models import ProjectMember
 from app.domain.projects.queries import load_project_facts
 from app.domain.tasks import dod as dod_mod
 from app.domain.tasks import positions
+from app.domain.tasks.classify import require_research_dod
 from app.domain.tasks.context import load_task_context
-from app.domain.tasks.models import Task, TaskPriority, TaskStatus
+from app.domain.tasks.models import DodKind, Task, TaskMode, TaskPriority, TaskStatus
 from app.domain.tasks.positions import append_position, lock_columns
 from app.domain.users.directory import UserRef, load_recipient, user_refs
 
@@ -64,6 +65,13 @@ UNSET: Final = Unset.UNSET
 
 
 @dataclass(frozen=True)
+class DodCriterionInput:
+    body: str
+    required: bool = True
+    kind: str = DodKind.CHECKLIST.value
+
+
+@dataclass(frozen=True)
 class TaskCreateData:
     """``assignee``: ``UNSET`` — не передан, ``None`` — явно без исполнителя."""
 
@@ -72,6 +80,8 @@ class TaskCreateData:
     assignee: UUID | None | Unset = UNSET
     due_date: date | None = None
     priority: str | TaskPriority = TaskPriority.MEDIUM.value
+    mode: str | TaskMode = TaskMode.ROUTINE.value
+    dod_criteria: tuple[DodCriterionInput, ...] = ()
 
 
 def _invalid(message: str) -> Unprocessable:
@@ -94,6 +104,26 @@ def _validate(data: TaskCreateData) -> TaskPriority:
         return TaskPriority(data.priority)
     except ValueError:
         raise _invalid("Приоритет: low, medium или high") from None
+
+
+def _mode(data: TaskCreateData) -> str:
+    try:
+        return TaskMode(data.mode).value
+    except ValueError:
+        raise _invalid("Режим: routine или research") from None
+
+
+async def _attach_criteria(
+    db: AsyncSession, actor: Actor, task: Task, data: TaskCreateData
+) -> None:
+    items = [(c.body, c.required, c.kind) for c in data.dod_criteria]
+    await dod_mod.insert_created_criteria(
+        db,
+        workspace_id=actor.workspace_id,
+        task_id=task.id,
+        created_by=actor.user_id,
+        items=items,
+    )
 
 
 def _effective_assignee(actor: Actor, data: TaskCreateData, *, top_level: bool) -> UUID | None:
@@ -165,6 +195,9 @@ async def create_task(
         today_msk(),
     )
     await _check_assignee(db, actor, project, assignee_id)
+    mode = _mode(data)
+    if mode == TaskMode.RESEARCH.value:
+        require_research_dod([c.body for c in data.dod_criteria])
     await lock_columns(db, project_id, TaskStatus.TODO)
     task = Task(
         workspace_id=actor.workspace_id,
@@ -177,9 +210,11 @@ async def create_task(
         assignee_id=assignee_id,
         position=await append_position(db, project_id, TaskStatus.TODO),
         created_by=actor.user_id,
+        mode=mode,
     )
     db.add(task)
     await db.flush()
+    await _attach_criteria(db, actor, task, data)
     await _record_task_event(db, actor, EventAction.TASK_CREATED, task.id, project_id)
     await notifications.on_assigned(
         db, actor, task_id=task.id, project_id=project_id, assignee_id=assignee_id
@@ -218,6 +253,9 @@ async def create_subtask(
     )
     if not can_create_subtask(actor, ctx.project, parent, assignee_id):
         raise Forbidden()
+    mode = _mode(data)
+    if mode == TaskMode.RESEARCH.value:
+        require_research_dod([c.body for c in data.dod_criteria])
     task = Task(
         workspace_id=actor.workspace_id,
         project_id=ctx.project.project_id,
@@ -230,9 +268,11 @@ async def create_subtask(
         assignee_id=assignee_id,
         position=None,
         created_by=actor.user_id,
+        mode=mode,
     )
     db.add(task)
     await db.flush()
+    await _attach_criteria(db, actor, task, data)
     await _record_task_event(db, actor, EventAction.TASK_CREATED, task.id, ctx.project.project_id)
     await notifications.on_assigned(
         db, actor, task_id=task.id, project_id=ctx.project.project_id, assignee_id=assignee_id

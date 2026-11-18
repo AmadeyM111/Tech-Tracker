@@ -1199,6 +1199,8 @@ async def test_t77_request_schemas_forbid_extra_and_have_no_null_where_required(
     spec = api_env.app.openapi()
     schema = spec["components"]["schemas"][name]
     expected = {"title", "description", "assignee_id", "due_date", "priority"}
+    if name == "TaskCreate":
+        expected |= {"mode", "dod_criteria"}
     if name == "TaskUpdate":
         expected |= {"status", "blocked", "blocked_reason", "human_close_only"}
     assert set(schema["properties"]) == expected

@@ -346,6 +346,7 @@ async def make_task(
         "created_by": created_by,
         "blocked": False,
         "human_close_only": True,
+        "mode": "routine",
         "created_at": now,
         "updated_at": now,
         "deleted_at": None,

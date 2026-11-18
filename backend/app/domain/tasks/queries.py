@@ -33,7 +33,7 @@ from app.domain.projects.queries import load_project_facts
 from app.domain.tasks.attribution import attr_of, load_task_attribution
 from app.domain.tasks.context import load_task_context
 from app.domain.tasks.dod import DodView, load_dod
-from app.domain.tasks.models import Task, TaskPriority, TaskStatus
+from app.domain.tasks.models import Task, TaskMode, TaskPriority, TaskStatus
 from app.domain.tasks.progress import progress
 from app.domain.users.directory import UserRef, user_refs
 
@@ -94,6 +94,7 @@ class TaskView:
     blocked_by: UserRef | None
     blocked_at: datetime | None
     dod: DodView
+    mode: TaskMode
 
 
 @dataclass(frozen=True)
@@ -215,6 +216,7 @@ async def get_task(db: AsyncSession, actor: Actor, task_id: UUID) -> TaskView:
         blocked_by=_ref(refs, task.blocked_by),
         blocked_at=task.blocked_at,
         dod=dod,
+        mode=TaskMode(task.mode),
     )
 
 

@@ -114,7 +114,7 @@ export async function deleteTask(id: string): Promise<void> {
 
 export async function addDodCriterion(
   id: string,
-  body: { body: string; required: boolean },
+  body: { body: string; required: boolean; kind: "checklist" | "evidence" },
 ): Promise<TaskDetail> {
   const { data } = await getAppClient().POST("/api/v1/tasks/{task_id}/dod-criteria", {
     params: { path: { task_id: id } },
@@ -127,7 +127,7 @@ export async function addDodCriterion(
 export async function patchDodCriterion(
   taskId: string,
   criterionId: string,
-  body: { checked: boolean },
+  body: { checked: boolean; evidence_ref?: string; evidence_note?: string },
 ): Promise<TaskDetail> {
   const { data } = await getAppClient().PATCH("/api/v1/tasks/{task_id}/dod-criteria/{criterion_id}", {
     params: { path: { task_id: taskId, criterion_id: criterionId } },

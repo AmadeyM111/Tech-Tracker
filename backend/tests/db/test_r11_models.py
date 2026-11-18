@@ -96,6 +96,7 @@ EXPECTED_COLUMNS: dict[str, dict[str, tuple[str, int | None, bool]]] = {
         "blocked_by": UUID_N,
         "blocked_at": TS_N,
         "human_close_only": BOOL,
+        "mode": TEXT,
         "created_at": TS,
         "updated_at": TS,
         "deleted_at": TS_N,

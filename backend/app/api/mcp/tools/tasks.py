@@ -29,9 +29,11 @@ from app.core.errors import ErrorCode, Unprocessable
 from app.core.pagination import Page, PageParams
 from app.domain.access.roles import Actor, Capability
 from app.domain.comments import service as comments
+from app.domain.tasks import classify as classify_mod
 from app.domain.tasks import dod as dod_mod
 from app.domain.tasks import queries, service
 from app.domain.tasks.entity_draft import EntityDraft, parse_entities
+from app.domain.tasks.models import TaskMode
 
 
 class TaskIdArgs(BaseModel):
@@ -62,6 +64,13 @@ class ProposeEntitiesArgs(BaseModel):
     text: str = Field(min_length=1, max_length=20_000)
     commit: bool = False
     project_id: UUID | None = None
+    mode: TaskMode | None = None
+
+
+class ClassifyTaskArgs(BaseModel):
+    text: str | None = Field(default=None, max_length=20_000)
+    task_id: UUID | None = None
+    commit: bool = False
 
 
 class EntityDraftOut(BaseModel):
@@ -154,7 +163,12 @@ def _project_of(item: EntityDraft, default: UUID | None) -> UUID:
 
 
 async def _commit_one(
-    db: AsyncSession, actor: Actor, item: EntityDraft, default_project: UUID | None
+    db: AsyncSession,
+    actor: Actor,
+    item: EntityDraft,
+    default_project: UUID | None,
+    *,
+    mode: TaskMode | None,
 ) -> dict[str, Any]:
     if item.type == "note" and item.existing_task_id is not None:
         view = await comments.create_comment(db, actor, item.existing_task_id, item.title)
@@ -165,6 +179,7 @@ async def _commit_one(
         title=item.title,
         description=item.title,
         due_date=today_msk(),
+        mode=(mode or TaskMode.ROUTINE).value,
     )
     task_id = await service.create_task(db, actor, _project_of(item, default_project), data)
     comment_id = None
@@ -185,13 +200,36 @@ async def _propose(db: AsyncSession, actor: Actor, args: ProposeEntitiesArgs) ->
         if item.type == "note" and item.existing_task_id is not None:
             continue
         _project_of(item, args.project_id)
-    committed = [await _commit_one(db, actor, item, args.project_id) for item in drafts]
+    committed = [
+        await _commit_one(db, actor, item, args.project_id, mode=args.mode) for item in drafts
+    ]
     return {"drafts": dumped, "committed": committed}
 
 
 async def _check_dod(db: AsyncSession, actor: Actor, args: CheckDodArgs) -> dict[str, Any]:
-    await dod_mod.check_criterion(db, actor, args.task_id, args.criterion_id, checked=args.checked)
+    await dod_mod.check_criterion(
+        db,
+        actor,
+        args.task_id,
+        args.criterion_id,
+        checked=args.checked,
+        evidence_ref=args.evidence_ref,
+        evidence_note=args.evidence_note,
+    )
     return await _detail(db, actor, args.task_id)
+
+
+async def _classify(db: AsyncSession, actor: Actor, args: ClassifyTaskArgs) -> dict[str, Any]:
+    result = await classify_mod.classify(
+        db, actor, text=args.text, task_id=args.task_id, commit=args.commit
+    )
+    return {
+        "task_id": str(result.task_id) if result.task_id is not None else None,
+        "mode": result.mode,
+        "missing": result.missing,
+        "can_run_without_human": result.can_run_without_human,
+        "committed": result.committed,
+    }
 
 
 BA = Capability.BUSINESS_ACCESS
@@ -252,6 +290,14 @@ def task_tools() -> list[ToolSpec]:
             CheckDodArgs,
             BA,
             _check_dod,
+            write=True,
+        ),
+        make_tool(
+            "classify_task",
+            "Classify task routine vs research; commit writes mode only.",
+            ClassifyTaskArgs,
+            BA,
+            _classify,
             write=True,
         ),
     ]

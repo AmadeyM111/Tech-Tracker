@@ -23,7 +23,7 @@ from app.domain.events.catalog import EventAction
 from app.domain.events.client_context import current_client_name
 from app.domain.events.writer import record_event
 from app.domain.tasks.context import load_task_context
-from app.domain.tasks.models import Task, TaskDodCriterion, TaskStatus
+from app.domain.tasks.models import DodKind, Task, TaskDodCriterion, TaskMode, TaskStatus
 from app.domain.users.directory import UserRef, user_refs
 
 if TYPE_CHECKING:
@@ -42,6 +42,9 @@ class DodItem:
     checked_by: UserRef | None
     checked_at: datetime | None
     position: int
+    kind: str
+    evidence_ref: str | None
+    evidence_note: str | None
 
 
 @dataclass(frozen=True)
@@ -50,6 +53,7 @@ class DodView:
     total: int
     human_close_only: bool
     items: list[DodItem]
+    missing_artifacts: list[str]
 
 
 def _facts(task: Task) -> TaskFacts:
@@ -80,15 +84,21 @@ def _reason(text: str) -> str:
     return value
 
 
+def criterion_is_open(row: TaskDodCriterion) -> bool:
+    if row.kind == DodKind.EVIDENCE.value:
+        ref = (row.evidence_ref or "").strip()
+        return not row.checked or not ref
+    return not row.checked
+
+
 async def open_required_bodies(db: AsyncSession, task_id: UUID) -> list[str]:
     rows = (
         (
             await db.execute(
-                select(TaskDodCriterion.body)
+                select(TaskDodCriterion)
                 .where(
                     TaskDodCriterion.task_id == task_id,
                     TaskDodCriterion.required.is_(True),
-                    TaskDodCriterion.checked.is_(False),
                 )
                 .order_by(TaskDodCriterion.position, TaskDodCriterion.id)
             )
@@ -96,7 +106,7 @@ async def open_required_bodies(db: AsyncSession, task_id: UUID) -> list[str]:
         .scalars()
         .all()
     )
-    return list(rows)
+    return [row.body for row in rows if criterion_is_open(row)]
 
 
 async def assert_can_close(db: AsyncSession, task: Task) -> None:
@@ -105,7 +115,8 @@ async def assert_can_close(db: AsyncSession, task: Task) -> None:
         raise Unprocessable(
             "Снимите блокер, прежде чем закрыть задачу", code=ErrorCode.task_blocked
         )
-    if task.human_close_only and current_client_name() is not None:
+    agent = current_client_name() is not None
+    if agent and (task.human_close_only or task.mode == TaskMode.RESEARCH.value):
         raise HumanCloseOnly()
     open_bodies = await open_required_bodies(db, task.id)
     if open_bodies:
@@ -139,20 +150,69 @@ async def load_dod(db: AsyncSession, workspace_id: UUID, task: Task) -> DodView:
             checked_by=None if r.checked_by is None else refs[r.checked_by],
             checked_at=r.checked_at,
             position=r.position,
+            kind=r.kind,
+            evidence_ref=r.evidence_ref,
+            evidence_note=r.evidence_note,
         )
         for r in rows
     ]
-    closed = sum(1 for i in items if i.checked)
+    closed = sum(1 for i, r in zip(items, rows, strict=True) if not criterion_is_open(r))
+    missing = [
+        r.body
+        for r in rows
+        if r.required and r.kind == DodKind.EVIDENCE.value and criterion_is_open(r)
+    ]
     return DodView(
         closed=closed,
         total=len(items),
         human_close_only=task.human_close_only,
         items=items,
+        missing_artifacts=missing,
     )
 
 
+async def insert_created_criteria(
+    db: AsyncSession,
+    *,
+    workspace_id: UUID,
+    task_id: UUID,
+    created_by: UUID,
+    items: list[tuple[str, bool, str]],
+) -> None:
+    """Критерии при создании задачи; без повторной проверки прав."""
+    for i, (body, required, kind) in enumerate(items, start=1):
+        if kind not in {DodKind.CHECKLIST.value, DodKind.EVIDENCE.value}:
+            raise Unprocessable(
+                "Тип критерия: checklist или evidence", code=ErrorCode.validation_error
+            )
+        db.add(
+            TaskDodCriterion(
+                workspace_id=workspace_id,
+                task_id=task_id,
+                body=_body(body),
+                required=required,
+                checked=False,
+                checked_by=None,
+                checked_at=None,
+                position=i,
+                created_by=created_by,
+                kind=kind,
+                evidence_ref=None,
+                evidence_note=None,
+            )
+        )
+    if items:
+        await db.flush()
+
+
 async def add_criterion(
-    db: AsyncSession, actor: Actor, task_id: UUID, *, body: str, required: bool
+    db: AsyncSession,
+    actor: Actor,
+    task_id: UUID,
+    *,
+    body: str,
+    required: bool,
+    kind: str = DodKind.CHECKLIST.value,
 ) -> UUID:
     ctx = await load_task_context(db, actor, task_id, lock_project="share")
     if not can_read_project_content(actor, ctx.project):
@@ -165,6 +225,8 @@ async def add_criterion(
     if not can_edit_task_fully(actor, ctx.project, _facts(task)):
         raise Forbidden()
     text = _body(body)
+    if kind not in {DodKind.CHECKLIST.value, DodKind.EVIDENCE.value}:
+        raise Unprocessable("Тип критерия: checklist или evidence", code=ErrorCode.validation_error)
     nxt = (
         await db.execute(
             select(func.coalesce(func.max(TaskDodCriterion.position), 0)).where(
@@ -182,14 +244,42 @@ async def add_criterion(
         checked_at=None,
         position=int(nxt) + 1,
         created_by=actor.user_id,
+        kind=kind,
+        evidence_ref=None,
+        evidence_note=None,
     )
     db.add(row)
     await db.flush()
     return row.id
 
 
+def _apply_evidence(
+    row: TaskDodCriterion, *, evidence_ref: str | None, evidence_note: str | None
+) -> None:
+    ref = (evidence_ref if evidence_ref is not None else row.evidence_ref) or ""
+    ref = ref.strip()
+    if not ref or len(ref) > BODY_MAX:
+        raise Unprocessable("Нужен URL или id артефакта (1–500)", code=ErrorCode.validation_error)
+    row.evidence_ref = ref
+    if evidence_note is None:
+        return
+    note = evidence_note.strip()
+    if len(note) > BODY_MAX:
+        raise Unprocessable(
+            "Комментарий evidence: до 500 символов", code=ErrorCode.validation_error
+        )
+    row.evidence_note = note or None
+
+
 async def check_criterion(
-    db: AsyncSession, actor: Actor, task_id: UUID, criterion_id: UUID, *, checked: bool
+    db: AsyncSession,
+    actor: Actor,
+    task_id: UUID,
+    criterion_id: UUID,
+    *,
+    checked: bool,
+    evidence_ref: str | None = None,
+    evidence_note: str | None = None,
 ) -> None:
     ctx = await load_task_context(db, actor, task_id, lock_project="share")
     if not can_read_project_content(actor, ctx.project):
@@ -211,7 +301,9 @@ async def check_criterion(
     ).scalar_one_or_none()
     if row is None:
         raise NotFound("Критерий не найден")
-    if row.checked == checked:
+    if row.kind == DodKind.EVIDENCE.value and checked:
+        _apply_evidence(row, evidence_ref=evidence_ref, evidence_note=evidence_note)
+    if row.checked == checked and not (checked and row.kind == DodKind.EVIDENCE.value):
         return
     now = utcnow()
     if checked:
@@ -222,6 +314,9 @@ async def check_criterion(
         row.checked = False
         row.checked_by = None
         row.checked_at = None
+        if row.kind == DodKind.EVIDENCE.value:
+            row.evidence_ref = None
+            row.evidence_note = None
     await db.flush()
     await record_event(
         db,

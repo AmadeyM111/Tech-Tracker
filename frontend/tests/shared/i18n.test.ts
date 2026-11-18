@@ -61,6 +61,7 @@ const API_CODES = [
   "pdn_consent_version_mismatch",
   "pdn_consent_pending",
   "dod_open",
+  "dod_required",
   "task_blocked",
   "task_already_done",
   "human_close_only",

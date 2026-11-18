@@ -128,7 +128,8 @@ export function taskDetail(over: Record<string, unknown> = {}) {
     blocked_reason: null,
     blocked_by: null,
     blocked_at: null,
-    dod: { closed: 0, total: 0, human_close_only: true, items: [] },
+    dod: { closed: 0, total: 0, human_close_only: true, items: [], missing_artifacts: [] },
+    mode: "routine",
     ...over,
   };
 }

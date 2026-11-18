@@ -22,6 +22,7 @@ WRITE_TOOLS = frozenset(
         "propose_entities",
         "upsert_knowledge",
         "check_dod_criterion",
+        "classify_task",
     }
 )
 
