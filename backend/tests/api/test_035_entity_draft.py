@@ -51,8 +51,7 @@ async def test_ac2_commit_creates_task_with_client_name(api_env: ApiEnv) -> None
     assert body["committed"][0]["type"] == "task"
     rows = await env.execute(
         text(
-            "SELECT client_name FROM domain_event "
-            "WHERE entity_id = :id AND action = 'task.created'"
+            "SELECT client_name FROM domain_event WHERE entity_id = :id AND action = 'task.created'"
         ).bindparams(id=task_id)
     )
     assert rows is not None and rows[0][0] == "Claude Code"

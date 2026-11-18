@@ -163,9 +163,7 @@ async def _commit_one(
     )
 
 
-async def _propose(
-    db: AsyncSession, actor: Actor, args: ProposeEntitiesArgs
-) -> dict[str, Any]:
+async def _propose(db: AsyncSession, actor: Actor, args: ProposeEntitiesArgs) -> dict[str, Any]:
     drafts = parse_entities(args.text)
     dumped = [_dump_draft(item) for item in drafts]
     if not args.commit:

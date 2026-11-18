@@ -69,9 +69,7 @@ async def test_ac3_human_status_clears_last_client_name(api_env: ApiEnv) -> None
     w = await make_api_world(env)
     token = await _agent_token(env, w, "ba", name="Claude Code")
     task = await _mcp_task(env, token, str(w.project_id), "Сначала агент")
-    patched = await send(
-        env, w.tok("ba"), "PATCH", task_url(task["id"]), {"status": "in_progress"}
-    )
+    patched = await send(env, w.tok("ba"), "PATCH", task_url(task["id"]), {"status": "in_progress"})
     assert patched.status_code == 200, patched.text
     assert patched.json()["last_client_name"] is None
     listed = await send(env, w.tok("ba"), "GET", project_tasks_url(w.project_id))
@@ -90,9 +88,7 @@ async def test_ac4_assignee_client_survives_human_title_edit(api_env: ApiEnv) ->
         "update_task",
         {"task_id": task["id"], "assignee_id": str(w.uid("usr"))},
     )
-    patched = await send(
-        env, w.tok("ba"), "PATCH", task_url(task["id"]), {"title": "Новое имя"}
-    )
+    patched = await send(env, w.tok("ba"), "PATCH", task_url(task["id"]), {"title": "Новое имя"})
     assert patched.status_code == 200, patched.text
     body = patched.json()
     assert body["last_client_name"] is None
