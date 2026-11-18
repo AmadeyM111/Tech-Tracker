@@ -25,7 +25,9 @@
 | 0029 | DoD и блокер (спека 033, CD-01+CD-03) | `feat/cd-01-03-dod-blocker` | занят другой сессией |
 | 0030 | MCP inbox / stuck (спека 034, CD-02+CD-04) | `feat/cd-02-04-mcp-inbox` | занят другой сессией |
 | 0031 | Атрибуция агента по `client_name` без `is_agent` (спека 022 CD-05, 035 CD-06) | `docs/adr/0031-agent-attribution-client-name.md` | предложено |
-| 0032+ | ADR — с 0032 | — | свободно |
+| 0032 | свободно (соседняя сессия CD-07) | — | свободно |
+| 0033 | Слои знаний `knowledge_record` (спека 037, CD-08+CD-09) | `docs/adr/0033-knowledge-records.md` | предложено |
+| 0034+ | ADR — с 0034 | — | свободно |
 
 ## Спеки
 | № | Тема | Где |
@@ -54,6 +56,8 @@
 | 032 | MCP: лимит 120/мин и read-only scope | `specs/032-mcp-rate-limit-readonly/` |
 | 034 | MCP inbox / stuck (CD-02+CD-04) | `feat/cd-02-04-mcp-inbox` |
 | 035 | черновик сущностей `propose_entities` (CD-06) | `specs/035-entity-draft/` (ветка `feat/cd-05-06-agent-entities`) |
+| 036 | DoD evidence / routine (CD-07+10+11) | `feat/cd-07-10-11-readiness` | занят другой сессией |
+| 037 | слои знаний `knowledge_record` (CD-08+CD-09) | `specs/037-knowledge-records/` |
 
 ## Миграции alembic
 | № | Тема | Где |
@@ -67,3 +71,6 @@
 | 0016 | Внешний вход: `external_identity`, `oauth_login_state`, … (спека 029, этап б) | `feat/029-providers`, PR #55 |
 | 0017 | Согласие на ПДн: колонки `pdn_consent_*` в `app_user`, `registration_request`, `oauth_login_state` (спека 021) | `feat/021-pdn-consent`; `down_revision` = 0016 (слита в main) |
 | 0018 | `api_token.read_only` (спека 032) | `feat/mcp-rate-limit-readonly`; `down_revision` = 0017 |
+| 0019 | DoD / `task.mode` (спека 036) | `feat/cd-07-10-11-readiness` | занят другой сессией |
+| 0020 | MCP inbox `external_message` (спека 034) | `feat/cd-02-04-mcp-inbox` | занят другой сессией |
+| 0021 | `knowledge_record` (спека 037, CD-08+CD-09) | `feat/cd-08-09-knowledge`; `down_revision` = 0018 |

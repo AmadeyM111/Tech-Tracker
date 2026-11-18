@@ -546,6 +546,28 @@ Access (1 час) и refresh (90 суток, ротация) токены гра
 | `pdn_consent_version` | text | да | версия текста согласия на ПДн, отмеченного до перехода к провайдеру (спека 021, миграция 0017); копируется в `app_user`, если вход создаёт учётную запись |
 | `created_at`, `expires_at` | timestamptz | нет | `expires_at` = создание + 10 минут; индекс `ix_oauth_login_state_expires_at` |
 
+### knowledge_record
+
+Запись-опора слоя знаний (спека 037, ADR-0033, миграция 0021). Слой пространства (`scope=space`)
+виден участникам любого проекта пространства; project-слой — только участникам этого проекта.
+
+| Столбец | Тип | NULL | Описание |
+|---|---|---|---|
+| `id` | uuid | нет | PK `pk_knowledge_record` |
+| `workspace_id` | uuid | нет | пространство; FK `fk_knowledge_record_workspace_id_workspace` |
+| `scope` | text | нет | `space` / `project`; `ck_knowledge_record_scope_valid` |
+| `project_id` | uuid | да | NULL при `space`, иначе FK на `project`; `ck_knowledge_record_scope_project` |
+| `kind` | text | нет | `decision` / `reason` / `agreement`; `ck_knowledge_record_kind_valid` |
+| `title` | text | нет | 1–255; `ck_knowledge_record_title_length` |
+| `body` | text | нет | 1–10000; `ck_knowledge_record_body_length` |
+| `confirmed_with` | text | да | обязателен при `agreement` (1–255); иначе NULL; `ck_knowledge_record_confirmed_with` |
+| `confirmed_by` | uuid | нет | кто подтвердил commit; FK `fk_knowledge_record_confirmed_by_app_user` RESTRICT |
+| `client_name` | text | да | имя MCP-клиента при commit; `ck_knowledge_record_client_name_length` |
+| `created_by` | uuid | да | автор вызова |
+| `created_at`, `updated_at` | timestamptz | нет | |
+
+Индекс `ix_knowledge_record_workspace_id_scope_created_at` (`workspace_id`, `scope`, `created_at`).
+
 ## Эксплуатация
 
 ### backup_run
@@ -586,6 +608,7 @@ Access (1 час) и refresh (90 суток, ротация) токены гра
 | `0017` | согласие на обработку ПДн (спека 021): `app_user.pdn_consent_version`, `pdn_consented_at`, `registration_request.pdn_consent_version`, `pdn_consent_at` (все `NULL`); откат удаляет столбцы |
 | `0014` | OAuth для облачных MCP-клиентов (spec 028): `oauth_client`, `oauth_grant`, `oauth_code`, `oauth_token`, `oauth_attempt`; откат удаляет пять таблиц |
 | `0018` | MCP read-only: `api_token.read_only boolean NOT NULL` (спека 032); откат удаляет столбец |
+| `0021` | `knowledge_record` (спека 037, CD-08/09): слои space/project, типы decision/reason/agreement; `down_revision` 0018; откат удаляет таблицу |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия
 моделей миграциям — `alembic -c backend/alembic.ini check` (входит в `scripts/check.sh` и CI).
