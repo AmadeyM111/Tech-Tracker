@@ -42,6 +42,8 @@ class BoardCard(BaseModel):
     hot: bool
     last_client_name: str | None
     assignee_client_name: str | None
+    # Блокер/инцидент (спека 033); не путать с ``hot``
+    blocked: bool
 
 
 class BoardColumn(BaseModel):

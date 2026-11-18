@@ -112,6 +112,37 @@ export async function deleteTask(id: string): Promise<void> {
   });
 }
 
+export async function addDodCriterion(
+  id: string,
+  body: { body: string; required: boolean; kind: "checklist" | "evidence" },
+): Promise<TaskDetail> {
+  const { data } = await getAppClient().POST("/api/v1/tasks/{task_id}/dod-criteria", {
+    params: { path: { task_id: id } },
+    body,
+  });
+  if (data === undefined) throw invalidBody(201);
+  return data;
+}
+
+export async function patchDodCriterion(
+  taskId: string,
+  criterionId: string,
+  body: { checked: boolean; evidence_ref?: string; evidence_note?: string },
+): Promise<TaskDetail> {
+  const { data } = await getAppClient().PATCH("/api/v1/tasks/{task_id}/dod-criteria/{criterion_id}", {
+    params: { path: { task_id: taskId, criterion_id: criterionId } },
+    body,
+  });
+  if (data === undefined) throw invalidBody(200);
+  return data;
+}
+
+export async function deleteDodCriterion(taskId: string, criterionId: string): Promise<void> {
+  await getAppClient().DELETE("/api/v1/tasks/{task_id}/dod-criteria/{criterion_id}", {
+    params: { path: { task_id: taskId, criterion_id: criterionId } },
+  });
+}
+
 export async function createSubtask(id: string, body: SubtaskCreate): Promise<TaskDetail> {
   // The schema marks `description` / `priority` as required only because they have server defaults.
   const { data } = await getAppClient().POST("/api/v1/tasks/{task_id}/subtasks", {

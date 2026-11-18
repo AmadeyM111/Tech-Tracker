@@ -82,6 +82,8 @@ async def test_registry_lists_tools_for_business_roles(api_env: ApiEnv) -> None:
     assert names == sorted(
         [
             "add_comment",
+            "check_dod_criterion",
+            "classify_task",
             "create_project",
             "create_subtask",
             "create_task",

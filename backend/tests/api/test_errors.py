@@ -393,6 +393,7 @@ def test_t04_error_hierarchy_status_and_codes() -> None:
         errors.PasswordChangeRequired: (403, "password_change_required"),
         errors.NoRole: (403, "no_role"),
         errors.OriginMismatch: (403, "origin_mismatch"),
+        errors.HumanCloseOnly: (403, "human_close_only"),
         errors.NotFound: (404, "not_found"),
         errors.ProjectArchived: (409, "project_archived"),
         errors.PayloadTooLarge: (413, "attachment_too_large"),
@@ -404,6 +405,7 @@ def test_t04_error_hierarchy_status_and_codes() -> None:
     assert issubclass(errors.PasswordChangeRequired, errors.Forbidden)
     assert issubclass(errors.NoRole, errors.Forbidden)
     assert issubclass(errors.OriginMismatch, errors.Forbidden)
+    assert issubclass(errors.HumanCloseOnly, errors.Forbidden)
     assert issubclass(errors.AppError, Exception)
     assert errors.Unprocessable.status_code == 422
 

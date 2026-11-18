@@ -7,16 +7,19 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     Uuid,
@@ -40,6 +43,16 @@ class TaskPriority(StrEnum):
     HIGH = "high"
 
 
+class TaskMode(StrEnum):
+    ROUTINE = "routine"
+    RESEARCH = "research"
+
+
+class DodKind(StrEnum):
+    CHECKLIST = "checklist"
+    EVIDENCE = "evidence"
+
+
 class Task(UUIDPkMixin, TimestampMixin, WorkspaceMixin, SoftDeleteMixin, Base):
     __tablename__ = "task"
     __table_args__ = (
@@ -48,6 +61,17 @@ class Task(UUIDPkMixin, TimestampMixin, WorkspaceMixin, SoftDeleteMixin, Base):
         CheckConstraint("status IN ('todo','in_progress','review','done')", name="status_valid"),
         CheckConstraint("priority IN ('low','medium','high')", name="priority_valid"),
         CheckConstraint("(parent_id IS NULL) = (position IS NOT NULL)", name="position_top_level"),
+        CheckConstraint(
+            "blocked_reason IS NULL OR char_length(blocked_reason) BETWEEN 1 AND 500",
+            name="blocked_reason_length",
+        ),
+        CheckConstraint(
+            "(blocked = false AND blocked_reason IS NULL AND blocked_by IS NULL"
+            " AND blocked_at IS NULL) OR (blocked = true AND blocked_reason IS NOT NULL"
+            " AND blocked_by IS NOT NULL AND blocked_at IS NOT NULL)",
+            name="blocked_fields",
+        ),
+        CheckConstraint("mode IN ('routine','research')", name="task_mode_valid"),
     )
 
     project_id: Mapped[UUID] = mapped_column(
@@ -77,6 +101,64 @@ class Task(UUIDPkMixin, TimestampMixin, WorkspaceMixin, SoftDeleteMixin, Base):
         ForeignKey("app_user.id", ondelete="RESTRICT", deferrable=True, initially="IMMEDIATE"),
         nullable=False,
     )
+    blocked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    blocked_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    blocked_by: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("app_user.id", ondelete="RESTRICT", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
+    blocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    human_close_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    mode: Mapped[str] = mapped_column(Text, nullable=False, default=TaskMode.ROUTINE.value)
+
+
+class TaskDodCriterion(UUIDPkMixin, TimestampMixin, WorkspaceMixin, Base):
+    """Критерий готовности задачи (спека 033, CD-01)."""
+
+    __tablename__ = "task_dod_criterion"
+    __table_args__ = (
+        CheckConstraint("char_length(body) BETWEEN 1 AND 500", name="body_length"),
+        CheckConstraint(
+            "(checked = false AND checked_by IS NULL AND checked_at IS NULL) OR "
+            "(checked = true AND checked_by IS NOT NULL AND checked_at IS NOT NULL)",
+            name="checked_fields",
+        ),
+        CheckConstraint("kind IN ('checklist','evidence')", name="kind_valid"),
+        CheckConstraint(
+            "evidence_ref IS NULL OR char_length(evidence_ref) BETWEEN 1 AND 500",
+            name="evidence_ref_length",
+        ),
+        CheckConstraint(
+            "evidence_note IS NULL OR char_length(evidence_note) BETWEEN 1 AND 500",
+            name="evidence_note_length",
+        ),
+        Index("ix_task_dod_criterion_task_id_position", "task_id", "position"),
+    )
+
+    task_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("task.id", ondelete="CASCADE", deferrable=True, initially="IMMEDIATE"),
+        nullable=False,
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    required: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    checked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    checked_by: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("app_user.id", ondelete="RESTRICT", deferrable=True, initially="IMMEDIATE"),
+        nullable=True,
+    )
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_by: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("app_user.id", ondelete="RESTRICT", deferrable=True, initially="IMMEDIATE"),
+        nullable=False,
+    )
+    kind: Mapped[str] = mapped_column(Text, nullable=False, default=DodKind.CHECKLIST.value)
+    evidence_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 # Доска проекта: колонка статуса, порядок по позиции (только задачи верхнего уровня).

@@ -1335,6 +1335,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/dod-criteria": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Dod Criterion
+         * @description Добавляет критерий готовности в конец списка.
+         */
+        post: operations["add_dod_criterion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/dod-criteria/{criterion_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Dod Criterion */
+        delete: operations["delete_dod_criterion"];
+        options?: never;
+        head?: never;
+        /**
+         * Patch Dod Criterion
+         * @description Отмечает или снимает отметку критерия готовности.
+         */
+        patch: operations["patch_dod_criterion"];
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/move": {
         parameters: {
             query?: never;
@@ -1649,6 +1690,8 @@ export interface components {
             assignee: components["schemas"]["UserRef"] | null;
             /** Assignee Client Name */
             assignee_client_name: string | null;
+            /** Blocked */
+            blocked: boolean;
             /** Due Date */
             due_date: string | null;
             /** Hot */
@@ -1810,6 +1853,69 @@ export interface components {
             /** Login */
             login: string;
             role: components["schemas"]["Role"];
+        };
+        /** DodCriterionCreate */
+        DodCriterionCreate: {
+            /** Body */
+            body: string;
+            /** @default checklist */
+            kind: components["schemas"]["DodKind"];
+            /**
+             * Required
+             * @default true
+             */
+            required: boolean;
+        };
+        /** DodCriterionOut */
+        DodCriterionOut: {
+            /** Body */
+            body: string;
+            /** Checked */
+            checked: boolean;
+            /** Checked At */
+            checked_at: string | null;
+            checked_by: components["schemas"]["UserRef"] | null;
+            /** Evidence Note */
+            evidence_note: string | null;
+            /** Evidence Ref */
+            evidence_ref: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["DodKind"];
+            /** Position */
+            position: number;
+            /** Required */
+            required: boolean;
+        };
+        /** DodCriterionPatch */
+        DodCriterionPatch: {
+            /** Checked */
+            checked: boolean;
+            /** Evidence Note */
+            evidence_note?: string | null;
+            /** Evidence Ref */
+            evidence_ref?: string | null;
+        };
+        /**
+         * DodKind
+         * @enum {string}
+         */
+        DodKind: "checklist" | "evidence";
+        /** DodOut */
+        DodOut: {
+            /** Closed */
+            closed: number;
+            /** Human Close Only */
+            human_close_only: boolean;
+            /** Items */
+            items: components["schemas"]["DodCriterionOut"][];
+            /** Missing Artifacts */
+            missing_artifacts: string[];
+            /** Total */
+            total: number;
         };
         /**
          * DuePreset
@@ -2087,6 +2193,8 @@ export interface components {
         /** OverviewTaskItem */
         OverviewTaskItem: {
             assignee: components["schemas"]["UserRef"] | null;
+            /** Blocked */
+            blocked: boolean;
             /** Due Date */
             due_date: string | null;
             /** Hot */
@@ -2550,8 +2658,12 @@ export interface components {
              * @default
              */
             description: string;
+            /** Dod Criteria */
+            dod_criteria?: components["schemas"]["DodCriterionCreate"][];
             /** Due Date */
             due_date?: string | null;
+            /** @default routine */
+            mode: components["schemas"]["TaskMode"];
             /** @default medium */
             priority: components["schemas"]["TaskPriority"];
             /** Title */
@@ -2563,6 +2675,13 @@ export interface components {
             /** Assignee Client Name */
             assignee_client_name: string | null;
             author: components["schemas"]["UserRef"];
+            /** Blocked */
+            blocked: boolean;
+            /** Blocked At */
+            blocked_at: string | null;
+            blocked_by: components["schemas"]["UserRef"] | null;
+            /** Blocked Reason */
+            blocked_reason: string | null;
             /**
              * Created At
              * Format: date-time
@@ -2570,6 +2689,7 @@ export interface components {
             created_at: string;
             /** Description */
             description: string;
+            dod: components["schemas"]["DodOut"];
             /** Due Date */
             due_date: string | null;
             /**
@@ -2579,6 +2699,7 @@ export interface components {
             id: string;
             /** Last Client Name */
             last_client_name: string | null;
+            mode: components["schemas"]["TaskMode"];
             /** Parent Id */
             parent_id: string | null;
             permissions: components["schemas"]["TaskPermissions"];
@@ -2604,6 +2725,8 @@ export interface components {
             assignee: components["schemas"]["UserRef"] | null;
             /** Assignee Client Name */
             assignee_client_name: string | null;
+            /** Blocked */
+            blocked: boolean;
             /**
              * Created At
              * Format: date-time
@@ -2627,6 +2750,11 @@ export interface components {
             title: string;
         };
         /**
+         * TaskMode
+         * @enum {string}
+         */
+        TaskMode: "routine" | "research";
+        /**
          * TaskMove
          * @description ``after_task_id`` — сосед сверху, ``before_task_id`` — снизу; без соседей — в конец.
          */
@@ -2643,6 +2771,8 @@ export interface components {
             change_assignee: boolean;
             /** Change Status */
             change_status: boolean;
+            /** Check Dod */
+            check_dod: boolean;
             /** Create Subtask */
             create_subtask: boolean;
             /** Delete */
@@ -2678,10 +2808,16 @@ export interface components {
         TaskUpdate: {
             /** Assignee Id */
             assignee_id?: string | null;
+            /** Blocked */
+            blocked?: boolean;
+            /** Blocked Reason */
+            blocked_reason?: string | null;
             /** Description */
             description?: string;
             /** Due Date */
             due_date?: string | null;
+            /** Human Close Only */
+            human_close_only?: boolean;
             priority?: components["schemas"]["TaskPriority"];
             status?: components["schemas"]["TaskStatus"];
             /** Title */
@@ -6316,6 +6452,7 @@ export interface operations {
                 page_size?: number;
                 assignee_id?: string | null;
                 status?: components["schemas"]["TaskStatus"] | null;
+                blocked?: boolean | null;
             };
             header?: never;
             path: {
@@ -6864,6 +7001,206 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Comment"];
+                };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    add_dod_criterion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DodCriterionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
+                };
+            };
+            /** @description Некорректный JSON в теле запроса (code: bad_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_dod_criterion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                criterion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Не выполнен вход или сессия недействительна (code: not_authenticated) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Доступ запрещён (code: forbidden, password_change_required, no_role, origin_mismatch) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Объект не найден или принадлежит другому пространству (code: not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ошибка валидации или бизнес-правила (code: validation_error или код из каталога) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patch_dod_criterion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                criterion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DodCriterionPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDetail"];
                 };
             };
             /** @description Некорректный JSON в теле запроса (code: bad_request) */

@@ -68,7 +68,7 @@ EXPECTED: dict[str, tuple[str, str | None, bool, frozenset[str], frozenset[str]]
         "task",
         "project",
         False,
-        F({"status", "assignee_id", "due_date", "title", "description"}),
+        F({"status", "assignee_id", "due_date", "title", "description", "mode"}),
         F({"status", "assignee_id", "due_date"}),
     ),
     "task.unassigned_member_removed": (
@@ -78,6 +78,9 @@ EXPECTED: dict[str, tuple[str, str | None, bool, frozenset[str], frozenset[str]]
         F({"assignee_id"}),
         F({"assignee_id"}),
     ),
+    "task.dod_checked": ("task", "project", False, F(), F()),
+    "task.blocked": ("task", "project", False, F(), F()),
+    "task.unblocked": ("task", "project", False, F(), F()),
     "comment.created": ("comment", "project", False, F(), F()),
     "comment.deleted": ("comment", "project", False, F(), F()),
     "attachment.created": ("attachment", "project", False, F(), F()),

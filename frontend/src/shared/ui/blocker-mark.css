@@ -1,0 +1,15 @@
+.ui-blocker-mark {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ui-blocker-mark.ui-blocker-mark--block {
+  display: table;
+  margin: 4px 0 0;
+}

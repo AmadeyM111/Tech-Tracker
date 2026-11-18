@@ -60,6 +60,11 @@ const API_CODES = [
   "pdn_consent_required",
   "pdn_consent_version_mismatch",
   "pdn_consent_pending",
+  "dod_open",
+  "dod_required",
+  "task_blocked",
+  "task_already_done",
+  "human_close_only",
 ];
 const CLIENT_CODES = ["network_error", "invalid_response"];
 // Коды из общего обработчика HTTP-ошибок backend (core/errors.py, _HTTP_STATUS_MAP).

@@ -93,6 +93,7 @@ export function taskItem(id: string, title: string, over: Record<string, unknown
     created_at: "2026-10-05T08:00:00Z",
     last_client_name: null,
     assignee_client_name: null,
+    blocked: false,
     ...over,
   };
 }
@@ -115,7 +116,20 @@ export function taskDetail(over: Record<string, unknown> = {}) {
     subtasks: [],
     progress: null,
     updated_at: "2026-10-05T08:00:00Z",
-    permissions: { edit: true, change_status: true, change_assignee: true, delete: true, create_subtask: true },
+    permissions: {
+      edit: true,
+      change_status: true,
+      change_assignee: true,
+      delete: true,
+      create_subtask: true,
+      check_dod: true,
+    },
+    blocked: false,
+    blocked_reason: null,
+    blocked_by: null,
+    blocked_at: null,
+    dod: { closed: 0, total: 0, human_close_only: true, items: [], missing_artifacts: [] },
+    mode: "routine",
     ...over,
   };
 }

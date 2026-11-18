@@ -22,10 +22,10 @@
 | 0026 | Внешние провайдеры входа и правила привязки (спека 029) | `docs/adr/0026-external-login-and-linking.md` (ветка `docs/login-simplify-spec`) | принято |
 | 0027 | Согласие на обработку ПДн (спека 021) | `docs/adr/0027-pdn-consent.md` (ветка `feat/021-pdn-consent`) | принято 2026-11-15 |
 | 0028 | MCP: 120 `tools/call` в минуту на токен и read-only (`gtrk_` + OAuth `mcp:read`) | `docs/adr/0028-mcp-rate-limit-readonly.md` | предложено |
-| 0029 | DoD и блокер (спека 033, CD-01+CD-03) | `feat/cd-01-03-dod-blocker` | занят другой сессией |
+| 0029 | DoD на задаче и блокер отдельно от «Горит» (спека 033, CD-01+CD-03) | `docs/adr/0029-dod-and-blocker.md` | предложено |
 | 0030 | MCP inbox / stuck (спека 034, CD-02+CD-04) | `feat/cd-02-04-mcp-inbox` | занят другой сессией |
 | 0031 | Атрибуция агента по `client_name` без `is_agent` (спека 022 CD-05, 035 CD-06) | `docs/adr/0031-agent-attribution-client-name.md` | предложено |
-| 0032 | свободно (соседняя сессия CD-07) | — | свободно |
+| 0032 | Evidence, mode и classify_task (спека 036, CD-07+CD-10+CD-11) | `docs/adr/0032-evidence-and-classify.md` | предложено |
 | 0033 | Слои знаний `knowledge_record` (спека 037, CD-08+CD-09) | `docs/adr/0033-knowledge-records.md` | предложено |
 | 0034+ | ADR — с 0034 | — | свободно |
 
@@ -54,11 +54,12 @@
 | 023 | удаление пользователей, черновик | занят |
 | 031 | метрики пилота | `specs/031-pilot-metrics/` |
 | 032 | MCP: лимит 120/мин и read-only scope | `specs/032-mcp-rate-limit-readonly/` |
+| 033 | DoD и блокер (CD-01+CD-03) | `specs/033-dod-and-blocker/` |
 | 034 | MCP inbox / stuck (CD-02+CD-04) | `feat/cd-02-04-mcp-inbox` |
 | 035 | черновик сущностей `propose_entities` (CD-06) | `specs/035-entity-draft/` (ветка `feat/cd-05-06-agent-entities`) |
-| 036 | DoD evidence / routine (CD-07+10+11) | `feat/cd-07-10-11-readiness` | занят другой сессией |
+| 036 | evidence, `task.mode`, `classify_task`, `dod_required` (CD-07+CD-10+CD-11) | `specs/036-evidence-and-classify/` |
 | 037 | слои знаний `knowledge_record` (CD-08+CD-09) | `specs/037-knowledge-records/` |
-| 038 | классификатор `routine` vs `research`, MCP `classify_task` (CD-10); ADR нет, колонка `task.mode` — спека 036 | `specs/038-classify-task/` (ветка `docs/038-classify-task`) |
+| 038 | классификатор `routine` vs `research`, MCP `classify_task` (CD-10); ADR нет, колонка `task.mode` — спека 036 | `specs/038-classify-task/` |
 
 ## Миграции alembic
 | № | Тема | Где |
@@ -72,6 +73,6 @@
 | 0016 | Внешний вход: `external_identity`, `oauth_login_state`, … (спека 029, этап б) | `feat/029-providers`, PR #55 |
 | 0017 | Согласие на ПДн: колонки `pdn_consent_*` в `app_user`, `registration_request`, `oauth_login_state` (спека 021) | `feat/021-pdn-consent`; `down_revision` = 0016 (слита в main) |
 | 0018 | `api_token.read_only` (спека 032) | `feat/mcp-rate-limit-readonly`; `down_revision` = 0017 |
-| 0019 | DoD / `task.mode` (спека 036) | `feat/cd-07-10-11-readiness` | занят другой сессией |
+| 0019 | DoD, блокер, evidence, `task.mode` (спеки 033+036) | `feat/cd-07-10-11-readiness`; `down_revision` = 0021 |
 | 0020 | MCP inbox `external_message` (спека 034) | `feat/cd-02-04-mcp-inbox` | занят другой сессией |
-| 0021 | `knowledge_record` (спека 037, CD-08+CD-09) | `feat/cd-08-09-knowledge`; `down_revision` = 0018 |
+| 0021 | `knowledge_record` (спека 037, CD-08+CD-09) | main; `down_revision` = 0018 |

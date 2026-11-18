@@ -430,6 +430,8 @@ BODY_ROUTES_400 = {
     ("POST", "/api/v1/oauth/authorize/decision"),  # 028
     ("POST", "/api/v1/me/login-methods/password"),  # 029: пароль учётной записи без пароля
     ("POST", "/api/v1/me/pdn-consent"),  # 021
+    ("POST", "/api/v1/tasks/{user_id}/dod-criteria"),  # 033
+    ("PATCH", "/api/v1/tasks/{user_id}/dod-criteria/{user_id}"),  # 033
 }
 BAD_JSON_DESCRIPTION = "Некорректный JSON в теле запроса (code: bad_request)"
 

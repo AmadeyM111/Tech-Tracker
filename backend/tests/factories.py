@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import column as sa_column
 from sqlalchemy import table as sa_table
+from sqlalchemy import text
 
 from app.core.clock import utcnow
 
@@ -50,6 +51,17 @@ class UserRow:
     role: str | None
     is_blocked: bool
     must_change_password: bool
+
+
+async def _live_columns(db: AsyncSession, table: str) -> set[str]:
+    rows = await db.execute(
+        text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = 'public' AND table_name = :t"
+        ),
+        {"t": table},
+    )
+    return {row[0] for row in rows}
 
 
 def get_table(name: str) -> Table:
@@ -344,13 +356,20 @@ async def make_task(
         "assignee_id": assignee_id,
         "position": pos,
         "created_by": created_by,
+        "blocked": False,
+        "human_close_only": True,
+        "mode": "routine",
         "created_at": now,
         "updated_at": now,
         "deleted_at": None,
         "deleted_batch_id": None,
     }
     values.update(extra)
-    await db.execute(get_table("task").insert().values(**values))
+    live = await _live_columns(db, "task")
+    values = {key: value for key, value in values.items() if key in live}
+    real = get_table("task")
+    light = sa_table("task", *[sa_column(key, real.c[key].type) for key in values])
+    await db.execute(light.insert().values(**values))
     return TaskRow(
         id=task_id,
         project_id=project_id,

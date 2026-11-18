@@ -784,7 +784,7 @@ async def test_fr41_every_r11_event_is_recorded_with_catalog_attributes(
         assert row["changed_fields"] == fields
         assert row["changes"] == changes
         recorded += 1
-    assert recorded == 15
+    assert recorded == 18
 
 
 async def test_t30_valid_event_with_subset_of_fields_and_no_changes(

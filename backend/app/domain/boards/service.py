@@ -51,6 +51,8 @@ class BoardCard:
     hot: bool
     last_client_name: str | None
     assignee_client_name: str | None
+    # Блокер/инцидент (спека 033); не путать с ``hot``
+    blocked: bool
 
 
 @dataclass(frozen=True)
@@ -112,6 +114,7 @@ async def get_board(db: AsyncSession, actor: Actor, project_id: UUID) -> BoardVi
                 Task.due_date,
                 Task.assignee_id,
                 Task.position,
+                Task.blocked,
                 func.coalesce(subs.c.total, 0).label("total"),
                 func.coalesce(subs.c.done, 0).label("done"),
                 func.coalesce(subs.c.in_work, 0).label("in_work"),
@@ -152,6 +155,7 @@ async def get_board(db: AsyncSession, actor: Actor, project_id: UUID) -> BoardVi
                 hot=is_hot(r.priority, r.due_date, r.status, today),
                 last_client_name=attr_of(attrs, r.id).last_client_name,
                 assignee_client_name=attr_of(attrs, r.id).assignee_client_name,
+                blocked=bool(r.blocked),
             )
         )
     return BoardView(

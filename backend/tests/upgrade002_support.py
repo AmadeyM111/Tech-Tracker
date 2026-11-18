@@ -64,7 +64,7 @@ __all__ = [
 ]
 
 PREFIX = "u002."
-HEAD_REVISION = "0021"  # голова цепочки: 0021 knowledge_record (после 0018; 0019/0020 чужие)
+HEAD_REVISION = "0019"  # голова цепочки: 0019 dod/blocker (после 0021 knowledge_record)
 FAILURE_MARK = "gt_test_injected_failure"
 _FAIL_FUNCTION = "gt_test_fail_0006"
 _PAST = datetime(2026, 10, 1, 8, 0, 0, tzinfo=UTC)
@@ -442,9 +442,12 @@ async def data_fingerprint(
         # отпечаток app_user сравнивается без этой колонки; first_name/last_name/self_registered
         # появляются миграцией 0010 - так же исключаются
         if table == "task":
+            # 0019: blocked/mode появляются позже схемы 0005 — как email у app_user
             row_text = (
-                "(to_jsonb(t) || jsonb_build_object('priority', "
-                "CASE t.priority WHEN 'base' THEN 'medium' ELSE t.priority END))::text"
+                "((to_jsonb(t) || jsonb_build_object('priority', "
+                "CASE t.priority WHEN 'base' THEN 'medium' ELSE t.priority END))"
+                " - 'blocked' - 'blocked_reason' - 'blocked_by' - 'blocked_at'"
+                " - 'human_close_only' - 'mode')::text"
             )
         elif table == "app_user":
             # 0017 (spec 021): pdn_consent_version и pdn_consented_at — так же исключаются
