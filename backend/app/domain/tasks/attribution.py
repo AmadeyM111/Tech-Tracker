@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import and_, any_, func, literal, or_, select
+from sqlalchemy import Select, and_, any_, func, literal, or_, select
 
 from app.domain.events.catalog import EntityType, EventAction
 from app.domain.events.models import DomainEvent
@@ -40,7 +40,7 @@ async def load_task_attribution(
     if not ids:
         return {}
 
-    def _latest(extra: Any = True):
+    def _latest(extra: Any = True) -> Select[Any]:
         numbered = (
             select(
                 DomainEvent.entity_id,
