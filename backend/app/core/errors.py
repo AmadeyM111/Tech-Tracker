@@ -108,6 +108,7 @@ class ErrorCode(StrEnum):
     knowledge_unstructured = "knowledge_unstructured"
     # [033]
     dod_open = "dod_open"
+    dod_required = "dod_required"
     task_blocked = "task_blocked"
     task_already_done = "task_already_done"
 

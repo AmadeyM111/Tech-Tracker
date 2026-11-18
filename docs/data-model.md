@@ -248,12 +248,13 @@
 | `blocked_by` | uuid | да | кто поставил блокер; FK → `app_user.id`, `RESTRICT` |
 | `blocked_at` | timestamptz | да | когда поставили блокер |
 | `human_close_only` | boolean | нет | `done` только человек, не MCP (спека 033, CD-01); по умолчанию `true` |
+| `mode` | text | нет | `routine` или `research` (спека 036, CD-10); по умолчанию `routine`; `CHECK` `ck_task_task_mode_valid` |
 
 `CHECK` `ck_task_blocked_fields`: при `blocked` заполнены причина, кто и когда; иначе все три `NULL`.
 
 ### task_dod_criterion
 
-Критерий готовности задачи (спека 033, CD-01, миграция 0019). Подзадачи не подменяют список родителя.
+Критерий готовности задачи (спеки 033 и 036, CD-01/CD-07, миграция 0019). Подзадачи не подменяют список родителя.
 
 | Столбец | Тип | NULL | Описание |
 |---|---|---|---|
@@ -267,6 +268,9 @@
 | `checked_at` | timestamptz | да | когда отметили |
 | `position` | integer | нет | порядок в списке |
 | `created_by` | uuid | нет | кто добавил; FK → `app_user.id`, `RESTRICT` |
+| `kind` | text | нет | `checklist` или `evidence` (спека 036); по умолчанию `checklist` |
+| `evidence_ref` | text | да | URL или id артефакта, 1–500; обязательно для закрытия `evidence` |
+| `evidence_note` | text | да | комментарий к артефакту, до 500 |
 | `created_at` | timestamptz | нет | момент создания |
 | `updated_at` | timestamptz | нет | момент последнего изменения |
 
@@ -638,7 +642,7 @@ Access (1 час) и refresh (90 суток, ротация) токены гра
 | `0014` | OAuth для облачных MCP-клиентов (spec 028): `oauth_client`, `oauth_grant`, `oauth_code`, `oauth_token`, `oauth_attempt`; откат удаляет пять таблиц |
 | `0018` | MCP read-only: `api_token.read_only boolean NOT NULL` (спека 032); откат удаляет столбец |
 | `0021` | `knowledge_record` (спека 037, CD-08/09): слои space/project, типы decision/reason/agreement; `down_revision` 0018; откат удаляет таблицу |
-| `0019` | DoD и блокер: колонки `task.blocked*` / `human_close_only` / `mode`, таблица `task_dod_criterion` (спеки 033+036); `down_revision` 0021 |
+| `0019` | DoD, блокер, evidence и `task.mode`: колонки `task.blocked*` / `human_close_only` / `mode`, таблица `task_dod_criterion` с `kind`/`evidence_*` (спеки 033+036); `down_revision` 0021 |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия
 моделей миграциям — `alembic -c backend/alembic.ini check` (входит в `scripts/check.sh` и CI).

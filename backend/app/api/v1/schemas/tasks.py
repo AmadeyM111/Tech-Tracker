@@ -16,7 +16,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from app.api.v1.schemas.common import ProjectRef, UserRef
 from app.core.pagination import PageParams
-from app.domain.tasks.models import TaskPriority, TaskStatus
+from app.domain.tasks.models import DodKind, TaskMode, TaskPriority, TaskStatus
 from app.domain.tasks.service import DESCRIPTION_MAX, TITLE_MAX
 
 _NO_NUL = r"^[^\x00]*$"
@@ -47,6 +47,14 @@ class TaskListQuery(PageParams):
     blocked: bool | None = None
 
 
+class DodCriterionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    body: str = Field(min_length=1, max_length=500, pattern=_NO_NUL)
+    required: bool = True
+    kind: DodKind = DodKind.CHECKLIST
+
+
 class TaskCreate(BaseModel):
     """Создание задачи и подзадачи; в схеме обязательно только ``title``.
 
@@ -70,6 +78,8 @@ class TaskCreate(BaseModel):
     assignee_id: UUID | None = None
     due_date: DueDate | None = None
     priority: TaskPriority = TaskPriority.MEDIUM
+    mode: TaskMode = TaskMode.ROUTINE
+    dod_criteria: list[DodCriterionCreate] = Field(default_factory=list)
 
 
 class TaskUpdate(BaseModel):
@@ -100,17 +110,12 @@ class TaskUpdate(BaseModel):
     human_close_only: bool = Field(default_factory=lambda: True)
 
 
-class DodCriterionCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    body: str = Field(min_length=1, max_length=500, pattern=_NO_NUL)
-    required: bool = True
-
-
 class DodCriterionPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     checked: bool
+    evidence_ref: str | None = None
+    evidence_note: str | None = None
 
 
 class DodCriterionOut(BaseModel):
@@ -123,6 +128,9 @@ class DodCriterionOut(BaseModel):
     checked_by: UserRef | None
     checked_at: datetime | None
     position: int
+    kind: DodKind
+    evidence_ref: str | None
+    evidence_note: str | None
 
 
 class DodOut(BaseModel):
@@ -132,6 +140,7 @@ class DodOut(BaseModel):
     total: int
     human_close_only: bool
     items: list[DodCriterionOut]
+    missing_artifacts: list[str]
 
 
 class TaskPermissions(BaseModel):
@@ -182,6 +191,7 @@ class TaskDetail(BaseModel):
     blocked_by: UserRef | None
     blocked_at: datetime | None
     dod: DodOut
+    mode: TaskMode
 
 
 class TaskListItem(BaseModel):

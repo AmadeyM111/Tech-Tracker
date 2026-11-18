@@ -98,6 +98,8 @@ codex mcp add gtrack --env GTRACK_TOKEN=$GTRACK_TOKEN --env GTRACK_URL=https://l
 | `list_knowledge` | записи знаний: слой пространства и свои проекты |
 | `get_knowledge` | одна запись знания |
 | `upsert_knowledge` | решение / причина / договорённость; без `commit=true` в БД не пишет |
+| `check_dod_criterion` | отметить критерий готовности; для `evidence` передайте `evidence_ref`; задачу не закрывает |
+| `classify_task` | `routine`/`research` и каких полей не хватает; без `commit` ничего не пишет; с `commit=true` пишет только `mode` |
 
 Удаление задач и проектов, участники, роли, учётные записи и CRM через MCP в R1 не открыты.
 
