@@ -49,6 +49,7 @@ export const ru = {
   "error.parent_task_deleted": "Родительская задача удалена, действие недоступно",
   "error.due_date_in_past": "Срок не может быть раньше сегодняшнего дня",
   "error.entity_parse_error": "Не удалось разобрать сущности из текста",
+  "error.knowledge_unstructured": "Нужны тип и поля решения, причины или договорённости",
   "error.unknown": "Не удалось выполнить действие. Попробуйте ещё раз",
   "auth.login_title": "Войти в GTrack",
   "auth.login_label": "Email или логин",

@@ -95,6 +95,9 @@ codex mcp add gtrack --env GTRACK_TOKEN=$GTRACK_TOKEN --env GTRACK_URL=https://l
 | `list_comments` | комментарии задачи |
 | `add_comment` | добавить комментарий к задаче |
 | `propose_entities` | черновик задач, инцидентов и заметок из текста; в БД пишет только с `commit=true` |
+| `list_knowledge` | записи знаний: слой пространства и свои проекты |
+| `get_knowledge` | одна запись знания |
+| `upsert_knowledge` | решение / причина / договорённость; без `commit=true` в БД не пишет |
 
 Удаление задач и проектов, участники, роли, учётные записи и CRM через MCP в R1 не открыты.
 

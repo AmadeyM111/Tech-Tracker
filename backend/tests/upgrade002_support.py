@@ -64,7 +64,7 @@ __all__ = [
 ]
 
 PREFIX = "u002."
-HEAD_REVISION = "0018"  # голова цепочки: 0018 mcp read_only (после 0017 pdn_consent)
+HEAD_REVISION = "0021"  # голова цепочки: 0021 knowledge_record (после 0018; 0019/0020 чужие)
 FAILURE_MARK = "gt_test_injected_failure"
 _FAIL_FUNCTION = "gt_test_fail_0006"
 _PAST = datetime(2026, 10, 1, 8, 0, 0, tzinfo=UTC)
