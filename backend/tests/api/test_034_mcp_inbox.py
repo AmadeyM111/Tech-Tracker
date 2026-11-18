@@ -138,7 +138,7 @@ async def test_034_ac5_stuck_after_48h_overdue_is_separate(api_env: ApiEnv) -> N
     assert str(done) not in by_id
     assert by_id[str(stale_overdue)]["overdue"] is True
     assert by_id[str(stale_ok)]["overdue"] is False
-    assert by_id[str(stale_ok)]["blocked"] is None
+    assert by_id[str(stale_ok)]["blocked"] is False
     assert by_id[str(stale_ok)]["open_dod"] is None
 
 
