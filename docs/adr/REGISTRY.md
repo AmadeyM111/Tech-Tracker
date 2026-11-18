@@ -58,6 +58,7 @@
 | 035 | черновик сущностей `propose_entities` (CD-06) | `specs/035-entity-draft/` (ветка `feat/cd-05-06-agent-entities`) |
 | 036 | DoD evidence / routine (CD-07+10+11) | `feat/cd-07-10-11-readiness` | занят другой сессией |
 | 037 | слои знаний `knowledge_record` (CD-08+CD-09) | `specs/037-knowledge-records/` |
+| 038 | классификатор `routine` vs `research`, MCP `classify_task` (CD-10); ADR нет, колонка `task.mode` — спека 036 | `specs/038-classify-task/` (ветка `docs/038-classify-task`) |
 
 ## Миграции alembic
 | № | Тема | Где |
