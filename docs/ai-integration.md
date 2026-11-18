@@ -94,6 +94,7 @@ codex mcp add gtrack --env GTRACK_TOKEN=$GTRACK_TOKEN --env GTRACK_URL=https://l
 | `create_project` | создать проект: владельцем становится вызывающий (лимит 30 на пользователя) |
 | `list_comments` | комментарии задачи |
 | `add_comment` | добавить комментарий к задаче |
+| `propose_entities` | черновик задач, инцидентов и заметок из текста; в БД пишет только с `commit=true` |
 
 Удаление задач и проектов, участники, роли, учётные записи и CRM через MCP в R1 не открыты.
 
