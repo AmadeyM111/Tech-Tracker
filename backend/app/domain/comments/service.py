@@ -31,6 +31,7 @@ from app.domain.comments.models import Comment
 from app.domain.comments.sanitize import strip_html
 from app.domain.events.catalog import EventAction
 from app.domain.events.writer import record_event
+from app.domain.inbox import service as inbox
 from app.domain.notifications import producer as notifications
 from app.domain.projects.models import Project
 from app.domain.projects.queries import load_project_facts
@@ -61,6 +62,8 @@ class CommentView:
     created_at: datetime
     edited_at: datetime | None
     permissions: CommentPermissions
+    source: str | None = None
+    source_url: str | None = None
 
 
 def _invalid(message: str) -> Unprocessable:
@@ -102,10 +105,12 @@ async def _views(
 ) -> list[CommentView]:
     authors = [c.created_by for c in comments if c.created_by is not None]
     refs = await user_refs(db, actor.workspace_id, authors)
+    sources = await inbox.sources_for_comments(db, actor.workspace_id, [c.id for c in comments])
     views: list[CommentView] = []
     for c in comments:
         assert c.created_by is not None  # комментарии пишут только пользователи
         is_deleted = c.deleted_at is not None
+        src, src_url = sources.get(c.id, (None, None))
         views.append(
             CommentView(
                 id=c.id,
@@ -115,6 +120,8 @@ async def _views(
                 is_deleted=is_deleted,
                 created_at=c.created_at,
                 edited_at=None if is_deleted else c.edited_at,
+                source=None if is_deleted else src,
+                source_url=None if is_deleted else src_url,
                 permissions=(
                     CommentPermissions(edit=False, delete=False)
                     if is_deleted

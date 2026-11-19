@@ -50,3 +50,5 @@ class Comment(BaseModel):
     created_at: datetime
     edited_at: datetime | None
     permissions: CommentPermissions
+    source: str | None
+    source_url: str | None

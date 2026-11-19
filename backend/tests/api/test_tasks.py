@@ -1168,6 +1168,8 @@ async def test_t77_response_schemas_match_plan_11_4_and_nulls_only_where_allowed
         "blocked_reason",
         "blocked_by",
         "blocked_at",
+        "source",
+        "source_url",
     }
     for name, prop in detail["properties"].items():
         assert _is_nullable(spec, prop) == (name in nullable_detail), name

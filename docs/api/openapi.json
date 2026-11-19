@@ -814,6 +814,28 @@
           "permissions": {
             "$ref": "#/components/schemas/CommentPermissions"
           },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
           "task_id": {
             "format": "uuid",
             "title": "Task Id",
@@ -828,7 +850,9 @@
           "is_deleted",
           "created_at",
           "edited_at",
-          "permissions"
+          "permissions",
+          "source",
+          "source_url"
         ],
         "title": "Comment",
         "type": "object"
@@ -3195,6 +3219,28 @@
           "project": {
             "$ref": "#/components/schemas/ProjectRef"
           },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
           "status": {
             "$ref": "#/components/schemas/TaskStatus"
           },
@@ -3239,7 +3285,9 @@
           "blocked_by",
           "blocked_at",
           "dod",
-          "mode"
+          "mode",
+          "source",
+          "source_url"
         ],
         "title": "TaskDetail",
         "type": "object"

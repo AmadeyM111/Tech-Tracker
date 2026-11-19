@@ -312,7 +312,7 @@ async def test_d62_get_task_query_count_independent_of_subtask_count(
     one = [s for s in seen_one if "SAVEPOINT" not in s.upper()]
     many = [s for s in seen_many if "SAVEPOINT" not in s.upper()]
     assert len(one) == len(many), (len(one), len(many))
-    assert len(many) <= 8
+    assert len(many) <= 9
 
 
 # --- исполнитель заблокирован / без роли (AC-43) -----------------------------------------------

@@ -307,6 +307,24 @@
 Индексы: `ix_comment_workspace_id` на `(workspace_id)`; `ix_comment_task_id_created_at` на
 `(task_id, created_at)`.
 
+### external_message
+
+Идемпотентный ключ внешнего сообщения (спека 034, миграция 0020, ADR-0030). `task` не меняется.
+
+| Столбец | Тип | NULL | Описание |
+|---|---|---|---|
+| `id` | uuid | нет | первичный ключ `pk_external_message` |
+| `workspace_id` | uuid | нет | FK → `workspace.id` |
+| `source` | text | нет | старт — `telegram`; `CHECK` `ck_external_message_source_valid` |
+| `external_id` | text | нет | id сообщения у источника; 1..256; UNIQUE вместе с workspace+source (`uq_external_message_source_external_id`) |
+| `url` | text | да | внешняя ссылка, 1..2048 |
+| `task_id` | uuid | нет | FK → `task.id`, `CASCADE` |
+| `comment_id` | uuid | да | FK → `comment.id`, `CASCADE`; `NULL` — ingest создал задачу |
+| `created_at` | timestamptz | нет | момент создания |
+| `updated_at` | timestamptz | нет | момент последнего изменения |
+
+Индексы: `ix_external_message_workspace_id`, `ix_external_message_task_id`, `ix_external_message_comment_id`.
+
 ### Мягкое удаление и события в MVP
 
 Решения plan §11 (D-55, D-56) и ADR-0012 п.3.
@@ -643,6 +661,7 @@ Access (1 час) и refresh (90 суток, ротация) токены гра
 | `0018` | MCP read-only: `api_token.read_only boolean NOT NULL` (спека 032); откат удаляет столбец |
 | `0021` | `knowledge_record` (спека 037, CD-08/09): слои space/project, типы decision/reason/agreement; `down_revision` 0018; откат удаляет таблицу |
 | `0019` | DoD, блокер, evidence и `task.mode`: колонки `task.blocked*` / `human_close_only` / `mode`, таблица `task_dod_criterion` с `kind`/`evidence_*` (спеки 033+036); `down_revision` 0021 |
+| `0020` | inbox MCP: таблица `external_message` (спека 034); `down_revision` `0019`; откат удаляет таблицу |
 
 Применённые миграции не правятся; любое изменение модели — новая миграция. Проверка соответствия
 моделей миграциям — `alembic -c backend/alembic.ini check` (входит в `scripts/check.sh` и CI).
