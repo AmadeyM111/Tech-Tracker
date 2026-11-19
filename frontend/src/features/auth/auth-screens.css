@@ -35,6 +35,10 @@
   font-size: 1.125rem;
 }
 
+.login-card .ui-input-row input:not([type="checkbox"]):not([type="radio"]) {
+  min-height: 0;
+}
+
 /* P-2: show/hide sits inside the field; 44 px target is in shared ui.css. */
 
 /* The 44 px size of the reveal button itself is in the shared ui.css (P-2). */

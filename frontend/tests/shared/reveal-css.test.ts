@@ -65,4 +65,8 @@ describe("reveal css (NFR-3)", () => {
     expect(rules(".ui-input-row input").join(";")).toMatch(/padding-right\s*:\s*44px/);
     expect(rules(".ui-input-row .ui-reveal").join(";")).toMatch(/position\s*:\s*absolute/);
   });
+
+  it("row keeps the field outline so the eye does not cut it", () => {
+    expect(rules(".ui-input-row").join(";")).toMatch(/border\s*:\s*1px solid var\(--text-muted\)/);
+  });
 });

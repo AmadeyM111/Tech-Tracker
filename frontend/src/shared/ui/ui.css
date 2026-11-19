@@ -150,19 +150,27 @@ select:disabled {
   margin-bottom: 12px;
 }
 
-/* 006 (plan 4.4): password field; reveal button sits inside the input on the right. */
+/* 006 (plan 4.4): password field; reveal sits inside. Border is on the row so the
+   outline stays whole at the eye (the button must not paint over the input edge). */
 .ui-input-row {
   display: flex;
   position: relative;
   align-items: stretch;
+  min-height: 44px;
+  background: var(--surface-2);
+  border: 1px solid var(--text-muted);
+  border-radius: 8px;
 }
 
 .ui-input-row input {
   flex: 1;
   min-width: 0;
   width: 100%;
-  min-height: 44px;
+  min-height: 0;
   padding-right: 44px;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-2);
+  border-radius: 8px;
 }
 
 /* Spec 005 v0.3 (P-2): show/hide button is a 44 by 44 px touch target (UI kit, rule 6). */
@@ -183,8 +191,11 @@ select:disabled {
 
 .ui-input-row .ui-reveal {
   position: absolute;
-  right: 0;
   top: 0;
+  right: 0;
+  bottom: 0;
+  height: auto;
+  min-height: 0;
 }
 
 .ui-reveal .ui-icon {
