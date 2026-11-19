@@ -59,4 +59,10 @@ describe("reveal css (NFR-3)", () => {
     expect(rules(".ui-input-row").join(";")).toMatch(/display\s*:\s*flex/);
     expect(rules(".ui-input-row input").join(";")).toMatch(/min-width\s*:\s*0/);
   });
+
+  it("reveal sits inside the input (padding-right and absolute button)", () => {
+    expect(rules(".ui-input-row").join(";")).toMatch(/position\s*:\s*relative/);
+    expect(rules(".ui-input-row input").join(";")).toMatch(/padding-right\s*:\s*44px/);
+    expect(rules(".ui-input-row .ui-reveal").join(";")).toMatch(/position\s*:\s*absolute/);
+  });
 });

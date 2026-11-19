@@ -35,10 +35,7 @@
   font-size: 1.125rem;
 }
 
-/* P-2: show/hide button keeps its place next to the field, 44 px touch target. */
-.login-card .ui-input-row {
-  align-items: stretch;
-}
+/* P-2: show/hide sits inside the field; 44 px target is in shared ui.css. */
 
 /* The 44 px size of the reveal button itself is in the shared ui.css (P-2). */
 .login-card .ui-reveal .ui-icon {
